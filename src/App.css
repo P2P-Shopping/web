@@ -182,3 +182,96 @@
     border-right-color: var(--border);
   }
 }
+.list-detail-container {
+  padding: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+  font-family: sans-serif;
+}
+
+/* Banner stilizat */
+.location-warning-banner {
+  background: #FFF5F5;
+  border: 1px solid #FEB2B2;
+  color: #C53030;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-banner-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: bold;
+  color: #C53030;
+}
+
+/* Formular adaugare */
+.add-item-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.add-input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  font-size: 16px;
+}
+
+.add-button {
+  padding: 10px 20px;
+  background: #111c2f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Lista de produse */
+.shopping-list {
+  list-style: none;
+  padding: 0;
+}
+
+.shopping-item {
+  padding: 15px;
+  border-bottom: 1px solid #EDF2F7;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.2s;
+}
+
+.item-completed {
+  background: #F7FAFC;
+}
+
+.item-checkbox {
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.item-text {
+  font-size: 18px;
+  color: #111c2f;
+}
+
+.item-completed .item-text {
+  text-decoration: line-through;
+  color: #A0AEC0;
+}
+
+.empty-msg {
+  text-align: center;
+  color: #888;
+  margin-top: 20px;
+}
