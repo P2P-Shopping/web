@@ -1,40 +1,48 @@
 import { useState, useEffect } from 'react'
+import { StompSubscription } from '@stomp/stompjs'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
-import stompClient from './services/socketService' // Important: Imports your new service
+import stompClient from './services/socketService'
 
 function App() {
   const [count, setCount] = useState(0)
-  const [isConnected, setIsConnected] = useState<boolean>(false) // Tracks server connection
+  const [isConnected, setIsConnected] = useState<boolean>(false)
 
   useEffect(() => {
-    // 1. Define what happens when the connection opens
+    let subscription: StompSubscription | null = null;
+
     stompClient.onConnect = () => {
       setIsConnected(true)
 
-      // 2. Subscribe to the pong channel to listen for the server
-      stompClient.subscribe('/topic/pong', (message) => {
+      // Clean up any lingering subscriptions before creating a new one
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+
+      subscription = stompClient.subscribe('/topic/pong', (message) => {
         alert(`Server Response: ${message.body}`)
       })
     }
 
-    // 3. Define what happens if the connection drops
     stompClient.onWebSocketClose = () => {
       setIsConnected(false)
     }
 
-    // 4. Command the client to connect
     stompClient.activate()
 
-    // 5. Cleanup function for when the app is closed
     return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+      // Detach handlers to prevent state updates on unmounted components
+      stompClient.onConnect = () => {}
+      stompClient.onWebSocketClose = () => {}
       stompClient.deactivate()
     }
-  }, [])
+  }, [stompClient]) // Added stompClient to the dependency array
 
-  // 6. The function that fires when you click the Ping button
   const handlePingPress = () => {
     if (isConnected) {
       stompClient.publish({
@@ -61,7 +69,6 @@ function App() {
           </p>
         </div>
 
-        {/* The new Ping button added next to the Vite counter */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
           <button
             className="counter"
@@ -82,7 +89,6 @@ function App() {
 
       <div className="ticks"></div>
 
-      {/* The rest of the default Vite template is left untouched */}
       <section id="next-steps">
         <div id="docs">
           <svg className="icon" role="presentation" aria-hidden="true">
@@ -92,13 +98,13 @@ function App() {
           <p>Your questions, answered</p>
           <ul>
             <li>
-              <a href="https://vite.dev/" target="_blank">
+              <a href="https://vite.dev/" target="_blank" rel="noreferrer">
                 <img className="logo" src={viteLogo} alt="" />
                 Explore Vite
               </a>
             </li>
             <li>
-              <a href="https://react.dev/" target="_blank">
+              <a href="https://react.dev/" target="_blank" rel="noreferrer">
                 <img className="button-icon" src={reactLogo} alt="" />
                 Learn more
               </a>
@@ -113,7 +119,7 @@ function App() {
           <p>Join the Vite community</p>
           <ul>
             <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
+              <a href="https://github.com/vitejs/vite" target="_blank" rel="noreferrer">
                 <svg className="button-icon" role="presentation" aria-hidden="true">
                   <use href="/icons.svg#github-icon"></use>
                 </svg>
@@ -121,7 +127,7 @@ function App() {
               </a>
             </li>
             <li>
-              <a href="https://chat.vite.dev/" target="_blank">
+              <a href="https://chat.vite.dev/" target="_blank" rel="noreferrer">
                 <svg className="button-icon" role="presentation" aria-hidden="true">
                   <use href="/icons.svg#discord-icon"></use>
                 </svg>

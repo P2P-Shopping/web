@@ -1,20 +1,17 @@
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
-// If you test this on a physical mobile device later, change 'localhost' to your computer's actual IPv4 address.
-const SOCKET_URL = 'http://localhost:8082/ws';
+// Pulls the URL from an environment variable, falling back to localhost if not set
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8082/ws';
 
 const stompClient = new Client({
-  // We use SockJS here because you configured `.withSockJS()` in your Spring Boot backend.
   webSocketFactory: () => new SockJS(SOCKET_URL),
-
-  // Fulfills the requirement: "try to re-establish the link every 3 seconds"
   reconnectDelay: 3000,
 
-  // Logs STOMP traffic to your browser console for easy debugging
-  debug: (str: string) => {
-    console.log(str);
-  },
+  // Only logs STOMP frames if Vite is running in development mode
+  debug: import.meta.env.DEV
+    ? (str: string) => console.debug(str)
+    : () => {},
 
   onStompError: (frame) => {
     console.error('Broker reported error: ' + frame.headers['message']);
