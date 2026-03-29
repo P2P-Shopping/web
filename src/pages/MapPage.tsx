@@ -1,14 +1,7 @@
-import { useEffect } from "react";
 import { useStore } from "../context/useStore";
-import { startMockEmitter, stopMockEmitter } from "../services/mockEmitter";
 
 const MapPage = () => {
   const userLocation = useStore((state) => state.userLocation);
-
-  useEffect(() => {
-    startMockEmitter();
-    return () => stopMockEmitter();
-  }, []);
 
   return (
     <section className="card">

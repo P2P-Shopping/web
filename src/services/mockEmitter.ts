@@ -5,8 +5,9 @@ let intervalId: number | null = null;
 export const startMockEmitter = () => {
   if (intervalId) return;
 
-  let currentLat = 47.151726;
-  let currentLng = 27.587914;
+  const { userLocation } = useStore.getState();
+  let currentLat = userLocation?.lat ?? 47.151726;
+  let currentLng = userLocation?.lng ?? 27.587914;
 
   intervalId = window.setInterval(() => {
     currentLat += (Math.random() - 0.5) * 0.00005;

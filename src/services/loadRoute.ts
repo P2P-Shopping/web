@@ -1,8 +1,7 @@
 import routeData from "../data/route-mock.json";
-import { useStore } from "../context/useStore";
+import { useStore, type RoutePoint } from "../context/useStore";
 
-type RoutePoint = { name: string; x: number; y: number; itemId: string; lat: number; lng: number };
-const typedRouteData = routeData as RoutePoint[];
+const typedRouteData: RoutePoint[] = routeData;
 
 export function loadMockRoute() {
   const { setRoute } = useStore.getState();

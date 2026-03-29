@@ -1,10 +1,16 @@
+import { useEffect } from "react";
+import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import { Routes, Route, Link } from "react-router-dom";
 import MapPage from "./pages/MapPage";
 import RoutePage from "./pages/RoutePage";
 import "./App.css";
 
-// App.tsx
 function App() {
+  useEffect(() => {
+    startMockEmitter();
+    return () => stopMockEmitter();
+  }, []);
+
   return (
     <div className="app-container">
       <header className="main-header">
