@@ -6,19 +6,49 @@ interface Item {
   checked: boolean;
 }
 
+const styles = {
+  inputContainer: {
+    display: 'flex',
+    gap: '10px',
+    marginBottom: '20px'
+  },
+  input: {
+    flex: 1,
+    padding: '10px',
+    fontSize: '16px',
+    border: '1px solid #ccc',
+    borderRadius: '4px'
+  },
+  addBtn: {
+    padding: '10px 20px',
+    fontSize: '16px',
+    background: '#4CAF50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer'
+  },
+  listItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '12px',
+    borderBottom: '1px solid #e0e0e0'
+  }
+};
+
 const ListDetail = () => {
   const { id } = useParams();
 
+  if (!id) {
+    return <div>Invalid list ID</div>;
+  }
+
+  const [newItemName, setNewItemName] = useState('');
   const [items, setItems] = useState<Item[]>(() => {
     const saved = localStorage.getItem(`list-${id}`);
     return saved ? JSON.parse(saved) : [];
   });
-  const [newItemName, setNewItemName] = useState('');
-
-  // Permission Status State Listener
-  const [permissionStatus, setPermissionStatus] = useState<string>('prompt');
-  const [showBanner, setShowBanner] = useState(true);
-
   useEffect(() => {
     //ia permisiunile dupa clean up
     let permResult: PermissionStatus;
@@ -53,6 +83,9 @@ const ListDetail = () => {
     useEffect(() => {
     localStorage.setItem(`list-${id}`, JSON.stringify(items));
   }, [items, id]);
+
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus['state']>('prompt');
+  const [showBanner, setShowBanner] = useState(true);
 
   const addItem = () => {
     if (newItemName.trim() === '') return;
@@ -152,12 +185,5 @@ const ListDetail = () => {
   );
 };
 
-const styles = {
-  backBtn: { background: 'none', border: 'none', color: '#3182CE', cursor: 'pointer', padding: '10px 0' },
-  inputContainer: { display: 'flex', gap: '10px', marginBottom: '25px' },
-  input: { flex: 1, padding: '12px', borderRadius: '6px', border: '1px solid #E2E8F0' },
-  addBtn: { padding: '10px 20px', background: '#2D3748', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-  listItem: { padding: '15px', borderBottom: '1px solid #EDF2F7', display: 'flex', alignItems: 'center', gap: '12px' }
-};      
 
 export default ListDetail;
