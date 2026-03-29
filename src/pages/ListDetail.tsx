@@ -50,7 +50,7 @@ const ListDetail = () => {
   }, []);
 
   // salvarea de itemuri dupa refresh
-  useEffect(() => {
+    useEffect(() => {
     localStorage.setItem(`list-${id}`, JSON.stringify(items));
   }, [items, id]);
 
