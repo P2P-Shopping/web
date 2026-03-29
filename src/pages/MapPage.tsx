@@ -1,0 +1,32 @@
+import { useEffect } from "react";
+import { useStore } from "../context/useStore";
+import { startMockEmitter, stopMockEmitter } from "../services/mockEmitter";
+
+const MapPage = () => {
+  const userLocation = useStore((state) => state.userLocation);
+
+  useEffect(() => {
+    startMockEmitter();
+    return () => stopMockEmitter();
+  }, []);
+
+  return (
+    <section className="card">
+      <h2 className="card-title">Live GPS Tracking</h2>
+      <div className="gps-info">
+        <p className="label">Coordonate simulate în timp real:</p>
+        <div className="coordinates">
+          <span className="coord-box">
+            Lat: <strong>{userLocation.lat.toFixed(5)}</strong>
+          </span>
+          <span className="coord-separator">|</span>
+          <span className="coord-box">
+            Lng: <strong>{userLocation.lng.toFixed(5)}</strong>
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default MapPage;
