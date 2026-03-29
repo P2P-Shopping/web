@@ -10,10 +10,10 @@ function App() {
       <header className="main-header">
         <nav className="nav-menu">
           <Link to="/" className="nav-link">
-            Hartă
+            Map
           </Link>
           <Link to="/route" className="nav-link">
-            Rută
+            Route
           </Link>
         </nav>
         <div className="logo-section">

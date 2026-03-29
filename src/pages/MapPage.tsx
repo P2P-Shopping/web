@@ -14,7 +14,7 @@ const MapPage = () => {
     <section className="card">
       <h2 className="card-title">Live GPS Tracking</h2>
       <div className="gps-info">
-        <p className="label">Coordonate simulate în timp real:</p>
+        <p className="label">Real-time simulated coordinates:</p>
         <div className="coordinates">
           <span className="coord-box">
             Lat: <strong>{userLocation.lat.toFixed(5)}</strong>

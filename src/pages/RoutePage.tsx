@@ -13,7 +13,7 @@ const RoutePage = () => {
     <>
       <div className="section-header">
         <h3>My Route</h3>
-        <span className="count-badge">{route.length} puncte</span>
+        <span className="count-badge">{route.length} points</span>
       </div>
 
       <ul className="route-list">
