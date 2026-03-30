@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-export default function AuthPage() {
+interface AuthPageProps {
+  onAuthSuccess?: (authResult: any) => void;
+}
+
+export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -11,36 +15,47 @@ export default function AuthPage() {
     confirmPassword: ''
   });
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isSubmitting) {
+      return;
+    }
 
     if (!isLogin && formData.password !== formData.confirmPassword) {
       setError("Passwords do not match. Please check again.");
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const payload = isLogin 
+      const payload = isLogin
         ? { email: formData.email, password: formData.password }
-        : { 
-            firstName: formData.firstName, 
-            lastName: formData.lastName, 
-            email: formData.email, 
-            password: formData.password 
+        : {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            password: formData.password
           };
 
       const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081').replace(/\/+$/, '');
-      
-      await axios.post(`${baseUrl}${endpoint}`, payload, {
-        withCredentials: true 
+
+      const response = await axios.post(`${baseUrl}${endpoint}`, payload, {
+        withCredentials: true
       });
 
-      alert(`${isLogin ? 'Login' : 'Registration'} Successful!`);
+      if (onAuthSuccess) {
+        onAuthSuccess(response.data);
+      }
     } catch (err: any) {
       setError(isLogin ? "Invalid email or password." : "Registration failed.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -127,8 +142,8 @@ export default function AuthPage() {
 
         {error && <p className="error-msg">{error}</p>}
 
-        <button type="submit" className="submit-btn compact">
-          {isLogin ? 'Login' : 'Create Account'}
+        <button type="submit" className="submit-btn compact" disabled={isSubmitting}>
+          {isSubmitting ? 'Submitting...' : (isLogin ? 'Login' : 'Create Account')}
         </button>
       </form>
     </div>
