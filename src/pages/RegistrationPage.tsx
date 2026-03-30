@@ -32,7 +32,7 @@ export default function AuthPage() {
             password: formData.password 
           };
 
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+      const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081').replace(/\/+$/, '');
       
       await axios.post(`${baseUrl}${endpoint}`, payload, {
         withCredentials: true 
