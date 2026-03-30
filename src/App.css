@@ -192,3 +192,138 @@ nav a:hover::after {
   padding: 4px 8px;
   border-radius: 4px;
 }
+
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  width: 100%;
+  background-color: #f8f9fa;
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.auth-card {
+  background: white;
+  padding: 24px 32px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
+}
+
+.auth-header h1 {
+  font-size: 22px;
+  margin: 0 0 4px 0;
+  color: #111;
+  text-align: center;
+}
+
+.auth-header p {
+  color: #888;
+  font-size: 13px;
+  margin: 0;
+  text-align: center;
+}
+
+.tab-container {
+  display: flex;
+  background-color: #f1f3f5;
+  padding: 4px;
+  border-radius: 12px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background-color: transparent;
+  font-weight: 600;
+  color: #111;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+  background-color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.auth-card label {
+  display: block;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #111;
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background-color: #f3f5f7;
+  font-size: 14px;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+
+.auth-card input:focus {
+  outline: none;
+  border-color: #000;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.submit-btn.compact {
+  width: 100%;
+  background: #0a0b10;
+  color: white;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  font-family: inherit;
+}
+
+.submit-btn.compact:hover {
+  background: #212529;
+}
+
+.error-msg {
+  color: #e03131;
+  font-size: 11px;
+  margin-top: -8px;
+  margin-bottom: 10px;
+  text-align: left;
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 20px;
+    border-radius: 15px;
+  }
+
+  .input-group {
+    flex-direction: column;
+    gap: 0;
+  }
+}

@@ -3,6 +3,7 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import { Routes, Route, Link } from "react-router-dom";
 import MapPage from "./pages/MapPage";
 import RoutePage from "./pages/RoutePage";
+import RegistrationPage from "./pages/RegistrationPage";
 import "./App.css";
 
 function App() {
@@ -10,6 +11,9 @@ function App() {
     startMockEmitter();
     return () => stopMockEmitter();
   }, []);
+    const handleAuthSuccess = (authResult: any) => {
+    console.info('Authentication successful');
+  };
 
   return (
     <div className="app-container">
@@ -32,6 +36,12 @@ function App() {
         <Routes>
           <Route path="/" element={<MapPage />} />
           <Route path="/route" element={<RoutePage />} />
+          <Route path="/register" element={
+            <div className="auth-container">
+               <RegistrationPage onAuthSuccess={handleAuthSuccess} />
+             </div>
+    } 
+  />
         </Routes>
       </main>
     </div>
