@@ -2,10 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 
 export default function AuthPage() {
-  // 1. STATE: Tracks if we are looking at 'login' or 'register'
   const [isLogin, setIsLogin] = useState(false);
-  
-  // 2. STATE: Form Data
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -19,14 +16,12 @@ export default function AuthPage() {
     e.preventDefault();
     setError('');
 
-    // Logic for Register only
     if (!isLogin && formData.password !== formData.confirmPassword) {
       setError("Passwords do not match. Please check again.");
       return;
     }
 
     try {
-      // JSON contract
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
       const payload = isLogin 
         ? { email: formData.email, password: formData.password }
@@ -37,12 +32,13 @@ export default function AuthPage() {
             password: formData.password 
           };
 
-      const response = await axios.post(`http://localhost:8080${endpoint}`, payload);
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+      
+      await axios.post(`${baseUrl}${endpoint}`, payload, {
+        withCredentials: true 
+      });
 
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        alert(`${isLogin ? 'Login' : 'Registration'} Successful!`);
-      }
+      alert(`${isLogin ? 'Login' : 'Registration'} Successful!`);
     } catch (err: any) {
       setError(isLogin ? "Invalid email or password." : "Registration failed.");
     }
@@ -52,10 +48,9 @@ export default function AuthPage() {
     <div className="auth-card">
       <div className="auth-header">
         <h1>Welcome to P2P Shopping</h1>
-        <p>{isLogin ? 'Login to your account' : 'Create an account to manage your lists'}</p>
+        <p>{isLogin ? 'Login to your account' : 'Create an account'}</p>
       </div>
 
-      {/* THE TAB SWITCHER */}
       <div className="tab-container">
         <button 
           type="button" 
@@ -74,33 +69,59 @@ export default function AuthPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Only show Name fields if NOT in login mode */}
         {!isLogin && (
-          <>
-            <label>Name</label>
-            <div className="input-group">
-              <input type="text" placeholder="First Name" required 
-                onChange={e => setFormData({...formData, firstName: e.target.value})} />
-              <input type="text" placeholder="Last Name" required 
-                onChange={e => setFormData({...formData, lastName: e.target.value})} />
+          <div className="input-group">
+            <div>
+              <label htmlFor="firstName">First Name</label>
+              <input 
+                id="firstName" 
+                type="text" 
+                placeholder="First Name" 
+                required 
+                onChange={e => setFormData({...formData, firstName: e.target.value})} 
+              />
             </div>
-          </>
+            <div>
+              <label htmlFor="lastName">Last Name</label>
+              <input 
+                id="lastName" 
+                type="text" 
+                placeholder="Last Name" 
+                required 
+                onChange={e => setFormData({...formData, lastName: e.target.value})} 
+              />
+            </div>
+          </div>
         )}
 
-        <label>Email</label>
-        <input type="email" placeholder="your@email.com" required 
-          onChange={e => setFormData({...formData, email: e.target.value})} />
+        <label htmlFor="email">Email</label>
+        <input 
+          id="email" 
+          type="email" 
+          placeholder="your@email.com" 
+          required 
+          onChange={e => setFormData({...formData, email: e.target.value})} 
+        />
 
-        <label>Password</label>
-        <input type="password" placeholder="••••••••" required 
-          onChange={e => setFormData({...formData, password: e.target.value})} />
+        <label htmlFor="password">Password</label>
+        <input 
+          id="password" 
+          type="password" 
+          placeholder="••••••••" 
+          required 
+          onChange={e => setFormData({...formData, password: e.target.value})} 
+        />
 
-        {/* Only show Confirm Password if NOT in login mode */}
         {!isLogin && (
           <>
-            <label>Confirm Password</label>
-            <input type="password" placeholder="••••••••" required 
-              onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
+            <label htmlFor="confirmPassword">Confirm Password</label>
+            <input 
+              id="confirmPassword" 
+              type="password" 
+              placeholder="••••••••" 
+              required 
+              onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
+            />
           </>
         )}
 

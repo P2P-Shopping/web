@@ -12,11 +12,11 @@
 
 .auth-card {
   background: white;
-  padding: 24px 32px; 
+  padding: 24px 32px;
   border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
   width: 100%;
-  max-width: 400px; 
+  max-width: 400px;
   box-sizing: border-box;
 }
 
@@ -34,7 +34,6 @@
   text-align: center;
 }
 
-/*sliding tab */
 .tab-container {
   display: flex;
   background-color: #f1f3f5;
@@ -55,14 +54,15 @@
   color: #111;
   font-size: 14px;
   font-family: inherit;
+  transition: all 0.2s ease;
 }
 
 .tab-btn.active {
-  background-color: white; 
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  background-color: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-label {
+.auth-card label {
   display: block;
   text-align: left;
   font-weight: 600;
@@ -71,13 +71,7 @@ label {
   color: #111;
 }
 
-.input-group {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-input {
+.auth-card input {
   width: 100%;
   padding: 10px 14px;
   margin-bottom: 12px;
@@ -87,11 +81,18 @@ input {
   font-size: 14px;
   box-sizing: border-box;
   font-family: inherit;
+  transition: border-color 0.2s ease;
 }
 
-input:focus {
+.auth-card input:focus {
   outline: none;
   border-color: #000;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .submit-btn.compact {
@@ -108,22 +109,27 @@ input:focus {
   font-family: inherit;
 }
 
+.submit-btn.compact:hover {
+  background: #212529;
+}
+
 .error-msg {
-  color: #e03131;    
-  font-size: 11px;   
-  margin-top: -8px;  
+  color: #e03131;
+  font-size: 11px;
+  margin-top: -8px;
   margin-bottom: 10px;
   text-align: left;
   font-weight: 500;
 }
+
 @media (max-width: 480px) {
   .auth-card {
-    padding: 20px; 
+    padding: 20px;
     border-radius: 15px;
   }
-  
+
   .input-group {
-    flex-direction: column; 
+    flex-direction: column;
     gap: 0;
   }
 }
