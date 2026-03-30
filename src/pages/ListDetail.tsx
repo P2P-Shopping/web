@@ -1,56 +1,53 @@
-import { useState, useEffect } from 'react';
-import { useParams} from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 
 interface Item {
   name: string;
   checked: boolean;
 }
 
-const styles = {
-  inputContainer: {
-    display: 'flex',
-    gap: '10px',
-    marginBottom: '20px'
-  },
-  input: {
-    flex: 1,
-    padding: '10px',
-    fontSize: '16px',
-    border: '1px solid #ccc',
-    borderRadius: '4px'
-  },
-  addBtn: {
-    padding: '10px 20px',
-    fontSize: '16px',
-    background: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer'
-  },
-  listItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '12px',
-    borderBottom: '1px solid #e0e0e0'
+const readItems = (listId?: string): Item[] => {
+  if (!listId) return [];
+  try {
+    const saved = localStorage.getItem(`list-${listId}`);
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("Error parsing localStorage:", error);
+    return [];
   }
+};
+
+const styles = {
+  inputContainer: { display: 'flex', gap: '10px', marginBottom: '20px' },
+  input: { flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ccc', borderRadius: '4px' },
+  addBtn: { padding: '10px 20px', fontSize: '16px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+  listItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderBottom: '1px solid #e0e0e0' }
 };
 
 const ListDetail = () => {
   const { id } = useParams();
-
-  if (!id) {
-    return <div>Invalid list ID</div>;
-  }
-
+  
   const [newItemName, setNewItemName] = useState('');
-  const [items, setItems] = useState<Item[]>(() => {
-    const saved = localStorage.getItem(`list-${id}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [items, setItems] = useState<Item[]>(() => readItems(id));
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus['state']>('prompt');
+  const [showBanner, setShowBanner] = useState(true);
+  
+  const previousIdRef = useRef(id);
+
   useEffect(() => {
-    //ia permisiunile dupa clean up
+    if (id !== previousIdRef.current) {
+      setItems(readItems(id));
+      previousIdRef.current = id;
+    }
+  }, [id]);
+  useEffect(() => {
+    if (!id) return;
+    localStorage.setItem(`list-${id}`, JSON.stringify(items));
+  }, [items, id]);
+
+  useEffect(() => {
     let permResult: PermissionStatus;
     const handler = () => setPermissionStatus(permResult.state);
 
@@ -62,15 +59,10 @@ const ListDetail = () => {
       });
     }
 
-    // permisiunea GPS 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log('GPS:', position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.warn('GPS error:', error.message);
-        }
+        (position) => console.log('GPS:', position.coords.latitude, position.coords.longitude),
+        (error) => console.warn('GPS error:', error.message)
       );
     }
 
@@ -79,13 +71,9 @@ const ListDetail = () => {
     };
   }, []);
 
-  // salvarea de itemuri dupa refresh
-    useEffect(() => {
-    localStorage.setItem(`list-${id}`, JSON.stringify(items));
-  }, [items, id]);
-
-  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus['state']>('prompt');
-  const [showBanner, setShowBanner] = useState(true);
+  if (!id) {
+    return <div style={{ padding: '20px' }}>Invalid list ID</div>;
+  }
 
   const addItem = () => {
     if (newItemName.trim() === '') return;
@@ -93,7 +81,6 @@ const ListDetail = () => {
     setNewItemName('');
   };
 
-  //Trigger Native Bridge ; trimte ping
   const handleCheck = (index: number) => {
     const newItems = [...items];
     const isNowChecked = !newItems[index].checked;
@@ -105,7 +92,7 @@ const ListDetail = () => {
         action: 'COLLECT_P2P_DATA',
         data: {
           item: newItems[index].name,
-          listId: id,   
+          listId: id,
           timestamp: Date.now(),
           context: 'Store_Shopping'
         }
@@ -121,31 +108,19 @@ const ListDetail = () => {
 
   return (
     <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-
-      {/*Dismissible Warning Banner */}
       {permissionStatus === 'denied' && showBanner && (
         <div style={{
-          background: '#FFF5F5',
-          border: '1px solid #FEB2B2',
-          color: '#C53030',
-          padding: '12px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030',
+          padding: '12px', borderRadius: '8px', marginBottom: '20px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}>
-          <span>  Location is off.</span>
+          <span>Location is off.</span>
           <button
             onClick={() => setShowBanner(false)}
-            style={{ border: 'none', background: '#5b5454', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            ✕
-          </button>
+            style={{ border: 'none', background: '#5b5454', cursor: 'pointer', color: 'white', borderRadius: '4px' }}
+          >✕</button>
         </div>
       )}
-
-
 
       <div style={styles.inputContainer}>
         <input
@@ -161,7 +136,7 @@ const ListDetail = () => {
 
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {items.map((item, index) => (
-          <li key={index} style={{
+          <li key={`${id}-${index}`} style={{
             ...styles.listItem,
             background: item.checked ? '#F7FAFC' : '#FFF'
           }}>
@@ -184,6 +159,5 @@ const ListDetail = () => {
     </div>
   );
 };
-
 
 export default ListDetail;
