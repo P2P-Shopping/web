@@ -3,7 +3,7 @@ import './App.css'; // THIS IS THE IMPORT THAT MAKES IT WORK!
 
 function App() {
   const handleAuthSuccess = (authResult: any) => {
-    console.log('Authentication successful:', authResult);
+    console.info('Authentication successful');
     // TODO: Switch view state or navigate to authenticated app flow
     // For now, logging the auth result
   };
