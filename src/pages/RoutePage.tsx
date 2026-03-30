@@ -17,8 +17,8 @@ const RoutePage = () => {
       </div>
 
       <ul className="route-list">
-        {route.map((point, index) => (
-          <li key={index} className="route-item">
+        {route.map((point) => (
+          <li key={point.itemId} className="route-item">
             <div className="point-info">
               <span className="point-icon">📍</span>
               <span className="point-name">{point.name}</span>
