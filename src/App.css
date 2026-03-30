@@ -1,135 +1,85 @@
-
+/* Containerul gri de fundal care centrează totul */
 .auth-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  width: 100%;
-  background-color: #f8f9fa;
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f5f7f9;
+    margin: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
 }
 
+/* Cardul Alb din poza colegei tale */
 .auth-card {
-  background: white;
-  padding: 24px 32px;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
-  width: 100%;
-  max-width: 400px;
-  box-sizing: border-box;
+    background: white;
+    width: 90%;
+    max-width: 400px;
+    padding: 40px;
+    border-radius: 24px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    text-align: center;
+    position: relative;
 }
 
-.auth-header h1 {
-  font-size: 22px;
-  margin: 0 0 4px 0;
-  color: #111;
-  text-align: center;
-}
+.auth-card h2 { margin-bottom: 8px; font-size: 22px; font-weight: 700; }
+.auth-subtitle { color: #888; font-size: 14px; margin-bottom: 30px; line-height: 1.4; }
 
-.auth-header p {
-  color: #888;
-  font-size: 13px;
-  margin: 0;
-  text-align: center;
+/* Tab-urile (Login/Register) */
+.auth-tabs {
+    display: flex;
+    background: #f0f0f0;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 30px;
 }
-
-.tab-container {
-  display: flex;
-  background-color: #f1f3f5;
-  padding: 4px;
-  border-radius: 12px;
-  margin-top: 20px;
-  margin-bottom: 20px;
-}
-
 .tab-btn {
-  flex: 1;
-  padding: 8px 0;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  background-color: transparent;
-  font-weight: 600;
-  color: #111;
-  font-size: 14px;
-  font-family: inherit;
-  transition: all 0.2s ease;
+    flex: 1; border: none; padding: 10px; border-radius: 10px;
+    cursor: pointer; font-weight: 600; background: transparent;
+}
+.tab-btn.active { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+/* Formular și Input-uri (Feedback Călin - Scoped) */
+.form-group { text-align: left; margin-bottom: 20px; }
+.form-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.form-group input {
+    width: 100%; padding: 14px; border: none; background: #f4f6f8;
+    border-radius: 12px; font-size: 15px; box-sizing: border-box;
 }
 
-.tab-btn.active {
-  background-color: white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+/* Butonul Negru de Login */
+.submit-btn {
+    width: 100%; padding: 16px; background: #050509; color: white;
+    border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+    cursor: pointer; margin-top: 10px;
+}
+.auth-row {
+    display: flex;
+    gap: 12px; /* Spatiul dintre First Name si Last Name */
+    width: 100%;
 }
 
-.auth-card label {
-  display: block;
-  text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-  margin-bottom: 6px;
-  color: #111;
+.auth-row .form-group {
+    flex: 1; /* Le face sa ocupe jumatate-jumatate din rand */
 }
 
-.auth-card input {
-  width: 100%;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background-color: #f3f5f7;
-  font-size: 14px;
-  box-sizing: border-box;
-  font-family: inherit;
-  transition: border-color 0.2s ease;
+/* Asigura-te ca label-urile si input-urile din Register 
+   arata FIX ca cele din Login */
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: left;
+    color: #333;
 }
 
-.auth-card input:focus {
-  outline: none;
-  border-color: #000;
-}
-
-.input-group {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.submit-btn.compact {
-  width: 100%;
-  background: #0a0b10;
-  color: white;
-  padding: 14px;
-  border: none;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 8px;
-  font-family: inherit;
-}
-
-.submit-btn.compact:hover {
-  background: #212529;
-}
-
-.error-msg {
-  color: #e03131;
-  font-size: 11px;
-  margin-top: -8px;
-  margin-bottom: 10px;
-  text-align: left;
-  font-weight: 500;
-}
-
-@media (max-width: 480px) {
-  .auth-card {
-    padding: 20px;
-    border-radius: 15px;
-  }
-
-  .input-group {
-    flex-direction: column;
-    gap: 0;
-  }
+.form-group input {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    background: #f4f6f8; /* Griul Juliei */
+    border-radius: 12px;
+    font-size: 15px;
+    box-sizing: border-box;
+    margin-bottom: 5px;
 }

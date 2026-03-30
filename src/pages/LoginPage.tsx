@@ -18,27 +18,26 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="auth-card-container">
+        <div className="auth-container">
             <div className="auth-card">
-                <button className="close-x">×</button>
                 <h2>Welcome to P2P Shopping</h2>
                 <p className="auth-subtitle">Login or create an account to manage your shopping lists</p>
 
                 <div className="auth-tabs">
-                    <button className="tab active">Login</button>
-                    <button className="tab" onClick={() => navigate('/register')}>Register</button>
+                    <button className="tab-btn active">Login</button>
+                    <button className="tab-btn" onClick={() => navigate('/register')}>Register</button>
                 </div>
 
                 <form onSubmit={handleLogin}>
-                    <div className="input-group">
+                    <div className="form-group">
                         <label htmlFor="email">Email</label>
                         <input id="email" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     </div>
-                    <div className="input-group">
+                    <div className="form-group">
                         <label htmlFor="password">Password</label>
                         <input id="password" type="password" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </div>
-                    <button type="submit" className="login-button">Login</button>
+                    <button type="submit" className="submit-btn">Login</button>
                 </form>
             </div>
         </div>

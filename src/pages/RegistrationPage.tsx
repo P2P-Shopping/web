@@ -1,151 +1,80 @@
-import { useState } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { registerRequest } from '../services/authService';
 
-interface AuthPageProps {
-  onAuthSuccess?: (authResult: any) => void;
-}
+const RegistrationPage = () => {
+    const navigate = useNavigate();
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+    });
 
-export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
-  const [isLogin, setIsLogin] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({ ...formData, [e.target.id]: e.target.value });
+    };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (formData.password !== formData.confirmPassword) {
+            alert("Parolele nu se potrivesc!");
+            return;
+        }
+        try {
+            await registerRequest(formData);
+            alert("Cont creat cu succes!");
+            navigate('/login');
+        } catch (err: any) {
+            alert("Eroare: " + err.message);
+        }
+    };
 
-    if (isSubmitting) {
-      return;
-    }
+    return (
+        <div className="auth-container">
+            <div className="auth-card">
+                <h2>Welcome to P2P Shopping</h2>
+                <p className="auth-subtitle">Create an account to manage your shopping lists</p>
 
-    if (!isLogin && formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match. Please check again.");
-      return;
-    }
+                <div className="auth-tabs">
+                    <button type="button" className="tab-btn" onClick={() => navigate('/login')}>Login</button>
+                    <button type="button" className="tab-btn active">Register</button>
+                </div>
 
-    setIsSubmitting(true);
+                <form onSubmit={handleRegister}>
+                    {/* Randul cu First Name si Last Name */}
+                    <div className="auth-row">
+                        <div className="form-group">
+                            <label htmlFor="firstName">First Name</label>
+                            <input id="firstName" type="text" placeholder="First Name" value={formData.firstName} onChange={handleChange} required />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="lastName">Last Name</label>
+                            <input id="lastName" type="text" placeholder="Last Name" value={formData.lastName} onChange={handleChange} required />
+                        </div>
+                    </div>
 
-    try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const payload = isLogin
-        ? { email: formData.email, password: formData.password }
-        : {
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            password: formData.password
-          };
+                    <div className="form-group">
+                        <label htmlFor="email">Email</label>
+                        <input id="email" type="email" placeholder="your@email.com" value={formData.email} onChange={handleChange} required />
+                    </div>
 
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081').replace(/\/+$/, '');
+                    <div className="form-group">
+                        <label htmlFor="password">Password</label>
+                        <input id="password" type="password" placeholder="********" value={formData.password} onChange={handleChange} required />
+                    </div>
 
-      const response = await axios.post(`${baseUrl}${endpoint}`, payload, {
-        withCredentials: true
-      });
+                    <div className="form-group">
+                        <label htmlFor="confirmPassword">Confirm Password</label>
+                        <input id="confirmPassword" type="password" placeholder="********" value={formData.confirmPassword} onChange={handleChange} required />
+                    </div>
 
-      if (onAuthSuccess) {
-        onAuthSuccess(response.data);
-      }
-    } catch (err: any) {
-      setError(isLogin ? "Invalid email or password." : "Registration failed.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="auth-card">
-      <div className="auth-header">
-        <h1>Welcome to P2P Shopping</h1>
-        <p>{isLogin ? 'Login to your account' : 'Create an account'}</p>
-      </div>
-
-      <div className="tab-container">
-        <button 
-          type="button" 
-          className={`tab-btn ${isLogin ? 'active' : ''}`}
-          onClick={() => { setIsLogin(true); setError(''); }}
-        >
-          Login
-        </button>
-        <button 
-          type="button" 
-          className={`tab-btn ${!isLogin ? 'active' : ''}`}
-          onClick={() => { setIsLogin(false); setError(''); }}
-        >
-          Register
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        {!isLogin && (
-          <div className="input-group">
-            <div>
-              <label htmlFor="firstName">First Name</label>
-              <input 
-                id="firstName" 
-                type="text" 
-                placeholder="First Name" 
-                required 
-                onChange={e => setFormData({...formData, firstName: e.target.value})} 
-              />
+                    <button type="submit" className="submit-btn">Create Account</button>
+                </form>
             </div>
-            <div>
-              <label htmlFor="lastName">Last Name</label>
-              <input 
-                id="lastName" 
-                type="text" 
-                placeholder="Last Name" 
-                required 
-                onChange={e => setFormData({...formData, lastName: e.target.value})} 
-              />
-            </div>
-          </div>
-        )}
+        </div>
+    );
+};
 
-        <label htmlFor="email">Email</label>
-        <input 
-          id="email" 
-          type="email" 
-          placeholder="your@email.com" 
-          required 
-          onChange={e => setFormData({...formData, email: e.target.value})} 
-        />
-
-        <label htmlFor="password">Password</label>
-        <input 
-          id="password" 
-          type="password" 
-          placeholder="••••••••" 
-          required 
-          onChange={e => setFormData({...formData, password: e.target.value})} 
-        />
-
-        {!isLogin && (
-          <>
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input 
-              id="confirmPassword" 
-              type="password" 
-              placeholder="••••••••" 
-              required 
-              onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
-            />
-          </>
-        )}
-
-        {error && <p className="error-msg">{error}</p>}
-
-        <button type="submit" className="submit-btn compact" disabled={isSubmitting}>
-          {isSubmitting ? 'Submitting...' : (isLogin ? 'Login' : 'Create Account')}
-        </button>
-      </form>
-    </div>
-  );
-}
+export default RegistrationPage;
