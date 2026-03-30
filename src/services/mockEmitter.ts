@@ -9,7 +9,7 @@ export const startMockEmitter = () => {
   let currentLat = userLocation?.lat ?? 47.151726;
   let currentLng = userLocation?.lng ?? 27.587914;
 
-  intervalId = window.setInterval(() => {
+  intervalId = globalThis.setInterval(() => {
     currentLat += (Math.random() - 0.5) * 0.00005;
     currentLng += (Math.random() - 0.5) * 0.00005;
 

@@ -19,12 +19,9 @@ function App() {
     <div className="app-container">
       <header className="main-header">
         <nav className="nav-menu">
-          <Link to="/" className="nav-link">
-            Map
-          </Link>
-          <Link to="/route" className="nav-link">
-            Route
-          </Link>
+          <Link to="/register" className="nav-link">Register</Link>
+          <Link to="/map" className="nav-link">Map</Link>
+          <Link to="/route" className="nav-link">Route</Link>
         </nav>
         <div className="logo-section">
           <span className="cart-icon">🛒</span>
@@ -34,7 +31,7 @@ function App() {
 
       <main className="content">
         <Routes>
-          <Route path="/" element={<MapPage />} />
+          <Route path="/map" element={<MapPage />} />
           <Route path="/route" element={<RoutePage />} />
           <Route path="/register" element={
             <div className="auth-container">
