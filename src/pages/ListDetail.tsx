@@ -1,161 +1,113 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 
 interface Item {
+  id: string; // Added unique ID
   name: string;
   checked: boolean;
 }
 
-const readItems = (listId?: string): Item[] => {
-  if (!listId) return [];
-  try {
-    const saved = localStorage.getItem(`list-${listId}`);
-    if (!saved) return [];
-    const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error("Error parsing localStorage:", error);
-    return [];
-  }
+const readItems = (id: string | undefined): Item[] => {
+  if (!id) return [];
+  const saved = localStorage.getItem(`list-${id}`);
+  return saved ? JSON.parse(saved) : [];
 };
 
-const styles = {
-  inputContainer: { display: 'flex', gap: '10px', marginBottom: '20px' },
-  input: { flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ccc', borderRadius: '4px' },
-  addBtn: { padding: '10px 20px', fontSize: '16px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-  listItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', borderBottom: '1px solid #e0e0e0' }
-};
-
-const ListDetail = () => {
-  const { id } = useParams();
-  
+const ListDetail: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [items, setItems] = useState<Item[]>([]);
   const [newItemName, setNewItemName] = useState('');
-  const [items, setItems] = useState<Item[]>(() => readItems(id));
-  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus['state']>('prompt');
+  const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
   const [showBanner, setShowBanner] = useState(true);
-  
-  const previousIdRef = useRef(id);
 
+  // Sync items when ID changes
   useEffect(() => {
-    if (id !== previousIdRef.current) {
-      setItems(readItems(id));
-      previousIdRef.current = id;
-    }
+    setItems(readItems(id));
   }, [id]);
+
+  // Persist items to localStorage
   useEffect(() => {
     if (!id) return;
     localStorage.setItem(`list-${id}`, JSON.stringify(items));
   }, [items, id]);
 
+  // Safe Permission Check
   useEffect(() => {
-    let permResult: PermissionStatus;
-    const handler = () => setPermissionStatus(permResult.state);
+    let isMounted = true;
+    let permResult: PermissionStatus | null = null;
+    
+    const handler = () => {
+      if (isMounted && permResult) setPermissionStatus(permResult.state);
+    };
 
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
+        if (!isMounted) return;
         permResult = result;
         setPermissionStatus(result.state);
         result.addEventListener('change', handler);
       });
     }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => console.log('GPS:', position.coords.latitude, position.coords.longitude),
-        (error) => console.warn('GPS error:', error.message)
-      );
-    }
-
     return () => {
+      isMounted = false;
       permResult?.removeEventListener('change', handler);
     };
   }, []);
 
-  if (!id) {
-    return <div style={{ padding: '20px' }}>Invalid list ID</div>;
-  }
-
-  const addItem = () => {
+  const addItem = (e: React.FormEvent) => {
+    e.preventDefault();
     if (newItemName.trim() === '') return;
-    setItems([...items, { name: newItemName, checked: false }]);
+    const newItem: Item = {
+      id: crypto.randomUUID(),
+      name: newItemName,
+      checked: false
+    };
+    setItems([...items, newItem]);
     setNewItemName('');
   };
 
-  const handleCheck = (index: number) => {
-    const newItems = [...items];
-    const isNowChecked = !newItems[index].checked;
-    newItems[index].checked = isNowChecked;
-    setItems(newItems);
-
-    if (isNowChecked) {
-      const payload = {
-        action: 'COLLECT_P2P_DATA',
-        data: {
-          item: newItems[index].name,
-          listId: id,
-          timestamp: Date.now(),
-          context: 'Store_Shopping'
-        }
-      };
-
-      if ((window as any).ReactNativeWebView) {
-        (window as any).ReactNativeWebView.postMessage(JSON.stringify(payload));
-      } else {
-        console.warn('BRIDGE_DEBUG: Ping trimis!', payload);
-      }
-    }
+  const handleCheck = (itemId: string) => {
+    setItems(items.map(item => 
+      item.id === itemId ? { ...item, checked: !item.checked } : item
+    ));
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-      {permissionStatus === 'denied' && showBanner && (
-        <div style={{
-          background: '#FFF5F5', border: '1px solid #FEB2B2', color: '#C53030',
-          padding: '12px', borderRadius: '8px', marginBottom: '20px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-        }}>
-          <span>Location is off.</span>
-          <button
-            onClick={() => setShowBanner(false)}
-            style={{ border: 'none', background: '#5b5454', cursor: 'pointer', color: 'white', borderRadius: '4px' }}
-          >✕</button>
+    <div className="list-detail-container">
+      {showBanner && permissionStatus === 'denied' && (
+        <div className="location-warning-banner">
+          <span>Location access is disabled. Some features may be limited.</span>
+          <button className="close-banner-btn" onClick={() => setShowBanner(false)}>✕</button>
         </div>
       )}
 
-      <div style={styles.inputContainer}>
+      <form onSubmit={addItem} className="add-item-form">
         <input
           type="text"
-          placeholder="Add product"
           value={newItemName}
           onChange={(e) => setNewItemName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addItem()}
-          style={styles.input}
+          placeholder="Add new item..."
+          className="add-input"
         />
-        <button onClick={addItem} style={styles.addBtn}>Add</button>
-      </div>
+        <button type="submit" className="add-button">Add</button>
+      </form>
 
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {items.map((item, index) => (
-          <li key={`${id}-${index}`} style={{
-            ...styles.listItem,
-            background: item.checked ? '#F7FAFC' : '#FFF'
-          }}>
+      <ul className="shopping-list">
+        {items.map((item) => (
+          <li key={item.id} className={`shopping-item ${item.checked ? 'item-completed' : ''}`}>
             <input
               type="checkbox"
               checked={item.checked}
-              onChange={() => handleCheck(index)}
-              style={{ width: '22px', height: '22px', cursor: 'pointer' }}
+              onChange={() => handleCheck(item.id)}
+              className="item-checkbox"
             />
-            <span style={{
-              fontSize: '18px',
-              textDecoration: item.checked ? 'line-through' : 'none',
-              color: item.checked ? '#A0AEC0' : '#111c2f'
-            }}>
-              {item.name}
-            </span>
+            <span className="item-text">{item.name}</span>
           </li>
         ))}
       </ul>
+      
+      {items.length === 0 && <p className="empty-msg">Your list is empty!</p>}
     </div>
   );
 };

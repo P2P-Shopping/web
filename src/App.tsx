@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ListDetail from './pages/ListDetail';
+import './App.css'; 
+
 function App() {
   return (
       <Routes>
