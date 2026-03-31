@@ -1,0 +1,58 @@
+.container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: 10vh;
+  padding: 10px;
+  left:0;
+  background-color: #eee;   /* background color */
+  border-bottom: 1px solid #ccc; /* optional border */
+  box-sizing: border-box;   /* include padding in width */
+  position: fixed;       /* optional, depending on layout */
+  z-index: 1;
+}
+
+.backButton {
+  margin-right: 10px;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.mapContainer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;   
+  height: 100%;  
+  transform: translate(-50%, -50%); 
+  overflow:hidden;
+  z-index:0;
+}
+
+/* ... rest of your css ... */
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-color: #ffffff;
+  overflow: hidden;
+  cursor: grab;
+  
+  /* Critical for mobile: stops browser from zooming/refreshing the page */
+  touch-action: none; 
+  -webkit-touch-callout: none; 
+}
+
+canvas.dragging {
+  cursor: grabbing;
+}
