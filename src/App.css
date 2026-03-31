@@ -1,4 +1,4 @@
-/* Containerul gri de fundal care centrează totul */
+/* Gray container for background and centering everything*/
 .auth-container {
     display: flex;
     justify-content: center;
@@ -9,7 +9,7 @@
     font-family: Inter, -apple-system, sans-serif;
 }
 
-/* Cardul Alb din poza colegei tale */
+/* White Card */
 .auth-card {
     background: white;
     width: 90%;
@@ -19,12 +19,13 @@
     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
     text-align: center;
     position: relative;
+    box-sizing: border-box;
 }
 
 .auth-card h2 { margin-bottom: 8px; font-size: 22px; font-weight: 700; }
 .auth-subtitle { color: #888; font-size: 14px; margin-bottom: 30px; line-height: 1.4; }
 
-/* Tab-urile (Login/Register) */
+/* Tabs (Login/Register) */
 .auth-tabs {
     display: flex;
     background: #f0f0f0;
@@ -38,32 +39,15 @@
 }
 .tab-btn.active { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 
-/* Formular și Input-uri (Feedback Călin - Scoped) */
+.tab-btn:focus-visible,
+.submit-btn:focus-visible {
+    outline: 2px solid #1f6feb;
+   outline-offset: 2px;
+}
+
+/* Form and Inputs*/
 .form-group { text-align: left; margin-bottom: 20px; }
-.form-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-.form-group input {
-    width: 100%; padding: 14px; border: none; background: #f4f6f8;
-    border-radius: 12px; font-size: 15px; box-sizing: border-box;
-}
 
-/* Butonul Negru de Login */
-.submit-btn {
-    width: 100%; padding: 16px; background: #050509; color: white;
-    border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
-    cursor: pointer; margin-top: 10px;
-}
-.auth-row {
-    display: flex;
-    gap: 12px; /* Spatiul dintre First Name si Last Name */
-    width: 100%;
-}
-
-.auth-row .form-group {
-    flex: 1; /* Le face sa ocupe jumatate-jumatate din rand */
-}
-
-/* Asigura-te ca label-urile si input-urile din Register 
-   arata FIX ca cele din Login */
 .form-group label {
     display: block;
     font-size: 14px;
@@ -77,9 +61,25 @@
     width: 100%;
     padding: 14px;
     border: none;
-    background: #f4f6f8; /* Griul Juliei */
+    background: #f4f6f8;
     border-radius: 12px;
     font-size: 15px;
     box-sizing: border-box;
     margin-bottom: 5px;
+}
+
+/* Black Login Button */
+.submit-btn {
+    width: 100%; padding: 16px; background: #050509; color: white;
+    border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+    cursor: pointer; margin-top: 10px;
+}
+.auth-row {
+    display: flex;
+    gap: 12px; /* Space between First Name and Last Name */
+    width: 100%;
+}
+
+.auth-row .form-group {
+    flex: 1;
 }
