@@ -1,4 +1,4 @@
-﻿import StoreMap from "./components/StoreMap.tsx";
+import StoreMap from "./components/StoreMap.tsx";
 import { useEffect, useState, useRef } from "react";
 import type { StompSubscription } from "@stomp/stompjs";
 import stompClient from "./services/socketService";
