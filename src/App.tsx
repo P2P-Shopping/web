@@ -1,10 +1,11 @@
 import StoreMap from "./components/StoreMap.tsx";
 import { useEffect } from "react";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
-import { Routes, Route, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import MapPage from "./pages/MapPage";
 import RoutePage from "./pages/RoutePage";
 import RegistrationPage from "./pages/RegistrationPage";
+import ListDetail from "./pages/ListDetail";
 import "./App.css";
 
 function App() {
@@ -29,18 +30,12 @@ function App() {
     <div className="app-container">
       <header className="main-header">
         <nav className="nav-menu">
-          <Link to="/register" className="nav-link">
-            Register
-          </Link>
-          <Link to="/map" className="nav-link">
-            Map
-          </Link>
-          <Link to="/route" className="nav-link">
-            Route
-          </Link>
-          <Link to="/nav" className="nav-link">
-            Store Map
-          </Link>
+          <Link to="/register" className="nav-link">Register</Link>
+          <Link to="/map" className="nav-link">Map</Link>
+          <Link to="/route" className="nav-link">Route</Link>
+          <Link to="/nav" className="nav-link">Store Map</Link>
+          {/* Am adăugat link-ul din task-ul colegei */}
+          <Link to="/list/default" className="nav-link">List</Link>
         </nav>
         <div className="logo-section">
           <span className="cart-icon">🛒</span>
@@ -61,6 +56,10 @@ function App() {
               </div>
             }
           />
+          {/* Rutele adăugate din task1.3 */}
+          <Route path="/list/:id" element={<ListDetail />} />
+          <Route path="/" element={<Navigate to="/list/default" replace />} />
+          <Route path="*" element={<div>Page not found</div>} />
         </Routes>
       </main>
     </div>
