@@ -5,7 +5,7 @@ import SockJS from "sockjs-client";
  * Singleton service managing the STOMP WebSocket connection.
  * Handles automatic reconnection and routes messages between the React frontend and Spring Boot backend.
  */
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:8081/ws";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "/ws";
 
 const stompClient = new Client({
   webSocketFactory: () => new SockJS(SOCKET_URL),
