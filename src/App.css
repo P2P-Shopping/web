@@ -340,9 +340,9 @@ nav a:hover::after {
 
 /* Banner stilizat */
 .location-warning-banner {
-  background: #FFF5F5;
-  border: 1px solid #FEB2B2;
-  color: #C53030;
+  background: #fff5f5;
+  border: 1px solid #feb2b2;
+  color: #c53030;
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 20px;
@@ -356,7 +356,7 @@ nav a:hover::after {
   background: none;
   cursor: pointer;
   font-weight: bold;
-  color: #C53030;
+  color: #c53030;
 }
 
 /* Formular adaugare */
@@ -370,7 +370,7 @@ nav a:hover::after {
   flex: 1;
   padding: 12px;
   border-radius: 6px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #e2e8f0;
   font-size: 16px;
 }
 
@@ -392,7 +392,7 @@ nav a:hover::after {
 
 .shopping-item {
   padding: 15px;
-  border-bottom: 1px solid #EDF2F7;
+  border-bottom: 1px solid #edf2f7;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -400,7 +400,7 @@ nav a:hover::after {
 }
 
 .item-completed {
-  background: #F7FAFC;
+  background: #f7fafc;
 }
 
 .item-checkbox {
@@ -416,7 +416,7 @@ nav a:hover::after {
 
 .item-completed .item-text {
   text-decoration: line-through;
-  color: #A0AEC0;
+  color: #a0aec0;
 }
 
 .empty-msg {

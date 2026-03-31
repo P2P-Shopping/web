@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 
 interface Item {
   id: string; // Added unique ID
@@ -16,7 +16,7 @@ const readItems = (id: string | undefined): Item[] => {
 const ListDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [items, setItems] = useState<Item[]>([]);
-  const [newItemName, setNewItemName] = useState('');
+  const [newItemName, setNewItemName] = useState("");
   const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
   const [showBanner, setShowBanner] = useState(true);
 
@@ -35,50 +35,52 @@ const ListDetail: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     let permResult: PermissionStatus | null = null;
-    
+
     const handler = () => {
       if (isMounted && permResult) setPermissionStatus(permResult.state);
     };
 
     if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
+      navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
         if (!isMounted) return;
         permResult = result;
         setPermissionStatus(result.state);
-        result.addEventListener('change', handler);
+        result.addEventListener("change", handler);
       });
     }
 
     return () => {
       isMounted = false;
-      permResult?.removeEventListener('change', handler);
+      permResult?.removeEventListener("change", handler);
     };
   }, []);
 
   const addItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newItemName.trim() === '') return;
+    if (newItemName.trim() === "") return;
     const newItem: Item = {
       id: crypto.randomUUID(),
       name: newItemName,
-      checked: false
+      checked: false,
     };
     setItems([...items, newItem]);
-    setNewItemName('');
+    setNewItemName("");
   };
 
   const handleCheck = (itemId: string) => {
-    setItems(items.map(item => 
-      item.id === itemId ? { ...item, checked: !item.checked } : item
-    ));
+    setItems(
+      items.map((item) => (item.id === itemId ? { ...item, checked: !item.checked } : item))
+    );
   };
 
   return (
     <div className="list-detail-container">
-      {showBanner && permissionStatus === 'denied' && (
+      {showBanner && permissionStatus === "denied" && (
         <div className="location-warning-banner">
           <span>Location access is disabled. Some features may be limited.</span>
-          <button className="close-banner-btn" onClick={() => setShowBanner(false)}>✕</button>
+          <button className="close-banner-btn" onClick={() => setShowBanner(false)}>
+            ✕
+          </button>
         </div>
       )}
 
@@ -90,12 +92,14 @@ const ListDetail: React.FC = () => {
           placeholder="Add new item..."
           className="add-input"
         />
-        <button type="submit" className="add-button">Add</button>
+        <button type="submit" className="add-button">
+          Add
+        </button>
       </form>
 
       <ul className="shopping-list">
         {items.map((item) => (
-          <li key={item.id} className={`shopping-item ${item.checked ? 'item-completed' : ''}`}>
+          <li key={item.id} className={`shopping-item ${item.checked ? "item-completed" : ""}`}>
             <input
               type="checkbox"
               checked={item.checked}
@@ -106,7 +110,7 @@ const ListDetail: React.FC = () => {
           </li>
         ))}
       </ul>
-      
+
       {items.length === 0 && <p className="empty-msg">Your list is empty!</p>}
     </div>
   );
