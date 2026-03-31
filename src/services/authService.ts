@@ -19,11 +19,10 @@ export const loginRequest = async (email: string, password: string) => {
     throw new Error("Date incorecte (Modul Mock)");
   }
 };
-
-export const registerRequest = async (data: any) => {
-  try {
-    return (await axios.post(`${API_URL}/api/auth/register`, data, { withCredentials: true })).data;
-  } catch (e) {
-    return { message: "Mock success" };
-  }
+export const registerRequest = async (data: Record<string, unknown>) => {
+  return (
+    await axios.post(`${API_URL}/api/auth/register`, data, {
+      withCredentials: true,
+    })
+  ).data;
 };

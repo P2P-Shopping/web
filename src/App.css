@@ -1,4 +1,5 @@
-/*Global styles*/
+/* Global styles */
+
 :root {
     --bg-color: #f8f9fa;
     --card-bg: #ffffff;
@@ -65,7 +66,7 @@ nav a:hover::after { width: 100%; }
 .point-name { font-weight: 600; }
 .point-coords { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; color: var(--text-secondary); background: #f1f5f9; padding: 4px 8px; border-radius: 4px; }
 
-/* Authentication*/
+/* Authentication */
 
 .auth-container {
     display: flex;
@@ -124,7 +125,7 @@ nav a:hover::after { width: 100%; }
     .auth-row { flex-direction: column; gap: 0; }
 }
 
-/*Shopping List*/
+/*Shopping List */
 
 .list-detail-container { padding: 20px; max-width: 500px; margin: 0 auto; font-family: sans-serif; }
 .location-warning-banner { background: #fff5f5; border: 1px solid #feb2b2; color: #c53030; padding: 12px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }

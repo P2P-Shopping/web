@@ -58,8 +58,8 @@ function App() {
     };
   }, []);
 
-  const handleAuthSuccess = () => {
-    console.info("Authentication successful");
+  const handleAuthSuccess = (result: unknown) => {
+    console.info("Authentication successful", result);
   };
 
   const handlePingPress = () => {
