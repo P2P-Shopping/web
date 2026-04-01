@@ -1,12 +1,13 @@
-import { useState } from "react";
-import axios from "axios";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { registerRequest } from "../services/authService";
 
-interface AuthPageProps {
-  onAuthSuccess?: (authResult: any) => void;
+interface RegistrationPageProps {
+  onAuthSuccess?: (authResult: unknown) => void;
 }
 
-export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
-  const [isLogin, setIsLogin] = useState(false);
+const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -14,49 +15,51 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     password: "",
     confirmPassword: "",
   });
+
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
+    setError("");
+  };
+
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
+    if (isSubmitting) return;
 
-    if (isSubmitting) {
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match. Please check again.");
       return;
     }
-
-    if (!isLogin && formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match. Please check again.");
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      setError(
+        "Password must be at least 8 characters long, contain 1 uppercase, 1 lowercase letter, and 1 number."
+      );
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-      const payload = isLogin
-        ? { email: formData.email, password: formData.password }
-        : {
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            password: formData.password,
-          };
-
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8081").replace(
-        /\/+$/,
-        ""
-      );
-
-      const response = await axios.post(`${baseUrl}${endpoint}`, payload, {
-        withCredentials: true,
-      });
+      const response = await registerRequest(formData);
 
       if (onAuthSuccess) {
-        onAuthSuccess(response.data);
+        onAuthSuccess(response);
       }
+
+      navigate("/login");
     } catch (err: any) {
-      setError(isLogin ? "Invalid email or password." : "Registration failed.");
+
+      if (err.response && err.response.data && err.response.data.message) {
+       
+        setError(err.response.data.message);
+      } else {
+        
+        setError("Registration failed. Please try again later.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -64,97 +67,88 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
   return (
     <div className="auth-card">
-      <div className="auth-header">
-        <h1>Welcome to P2P Shopping</h1>
-        <p>{isLogin ? "Login to your account" : "Create an account"}</p>
-      </div>
+      <h2>Welcome to P2P Shopping</h2>
+      <p className="auth-subtitle">Create an account to manage your shopping lists</p>
 
-      <div className="tab-container">
-        <button
-          type="button"
-          className={`tab-btn ${isLogin ? "active" : ""}`}
-          onClick={() => {
-            setIsLogin(true);
-            setError("");
-          }}
-        >
+      <div className="auth-tabs">
+        <button type="button" className="tab-btn" onClick={() => navigate("/login")}>
           Login
         </button>
-        <button
-          type="button"
-          className={`tab-btn ${!isLogin ? "active" : ""}`}
-          onClick={() => {
-            setIsLogin(false);
-            setError("");
-          }}
-        >
+        <button type="button" className="tab-btn active">
           Register
         </button>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        {!isLogin && (
-          <div className="input-group">
-            <div>
-              <label htmlFor="firstName">First Name</label>
-              <input
-                id="firstName"
-                type="text"
-                placeholder="First Name"
-                required
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-              />
-            </div>
-            <div>
-              <label htmlFor="lastName">Last Name</label>
-              <input
-                id="lastName"
-                type="text"
-                placeholder="Last Name"
-                required
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-              />
-            </div>
-          </div>
-        )}
-
-        <label htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          placeholder="your@email.com"
-          required
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-        />
-
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          placeholder="••••••••"
-          required
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-        />
-
-        {!isLogin && (
-          <>
-            <label htmlFor="confirmPassword">Confirm Password</label>
+      <form onSubmit={handleRegister}>
+        <div className="auth-row">
+          <div className="form-group">
+            <label htmlFor="firstName">First Name</label>
             <input
-              id="confirmPassword"
-              type="password"
-              placeholder="••••••••"
+              id="firstName"
+              type="text"
+              placeholder="First Name"
+              value={formData.firstName}
+              onChange={handleChange}
               required
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
             />
-          </>
-        )}
+          </div>
+          <div className="form-group">
+            <label htmlFor="lastName">Last Name</label>
+            <input
+              id="lastName"
+              type="text"
+              placeholder="Last Name"
+              value={formData.lastName}
+              onChange={handleChange}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            placeholder="your@email.com"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="confirmPassword">Confirm Password</label>
+          <input
+            id="confirmPassword"
+            type="password"
+            placeholder="••••••••"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            required
+          />
+        </div>
 
         {error && <p className="error-msg">{error}</p>}
 
-        <button type="submit" className="submit-btn compact" disabled={isSubmitting}>
-          {isSubmitting ? "Submitting..." : isLogin ? "Login" : "Create Account"}
+        <button type="submit" className="submit-btn" disabled={isSubmitting}>
+          {isSubmitting ? "Submitting..." : "Create Account"}
         </button>
       </form>
     </div>
   );
-}
+};
+
+export default RegistrationPage;

@@ -4,9 +4,13 @@ import type { StompSubscription } from "@stomp/stompjs";
 import stompClient from "./services/socketService";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+
+// Auth Pages
+import LoginPage from "./pages/LoginPage";
+import RegistrationPage from "./pages/RegistrationPage";
+
 import MapPage from "./pages/MapPage";
 import RoutePage from "./pages/RoutePage";
-import RegistrationPage from "./pages/RegistrationPage";
 import ListDetail from "./pages/ListDetail";
 import "./App.css";
 
@@ -15,6 +19,7 @@ function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const location = useLocation();
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     startMockEmitter();
     return () => stopMockEmitter();
@@ -53,8 +58,8 @@ function App() {
     };
   }, []);
 
-  const handleAuthSuccess = () => {
-    console.info("Authentication successful");
+  const handleAuthSuccess = (result: unknown) => {
+    console.info("Authentication successful", result);
   };
 
   const handlePingPress = () => {
@@ -99,6 +104,10 @@ function App() {
 
       <header className="main-header">
         <nav className="nav-menu">
+          {/* Added your link to Login */}
+          <Link to="/login" className="nav-link">
+            Login
+          </Link>
           <Link to="/register" className="nav-link">
             Register
           </Link>
@@ -111,7 +120,6 @@ function App() {
           <Link to="/nav" className="nav-link">
             Store Map
           </Link>
-          {/* Am adăugat link-ul din task-ul colegei */}
           <Link to="/list/default" className="nav-link">
             List
           </Link>
@@ -143,9 +151,14 @@ function App() {
 
       <main className="content">
         <Routes>
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/nav" element={<StoreMap />} />
-          <Route path="/route" element={<RoutePage />} />
+          <Route
+            path="/login"
+            element={
+              <div className="auth-container">
+                <LoginPage />
+              </div>
+            }
+          />
           <Route
             path="/register"
             element={
@@ -154,9 +167,12 @@ function App() {
               </div>
             }
           />
-          {/* Rutele adăugate din task1.3 */}
+          <Route path="/map" element={<MapPage />} />
+          <Route path="/nav" element={<StoreMap />} />
+          <Route path="/route" element={<RoutePage />} />
           <Route path="/list/:id" element={<ListDetail />} />
-          <Route path="/" element={<Navigate to="/list/default" replace />} />
+
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<div>Page not found</div>} />
         </Routes>
       </main>
