@@ -1,10 +1,37 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import stompClient from "../services/socketService";
 
 interface Item {
   id: string; // Added unique ID
   name: string;
   checked: boolean;
+}
+
+class SyncPayloadBuilder {
+  private payload: Record<string, any> = {
+    eventType: "ITEM_TOGGLED",
+    timestamp: Date.now()
+  };
+
+  setListId(listId: string) {
+    this.payload.listId = listId;
+    return this;
+  }
+
+  setItemId(itemId: string) {
+    this.payload.itemId = itemId;
+    return this;
+  }
+
+  setChecked(checked: boolean) {
+    this.payload.checked = checked;
+    return this;
+  }
+
+  build() {
+    return JSON.stringify(this.payload);
+  }
 }
 
 const readItems = (id: string | undefined): Item[] => {
@@ -68,8 +95,27 @@ const ListDetail: React.FC = () => {
   };
 
   const handleCheck = (itemId: string) => {
-    setItems(
-      items.map((item) => (item.id === itemId ? { ...item, checked: !item.checked } : item))
+    setItems((prevItems) => 
+      prevItems.map((item) => {
+        if (item.id === itemId) {
+          const newChecked = !item.checked;
+          const payload = new SyncPayloadBuilder()
+            .setListId(id || "unknown")
+            .setItemId(item.id)
+            .setChecked(newChecked)
+            .build();
+            
+          if (stompClient.connected) {
+            stompClient.publish({
+              destination: "/app/sync",
+              body: payload
+            });
+          }
+          
+          return { ...item, checked: newChecked };
+        }
+        return item;
+      })
     );
   };
 
