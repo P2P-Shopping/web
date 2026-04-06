@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import stompClient from "../services/socketService";
 
 interface Item {
   id: string; // Added unique ID
@@ -68,9 +69,31 @@ const ListDetail: React.FC = () => {
   };
 
   const handleCheck = (itemId: string) => {
+    const previousItems = [...items]; // Backup for rollback
+    const targetItem = items.find((item) => item.id === itemId);
+    if (!targetItem) return;
+
+    const nextStatus = !targetItem.checked;
+
+    // Optimistic UI update
     setItems(
-      items.map((item) => (item.id === itemId ? { ...item, checked: !item.checked } : item))
+      items.map((item) => (item.id === itemId ? { ...item, checked: nextStatus } : item))
     );
+
+    try {
+      if (!stompClient.connected) throw new Error();
+
+      stompClient.publish({
+        destination: `/app/list/${id}/update`,
+        body: JSON.stringify({
+          action: "UPDATE",
+          itemId: itemId,
+          content: JSON.stringify({ checked: nextStatus }),
+        }),
+      });
+    } catch (error) {
+      setItems(previousItems); // Rollback on failure
+    }
   };
 
   return (
