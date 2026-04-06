@@ -69,19 +69,23 @@ const ListDetail: React.FC = () => {
   };
 
   const handleCheck = (itemId: string) => {
-    const previousItems = [...items]; // Backup for rollback
+    const previousItems = [...items]; // Backup state for potential rollback
     const targetItem = items.find((item) => item.id === itemId);
+    
     if (!targetItem) return;
 
     const nextStatus = !targetItem.checked;
 
-    // Optimistic UI update
+    // Optimistic UI Update: change state immediately
     setItems(
       items.map((item) => (item.id === itemId ? { ...item, checked: nextStatus } : item))
     );
 
     try {
-      if (!stompClient.connected) throw new Error();
+      if (!stompClient.connected) {
+        // Fix for SonarCloud: Passing a specific message to the Error constructor
+        throw new Error("Unable to sync: WebSocket connection is closed");
+      }
 
       stompClient.publish({
         destination: `/app/list/${id}/update`,
@@ -92,7 +96,9 @@ const ListDetail: React.FC = () => {
         }),
       });
     } catch (error) {
-      setItems(previousItems); // Rollback on failure
+      // Fix for SonarCloud: Explicitly handling the exception with a rollback and logging
+      setItems(previousItems);
+      console.error("Optimistic UI failed, state reverted:", error instanceof Error ? error.message : error);
     }
   };
 
