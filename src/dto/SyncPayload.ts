@@ -1,12 +1,5 @@
-/**
- * Defines the allowed actions that can be synchronized over the WebSocket.
- */
 export type ActionType = 'UPDATE_ITEM' | 'DELETE_ITEM' | 'USER_PRESENCE';
 
-/**
- * Base abstract class for standardizing outgoing WebSocket payloads.
- * Ensures the backend never receives malformed data.
- */
 export abstract class SyncPayload {
   actionType: ActionType;
   entityId: string;
@@ -20,14 +13,8 @@ export abstract class SyncPayload {
     this.timestamp = new Date().toISOString(); 
   }
 
-  /**
-   * Must be implemented by child classes to validate their specific schema.
-   */
   abstract validateSchema(): boolean;
 
-  /**
-   * Utility to validate the base fields required for any payload.
-   */
   protected validateBaseSchema(): boolean {
     return Boolean(
       this.actionType && 
@@ -36,16 +23,23 @@ export abstract class SyncPayload {
       this.timestamp
     );
   }
+
+  // [REPARAT EROAREA 2]: Funcție care validează AUTOMAT și transformă în JSON.
+  // Dacă un coleg trimite date greșite, aplicația va da eroare aici, protejând serverul.
+  serialize(): string {
+    if (!this.validateSchema()) {
+      throw new Error(`Invalid payload schema for action: ${this.actionType}`);
+    }
+    return JSON.stringify(this);
+  }
 }
 
-/**
- * Payload for updating an item's state (e.g., toggling a checkbox).
- */
 export class ItemEditPayload extends SyncPayload {
   fieldName: string;
-  newValue: string;
+  // [REPARAT EROAREA 1]: Acum suportă și text, și true/false, și numere.
+  newValue: string | boolean | number | null;
 
-  constructor(entityId: string, originUserId: string, fieldName: string, newValue: string) {
+  constructor(entityId: string, originUserId: string, fieldName: string, newValue: string | boolean | number | null) {
     super('UPDATE_ITEM', entityId, originUserId);
     this.fieldName = fieldName;
     this.newValue = newValue;
@@ -61,9 +55,20 @@ export class ItemEditPayload extends SyncPayload {
   }
 }
 
-/**
- * Payload for broadcasting user presence (e.g., active, typing).
- */
+// [REPARAT CHICHIȚA 4]: Am adăugat formularul pentru ștergerea unui produs.
+export class ItemDeletePayload extends SyncPayload {
+  constructor(entityId: string, originUserId: string) {
+    super('DELETE_ITEM', entityId, originUserId);
+  }
+
+  validateSchema(): boolean {
+    return (
+      this.validateBaseSchema() &&
+      this.actionType === 'DELETE_ITEM'
+    );
+  }
+}
+
 export class PresencePayload extends SyncPayload {
   status: string;
 
