@@ -34,10 +34,43 @@ class SyncPayloadBuilder {
 	}
 }
 
+// Sanitize strings to reduce risk of storing/executing malicious payloads.
+const sanitizeString = (input: unknown): string => {
+	const s = String(input ?? "");
+
+	// Remove any <script>...</script> blocks entirely
+	const withoutScripts = s.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
+
+	// Escape angle brackets and ampersands so stored values cannot be
+	// interpreted as HTML if later injected into the DOM unsafely.
+	return withoutScripts.replace(/[<>&]/g, (c) =>
+		c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;",
+	);
+};
+
+const sanitizeItemsForStorage = (items: Item[]): Item[] =>
+	items.map((item) => ({
+		id: String(item.id),
+		name: sanitizeString(item.name),
+		checked: Boolean(item.checked),
+	}));
+
 const readItems = (id: string | undefined): Item[] => {
 	if (!id) return [];
 	const saved = localStorage.getItem(`list-${id}`);
-	return saved ? JSON.parse(saved) : [];
+	if (!saved) return [];
+	try {
+		const parsed = JSON.parse(saved);
+		if (!Array.isArray(parsed)) return [];
+		return parsed.map((p) => ({
+			id: String(p.id ?? crypto.randomUUID()),
+			name: sanitizeString(p.name ?? ""),
+			checked: Boolean(p.checked),
+		}));
+	} catch {
+		// Corrupted or malicious data in storage; return empty list instead of throwing.
+		return [];
+	}
 };
 
 const ListDetail: React.FC = () => {
@@ -56,7 +89,10 @@ const ListDetail: React.FC = () => {
 	// Persist items to localStorage
 	useEffect(() => {
 		if (!id) return;
-		localStorage.setItem(`list-${id}`, JSON.stringify(items));
+		// Sanitize items before writing to browser storage to avoid persisting
+		// potentially malicious payloads.
+		const sanitized = sanitizeItemsForStorage(items);
+		localStorage.setItem(`list-${id}`, JSON.stringify(sanitized));
 	}, [items, id]);
 
 	// Safe Permission Check
