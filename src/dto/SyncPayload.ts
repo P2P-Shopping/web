@@ -1,5 +1,8 @@
-export type ActionType = 'UPDATE_ITEM' | 'DELETE_ITEM' | 'USER_PRESENCE';
+export type ActionType = 'UPDATE_ITEM' | 'DELETE_ITEM' | 'USER_PRESENCE' | 'REJECT';
 
+/**
+ * Base class for all synchronization payloads.
+ */
 export abstract class SyncPayload {
   actionType: ActionType;
   entityId: string;
@@ -82,6 +85,43 @@ export class PresencePayload extends SyncPayload {
       this.validateBaseSchema() &&
       this.actionType === 'USER_PRESENCE' &&
       Boolean(this.status)
+    );
+  }
+}
+
+/**
+ * Payload to broadcast a rejection of a previous optimistic update.
+ */
+export class RejectionPayload extends SyncPayload {
+  listId: string;
+  itemId: string;
+  reason?: string;
+
+  /**
+   * Constructs a new RejectionPayload.
+   * @param {string} entityId - The entity ID.
+   * @param {string} originUserId - The origin user ID performing the rejection.
+   * @param {string} listId - The ID of the list where the item belongs.
+   * @param {string} itemId - The ID of the item whose update was rejected.
+   * @param {string} [reason] - An optional reason describing the rejection.
+   */
+  constructor(entityId: string, originUserId: string, listId: string, itemId: string, reason?: string) {
+    super('REJECT', entityId, originUserId);
+    this.listId = listId;
+    this.itemId = itemId;
+    this.reason = reason;
+  }
+
+  /**
+   * Validates the schema of the rejection payload.
+   * @returns {boolean} True if the payload contains the necessary generic fields and rejection details.
+   */
+  validateSchema(): boolean {
+    return (
+      this.validateBaseSchema() &&
+      this.actionType === 'REJECT' &&
+      Boolean(this.listId) &&
+      Boolean(this.itemId)
     );
   }
 }
