@@ -143,7 +143,9 @@ const ListDetail: React.FC = () => {
 
 		// Optimistic UI update (functional form to avoid stale closures)
 		setItems((prevItems) =>
-			prevItems.map((item) => (item.id === itemId ? { ...item, checked: newChecked } : item)),
+			prevItems.map((item) =>
+				item.id === itemId ? { ...item, checked: newChecked } : item,
+			),
 		);
 
 		if (!id) return;
@@ -167,7 +169,10 @@ const ListDetail: React.FC = () => {
 		} catch (error) {
 			// Rollback on failure and log a clear message
 			setItems(previousItems);
-			console.error("Optimistic UI failed, state reverted:", error instanceof Error ? error.message : error);
+			console.error(
+				"Optimistic UI failed, state reverted:",
+				error instanceof Error ? error.message : error,
+			);
 		}
 	};
 
