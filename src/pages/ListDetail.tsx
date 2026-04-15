@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import stompClient from "../services/socketService";
 
@@ -81,6 +81,63 @@ const ListDetail: React.FC = () => {
 		useState<PermissionState | null>(null);
 	const [showBanner, setShowBanner] = useState(true);
 
+	// Track pending optimistic publishes so we can rollback on timeout or global errors.
+	const pendingRollbacksRef = useRef(
+		new Map<string, { timeoutId: number; rollback: () => void }>(),
+	);
+	const handlersWrappedRef = useRef(false);
+	const RECEIPT_TIMEOUT_MS = 5000;
+
+	// Wrap global STOMP/WebSocket error handlers so transmission failures trigger the same rollback path.
+	useEffect(() => {
+		if (handlersWrappedRef.current) return;
+		handlersWrappedRef.current = true;
+
+		const prevOnWS = (stompClient as any).onWebSocketError;
+		const prevOnStomp = (stompClient as any).onStompError;
+
+		(stompClient as any).onWebSocketError = (evt: any) => {
+			try {
+				prevOnWS?.(evt);
+			} catch (e) {
+				console.error("Error in previous onWebSocketError handler:", e);
+			}
+
+			for (const [id, entry] of pendingRollbacksRef.current.entries()) {
+				try {
+					clearTimeout(entry.timeoutId);
+					entry.rollback();
+				} catch (err) {
+					console.error("Rollback failed during WebSocket error:", err);
+				}
+				pendingRollbacksRef.current.delete(id);
+			}
+		};
+
+		(stompClient as any).onStompError = (frame: any) => {
+			try {
+				prevOnStomp?.(frame);
+			} catch (e) {
+				console.error("Error in previous onStompError handler:", e);
+			}
+
+			for (const [id, entry] of pendingRollbacksRef.current.entries()) {
+				try {
+					clearTimeout(entry.timeoutId);
+					entry.rollback();
+				} catch (err) {
+					console.error("Rollback failed during STOMP error:", err);
+				}
+				pendingRollbacksRef.current.delete(id);
+			}
+		};
+
+		return () => {
+			(stompClient as any).onWebSocketError = prevOnWS;
+			(stompClient as any).onStompError = prevOnStomp;
+		};
+	}, []);
+
 	// Sync items when ID changes
 	useEffect(() => {
 		setItems(readItems(id));
@@ -134,19 +191,20 @@ const ListDetail: React.FC = () => {
 	};
 
 	const handleCheck = (itemId: string) => {
-		// Derive the new checked state from current items (pure, synchronous)
 		const currentItem = items.find((item) => item.id === itemId);
 		if (!currentItem) return;
 		const newChecked = !currentItem.checked;
 
-		// Pure state update: toggle the checked state only
+		// Backup state for potential rollback
+		const previousItems = [...items];
+
+		// Optimistic UI update (functional form to avoid stale closures)
 		setItems((prevItems) =>
 			prevItems.map((item) =>
 				item.id === itemId ? { ...item, checked: newChecked } : item,
 			),
 		);
 
-		// Only build and publish a sync event when a valid list id exists
 		if (!id) return;
 
 		const payload = new SyncPayloadBuilder()
@@ -155,11 +213,67 @@ const ListDetail: React.FC = () => {
 			.setChecked(newChecked)
 			.build();
 
-		if (stompClient.connected) {
+		if (!stompClient.connected) {
+			setItems(previousItems);
+			console.error("Unable to sync: WebSocket connection is closed");
+			return;
+		}
+
+		const receiptId = `rcpt-${crypto.randomUUID()}`;
+
+		try {
+			// Register receipt watcher before sending so we don't miss quick receipts.
+			if ((stompClient as any).watchForReceipt) {
+				(stompClient as any).watchForReceipt(receiptId, () => {
+					const entry = pendingRollbacksRef.current.get(receiptId);
+					if (entry) {
+						clearTimeout(entry.timeoutId);
+						pendingRollbacksRef.current.delete(receiptId);
+					}
+				});
+			}
+
+			// Prepare rollback + timeout in case no receipt arrives
+			const timeoutId = window.setTimeout(() => {
+				const entry = pendingRollbacksRef.current.get(receiptId);
+				if (!entry) return;
+				try {
+					entry.rollback();
+				} catch (err) {
+					console.error("Rollback failed (timeout):", err);
+				}
+				pendingRollbacksRef.current.delete(receiptId);
+			}, RECEIPT_TIMEOUT_MS);
+
+			pendingRollbacksRef.current.set(receiptId, {
+				timeoutId,
+				rollback: () => {
+					setItems(previousItems);
+					console.error(
+						"Optimistic UI failed (no receipt), state reverted for item:",
+						itemId,
+					);
+				},
+			});
+
 			stompClient.publish({
 				destination: "/app/sync",
 				body: payload,
+				headers: { receipt: receiptId },
 			});
+		} catch (error) {
+			const entry = pendingRollbacksRef.current.get(receiptId);
+			if (entry) {
+				clearTimeout(entry.timeoutId);
+				entry.rollback();
+				pendingRollbacksRef.current.delete(receiptId);
+			} else {
+				setItems(previousItems);
+			}
+			console.error(
+				"Optimistic UI failed, state reverted:",
+				error instanceof Error ? error.message : error,
+			);
 		}
 	};
 
