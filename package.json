@@ -1,32 +1,32 @@
 {
-  "name": "web",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "biome check .",
-    "preview": "vite preview",
-    "format": "biome format --write ."
-  },
-  "dependencies": {
-    "@stomp/stompjs": "^7.3.0",
-    "axios": "^1.15.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "react-router-dom": "^7.14.1",
-    "sockjs-client": "^1.6.1",
-    "zustand": "^5.0.12"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.12",
-    "@types/node": "^24.12.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@types/sockjs-client": "^1.5.4",
-    "@vitejs/plugin-react": "^6.0.1",
-    "typescript": "~5.9.3",
-    "vite": "^8.0.8"
-  }
+    "name": "web",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc -b && vite build",
+        "lint": "biome check .",
+        "preview": "vite preview",
+        "format": "biome format --write ."
+    },
+    "dependencies": {
+        "@stomp/stompjs": "^7.3.0",
+        "axios": "^1.15.0",
+        "react": "^19.2.5",
+        "react-dom": "^19.2.5",
+        "react-router-dom": "^7.14.1",
+        "sockjs-client": "^1.6.1",
+        "zustand": "^5.0.12"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.12",
+        "@types/node": "^24.12.2",
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
+        "@types/sockjs-client": "^1.5.4",
+        "@vitejs/plugin-react": "^6.0.1",
+        "typescript": "~5.9.3",
+        "vite": "^8.0.8"
+    }
 }

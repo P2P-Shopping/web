@@ -15,16 +15,48 @@
     gap: 12px;
 }
 
-.logo-section h1 { font-size: 1.25rem; font-weight: 700; margin: 0; color: var(--text-main); }
-.cart-icon { font-size: 1.5rem; }
-.team-tag { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; }
+.logo-section h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-main);
+}
+.cart-icon {
+    font-size: 1.5rem;
+}
+.team-tag {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
 
 /* Navigation Menu */
-nav { display: flex; gap: 24px; margin-right: 2rem; }
-nav a { text-decoration: none; color: var(--text-secondary); font-weight: 600; font-size: 0.95rem; transition: color 0.2s ease; position: relative; }
-nav a:hover { color: var(--accent-blue); }
-nav a::after { content: ""; position: absolute; width: 0; height: 2px; bottom: -4px; left: 0; background-color: var(--accent-blue); transition: width 0.2s ease; }
-nav a:hover::after { width: 100%; }
-
-
-
+nav {
+    display: flex;
+    gap: 24px;
+    margin-right: 2rem;
+}
+nav a {
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: color 0.2s ease;
+    position: relative;
+}
+nav a:hover {
+    color: var(--accent-blue);
+}
+nav a::after {
+    content: "";
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -4px;
+    left: 0;
+    background-color: var(--accent-blue);
+    transition: width 0.2s ease;
+}
+nav a:hover::after {
+    width: 100%;
+}

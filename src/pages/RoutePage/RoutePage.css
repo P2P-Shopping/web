@@ -1,9 +1,55 @@
 /* Route List Styles */
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.count-badge { background: var(--card-bg); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; border: 2px solid black; color: var(--text-secondary)}
-.route-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.route-item { background: var(--card-bg); border: 2px solid var(--border-secondary-color); padding: 1rem; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; transition: transform 0.2s, box-shadow 0.2s; }
-.route-item:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
-.point-info { display: flex; align-items: center; gap: 10px; }
-.point-name { font-weight: 600; color : var(--text-secondary);}
-.point-coords { font-family: "JetBrains Mono", monospace; font-size: 0.85rem; color : var(--text-main); padding: 4px 8px; border-radius: 4px; }
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+.count-badge {
+    background: var(--card-bg);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 2px solid black;
+    color: var(--text-secondary);
+}
+.route-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.route-item {
+    background: var(--card-bg);
+    border: 2px solid var(--border-secondary-color);
+    padding: 1rem;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition:
+        transform 0.2s,
+        box-shadow 0.2s;
+}
+.route-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+.point-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.point-name {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.point-coords {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
