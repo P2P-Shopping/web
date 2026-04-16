@@ -132,13 +132,13 @@ const ListDetail: React.FC = () => {
     // Zustand hooks
     const conflictItems = useStore((state) => state.conflictItems);
     const setItemConflict = useStore((state) => state.setItemConflict);
-    const rollbackItemState = useStore((state) => state.rollbackItemState);
-    const backupItemState = useStore((state) => state.backupItemState);
     const handlePresenceEvent = usePresenceStore((state) => state.handlePresenceEvent);
     const clearAllTimeouts = usePresenceStore((state) => state.clearAllTimeouts);
     const isOnline = useStore((state) => state.isOnline);
     // Track active conflict timeouts to prevent memory leaks
     const conflictTimeoutsRef = useRef<Record<string, number>>({});
+    // Local source-of-truth backup map for optimistic rollback in this component.
+    const itemBackupsRef = useRef<Record<string, Item>>({});
 
     const [myUsername] = useState(() => {
         const stored = localStorage.getItem("p2p_username");
@@ -148,7 +148,13 @@ const ListDetail: React.FC = () => {
 
     const handleRejection = (itemId: string) => {
         if (!itemId) return;
-        rollbackItemState(itemId);
+        const backup = itemBackupsRef.current[itemId];
+        if (backup) {
+            setItems((prevItems) =>
+                prevItems.map((item) => (item.id === itemId ? { ...backup } : item)),
+            );
+            delete itemBackupsRef.current[itemId];
+        }
         setItemConflict(itemId, true);
         
         if (conflictTimeoutsRef.current[itemId]) {
@@ -245,7 +251,7 @@ const ListDetail: React.FC = () => {
             conflictTimeoutsRef.current = {};
             clearAllTimeouts();
         };
-    }, [id, rollbackItemState, setItemConflict, handlePresenceEvent, myUsername, clearAllTimeouts]);
+    }, [id, setItemConflict, handlePresenceEvent, myUsername, clearAllTimeouts]);
     const [newItemName, setNewItemName] = useState("");
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
@@ -382,8 +388,8 @@ const ListDetail: React.FC = () => {
         if (!currentItem) return;
         const newChecked = !currentItem.checked;
 
-        // Backup state for potential rollback in the store
-        backupItemState({ ...currentItem });
+        // Backup state for potential rollback in local component state
+        itemBackupsRef.current[itemId] = { ...currentItem };
 
         // Optimistic UI update (functional form to avoid stale closures)
         setItems((prevItems) => toggleItemChecked(prevItems, itemId, newChecked));
@@ -397,8 +403,7 @@ const ListDetail: React.FC = () => {
             .build();
 
         if (!stompClient.connected || !isOnline) {
-            rollbackItemState(itemId);
-            setItemConflict(itemId, true);
+            handleRejection(itemId);
             console.error("Unable to sync: WebSocket connection is closed or device is offline");
             
             // Add a transient visual warning if they click while offline
@@ -424,6 +429,7 @@ const ListDetail: React.FC = () => {
                         clearTimeout(entry.timeoutId);
                         pendingRollbacksRef.current.delete(receiptId);
                     }
+                    delete itemBackupsRef.current[itemId];
                 });
             }
 
@@ -442,7 +448,7 @@ const ListDetail: React.FC = () => {
             pendingRollbacksRef.current.set(receiptId, {
                 timeoutId,
                 rollback: () => {
-                    rollbackItemState(itemId);
+                    handleRejection(itemId);
                     console.error(
                         "Optimistic UI failed (no receipt), state reverted for item:",
                         itemId,
@@ -462,7 +468,7 @@ const ListDetail: React.FC = () => {
                 entry.rollback();
                 pendingRollbacksRef.current.delete(receiptId);
             } else {
-                rollbackItemState(itemId);
+                handleRejection(itemId);
             }
             console.error(
                 "Optimistic UI failed, state reverted:",
