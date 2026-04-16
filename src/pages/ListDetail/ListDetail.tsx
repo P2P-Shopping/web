@@ -131,6 +131,37 @@ const ListDetail: React.FC = () => {
         return stored || `User_${Math.floor(Math.random() * 1000)}`;
     });
 
+    const handleRejection = (itemId: string) => {
+        if (!itemId) return;
+        rollbackItemState(itemId);
+        setItemConflict(itemId, true);
+        
+        if (conflictTimeoutsRef.current[itemId]) {
+            globalThis.clearTimeout(conflictTimeoutsRef.current[itemId]);
+        }
+        conflictTimeoutsRef.current[itemId] = globalThis.setTimeout(() => {
+            setItemConflict(itemId, false);
+            delete conflictTimeoutsRef.current[itemId];
+        }, 3000);
+    };
+
+    const handleUpdatePayload = (payload: any) => {
+        if (payload.status === "Rejection") {
+            handleRejection(payload.itemId);
+        } else if (payload.status === "Success" || !payload.status) {
+            if (payload.itemId && (payload.action === "UPDATE_ITEM" || payload.actionType === "UPDATE_ITEM")) {
+                const newChecked = payload.checked ?? payload.isChecked;
+                setItems((prevItems) => {
+                    const idx = prevItems.findIndex(i => i.id === payload.itemId);
+                    if (idx === -1) return prevItems;
+                    const newArray = [...prevItems];
+                    newArray[idx] = { ...newArray[idx], checked: newChecked };
+                    return newArray;
+                });
+            }
+        }
+    };
+
     useEffect(() => {
         if (!id) return;
         
@@ -140,21 +171,7 @@ const ListDetail: React.FC = () => {
         
         const connectAndSubscribe = () => {
             if (!stompClient.connected) return;
-            const handleRejection = (itemId: string) => {
-                if (!itemId) return;
-                rollbackItemState(itemId);
-                setItemConflict(itemId, true);
-                
-                if (conflictTimeoutsRef.current[itemId]) {
-                    globalThis.clearTimeout(conflictTimeoutsRef.current[itemId]);
-                }
-
-                conflictTimeoutsRef.current[itemId] = globalThis.setTimeout(() => {
-                    setItemConflict(itemId, false);
-                    delete conflictTimeoutsRef.current[itemId];
-                }, 3000);
-            };
-
+            
             rejectSub = stompClient.subscribe(`/topic/list/${id}/errors`, (message) => {
                 try {
                     const payload = JSON.parse(message.body);
@@ -168,21 +185,7 @@ const ListDetail: React.FC = () => {
 
             updateSub = stompClient.subscribe(`/topic/list/${id}`, (message) => {
                 try {
-                    const payload = JSON.parse(message.body);
-                    if (payload.status === "Rejection") {
-                        handleRejection(payload.itemId);
-                    } else if (payload.status === "Success" || !payload.status) {
-                        if (payload.itemId && (payload.action === "UPDATE_ITEM" || payload.actionType === "UPDATE_ITEM")) {
-                            const newChecked = payload.checked ?? payload.isChecked;
-                            setItems((prevItems) => {
-                                const idx = prevItems.findIndex(i => i.id === payload.itemId);
-                                if (idx === -1) return prevItems;
-                                const newArray = [...prevItems];
-                                newArray[idx] = { ...newArray[idx], checked: newChecked };
-                                return newArray;
-                            });
-                        }
-                    }
+                    handleUpdatePayload(JSON.parse(message.body));
                 } catch (e) {
                     console.error("Error parsing update payload", e);
                 }
