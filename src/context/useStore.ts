@@ -9,6 +9,15 @@ export interface RoutePoint {
     lng: number;
 }
 
+/**
+ * Basic Item interface for Zustand
+ */
+export interface Item {
+    id: string;
+    name: string;
+    checked: boolean;
+}
+
 interface AppState {
     userLocation: Coordinate;
     route: RoutePoint[];
@@ -67,9 +76,14 @@ export const useStore = create<AppState>((set, get) => ({
     rollbackItemState: (itemId) => {
         const backup = get().backupItems[itemId];
         if (backup) {
-            set((state) => ({
-                items: state.items.map((i) => (i.id === itemId ? { ...backup } : i)),
-            }));
+            set((state) => {
+                const newBackupItems = { ...state.backupItems };
+                delete newBackupItems[itemId];
+                return {
+                    items: state.items.map((i) => (i.id === itemId ? { ...backup } : i)),
+                    backupItems: newBackupItems,
+                };
+            });
         }
     },
     setItemConflict: (itemId, hasConflict) =>
@@ -77,12 +91,3 @@ export const useStore = create<AppState>((set, get) => ({
             conflictItems: { ...state.conflictItems, [itemId]: hasConflict },
         })),
 }));
-
-/**
- * Basic Item interface for Zustand
- */
-export interface Item {
-    id: string;
-    name: string;
-    checked: boolean;
-}

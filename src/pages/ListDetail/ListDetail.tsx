@@ -2,17 +2,11 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import stompClient from "../../services/socketService";
-import { useStore } from "../../context/useStore";
+import { useStore, type Item } from "../../context/useStore";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { PresenceBar } from "../../components";
 
 import "./ListDetail.css";
-
-interface Item {
-    id: string; // Added unique ID
-    name: string;
-    checked: boolean;
-}
 
 class SyncPayloadBuilder {
     private payload: Record<string, any> = {
@@ -127,7 +121,10 @@ const toggleItemChecked = (prevItems: Item[], itemId: string, newChecked: boolea
 
 const ListDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const [items, setItems] = useState<Item[]>([]);
+    const items = useStore((state) => state.items);
+    const setItems = useStore((state) => state.setItems);
+    const rollbackItemState = useStore((state) => state.rollbackItemState);
+    const backupItemState = useStore((state) => state.backupItemState);
     
     // Zustand hooks
     const conflictItems = useStore((state) => state.conflictItems);
@@ -137,11 +134,6 @@ const ListDetail: React.FC = () => {
     const isOnline = useStore((state) => state.isOnline);
     // Track active conflict timeouts to prevent memory leaks
     const conflictTimeoutsRef = useRef<Record<string, number>>({});
-    // Local source-of-truth backup map for optimistic rollback in this component.
-    const itemBackupsRef = useRef<Record<string, Item>>({});
-    const clearBackup = (itemId: string) => {
-        delete itemBackupsRef.current[itemId];
-    };
 
     const [myUsername] = useState(() => {
         const stored = localStorage.getItem("p2p_username");
@@ -151,13 +143,7 @@ const ListDetail: React.FC = () => {
 
     const handleRejection = (itemId: string) => {
         if (!itemId) return;
-        const backup = itemBackupsRef.current[itemId];
-        if (backup) {
-            setItems((prevItems) =>
-                prevItems.map((item) => (item.id === itemId ? backup : item)),
-            );
-            clearBackup(itemId);
-        }
+        rollbackItemState(itemId);
         setItemConflict(itemId, true);
         
         if (conflictTimeoutsRef.current[itemId]) {
@@ -175,7 +161,7 @@ const ListDetail: React.FC = () => {
         } else if (payload.status === "Success" || !payload.status) {
             if (payload.itemId && (payload.action === "UPDATE_ITEM" || payload.actionType === "UPDATE_ITEM")) {
                 const newChecked = payload.checked ?? payload.isChecked;
-                setItems((prevItems) => applyItemUpdate(prevItems, payload.itemId, newChecked));
+                setItems(applyItemUpdate(items, payload.itemId, newChecked));
             }
         }
     };
@@ -234,19 +220,11 @@ const ListDetail: React.FC = () => {
             handlePresenceEvent({ eventType: "JOIN", username: myUsername, listId: id });
         };
 
-        let cancelled = false;
-        const prevOnConnect = stompClient.onConnect;
         if (stompClient.connected) {
             connectAndSubscribe();
         } else {
-            stompClient.onConnect = (frame) => {
-                prevOnConnect?.(frame);
-                if (!cancelled) connectAndSubscribe();
-            };
+            stompClient.onConnect = () => connectAndSubscribe();
         }
-        return () => {
-            cancelled = true;
-            stompClient.onConnect = prevOnConnect;
 
         return () => {
             if (stompClient.connected) {
@@ -399,11 +377,11 @@ const ListDetail: React.FC = () => {
         if (!currentItem) return;
         const newChecked = !currentItem.checked;
 
-        // Backup state for potential rollback in local component state
-        itemBackupsRef.current[itemId] = { ...currentItem };
+        // Backup state for potential rollback in the store
+        backupItemState({ ...currentItem });
 
         // Optimistic UI update (functional form to avoid stale closures)
-        setItems((prevItems) => toggleItemChecked(prevItems, itemId, newChecked));
+        setItems(toggleItemChecked(items, itemId, newChecked));
 
         if (!id) return;
 
@@ -440,7 +418,6 @@ const ListDetail: React.FC = () => {
                         clearTimeout(entry.timeoutId);
                         pendingRollbacksRef.current.delete(receiptId);
                     }
-                    clearBackup(itemId);
                 });
             }
 
