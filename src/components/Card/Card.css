@@ -1,3 +1,16 @@
 /* Content & Cards */
-.card { background: var(--card-bg); border-radius: 12px; padding: 1.5rem; box-shadow: var(--shadow); margin-bottom: 2rem; }
-.card-title { font-size: 1rem; color: var(--navbar-text); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 1.25rem;}
+.card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+}
+.card-title {
+    font-size: 1rem;
+    color: var(--navbar-text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+}
