@@ -12,6 +12,7 @@ import RegistrationPage from "./pages/RegistrationPage";
 import MapPage from "./pages/MapPage";
 import RoutePage from "./pages/RoutePage";
 import ListDetail from "./pages/ListDetail";
+import MyListsPage from "./pages/MyListsPage";
 import "./App.css";
 
 function App() {
@@ -120,8 +121,8 @@ function App() {
           <Link to="/nav" className="nav-link">
             Store Map
           </Link>
-          <Link to="/list/default" className="nav-link">
-            List
+          <Link to="/my-lists" className="nav-link">
+            My Lists
           </Link>
 
           <button
@@ -170,6 +171,7 @@ function App() {
           <Route path="/map" element={<MapPage />} />
           <Route path="/nav" element={<StoreMap />} />
           <Route path="/route" element={<RoutePage />} />
+          <Route path="/my-lists" element={<MyListsPage />} />
           <Route path="/list/:id" element={<ListDetail />} />
 
           <Route path="/" element={<Navigate to="/login" replace />} />

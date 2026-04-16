@@ -7,22 +7,14 @@ import type { RejectionPayload } from "../dto/SyncPayload";
 import type { PresencePayload, PresenceEventType } from "../dto/PresencePayload";
 import PresenceBar from "../components/PresenceBar";
 import type { StompSubscription } from "@stomp/stompjs";
-
-/**
- * Structure mapping internal list items.
- */
-interface Item {
-  id: string;
-  name: string;
-  checked: boolean;
-}
+import type { Item } from "../context/useStore";
 
 /**
  * Prepares mock sync payloads.
  */
 class SyncPayloadBuilder {
   private payload: Record<string, any> = {
-    eventType: "ITEM_TOGGLED",
+    actionType: "CHECK_OFF",
     timestamp: Date.now(),
   };
 
@@ -64,35 +56,35 @@ const sanitizeString = (input: unknown): string => {
 };
 
 /**
- * Transforms items safely before caching locally.
- * @param {Item[]} items - Active data items.
- * @returns {Item[]} Escaped and structural item states.
- */
-const sanitizeItemsForStorage = (items: Item[]): Item[] =>
-  items.map((item) => ({
-    id: String(item.id),
-    name: sanitizeString(item.name),
-    checked: Boolean(item.checked),
-  }));
-
-/**
- * Loads serialized and sanitized list item arrays from storage caches.
+ * Uses Axios to fetch the full list topology directly from the active backend server.
+ * Returns blank array fallback if failed instead of throwing runtime interrupts.
  * @param {string | undefined} id - Unique associated list UUID.
- * @returns {Item[]} Decoded shopping list items.
+ * @returns {Promise<Item[]>} Decoded shopping list items directly from Postgres.
  */
-const readItems = (id: string | undefined): Item[] => {
+const fetchRealItems = async (id: string | undefined): Promise<Item[]> => {
   if (!id) return [];
-  const saved = localStorage.getItem(`list-${id}`);
-  if (!saved) return [];
   try {
-    const parsed = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((p) => ({
+    const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8081";
+    const token = localStorage.getItem("jwt_token") || "";
+    const res = await window.fetch(`${API_URL}/api/lists/${id}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token ? `Bearer ${token}` : ""
+      }
+    });
+    if (res.status === 403) throw new Error("403_FORBIDDEN");
+    if (!res.ok) throw new Error("List load rejected.");
+    const data = await res.json();
+    if (!data.items || !Array.isArray(data.items)) return [];
+    
+    return data.items.map((p: any) => ({
       id: String(p.id ?? crypto.randomUUID()),
       name: sanitizeString(p.name ?? ""),
       checked: Boolean(p.checked),
     }));
-  } catch {
+  } catch (err: any) {
+    if (err.message === "403_FORBIDDEN") throw err;
+    if (import.meta.env.DEV) console.error("REST Backend missing/failed for list:", err);
     return [];
   }
 };
@@ -103,22 +95,40 @@ const readItems = (id: string | undefined): Item[] => {
  */
 const ListDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [items, setItems] = useState<Item[]>([]);
   const [newItemName, setNewItemName] = useState("");
   const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
   const [showBanner, setShowBanner] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Store Hooks
+  const items = useStore((state) => state.items);
+  const setItemsFromFetch = useStore((state) => state.setItemsFromFetch);
+  const toggleItemOptimistic = useStore((state) => state.toggleItemOptimistic);
+  const handleItemSyncBroadcast = useStore((state) => state.handleItemSyncBroadcast);
+  const addItemLocal = useStore((state) => state.addItemLocal);
+  
   const conflictItems = useStore((state) => state.conflictItems);
   const setItemConflict = useStore((state) => state.setItemConflict);
   const backupGlobalItemState = useStore((state) => state.backupItemState);
   const getBackupItemState = useStore((state) => state.getBackupItemState);
-  const triggerStoreRollback = useStore((state) => state.rollbackItemState);
+  const rawTriggerStoreRollback = useStore((state) => state.rollbackItemState);
+  
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
+
+  const [isForbidden, setIsForbidden] = useState(false);
+  const [collaboratorEmail, setCollaboratorEmail] = useState("");
+
+  const triggerStoreRollback = React.useCallback((itemId: string) => {
+    rawTriggerStoreRollback(itemId);
+    setSyncErrorMessage("⚠️ Sync error: Failed to save changes to the database. Item reverted.");
+    setTimeout(() => setSyncErrorMessage(null), 5000);
+  }, [rawTriggerStoreRollback]);
+
   const handlePresenceEvent = usePresenceStore((state) => state.handlePresenceEvent);
   const clearAllTimeouts = usePresenceStore((state) => state.clearAllTimeouts);
 
   const pendingRollbacksRef = useRef(
-    new Map<string, { timeoutId: number; rollback: () => void }>(),
+    new Map<string, { timeoutId: number; itemId?: string; rollback: () => void }>(),
   );
   
   const activeConflictTimeoutsRef = useRef(new Map<string, number>());
@@ -155,6 +165,7 @@ const ListDetail: React.FC = () => {
 
     let errorSub: StompSubscription | null = null;
     let presenceSub: StompSubscription | null = null;
+    let updateSub: StompSubscription | null = null;
     let isSubscribed = false;
 
     const setupSubscriptions = () => {
@@ -173,9 +184,6 @@ const ListDetail: React.FC = () => {
 
               const backupNode = getBackupItemState(payload.itemId);
               if (backupNode) { 
-                 setItems((prev) => 
-                   prev.map((i) => i.id === payload.itemId ? { ...i, ...backupNode } : i)
-                 );
                  triggerStoreRollback(payload.itemId);
               }
 
@@ -208,6 +216,30 @@ const ListDetail: React.FC = () => {
             });
           } catch (e) {
             // Ignore
+          }
+        });
+
+        // Add WebSocket Listener Action (handleItemSyncBroadcast)
+        updateSub = stompClient.subscribe(`/topic/list/${id}`, (message) => {
+          try {
+             const updatePayload = JSON.parse(message.body);
+             if (updatePayload.action === "ADD" || updatePayload.action === "TOGGLE" || updatePayload.actionType === "ADD" || updatePayload.actionType === "TOGGLE") {
+                 // Clear rollback timer for this item
+                 for (const [receipt, entry] of pendingRollbacksRef.current.entries()) {
+                   if (entry.itemId === updatePayload.itemId) {
+                     clearTimeout(entry.timeoutId);
+                     pendingRollbacksRef.current.delete(receipt);
+                   }
+                 }
+                 
+                 if (updatePayload.action === "ADD" || updatePayload.actionType === "ADD") {
+                     fetchRealItems(id).then(setItemsFromFetch).catch(() => {});
+                 } else {
+                     handleItemSyncBroadcast(updatePayload.itemId, updatePayload.checked);
+                 }
+             }
+          } catch(e) {
+             // Ignore
           }
         });
 
@@ -252,6 +284,9 @@ const ListDetail: React.FC = () => {
       }
       if (presenceSub) {
         presenceSub.unsubscribe();
+      }
+      if (updateSub) {
+        updateSub.unsubscribe();
       }
       clearAllTimeouts();
     };
@@ -301,17 +336,20 @@ const ListDetail: React.FC = () => {
     };
   }, []);
 
-  // Sync items when ID changes
+  // Sync items when ID changes via REST fetch immediately
   useEffect(() => {
-    setItems(readItems(id));
-  }, [id]);
-
-  // Persist items to localStorage
-  useEffect(() => {
-    if (!id) return;
-    const sanitized = sanitizeItemsForStorage(items);
-    localStorage.setItem(`list-${id}`, JSON.stringify(sanitized));
-  }, [items, id]);
+    setIsLoading(true);
+    setIsForbidden(false);
+    fetchRealItems(id).then((fetched) => {
+      setItemsFromFetch(fetched);
+      setIsLoading(false);
+    }).catch(err => {
+      if (err.message === "403_FORBIDDEN") {
+        setIsForbidden(true);
+        setIsLoading(false);
+      }
+    });
+  }, [id, setItemsFromFetch]);
 
   // Safe Permission Check
   useEffect(() => {
@@ -345,14 +383,37 @@ const ListDetail: React.FC = () => {
    */
   const addItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newItemName.trim() === "") return;
+    if (newItemName.trim() === "" || !id) return;
+    const tempId = crypto.randomUUID();
     const newItem: Item = {
-      id: crypto.randomUUID(),
+      id: tempId,
       name: newItemName,
       checked: false,
     };
-    setItems([...items, newItem]);
+    
+    // Optimistic local update
+    addItemLocal(newItem);
     setNewItemName("");
+
+    if (!stompClient.connected) {
+      triggerStoreRollback(tempId);
+      return;
+    }
+
+    const payload = new SyncPayloadBuilder()
+      .setListId(id)
+      .setItemId(tempId)
+      .setChecked(false)
+      .build();
+    
+    const rawPayload = JSON.parse(payload);
+    rawPayload.actionType = "ADD";
+    rawPayload.name = newItemName;
+    
+    stompClient.publish({
+      destination: `/app/list/${id}/update`,
+      body: JSON.stringify(rawPayload)
+    });
   };
 
   /**
@@ -379,25 +440,23 @@ const ListDetail: React.FC = () => {
     if (!currentItem) return;
     const newChecked = !currentItem.checked;
 
-    const previousItems = [...items];
     backupGlobalItemState({ ...currentItem }); // Bind state immediately prior to modifications against the global layout
 
-    setItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === itemId ? { ...item, checked: newChecked } : item,
-      ),
-    );
+    toggleItemOptimistic(itemId, newChecked);
 
     if (!id) return;
 
-    const payload = new SyncPayloadBuilder()
+    const payloadObj = JSON.parse(new SyncPayloadBuilder()
       .setListId(id)
       .setItemId(itemId)
       .setChecked(newChecked)
-      .build();
+      .build());
+    
+    payloadObj.actionType = "TOGGLE";
+    const payload = JSON.stringify(payloadObj);
 
     if (!stompClient.connected) {
-      setItems(previousItems);
+      triggerStoreRollback(itemId);
       return;
     }
 
@@ -425,14 +484,14 @@ const ListDetail: React.FC = () => {
 
       pendingRollbacksRef.current.set(receiptId, {
         timeoutId,
+        itemId,
         rollback: () => {
-          setItems(previousItems);
           triggerStoreRollback(itemId);
         },
       });
 
       stompClient.publish({
-        destination: "/app/sync",
+        destination: `/app/list/${id}/update`,
         body: payload,
         headers: { receipt: receiptId },
       });
@@ -443,20 +502,85 @@ const ListDetail: React.FC = () => {
         entry.rollback();
         pendingRollbacksRef.current.delete(receiptId);
       } else {
-        setItems(previousItems);
         triggerStoreRollback(itemId);
       }
     }
   };
 
+  if (isLoading) {
+    return <div className="loading-spinner">Loading list details...</div>;
+  }
+
+  if (isForbidden) {
+    return (
+      <div className="list-detail-container" style={{ textAlign: "center", marginTop: "50px" }}>
+        <h2>Access Denied</h2>
+        <p>You are not a collaborator on this list.</p>
+        <button className="add-button" onClick={() => window.location.href = "/my-lists"} style={{ marginTop: "20px" }}>
+          Go to My Lists
+        </button>
+      </div>
+    );
+  }
+
+  const handleAddCollaborator = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!collaboratorEmail.trim() || !id) return;
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8081";
+      const token = localStorage.getItem("jwt_token") || "";
+      const res = await window.fetch(`${API_URL}/api/lists/${id}/collaborators`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : ""
+        },
+        body: JSON.stringify({ email: collaboratorEmail })
+      });
+      if (res.ok) {
+        setCollaboratorEmail("");
+        alert("Collaborator added successfully!");
+      } else {
+        alert("Failed to add collaborator.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error adding collaborator.");
+    }
+  };
+
   return (
     <div className="list-detail-container">
+      {syncErrorMessage && (
+        <div className="location-warning-banner" style={{ marginBottom: '10px' }}>
+          <span>{syncErrorMessage}</span>
+          <button className="close-banner-btn" onClick={() => setSyncErrorMessage(null)}>✕</button>
+        </div>
+      )}
+
       {showBanner && permissionStatus === "denied" && (
         <div className="location-warning-banner">
           <span>Location access is disabled. Some features may be limited.</span>
           <button className="close-banner-btn" onClick={() => setShowBanner(false)}>✕</button>
         </div>
       )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <button className="add-button" onClick={() => window.location.href = "/my-lists"} style={{ padding: "5px 10px" }}>
+          ← Back to My Lists
+        </button>
+        <form onSubmit={handleAddCollaborator} style={{ display: "flex", gap: "10px" }}>
+          <input
+            type="email"
+            value={collaboratorEmail}
+            onChange={(e) => setCollaboratorEmail(e.target.value)}
+            placeholder="Collaborator Email"
+            className="add-input"
+            style={{ width: "200px" }}
+          />
+          <button type="submit" className="add-button">Add</button>
+        </form>
+      </div>
 
       <PresenceBar />
 
