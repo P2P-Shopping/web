@@ -38,14 +38,43 @@ class SyncPayloadBuilder {
 }
 
 // Sanitize strings to reduce risk of storing/executing malicious payloads.
+const removeScriptBlocks = (input: string): string => {
+    const lowerInput = input.toLowerCase();
+    const closingTag = "</script>";
+    let cursor = 0;
+    let output = "";
+
+    while (cursor < input.length) {
+        const start = lowerInput.indexOf("<script", cursor);
+        if (start === -1) {
+            output += input.slice(cursor);
+            break;
+        }
+
+        const tagEnd = input.indexOf(">", start + 7);
+        if (tagEnd === -1) {
+            output += input.slice(cursor);
+            break;
+        }
+
+        const closeStart = lowerInput.indexOf(closingTag, tagEnd + 1);
+        if (closeStart === -1) {
+            output += input.slice(cursor);
+            break;
+        }
+
+        output += input.slice(cursor, start);
+        cursor = closeStart + closingTag.length;
+    }
+
+    return output;
+};
+
 const sanitizeString = (input: unknown): string => {
     const s = String(input ?? "");
 
     // Remove any <script>...</script> blocks entirely
-    const withoutScripts = s.replace(
-        /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
-        "",
-    );
+    const withoutScripts = removeScriptBlocks(s);
 
     // Escape angle brackets and ampersands so stored values cannot be
     // interpreted as HTML if later injected into the DOM unsafely.
