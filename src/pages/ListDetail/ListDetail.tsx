@@ -2,18 +2,15 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import stompClient from "../../services/socketService";
+import { useStore, type Item } from "../../context/useStore";
+import { usePresenceStore } from "../../context/usePresenceStore";
+import { PresenceBar } from "../../components";
 
 import "./ListDetail.css";
 
-interface Item {
-    id: string; // Added unique ID
-    name: string;
-    checked: boolean;
-}
-
 class SyncPayloadBuilder {
     private payload: Record<string, any> = {
-        eventType: "ITEM_TOGGLED",
+        actionType: "UPDATE_ITEM",
         timestamp: Date.now(),
     };
 
@@ -108,9 +105,142 @@ const readItems = (id: string | undefined): Item[] => {
     }
 };
 
+// Pure utility to apply state updates outside of the component to reduce nesting depth
+const applyItemUpdate = (prevItems: Item[], itemId: string, newChecked: boolean): Item[] => {
+    const idx = prevItems.findIndex((i) => i.id === itemId);
+    if (idx === -1) return prevItems;
+    const newArray = [...prevItems];
+    newArray[idx] = { ...newArray[idx], checked: newChecked };
+    return newArray;
+};
+
+const toggleItemChecked = (prevItems: Item[], itemId: string, newChecked: boolean): Item[] =>
+    prevItems.map((item) =>
+        item.id === itemId ? { ...item, checked: newChecked } : item,
+    );
+
 const ListDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const [items, setItems] = useState<Item[]>([]);
+    const items = useStore((state) => state.items);
+    const setItems = useStore((state) => state.setItems);
+    const rollbackItemState = useStore((state) => state.rollbackItemState);
+    const backupItemState = useStore((state) => state.backupItemState);
+    
+    // Zustand hooks
+    const conflictItems = useStore((state) => state.conflictItems);
+    const setItemConflict = useStore((state) => state.setItemConflict);
+    const handlePresenceEvent = usePresenceStore((state) => state.handlePresenceEvent);
+    const clearAllTimeouts = usePresenceStore((state) => state.clearAllTimeouts);
+    const isOnline = useStore((state) => state.isOnline);
+    // Track active conflict timeouts to prevent memory leaks
+    const conflictTimeoutsRef = useRef<Record<string, number>>({});
+
+    const [myUsername] = useState(() => {
+        const stored = localStorage.getItem("p2p_username");
+        const randomNum = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 1000;
+        return stored || `User_${randomNum}`;
+    });
+
+    const handleRejection = (itemId: string) => {
+        if (!itemId) return;
+        rollbackItemState(itemId);
+        setItemConflict(itemId, true);
+        
+        if (conflictTimeoutsRef.current[itemId]) {
+            globalThis.clearTimeout(conflictTimeoutsRef.current[itemId]);
+        }
+        conflictTimeoutsRef.current[itemId] = globalThis.setTimeout(() => {
+            setItemConflict(itemId, false);
+            delete conflictTimeoutsRef.current[itemId];
+        }, 3000);
+    };
+
+    const handleUpdatePayload = (payload: any) => {
+        if (payload.status === "Rejection") {
+            handleRejection(payload.itemId);
+        } else if (payload.status === "Success" || !payload.status) {
+            if (payload.itemId && (payload.action === "UPDATE_ITEM" || payload.actionType === "UPDATE_ITEM")) {
+                const newChecked = payload.checked ?? payload.isChecked;
+                setItems(applyItemUpdate(items, payload.itemId, newChecked));
+            }
+        }
+    };
+
+    const onErrorsMessage = (message: any) => {
+        try {
+            const payload = JSON.parse(message.body);
+            if (payload.actionType === "REJECT" || payload.actionType === "ERROR") {
+                handleRejection(payload.itemId);
+            }
+        } catch (e) {
+            console.error("Error parsing reject payload", e);
+        }
+    };
+
+    const onUpdateMessage = (message: any) => {
+        try {
+            handleUpdatePayload(JSON.parse(message.body));
+        } catch (e) {
+            console.error("Error parsing update payload", e);
+        }
+    };
+
+    const onPresenceMessage = (message: any) => {
+        if (!id) return;
+        try {
+            const payload = JSON.parse(message.body);
+            handlePresenceEvent({
+                username: payload.username,
+                eventType: payload.eventType,
+                listId: id,
+            });
+        } catch (e) {
+            console.error("Error parsing presence payload", e);
+        }
+    };
+
+    useEffect(() => {
+        if (!id) return;
+        
+        let rejectSub: any;
+        let presenceSub: any;
+        let updateSub: any;
+        
+        const connectAndSubscribe = () => {
+            if (!stompClient.connected) return;
+            
+            rejectSub = stompClient.subscribe(`/topic/list/${id}/errors`, onErrorsMessage);
+            updateSub = stompClient.subscribe(`/topic/list/${id}`, onUpdateMessage);
+            presenceSub = stompClient.subscribe(`/topic/list/${id}/presence`, onPresenceMessage);
+
+            stompClient.publish({
+                destination: `/app/list/${id}/presence`,
+                body: JSON.stringify({ eventType: "JOIN", username: myUsername, listId: id }),
+            });
+            handlePresenceEvent({ eventType: "JOIN", username: myUsername, listId: id });
+        };
+
+        if (stompClient.connected) {
+            connectAndSubscribe();
+        } else {
+            stompClient.onConnect = () => connectAndSubscribe();
+        }
+
+        return () => {
+            if (stompClient.connected) {
+                stompClient.publish({
+                    destination: `/app/list/${id}/presence`,
+                    body: JSON.stringify({ eventType: "LEAVE", username: myUsername, listId: id }),
+                });
+            }
+            if (rejectSub) rejectSub.unsubscribe();
+            if (presenceSub) presenceSub.unsubscribe();
+            if (updateSub) updateSub.unsubscribe();
+            Object.values(conflictTimeoutsRef.current).forEach(tId => globalThis.clearTimeout(tId));
+            conflictTimeoutsRef.current = {};
+            clearAllTimeouts();
+        };
+    }, [id, setItemConflict, handlePresenceEvent, myUsername, clearAllTimeouts]);
     const [newItemName, setNewItemName] = useState("");
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
@@ -216,6 +346,20 @@ const ListDetail: React.FC = () => {
         };
     }, []);
 
+    const lastTypingEmitRef = useRef<number>(0);
+
+    const handleTyping = () => {
+        const now = Date.now();
+        if (now - lastTypingEmitRef.current > 500 && stompClient.connected && id && isOnline) {
+            lastTypingEmitRef.current = now;
+            stompClient.publish({
+                destination: `/app/list/${id}/presence`,
+                body: JSON.stringify({ eventType: "TYPING", username: myUsername, listId: id }),
+            });
+            handlePresenceEvent({ eventType: "TYPING", username: myUsername, listId: id });
+        }
+    };
+
     const addItem = (e: React.FormEvent) => {
         e.preventDefault();
         if (newItemName.trim() === "") return;
@@ -233,15 +377,11 @@ const ListDetail: React.FC = () => {
         if (!currentItem) return;
         const newChecked = !currentItem.checked;
 
-        // Backup state for potential rollback
-        const previousItems = [...items];
+        // Backup state for potential rollback in the store
+        backupItemState({ ...currentItem });
 
         // Optimistic UI update (functional form to avoid stale closures)
-        setItems((prevItems) =>
-            prevItems.map((item) =>
-                item.id === itemId ? { ...item, checked: newChecked } : item,
-            ),
-        );
+        setItems(toggleItemChecked(items, itemId, newChecked));
 
         if (!id) return;
 
@@ -251,9 +391,19 @@ const ListDetail: React.FC = () => {
             .setChecked(newChecked)
             .build();
 
-        if (!stompClient.connected) {
-            setItems(previousItems);
-            console.error("Unable to sync: WebSocket connection is closed");
+        if (!stompClient.connected || !isOnline) {
+            handleRejection(itemId);
+            console.error("Unable to sync: WebSocket connection is closed or device is offline");
+            
+            // Add a transient visual warning if they click while offline
+            if (conflictTimeoutsRef.current[itemId]) {
+                globalThis.clearTimeout(conflictTimeoutsRef.current[itemId]);
+            }
+            conflictTimeoutsRef.current[itemId] = globalThis.setTimeout(() => {
+                setItemConflict(itemId, false);
+                delete conflictTimeoutsRef.current[itemId];
+            }, 3000);
+            
             return;
         }
 
@@ -272,7 +422,7 @@ const ListDetail: React.FC = () => {
             }
 
             // Prepare rollback + timeout in case no receipt arrives
-            const timeoutId = window.setTimeout(() => {
+            const timeoutId = globalThis.setTimeout(() => {
                 const entry = pendingRollbacksRef.current.get(receiptId);
                 if (!entry) return;
                 try {
@@ -286,7 +436,7 @@ const ListDetail: React.FC = () => {
             pendingRollbacksRef.current.set(receiptId, {
                 timeoutId,
                 rollback: () => {
-                    setItems(previousItems);
+                    handleRejection(itemId);
                     console.error(
                         "Optimistic UI failed (no receipt), state reverted for item:",
                         itemId,
@@ -295,7 +445,7 @@ const ListDetail: React.FC = () => {
             });
 
             stompClient.publish({
-                destination: "/app/sync",
+                destination: `/app/list/${id}/update`,
                 body: payload,
                 headers: { receipt: receiptId },
             });
@@ -306,7 +456,7 @@ const ListDetail: React.FC = () => {
                 entry.rollback();
                 pendingRollbacksRef.current.delete(receiptId);
             } else {
-                setItems(previousItems);
+                handleRejection(itemId);
             }
             console.error(
                 "Optimistic UI failed, state reverted:",
@@ -333,11 +483,16 @@ const ListDetail: React.FC = () => {
                 </div>
             )}
 
+            <PresenceBar />
+
             <form onSubmit={addItem} className="add-item-form">
                 <input
                     type="text"
                     value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
+                    onChange={(e) => {
+                        setNewItemName(e.target.value);
+                        handleTyping();
+                    }}
                     placeholder="Add new item..."
                     className="add-input"
                 />
@@ -347,10 +502,12 @@ const ListDetail: React.FC = () => {
             </form>
 
             <ul className="shopping-list">
-                {items.map((item) => (
+                {items.map((item) => {
+                    const isConflicting = conflictItems[item.id] === true;
+                    return (
                     <li
                         key={item.id}
-                        className={`shopping-item ${item.checked ? "item-completed" : ""}`}
+                        className={`shopping-item ${item.checked ? "item-completed" : ""} ${isConflicting ? "item-conflict" : ""}`}
                     >
                         <label className="item-label">
                             <input
@@ -359,10 +516,12 @@ const ListDetail: React.FC = () => {
                                 onChange={() => handleCheck(item.id)}
                                 className="item-checkbox"
                             />
-                            <span className="item-text">{item.name}</span>
+                            <span className="item-text">
+                                {item.name} {isConflicting && <span className="warning-icon">⚠️</span>}
+                            </span>
                         </label>
                     </li>
-                ))}
+                )})}
             </ul>
 
             {items.length === 0 && (

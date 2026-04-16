@@ -3,6 +3,10 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
     plugins: [react()],
+    server: {
+        port: 5173,
+        strictPort: true,
+    },
     define: {
         // Prevents "global is not defined" crash from SockJS
         global: "window",

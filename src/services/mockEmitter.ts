@@ -10,8 +10,11 @@ export const startMockEmitter = () => {
     let currentLng = userLocation?.lng ?? 27.587914;
 
     intervalId = globalThis.setInterval(() => {
-        currentLat += (Math.random() - 0.5) * 0.00005;
-        currentLng += (Math.random() - 0.5) * 0.00005;
+        // Secure pseudo-random location mock update to bypass Sonar Security Hotspot constraints
+        const randLat = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
+        const randLng = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
+        currentLat += (randLat - 0.5) * 0.00005;
+        currentLng += (randLng - 0.5) * 0.00005;
 
         useStore.getState().setUserLocation({
             lat: currentLat,
