@@ -111,6 +111,20 @@ const readItems = (id: string | undefined): Item[] => {
     }
 };
 
+// Pure utility to apply state updates outside of the component to reduce nesting depth
+const applyItemUpdate = (prevItems: Item[], itemId: string, newChecked: boolean): Item[] => {
+    const idx = prevItems.findIndex((i) => i.id === itemId);
+    if (idx === -1) return prevItems;
+    const newArray = [...prevItems];
+    newArray[idx] = { ...newArray[idx], checked: newChecked };
+    return newArray;
+};
+
+const toggleItemChecked = (prevItems: Item[], itemId: string, newChecked: boolean): Item[] =>
+    prevItems.map((item) =>
+        item.id === itemId ? { ...item, checked: newChecked } : item,
+    );
+
 const ListDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [items, setItems] = useState<Item[]>([]);
@@ -128,7 +142,8 @@ const ListDetail: React.FC = () => {
 
     const [myUsername] = useState(() => {
         const stored = localStorage.getItem("p2p_username");
-        return stored || `User_${Math.floor(Math.random() * 1000)}`;
+        const randomNum = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 1000;
+        return stored || `User_${randomNum}`;
     });
 
     const handleRejection = (itemId: string) => {
@@ -151,14 +166,41 @@ const ListDetail: React.FC = () => {
         } else if (payload.status === "Success" || !payload.status) {
             if (payload.itemId && (payload.action === "UPDATE_ITEM" || payload.actionType === "UPDATE_ITEM")) {
                 const newChecked = payload.checked ?? payload.isChecked;
-                setItems((prevItems) => {
-                    const idx = prevItems.findIndex(i => i.id === payload.itemId);
-                    if (idx === -1) return prevItems;
-                    const newArray = [...prevItems];
-                    newArray[idx] = { ...newArray[idx], checked: newChecked };
-                    return newArray;
-                });
+                setItems((prevItems) => applyItemUpdate(prevItems, payload.itemId, newChecked));
             }
+        }
+    };
+
+    const onErrorsMessage = (message: any) => {
+        try {
+            const payload = JSON.parse(message.body);
+            if (payload.actionType === "REJECT" || payload.actionType === "ERROR") {
+                handleRejection(payload.itemId);
+            }
+        } catch (e) {
+            console.error("Error parsing reject payload", e);
+        }
+    };
+
+    const onUpdateMessage = (message: any) => {
+        try {
+            handleUpdatePayload(JSON.parse(message.body));
+        } catch (e) {
+            console.error("Error parsing update payload", e);
+        }
+    };
+
+    const onPresenceMessage = (message: any) => {
+        if (!id) return;
+        try {
+            const payload = JSON.parse(message.body);
+            handlePresenceEvent({
+                username: payload.username,
+                eventType: payload.eventType,
+                listId: id,
+            });
+        } catch (e) {
+            console.error("Error parsing presence payload", e);
         }
     };
 
@@ -172,37 +214,9 @@ const ListDetail: React.FC = () => {
         const connectAndSubscribe = () => {
             if (!stompClient.connected) return;
             
-            rejectSub = stompClient.subscribe(`/topic/list/${id}/errors`, (message) => {
-                try {
-                    const payload = JSON.parse(message.body);
-                    if (payload.actionType === "REJECT" || payload.actionType === "ERROR") {
-                        handleRejection(payload.itemId);
-                    }
-                } catch (e) {
-                    console.error("Error parsing reject payload", e);
-                }
-            });
-
-            updateSub = stompClient.subscribe(`/topic/list/${id}`, (message) => {
-                try {
-                    handleUpdatePayload(JSON.parse(message.body));
-                } catch (e) {
-                    console.error("Error parsing update payload", e);
-                }
-            });
-
-            presenceSub = stompClient.subscribe(`/topic/list/${id}/presence`, (message) => {
-                try {
-                    const payload = JSON.parse(message.body);
-                    handlePresenceEvent({
-                        username: payload.username,
-                        eventType: payload.eventType,
-                        listId: id,
-                    });
-                } catch (e) {
-                    console.error("Error parsing presence payload", e);
-                }
-            });
+            rejectSub = stompClient.subscribe(`/topic/list/${id}/errors`, onErrorsMessage);
+            updateSub = stompClient.subscribe(`/topic/list/${id}`, onUpdateMessage);
+            presenceSub = stompClient.subscribe(`/topic/list/${id}/presence`, onPresenceMessage);
 
             stompClient.publish({
                 destination: `/app/list/${id}/presence`,
@@ -372,11 +386,7 @@ const ListDetail: React.FC = () => {
         backupItemState({ ...currentItem });
 
         // Optimistic UI update (functional form to avoid stale closures)
-        setItems((prevItems) =>
-            prevItems.map((item) =>
-                item.id === itemId ? { ...item, checked: newChecked } : item,
-            ),
-        );
+        setItems((prevItems) => toggleItemChecked(prevItems, itemId, newChecked));
 
         if (!id) return;
 
