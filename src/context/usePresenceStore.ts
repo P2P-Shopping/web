@@ -46,7 +46,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     handlePresenceEvent: (event: PresenceEvent) => {
         const { username, eventType } = event;
-        
+
         if (eventType === "JOIN") {
             set((state) => {
                 const newSet = new Set(state.activeUsers);
@@ -61,39 +61,40 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 
                 const newTyping = { ...state.typingUsers };
                 if (newTyping[username]) {
-                    window.clearTimeout(newTyping[username]);
+                    globalThis.clearTimeout(newTyping[username]);
                     delete newTyping[username];
                 }
                 return { activeUsers: newSet, typingUsers: newTyping };
             });
         } 
         else if (eventType === "TYPING") {
+            const currentTyping = get().typingUsers;
+            if (currentTyping[username]) {
+                globalThis.clearTimeout(currentTyping[username]);
+            }
+            
+            const timeoutId = globalThis.setTimeout(() => {
+                set((innerState) => {
+                    const updatedTyping = { ...innerState.typingUsers };
+                    delete updatedTyping[username];
+                    return { typingUsers: updatedTyping };
+                });
+            }, 2000);
+
             set((state) => {
-                // Ensure the user is in activeUsers conceptually
                 const newSet = new Set(state.activeUsers);
                 newSet.add(username);
-                
-                const newTyping = { ...state.typingUsers };
-                if (newTyping[username]) {
-                    window.clearTimeout(newTyping[username]);
-                }
-                
-                newTyping[username] = window.setTimeout(() => {
-                    set((innerState) => {
-                        const updatedTyping = { ...innerState.typingUsers };
-                        delete updatedTyping[username];
-                        return { typingUsers: updatedTyping };
-                    });
-                }, 2000);
-
-                return { activeUsers: newSet, typingUsers: newTyping };
+                return { 
+                    activeUsers: newSet, 
+                    typingUsers: { ...state.typingUsers, [username]: timeoutId } 
+                };
             });
         }
     },
 
     clearAllTimeouts: () => {
         const currentTyping = get().typingUsers;
-        Object.values(currentTyping).forEach((id) => window.clearTimeout(id));
+        Object.values(currentTyping).forEach((id) => globalThis.clearTimeout(id));
         set({ typingUsers: {} });
     },
 }));

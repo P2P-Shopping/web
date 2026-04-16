@@ -29,16 +29,16 @@ export const useNetworkState = (): void => {
         };
 
         // Attach listeners for online and offline events
-        window.addEventListener("online", handleOnline);
-        window.addEventListener("offline", handleOffline);
+        globalThis.addEventListener("online", handleOnline);
+        globalThis.addEventListener("offline", handleOffline);
 
         // Immediate fallback check in case state changed before listener attached
         setOnlineStatus(navigator.onLine);
 
         // Explicitly remove listeners on cleanup to prevent memory leaks
         return () => {
-            window.removeEventListener("online", handleOnline);
-            window.removeEventListener("offline", handleOffline);
+            globalThis.removeEventListener("online", handleOnline);
+            globalThis.removeEventListener("offline", handleOffline);
         };
     }, [setOnlineStatus]);
 };
