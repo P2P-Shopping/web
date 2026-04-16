@@ -1,5 +1,5 @@
 import type { StompSubscription } from "@stomp/stompjs";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 // 2. THIS IS NEW: Import your Navbar from your components/ folder
 import { Navbar } from "./components";
@@ -23,6 +23,24 @@ function App() {
     const _location = useLocation();
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    const clearToastTimeout = useCallback(() => {
+        if (!toastTimeoutRef.current) return;
+        clearTimeout(toastTimeoutRef.current);
+        toastTimeoutRef.current = null;
+    }, []);
+
+    const handlePongMessage = useCallback(
+        (message: { body: string }) => {
+            setToastMessage(`Server Response: ${message.body}`);
+            clearToastTimeout();
+            toastTimeoutRef.current = setTimeout(() => {
+                setToastMessage(null);
+                toastTimeoutRef.current = null;
+            }, 3000);
+        },
+        [clearToastTimeout],
+    );
+
     useEffect(() => {
         startMockEmitter();
         return () => stopMockEmitter();
@@ -38,16 +56,10 @@ function App() {
                 subscription.unsubscribe();
             }
 
-            subscription = stompClient.subscribe("/topic/pong", (message) => {
-                setToastMessage(`Server Response: ${message.body}`);
-                if (toastTimeoutRef.current) {
-                    clearTimeout(toastTimeoutRef.current);
-                }
-                toastTimeoutRef.current = setTimeout(
-                    () => setToastMessage(null),
-                    3000,
-                );
-            });
+            subscription = stompClient.subscribe(
+                "/topic/pong",
+                handlePongMessage,
+            );
         };
 
         stompClient.onWebSocketClose = () => {
@@ -58,11 +70,15 @@ function App() {
 
         return () => {
             if (subscription) subscription.unsubscribe();
+            if (toastTimeoutRef.current) {
+                clearTimeout(toastTimeoutRef.current);
+                toastTimeoutRef.current = null;
+            }
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
             stompClient.deactivate();
         };
-    }, []);
+    }, [handlePongMessage]);
 
     const handleAuthSuccess = (result: unknown) => {
         console.info("Authentication successful", result);
