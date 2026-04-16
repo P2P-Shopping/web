@@ -139,6 +139,9 @@ const ListDetail: React.FC = () => {
     const conflictTimeoutsRef = useRef<Record<string, number>>({});
     // Local source-of-truth backup map for optimistic rollback in this component.
     const itemBackupsRef = useRef<Record<string, Item>>({});
+    const clearBackup = (itemId: string) => {
+        delete itemBackupsRef.current[itemId];
+    };
 
     const [myUsername] = useState(() => {
         const stored = localStorage.getItem("p2p_username");
@@ -151,9 +154,9 @@ const ListDetail: React.FC = () => {
         const backup = itemBackupsRef.current[itemId];
         if (backup) {
             setItems((prevItems) =>
-                prevItems.map((item) => (item.id === itemId ? { ...backup } : item)),
+                prevItems.map((item) => (item.id === itemId ? backup : item)),
             );
-            delete itemBackupsRef.current[itemId];
+            clearBackup(itemId);
         }
         setItemConflict(itemId, true);
         
@@ -429,7 +432,7 @@ const ListDetail: React.FC = () => {
                         clearTimeout(entry.timeoutId);
                         pendingRollbacksRef.current.delete(receiptId);
                     }
-                    delete itemBackupsRef.current[itemId];
+                    clearBackup(itemId);
                 });
             }
 
