@@ -1,17 +1,15 @@
-import StoreMap from "./components/StoreMap.tsx";
 import { useEffect, useState, useRef } from "react";
 import type { StompSubscription } from "@stomp/stompjs";
 import stompClient from "./services/socketService";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
-import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 
-// Auth Pages
-import LoginPage from "./pages/LoginPage";
-import RegistrationPage from "./pages/RegistrationPage";
+// 1. Import your pages from your pages/ folder
+import { LoginPage, RegistrationPage, MapPage, RoutePage, ListDetail, StoreMap } from './pages';
 
-import MapPage from "./pages/MapPage";
-import RoutePage from "./pages/RoutePage";
-import ListDetail from "./pages/ListDetail";
+// 2. THIS IS NEW: Import your Navbar from your components/ folder
+import { Navbar } from './components';
+
 import "./App.css";
 
 function App() {
@@ -73,12 +71,6 @@ function App() {
     }
   };
 
-  const isStoreMap = location.pathname === "/nav";
-
-  if (isStoreMap) {
-    return <StoreMap />;
-  }
-
   return (
     <div className="app-container">
       {/* Toast Notification */}
@@ -102,52 +94,9 @@ function App() {
         </div>
       )}
 
-      <header className="main-header">
-        <nav className="nav-menu">
-          {/* Added your link to Login */}
-          <Link to="/login" className="nav-link">
-            Login
-          </Link>
-          <Link to="/register" className="nav-link">
-            Register
-          </Link>
-          <Link to="/map" className="nav-link">
-            Map
-          </Link>
-          <Link to="/route" className="nav-link">
-            Route
-          </Link>
-          <Link to="/nav" className="nav-link">
-            Store Map
-          </Link>
-          <Link to="/list/default" className="nav-link">
-            List
-          </Link>
-
-          <button
-            className="nav-link"
-            onClick={handlePingPress}
-            disabled={!isConnected}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              font: "inherit",
-              color: isConnected ? "inherit" : "gray",
-              cursor: isConnected ? "pointer" : "not-allowed",
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-            }}
-          >
-            {isConnected ? "🟢 Ping Server" : "🔴 Disconnected"}
-          </button>
-        </nav>
-        <div className="logo-section">
-          <span className="cart-icon">🛒</span>
-          <h1>P2P Shopping</h1>
-        </div>
-      </header>
+      {/* 3. THIS IS NEW: Drop in your reusable Navbar component! 
+          We pass it the variables it needs to make the Ping button work. */}
+      <Navbar isConnected={isConnected} handlePingPress={handlePingPress} />
 
       <main className="content">
         <Routes>

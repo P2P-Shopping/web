@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { registerRequest } from "../services/authService";
+import { registerRequest } from "../../services/authService";
+
+import "../LoginPage/LoginPage.css"
 
 interface RegistrationPageProps {
   onAuthSuccess?: (authResult: unknown) => void;

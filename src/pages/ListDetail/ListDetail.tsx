@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import stompClient from "../services/socketService";
+import stompClient from "../../services/socketService";
+
+import "./ListDetail.css"
 
 interface Item {
 	id: string; // Added unique ID
@@ -278,54 +280,57 @@ const ListDetail: React.FC = () => {
 	};
 
 	return (
-		<div className="list-detail-container">
-			{showBanner && permissionStatus === "denied" && (
-				<div className="location-warning-banner">
-					<span>
-						Location access is disabled. Some features may be limited.
-					</span>
-					<button
-						className="close-banner-btn"
-						onClick={() => setShowBanner(false)}
-					>
-						✕
-					</button>
-				</div>
-			)}
+      <div className="list-detail-container">
+        {showBanner && permissionStatus === "denied" && (
+          <div className="location-warning-banner">
+            <span>
+              Location access is disabled. Some features may be limited.
+            </span>
+            <button
+              className="close-banner-btn"
+              onClick={() => setShowBanner(false)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
-			<form onSubmit={addItem} className="add-item-form">
-				<input
-					type="text"
-					value={newItemName}
-					onChange={(e) => setNewItemName(e.target.value)}
-					placeholder="Add new item..."
-					className="add-input"
-				/>
-				<button type="submit" className="add-button">
-					Add
-				</button>
-			</form>
+        <form onSubmit={addItem} className="add-item-form">
+          <input
+            type="text"
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            placeholder="Add new item..."
+            className="add-input"
+          />
+          <button type="submit" className="add-button">
+            Add
+          </button>
+        </form>
 
-			<ul className="shopping-list">
-				{items.map((item) => (
-					<li
-						key={item.id}
-						className={`shopping-item ${item.checked ? "item-completed" : ""}`}
-					>
-						<input
-							type="checkbox"
-							checked={item.checked}
-							onChange={() => handleCheck(item.id)}
-							className="item-checkbox"
-						/>
-						<span className="item-text">{item.name}</span>
-					</li>
-				))}
-			</ul>
+        <ul className="shopping-list">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className={`shopping-item ${item.checked ? "item-completed" : ""}`}
+            >
 
-			{items.length === 0 && <p className="empty-msg">Your list is empty!</p>}
-		</div>
-	);
+			<label className = "item-label">	
+              <input
+                type="checkbox"
+                checked={item.checked}
+                onChange={() => handleCheck(item.id)}
+                className="item-checkbox"
+              />
+              <span className="item-text">{item.name}</span>
+			</label>
+            </li>
+          ))}
+        </ul>
+
+        {items.length === 0 && <p className="empty-msg">Your list is empty!</p>}
+      </div>
+  );
 };
 
 export default ListDetail;

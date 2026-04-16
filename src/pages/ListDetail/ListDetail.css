@@ -1,0 +1,125 @@
+/* Shopping List Container */
+.list-detail-container {
+	padding: 20px;
+	max-width: 500px;
+	margin: 0 auto;
+	font-family: sans-serif;
+}
+.location-warning-banner {
+	background: #fff5f5;
+	border: 1px solid #feb2b2;
+	color: #c53030;
+	padding: 12px;
+	border-radius: 8px;
+	margin-bottom: 20px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+.close-banner-btn {
+	border: none;
+	background: none;
+	cursor: pointer;
+	font-weight: bold;
+	color: #c53030;
+}
+
+/* Form Elements */
+.add-item-form {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 25px;
+}
+.add-input {
+	flex: 1;
+	padding: 12px;
+	border-radius: 6px;
+	border: 2px solid var(--border-color);
+	font-size: 16px;
+	background: var(--navbar-color);
+	color: var(--text-secondary);
+}
+.add-button {
+	padding: 10px 20px;
+	background: var(--navbar-color);
+	color: white;
+	border-radius: 6px;
+	cursor: pointer;
+	font-weight: 600;
+	border: 2px solid var(--border-color);
+}
+
+/* The List Structure */
+.shopping-list {
+	list-style: none;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* The Item Container */
+.shopping-item {
+	border: 2px solid var(--border-color);
+	transition: background 0.2s;
+	background-color: var(--card-bg);
+	border-radius: 12px;
+	/* Remove padding here, move it to the label! */
+	padding: 0;
+}
+
+.item-completed {
+	background: #f7fafc;
+	opacity: 0.8;
+}
+
+.item-label {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	padding: 15px; /* Moved padding here so the click area fills the container */
+	cursor: pointer;
+	box-sizing: border-box; /* Ensures padding doesn't break the width */
+}
+
+.item-checkbox {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 22px;
+	height: 22px;
+	cursor: pointer;
+	margin: 0; /* Prevents alignment issues */
+	flex-shrink: 0; /* Prevents the checkbox from shrinking if the text is long */
+
+	background-color: var(--text-secondary);
+	border: 2px solid var(--purple-dark);
+	border-radius: 4px;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease-in-out;
+}
+
+/* The checkmark */
+input[type="checkbox"].item-checkbox:checked::after {
+	content: "✔";
+	color: var(--purple-dark);
+	font-size: 14px;
+	font-weight: bold;
+}
+
+/* Text */
+.item-text {
+	font-size: 18px;
+	color: var(--text-secondary);
+}
+.item-completed .item-text {
+	text-decoration: line-through;
+}
+.empty-msg {
+	text-align: center;
+	color: #888;
+	margin-top: 20px;
+}

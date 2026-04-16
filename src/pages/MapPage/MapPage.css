@@ -1,0 +1,2 @@
+.coordinates { display: flex; gap: 15px; font-size: 1.2rem; align-items: center; margin-top: 8px; }
+.coord-box strong {color : var(--text-secondary); -webkit-text-stroke : 1px var(--text-secondary-outline)}
