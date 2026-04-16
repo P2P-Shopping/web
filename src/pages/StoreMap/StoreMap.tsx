@@ -1,8 +1,13 @@
 import React, { useRef, useEffect, useState } from "react";
+
 import "./StoreMap.css";
 
 // 1. Dummy GPS Data
 const USER_GPS = { lat: 44.4268, lng: 26.1025 };
+
+const rootStyles = getComputedStyle(document.documentElement);
+const productColor = rootStyles.getPropertyValue('--product-dot').trim() || "#FF3366";
+const userColor = rootStyles.getPropertyValue('--user-dot').trim() || "#00D4FF";
 
 const PRODUCTS_GPS = [
   { id: 1, lat: 44.4269, lng: 26.1026 },
@@ -28,7 +33,7 @@ function getRelativePixels(targetLat: number, targetLng: number, refLat: number,
   return { x, y };
 }
 
-function StoreMap() {
+const StoreMap = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // --- STATE ---
@@ -63,14 +68,14 @@ function StoreMap() {
 
       ctx.beginPath();
       ctx.arc(x, y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = "red";
+      ctx.fillStyle = productColor;
       ctx.fill();
     });
 
     // Draw User
     ctx.beginPath();
     ctx.arc(0, 0, 12, 0, Math.PI * 2);
-    ctx.fillStyle = "blue";
+    ctx.fillStyle = userColor;
     ctx.fill();
     ctx.strokeStyle = "white";
     ctx.lineWidth = 2;
@@ -110,14 +115,6 @@ function StoreMap() {
   };
 
   return (
-    <div className="container">
-      <div className="navbar">
-        <button className="backButton" onClick={() => window.history.back()}>
-          ←
-        </button>
-        <h3>In-store navigation</h3>
-      </div>
-
       <div className="mapContainer">
         <canvas
           ref={canvasRef}
@@ -129,7 +126,6 @@ function StoreMap() {
           onPointerCancel={handlePointerUp}
         />
       </div>
-    </div>
   );
 }
 

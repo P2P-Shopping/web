@@ -1,11 +1,14 @@
-import { useStore } from "../context/useStore";
+import { useStore } from "../../context/useStore";
+// 1. Import the Card
+import { Card } from "../../components"; 
+import "./MapPage.css";
 
 const MapPage = () => {
   const userLocation = useStore((state) => state.userLocation);
 
   return (
-    <section className="card">
-      <h2 className="card-title">Live GPS Tracking</h2>
+    // 2. Wrap the content in the Card component!
+    <Card title="Live GPS Tracking">
       <div className="gps-info">
         <p className="label">Real-time simulated coordinates:</p>
         <div className="coordinates">
@@ -18,7 +21,7 @@ const MapPage = () => {
           </span>
         </div>
       </div>
-    </section>
+    </Card>
   );
 };
 

@@ -1,6 +1,8 @@
 import { useEffect } from "react";
-import { useStore } from "../context/useStore";
-import { loadMockRoute } from "../services/loadRoute";
+import { useStore } from "../../context/useStore";
+import { loadMockRoute } from "../../services/loadRoute";
+
+import "./RoutePage.css";
 
 const RoutePage = () => {
   const route = useStore((state) => state.route);
@@ -10,9 +12,9 @@ const RoutePage = () => {
   }, []);
 
   return (
-    <>
+    <div className="route-page-container">
       <div className="section-header">
-        <h3>My Route</h3>
+        <h2>My Route</h2>
         <span className="count-badge">{route.length} points</span>
       </div>
 
@@ -23,13 +25,16 @@ const RoutePage = () => {
               <span className="point-icon">📍</span>
               <span className="point-name">{point.name}</span>
             </div>
+            
+            {/* Split into two spans to force the wrap seen in the screenshot */}
             <div className="point-coords">
-              Lat: {point.lat.toFixed(6)} • Lng: {point.lng.toFixed(6)}
+              <span>Lat: {point.lat.toFixed(6)} • Lng:</span>
+              <span>{point.lng.toFixed(6)}</span>
             </div>
           </li>
         ))}
       </ul>
-    </>
+    </div>
   );
 };
 
