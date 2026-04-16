@@ -234,11 +234,19 @@ const ListDetail: React.FC = () => {
             handlePresenceEvent({ eventType: "JOIN", username: myUsername, listId: id });
         };
 
+        let cancelled = false;
+        const prevOnConnect = stompClient.onConnect;
         if (stompClient.connected) {
             connectAndSubscribe();
         } else {
-            stompClient.onConnect = () => connectAndSubscribe();
+            stompClient.onConnect = (frame) => {
+                prevOnConnect?.(frame);
+                if (!cancelled) connectAndSubscribe();
+            };
         }
+        return () => {
+            cancelled = true;
+            stompClient.onConnect = prevOnConnect;
 
         return () => {
             if (stompClient.connected) {
