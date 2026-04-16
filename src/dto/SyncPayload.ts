@@ -1,4 +1,4 @@
-export type ActionType = "UPDATE_ITEM" | "DELETE_ITEM" | "USER_PRESENCE";
+export type ActionType = "UPDATE_ITEM" | "DELETE_ITEM" | "USER_PRESENCE" | "REJECT" | "ERROR";
 
 export abstract class SyncPayload {
     actionType: ActionType;
@@ -92,4 +92,15 @@ export class PresencePayload extends SyncPayload {
             Boolean(this.status)
         );
     }
+}
+/**
+ * Payload indicating a rejection from the server.
+ */
+export interface RejectionPayload {
+    /** The ID of the item that caused a conflict. */
+    itemId: string;
+    /** The ID of the list where the conflict occurred. */
+    listId: string;
+    /** Optional reason for the rejection. */
+    reason?: string;
 }
