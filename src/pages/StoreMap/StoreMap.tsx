@@ -19,7 +19,7 @@ const MAP_CONFIG = {
     PIXELS_PER_METER: 20,
     GLIDE_SPEED: 0.1, 
     MIN_ZOOM: 0.3,
-    MAX_ZOOM: 4.0,
+    MAX_ZOOM: 4,
 };
 
 // ==========================================
@@ -45,6 +45,33 @@ const generateLocalProducts = (centerGps: Coordinate): Product[] => {
         { id: 3, lat: centerGps.lat + (latOffset * 1.5), lng: centerGps.lng - (lngOffset * 0.5), name: "Apples" },
         { id: 4, lat: centerGps.lat - (latOffset * 0.8), lng: centerGps.lng + (lngOffset * 1.2), name: "Coffee" },
     ];
+};
+
+// Algorithmic pathfinding extracted to reduce render loop cognitive complexity
+const calculateNearestNeighborRoute = (
+    startPoint: Point,
+    products: Product[],
+    anchor: Coordinate
+): Product[] => {
+    const unvisited = [...products];
+    const orderedRoute: Product[] = [];
+    let currentPoint = { ...startPoint };
+
+    while (unvisited.length > 0) {
+        let nearestIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < unvisited.length; i++) {
+            const pPx = getRelativePixels(unvisited[i], anchor);
+            const dist = Math.hypot(pPx.x - currentPoint.x, pPx.y - currentPoint.y);
+            if (dist < minDist) { minDist = dist; nearestIdx = i; }
+        }
+        const nearestProduct = unvisited[nearestIdx];
+        orderedRoute.push(nearestProduct);
+        currentPoint = getRelativePixels(nearestProduct, anchor);
+        unvisited.splice(nearestIdx, 1);
+    }
+
+    return orderedRoute;
 };
 
 // ==========================================
@@ -133,23 +160,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
                 // Nearest Neighbor Routing
                 if (localProducts.current.length > 0) {
-                    const unvisited = [...localProducts.current];
-                    const orderedRoute: Product[] = [];
-                    let currentPoint = { ...userPos };
-
-                    while (unvisited.length > 0) {
-                        let nearestIdx = 0;
-                        let minDist = Infinity;
-                        for (let i = 0; i < unvisited.length; i++) {
-                            const pPx = getRelativePixels(unvisited[i], anchor);
-                            const dist = Math.hypot(pPx.x - currentPoint.x, pPx.y - currentPoint.y);
-                            if (dist < minDist) { minDist = dist; nearestIdx = i; }
-                        }
-                        const nearestProduct = unvisited[nearestIdx];
-                        orderedRoute.push(nearestProduct);
-                        currentPoint = getRelativePixels(nearestProduct, anchor);
-                        unvisited.splice(nearestIdx, 1);
-                    }
+                    // Call the newly extracted helper function here
+                    const orderedRoute = calculateNearestNeighborRoute(userPos, localProducts.current, anchor);
 
                     // Draw Route Path
                     ctx.beginPath();
