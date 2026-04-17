@@ -347,6 +347,7 @@ const StoreMap: React.FC = () => {
         <div className={`mapContainer ${isDragging ? "dragging" : ""}`} {...handlers}>
             <canvas ref={canvasRef} className="map-canvas" />
             
+            {import.meta.env.DEV && (
             <button
                 className="debug-gps-button"
                 onClick={(e) => {
@@ -356,6 +357,7 @@ const StoreMap: React.FC = () => {
             >
                 Simulate GPS Move
             </button>
+            )}
         </div>
     );
 };
