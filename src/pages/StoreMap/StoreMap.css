@@ -54,6 +54,28 @@
     animation: pulse 1.5s infinite;
 }
 
+.recenter-button {
+    position: absolute;
+    top: 90px;
+    left: 10px;
+    padding: 14px 20px;
+    border-radius: 50px;
+    border: none;
+    background-color: var(--user-dot, #00D4FF);
+    color: #121212;
+    font-weight: 900;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+    z-index: 20;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.recenter-button:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 8px rgba(0, 212, 255, 0.4);
+}
+
 
 @keyframes pulse {
     0% { opacity: 0.6; }

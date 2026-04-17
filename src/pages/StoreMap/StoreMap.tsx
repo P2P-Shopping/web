@@ -349,10 +349,22 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         lastPanPoint.current = null;
     };
 
+    const recenterCamera = () => {
+        if (!originGps.current) return;
+        
+        // Find exactly where the user is right now relative to the anchor
+        const userPos = getRelativePixels(currentRenderedGps.current, originGps.current);
+        
+        // Shift the camera in the exact opposite direction, scaled by the current zoom
+        camera.current.x = -userPos.x * camera.current.zoom;
+        camera.current.y = -userPos.y * camera.current.zoom;
+    };
+
     return {
         isDragging,
         hasLocationLock,
         gpsError,
+        recenterCamera,
         handlers: {
             onTouchStart: handleTouchStart,
             onTouchMove: handleTouchMove,
@@ -371,7 +383,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 // ==========================================
 const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { isDragging, hasLocationLock, gpsError, handlers } = useMapEngine(canvasRef);
+    const { isDragging, hasLocationLock, gpsError, handlers, recenterCamera } = useMapEngine(canvasRef);
 
     // INTERCEPTOR: Shows error message if denied/failed, otherwise shows loading text
     if (!hasLocationLock) {
@@ -385,6 +397,16 @@ const StoreMap: React.FC = () => {
     return (
         <div className={`mapContainer ${isDragging ? "dragging" : ""}`} {...handlers}>
             <canvas ref={canvasRef} className="map-canvas" />
+
+            <button
+                className="recenter-button"
+                onClick={(e) => {
+                    e.stopPropagation(); 
+                    recenterCamera();
+                }}
+            >
+                 RECENTER
+            </button>
         </div>
     );
 };
