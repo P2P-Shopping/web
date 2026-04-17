@@ -7,20 +7,71 @@
     transform: translate(-50%, -50%);
     overflow: hidden;
     z-index: 0;
-}
-
-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: hidden;
-    cursor: grab;
-
-    /* Critical for mobile: stops browser from zooming/refreshing the page */
+    background-color: var(--bg-color); 
+    
+    /* ADD THESE TO THE CONTAINER! */
     touch-action: none;
     -webkit-touch-callout: none;
 }
 
-canvas.dragging {
+.map-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: hidden;
+    
+    /* Keep these here just to be safe */
+    touch-action: none;
+    -webkit-touch-callout: none;
+}
+
+.mapContainer.dragging,
+.map-canvas.dragging {
     cursor: grabbing;
+}
+
+/* ADD TO BOTTOM OF StoreMap.css */
+
+.map-loading-screen {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--bg-color, #121212);
+    color: var(--user-dot, #00D4FF);
+    z-index: 10;
+}
+
+.map-loading-screen h2 {
+    font-family: sans-serif;
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 20px;
+    animation: pulse 1.5s infinite;
+}
+
+.debug-gps-button {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: none;
+    background: var(--card-bg, #ffffff);
+    color: var(--indigo-dark, #333333);
+    font-weight: bold;
+    z-index: 10;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
 }

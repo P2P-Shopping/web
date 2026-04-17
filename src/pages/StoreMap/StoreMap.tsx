@@ -1,143 +1,361 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-
 import "./StoreMap.css";
 
-// 1. Dummy GPS Data
-const USER_GPS = { lat: 44.4268, lng: 26.1025 };
+// ==========================================
+// 1. TYPES & INTERFACES
+// ==========================================
+interface Coordinate { lat: number; lng: number; }
+interface Product extends Coordinate { id: number; name: string; }
+interface Point { x: number; y: number; }
+interface CameraState { x: number; y: number; zoom: number; }
+interface ThemeColors { product: string; user: string; route: string; }
 
-const rootStyles = getComputedStyle(document.documentElement);
-const productColor =
-    rootStyles.getPropertyValue("--product-dot").trim() || "#FF3366";
-const userColor = rootStyles.getPropertyValue("--user-dot").trim() || "#00D4FF";
+// ==========================================
+// 2. CONFIGURATION
+// ==========================================
+const MAP_CONFIG = {
+    METERS_PER_DEGREE_LAT: 111320,
+    PIXELS_PER_METER: 20,
+    GLIDE_SPEED: 0.1, 
+    MIN_ZOOM: 0.3,
+    MAX_ZOOM: 4.0,
+};
 
-const PRODUCTS_GPS = [
-    { id: 1, lat: 44.4269, lng: 26.1026 },
-    { id: 2, lat: 44.4267, lng: 26.1023 },
-    { id: 3, lat: 44.4268, lng: 26.1028 },
-    { id: 4, lat: 44.427, lng: 26.1024 },
-];
-
-// 2. Conversion Configuration
-const METERS_PER_DEGREE_LAT = 111320;
-const PIXELS_PER_METER = 20;
-
-// Helper function to convert GPS to relative X/Y pixels
-function getRelativePixels(
-    targetLat: number,
-    targetLng: number,
-    refLat: number,
-    refLng: number,
-) {
-    const dLat = targetLat - refLat;
-    const dLng = targetLng - refLng;
-
-    const metersPerDegreeLng =
-        METERS_PER_DEGREE_LAT * Math.cos(refLat * (Math.PI / 180));
-
-    const x = dLng * metersPerDegreeLng * PIXELS_PER_METER;
-    const y = -(dLat * METERS_PER_DEGREE_LAT) * PIXELS_PER_METER;
-
+// ==========================================
+// 3. PURE HELPER FUNCTIONS
+// ==========================================
+const getRelativePixels = (target: Coordinate, reference: Coordinate): Point => {
+    const dLat = target.lat - reference.lat;
+    const dLng = target.lng - reference.lng;
+    const metersPerDegreeLng = MAP_CONFIG.METERS_PER_DEGREE_LAT * Math.cos(reference.lat * (Math.PI / 180));
+    const x = dLng * metersPerDegreeLng * MAP_CONFIG.PIXELS_PER_METER;
+    const y = -(dLat * MAP_CONFIG.METERS_PER_DEGREE_LAT) * MAP_CONFIG.PIXELS_PER_METER;
     return { x, y };
-}
+};
 
-const StoreMap = () => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+// Procedurally scatters products ~10 to 30 meters around a central GPS point
+const generateLocalProducts = (centerGps: Coordinate): Product[] => {
+    const latOffset = 0.00015; 
+    const lngOffset = 0.00015;
 
-    // --- STATE ---
-    const [pan, setPan] = useState({ x: 0, y: 0 });
+    return [
+        { id: 1, lat: centerGps.lat + latOffset, lng: centerGps.lng + lngOffset, name: "Milk" },
+        { id: 2, lat: centerGps.lat - latOffset, lng: centerGps.lng - lngOffset, name: "Bread" },
+        { id: 3, lat: centerGps.lat + (latOffset * 1.5), lng: centerGps.lng - (lngOffset * 0.5), name: "Apples" },
+        { id: 4, lat: centerGps.lat - (latOffset * 0.8), lng: centerGps.lng + (lngOffset * 1.2), name: "Coffee" },
+    ];
+};
+
+// ==========================================
+// 4. CUSTOM HOOK: MAP ENGINE
+// ==========================================
+const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const [isDragging, setIsDragging] = useState(false);
+    const [hasLocationLock, setHasLocationLock] = useState(false);
+    const [gpsError, setGpsError] = useState<string | null>(null);
 
-    // --- REFS ---
-    const lastPos = useRef({ x: 0, y: 0 });
-    // NEW: Track the ID of the first finger that touches the screen
-    const activePointerId = useRef<number | null>(null);
+    // --- Dynamic Map State ---
+    const originGps = useRef<Coordinate | null>(null); 
+    const targetGps = useRef<Coordinate>({ lat: 0, lng: 0 });
+    const currentRenderedGps = useRef<Coordinate>({ lat: 0, lng: 0 });
+    const localProducts = useRef<Product[]>([]); 
+    
+    const isFirstLocationUpdate = useRef(true);
+    const camera = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
+    
+    // --- Touch/Mouse Tracking ---
+    const lastPanPoint = useRef<Point | null>(null);
+    const gestureState = useRef<{
+        initialDist: number;
+        initialZoom: number;
+        initialPinchWorld: Point | null;
+    }>({ initialDist: 0, initialZoom: 1, initialPinchWorld: null });
 
+    // --- Core Render Loop ---
     useEffect(() => {
+        if (!hasLocationLock) return;
+
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        const ctx = canvas?.getContext("2d");
+        if (!canvas || !ctx || !originGps.current) return;
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const rootStyles = getComputedStyle(document.documentElement);
+        const theme: ThemeColors = {
+            product: rootStyles.getPropertyValue("--red-neon").trim() || "#FF3366",
+            user: rootStyles.getPropertyValue("--blue-neon").trim() || "#00D4FF",
+            route: rootStyles.getPropertyValue("--green-neon").trim() || "#00FF66",
+        };
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let animationFrameId: number;
 
-        const offsetX = canvas.width / 2 + pan.x;
-        const offsetY = canvas.height / 2 + pan.y;
+        const renderLoop = () => {
+            try {
+                // Resize
+                const rect = canvas.parentElement?.getBoundingClientRect();
+                canvas.width = rect?.width || window.innerWidth;
+                canvas.height = rect?.height || window.innerHeight;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Physics (Gliding)
+                currentRenderedGps.current.lat += (targetGps.current.lat - currentRenderedGps.current.lat) * MAP_CONFIG.GLIDE_SPEED;
+                currentRenderedGps.current.lng += (targetGps.current.lng - currentRenderedGps.current.lng) * MAP_CONFIG.GLIDE_SPEED;
 
-        ctx.save();
-        ctx.translate(offsetX, offsetY);
+                // Camera Setup
+                ctx.save();
+                ctx.translate((canvas.width / 2) + camera.current.x, (canvas.height / 2) + camera.current.y);
+                ctx.scale(camera.current.zoom, camera.current.zoom);
 
-        // Draw Products
-        PRODUCTS_GPS.forEach((product) => {
-            const { x, y } = getRelativePixels(
-                product.lat,
-                product.lng,
-                USER_GPS.lat,
-                USER_GPS.lng,
-            );
+                const anchor = originGps.current!;
+                const userPos = getRelativePixels(currentRenderedGps.current, anchor);
 
-            ctx.beginPath();
-            ctx.arc(x, y, 8, 0, Math.PI * 2);
-            ctx.fillStyle = productColor;
-            ctx.fill();
-        });
+                // Nearest Neighbor Routing
+                if (localProducts.current.length > 0) {
+                    const unvisited = [...localProducts.current];
+                    const orderedRoute: Product[] = [];
+                    let currentPoint = { ...userPos };
 
-        // Draw User
-        ctx.beginPath();
-        ctx.arc(0, 0, 12, 0, Math.PI * 2);
-        ctx.fillStyle = userColor;
-        ctx.fill();
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+                    while (unvisited.length > 0) {
+                        let nearestIdx = 0;
+                        let minDist = Infinity;
+                        for (let i = 0; i < unvisited.length; i++) {
+                            const pPx = getRelativePixels(unvisited[i], anchor);
+                            const dist = Math.hypot(pPx.x - currentPoint.x, pPx.y - currentPoint.y);
+                            if (dist < minDist) { minDist = dist; nearestIdx = i; }
+                        }
+                        const nearestProduct = unvisited[nearestIdx];
+                        orderedRoute.push(nearestProduct);
+                        currentPoint = getRelativePixels(nearestProduct, anchor);
+                        unvisited.splice(nearestIdx, 1);
+                    }
 
-        ctx.restore();
-    }, [pan]);
+                    // Draw Route Path
+                    ctx.beginPath();
+                    ctx.strokeStyle = theme.route;
+                    ctx.lineWidth = 4 / camera.current.zoom;
+                    ctx.setLineDash([10 / camera.current.zoom, 10 / camera.current.zoom]);
+                    ctx.moveTo(userPos.x, userPos.y);
+                    orderedRoute.forEach((product) => {
+                        const { x, y } = getRelativePixels(product, anchor);
+                        ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
 
-    // --- INTERACTION HANDLERS ---
+                // Draw Products
+                localProducts.current.forEach((product) => {
+                    const { x, y } = getRelativePixels(product, anchor);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 8 / camera.current.zoom, 0, Math.PI * 2);
+                    ctx.fillStyle = theme.product;
+                    ctx.fill();
+                });
 
-    const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        // Only register the drag if we don't already have an active finger
-        if (activePointerId.current === null) {
-            activePointerId.current = e.pointerId; // Lock onto this finger
+                // Draw User
+                ctx.beginPath();
+                ctx.arc(userPos.x, userPos.y, 12 / camera.current.zoom, 0, Math.PI * 2);
+                ctx.fillStyle = theme.user;
+                ctx.fill();
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 2 / camera.current.zoom;
+                ctx.stroke();
+
+            } catch (err) {
+                console.error("Map Render Glitch:", err);
+            } finally {
+                ctx.restore();
+                animationFrameId = requestAnimationFrame(renderLoop);
+            }
+        };
+
+        renderLoop();
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [canvasRef, hasLocationLock]);
+
+    // --- Native GPS Stream ---
+    useEffect(() => {
+        if (!("geolocation" in navigator)) {
+            setGpsError("Geolocation is not supported by your browser.");
+            return;
+        }
+
+        const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const newCoords = { lat: latitude, lng: longitude };
+                
+                if (isFirstLocationUpdate.current) {
+                    originGps.current = { ...newCoords };
+                    localProducts.current = generateLocalProducts(newCoords);
+                    targetGps.current = { ...newCoords };
+                    currentRenderedGps.current = { ...newCoords };
+                    
+                    isFirstLocationUpdate.current = false;
+                    setGpsError(null); 
+                    setHasLocationLock(true); 
+                } else {
+                    targetGps.current = { ...newCoords };
+                }
+            },
+            (error) => {
+                console.warn("GPS Error:", error.message);
+                if (error.code === error.PERMISSION_DENIED) {
+                    setGpsError("Location access denied. Please allow GPS to use the map.");
+                } else if (error.code === error.TIMEOUT) {
+                    setGpsError("GPS signal lost. Make sure you are outside or have clear sky view.");
+                } else {
+                    setGpsError("Unable to acquire GPS signal.");
+                }
+            },
+            { 
+                enableHighAccuracy: true, 
+                maximumAge: 10000, 
+                timeout: 27000 
+            }
+        );
+
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, []);
+
+    // --- Touch Handlers ---
+    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+        if (e.touches.length === 1) {
+            lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             setIsDragging(true);
-            lastPos.current = { x: e.clientX, y: e.clientY };
+        } else if (e.touches.length === 2) {
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+            if (dist < 1) return;
+
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+
+            const pinchScreenX = ((t1.clientX + t2.clientX) / 2) - rect.left;
+            const pinchScreenY = ((t1.clientY + t2.clientY) / 2) - rect.top;
+
+            gestureState.current.initialDist = dist;
+            gestureState.current.initialZoom = camera.current.zoom;
+            gestureState.current.initialPinchWorld = {
+                x: (pinchScreenX - (rect.width / 2) - camera.current.x) / camera.current.zoom,
+                y: (pinchScreenY - (rect.height / 2) - camera.current.y) / camera.current.zoom
+            };
         }
     };
 
-    const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        // Ignore the event entirely if it's not our locked finger
-        if (!isDragging || e.pointerId !== activePointerId.current) return;
+    const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+        if (e.touches.length === 1 && lastPanPoint.current) {
+            const t = e.touches[0];
+            camera.current.x += t.clientX - lastPanPoint.current.x;
+            camera.current.y += t.clientY - lastPanPoint.current.y;
+            lastPanPoint.current = { x: t.clientX, y: t.clientY };
+        } 
+        else if (e.touches.length === 2 && gestureState.current.initialPinchWorld) {
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
 
-        const dx = e.clientX - lastPos.current.x;
-        const dy = e.clientY - lastPos.current.y;
+            if (gestureState.current.initialDist < 1) return;
 
-        setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-        lastPos.current = { x: e.clientX, y: e.clientY };
+            const scaleRatio = dist / gestureState.current.initialDist;
+            let newZoom = gestureState.current.initialZoom * scaleRatio;
+            if (Number.isNaN(newZoom) || !Number.isFinite(newZoom)) return; 
+            newZoom = Math.min(Math.max(newZoom, MAP_CONFIG.MIN_ZOOM), MAP_CONFIG.MAX_ZOOM);
+
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+
+            const pinchScreenX = ((t1.clientX + t2.clientX) / 2) - rect.left;
+            const pinchScreenY = ((t1.clientY + t2.clientY) / 2) - rect.top;
+
+            camera.current.x = pinchScreenX - (rect.width / 2) - (gestureState.current.initialPinchWorld.x * newZoom);
+            camera.current.y = pinchScreenY - (rect.height / 2) - (gestureState.current.initialPinchWorld.y * newZoom);
+            camera.current.zoom = newZoom;
+        }
     };
 
-    const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        // Only stop dragging if the finger lifted was our locked finger
-        if (e.pointerId === activePointerId.current) {
+    const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+        if (e.touches.length === 1) {
+            lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else {
+            lastPanPoint.current = null;
             setIsDragging(false);
-            activePointerId.current = null; // Free up the lock for the next touch
+        }
+        gestureState.current.initialPinchWorld = null;
+    };
+
+    // --- Mouse Handlers (Desktop Testing) ---
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        setIsDragging(true);
+        lastPanPoint.current = { x: e.clientX, y: e.clientY };
+    };
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isDragging || !lastPanPoint.current) return;
+        camera.current.x += e.clientX - lastPanPoint.current.x;
+        camera.current.y += e.clientY - lastPanPoint.current.y;
+        lastPanPoint.current = { x: e.clientX, y: e.clientY };
+    };
+    const handleMouseUp = () => {
+        setIsDragging(false);
+        lastPanPoint.current = null;
+    };
+
+    const simulateMove = () => {
+        targetGps.current.lat += 0.00005; 
+        targetGps.current.lng += 0.00005;
+    };
+
+    return {
+        isDragging,
+        hasLocationLock,
+        gpsError,
+        simulateMove,
+        handlers: {
+            onTouchStart: handleTouchStart,
+            onTouchMove: handleTouchMove,
+            onTouchEnd: handleTouchEnd,
+            onTouchCancel: handleTouchEnd,
+            onMouseDown: handleMouseDown,
+            onMouseMove: handleMouseMove,
+            onMouseUp: handleMouseUp,
+            onMouseLeave: handleMouseUp,
         }
     };
+};
+
+// ==========================================
+// 5. PRESENTATIONAL COMPONENT (UI Layer)
+// ==========================================
+const StoreMap: React.FC = () => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const { isDragging, hasLocationLock, gpsError, simulateMove, handlers } = useMapEngine(canvasRef);
+
+    // INTERCEPTOR: Shows error message if denied/failed, otherwise shows loading text
+    if (!hasLocationLock) {
+        return (
+            <div className="map-loading-screen">
+                <h2>{gpsError ? gpsError : "Acquiring GPS Signal... 🛰️"}</h2>
+            </div>
+        );
+    }
 
     return (
-        <div className="mapContainer">
-            <canvas
-                ref={canvasRef}
-                className={`canvas ${isDragging ? "dragging" : ""}`}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-            />
+        <div className={`mapContainer ${isDragging ? "dragging" : ""}`} {...handlers}>
+            <canvas ref={canvasRef} className="map-canvas" />
+            
+            <button
+                className="debug-gps-button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    simulateMove();
+                }}
+            >
+                Simulate GPS Move
+            </button>
         </div>
     );
 };
