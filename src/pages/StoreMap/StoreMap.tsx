@@ -73,6 +73,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     }>({ initialDist: 0, initialZoom: 1, initialPinchWorld: null });
 
     // --- Core Render Loop ---
+    // --- Core Render Loop ---
     useEffect(() => {
         if (!hasLocationLock) return;
 
@@ -89,8 +90,20 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
         let animationFrameId: number;
         let consecutiveErrors = 0;
+        
+        // FIX: Track the timestamp of the last frame
+        let lastTime: number | null = null;
 
-        const renderLoop = () => {
+        // requestAnimationFrame automatically passes the current timestamp to this function
+        const renderLoop = (timestamp: number) => {
+            // Calculate Delta Time (dt) in seconds
+            if (lastTime === null) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // Clamp dt to a maximum of 100ms to prevent massive jumps when switching browser tabs
+            const safeDt = Math.min(dt, 0.1);
+
             let didSave = false;
             try {
                 // Resize
@@ -101,9 +114,13 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                 if (canvas.height !== targetH) canvas.height = targetH;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                // Physics (Gliding)
-                currentRenderedGps.current.lat += (targetGps.current.lat - currentRenderedGps.current.lat) * MAP_CONFIG.GLIDE_SPEED;
-                currentRenderedGps.current.lng += (targetGps.current.lng - currentRenderedGps.current.lng) * MAP_CONFIG.GLIDE_SPEED;
+                // FIX: Frame-Rate Independent Physics (Exponential Decay Lerp)
+                // Multiplying GLIDE_SPEED by 60 keeps the visual speed identical to the old 60fps math
+                const decayRate = MAP_CONFIG.GLIDE_SPEED * 60; 
+                const lerpFactor = 1 - Math.exp(-decayRate * safeDt);
+
+                currentRenderedGps.current.lat += (targetGps.current.lat - currentRenderedGps.current.lat) * lerpFactor;
+                currentRenderedGps.current.lng += (targetGps.current.lng - currentRenderedGps.current.lng) * lerpFactor;
 
                 // Camera Setup
                 ctx.save();
@@ -178,7 +195,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
             }
         };
 
-        renderLoop();
+        animationFrameId = requestAnimationFrame(renderLoop);
         return () => cancelAnimationFrame(animationFrameId);
     }, [canvasRef, hasLocationLock]);
 
@@ -205,10 +222,14 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     setHasLocationLock(true); 
                 } else {
                     targetGps.current = { ...newCoords };
+                    // Optional: Clear any lingering soft errors once signal returns
+                    setGpsError(null); 
+                    setHasLocationLock(true);
                 }
             },
             (error) => {
                 console.warn("GPS Error:", error.message);
+                
                 if (error.code === error.PERMISSION_DENIED) {
                     setGpsError("Location access denied. Please allow GPS to use the map.");
                 } else if (error.code === error.TIMEOUT) {
@@ -216,6 +237,9 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                 } else {
                     setGpsError("Unable to acquire GPS signal.");
                 }
+                
+                // FIX: Instantly drop the location lock to surface the gpsError overlay
+                setHasLocationLock(false);
             },
             { 
                 enableHighAccuracy: true, 
