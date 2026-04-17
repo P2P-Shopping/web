@@ -88,13 +88,17 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         };
 
         let animationFrameId: number;
+        let consecutiveErrors = 0;
 
         const renderLoop = () => {
+            let didSave = false;
             try {
                 // Resize
                 const rect = canvas.parentElement?.getBoundingClientRect();
-                canvas.width = rect?.width || window.innerWidth;
-                canvas.height = rect?.height || window.innerHeight;
+                const targetW = rect?.width || window.innerWidth;
+                const targetH = rect?.height || window.innerHeight;
+                if (canvas.width !== targetW) canvas.width = targetW;
+                if (canvas.height !== targetH) canvas.height = targetH;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
                 // Physics (Gliding)
@@ -103,6 +107,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
                 // Camera Setup
                 ctx.save();
+                didSave = true;
                 ctx.translate((canvas.width / 2) + camera.current.x, (canvas.height / 2) + camera.current.y);
                 ctx.scale(camera.current.zoom, camera.current.zoom);
 
@@ -161,11 +166,15 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                 ctx.lineWidth = 2 / camera.current.zoom;
                 ctx.stroke();
 
+                consecutiveErrors = 0;
             } catch (err) {
                 console.error("Map Render Glitch:", err);
+                consecutiveErrors++;
             } finally {
-                ctx.restore();
-                animationFrameId = requestAnimationFrame(renderLoop);
+                if (didSave) ctx.restore();
+                if (consecutiveErrors < 5) {
+                    animationFrameId = requestAnimationFrame(renderLoop);
+                }
             }
         };
 
@@ -304,16 +313,10 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         lastPanPoint.current = null;
     };
 
-    const simulateMove = () => {
-        targetGps.current.lat += 0.00005; 
-        targetGps.current.lng += 0.00005;
-    };
-
     return {
         isDragging,
         hasLocationLock,
         gpsError,
-        simulateMove,
         handlers: {
             onTouchStart: handleTouchStart,
             onTouchMove: handleTouchMove,
@@ -332,7 +335,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 // ==========================================
 const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { isDragging, hasLocationLock, gpsError, simulateMove, handlers } = useMapEngine(canvasRef);
+    const { isDragging, hasLocationLock, gpsError, handlers } = useMapEngine(canvasRef);
 
     // INTERCEPTOR: Shows error message if denied/failed, otherwise shows loading text
     if (!hasLocationLock) {
@@ -346,18 +349,6 @@ const StoreMap: React.FC = () => {
     return (
         <div className={`mapContainer ${isDragging ? "dragging" : ""}`} {...handlers}>
             <canvas ref={canvasRef} className="map-canvas" />
-            
-            {import.meta.env.DEV && (
-            <button
-                className="debug-gps-button"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    simulateMove();
-                }}
-            >
-                Simulate GPS Move
-            </button>
-            )}
         </div>
     );
 };

@@ -30,7 +30,6 @@
     cursor: grabbing;
 }
 
-/* ADD TO BOTTOM OF StoreMap.css */
 
 .map-loading-screen {
     position: absolute;
@@ -43,7 +42,7 @@
     justify-content: center;
     align-items: center;
     background-color: var(--bg-color, #121212);
-    color: var(--user-dot, #00D4FF);
+    color: var(--blue-neon, #00D4FF);
     z-index: 10;
 }
 
@@ -55,20 +54,6 @@
     animation: pulse 1.5s infinite;
 }
 
-.debug-gps-button {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    padding: 10px 15px;
-    border-radius: 8px;
-    border: none;
-    background: var(--card-bg, #ffffff);
-    color: var(--indigo-dark, #333333);
-    font-weight: bold;
-    z-index: 10;
-    cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
 
 @keyframes pulse {
     0% { opacity: 0.6; }
