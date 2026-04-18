@@ -2,6 +2,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
 import "./StoreMap.css";
+import ListDetail from "../ListDetail/ListDetail";
 
 // 1. Dummy GPS Data
 const USER_GPS = { lat: 44.4268, lng: 26.1025 };
@@ -138,6 +139,7 @@ const StoreMap = () => {
                 onPointerLeave={handlePointerUp}
                 onPointerCancel={handlePointerUp}
             />
+            <ListDetail />
         </div>
     );
 };

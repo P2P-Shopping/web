@@ -1,372 +1,144 @@
-import type React from "react";
-import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useLocation } from "react-router-dom";
 import stompClient from "../../services/socketService";
-
+import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import "./ListDetail.css";
 
 interface Item {
-    id: string; // Added unique ID
+    id: string;
     name: string;
     checked: boolean;
 }
 
-class SyncPayloadBuilder {
-    private payload: Record<string, any> = {
-        eventType: "ITEM_TOGGLED",
-        timestamp: Date.now(),
-    };
-
-    setListId(listId: string) {
-        this.payload.listId = listId;
-        return this;
-    }
-
-    setItemId(itemId: string) {
-        this.payload.itemId = itemId;
-        return this;
-    }
-
-    setChecked(checked: boolean) {
-        this.payload.checked = checked;
-        return this;
-    }
-
-    build() {
-        return JSON.stringify(this.payload);
-    }
-}
-
-// Sanitize strings to reduce risk of storing/executing malicious payloads.
-const removeScriptBlocks = (input: string): string => {
-    const lowerInput = input.toLowerCase();
-    const closingTag = "</script>";
-    let cursor = 0;
-    let output = "";
-
-    while (cursor < input.length) {
-        const start = lowerInput.indexOf("<script", cursor);
-        if (start === -1) {
-            output += input.slice(cursor);
-            break;
-        }
-
-        const tagEnd = input.indexOf(">", start + 7);
-        if (tagEnd === -1) {
-            output += input.slice(cursor);
-            break;
-        }
-
-        const closeStart = lowerInput.indexOf(closingTag, tagEnd + 1);
-        if (closeStart === -1) {
-            output += input.slice(cursor);
-            break;
-        }
-
-        output += input.slice(cursor, start);
-        cursor = closeStart + closingTag.length;
-    }
-
-    return output;
-};
-
-const sanitizeString = (input: unknown): string => {
-    const s = String(input ?? "");
-
-    // Remove any <script>...</script> blocks entirely
-    const withoutScripts = removeScriptBlocks(s);
-
-    // Escape angle brackets and ampersands so stored values cannot be
-    // interpreted as HTML if later injected into the DOM unsafely.
-    return withoutScripts.replace(/[<>&]/g, (c) =>
-        c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;",
-    );
-};
-
-const sanitizeItemsForStorage = (items: Item[]): Item[] =>
-    items.map((item) => ({
-        id: String(item.id),
-        name: sanitizeString(item.name),
-        checked: Boolean(item.checked),
-    }));
-
-const readItems = (id: string | undefined): Item[] => {
-    if (!id) return [];
-    const saved = localStorage.getItem(`list-${id}`);
-    if (!saved) return [];
-    try {
-        const parsed = JSON.parse(saved);
-        if (!Array.isArray(parsed)) return [];
-        return parsed.map((p) => ({
-            id: String(p.id ?? crypto.randomUUID()),
-            name: sanitizeString(p.name ?? ""),
-            checked: Boolean(p.checked),
-        }));
-    } catch {
-        // Corrupted or malicious data in storage; return empty list instead of throwing.
-        return [];
-    }
-};
-
 const ListDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
+    const location = useLocation();
+    const isNavView = location.pathname.includes("/nav");
+
     const [items, setItems] = useState<Item[]>([]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [newItemName, setNewItemName] = useState("");
-    const [permissionStatus, setPermissionStatus] =
-        useState<PermissionState | null>(null);
-    const [showBanner, setShowBanner] = useState(true);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
 
-    // Track pending optimistic publishes so we can rollback on timeout or global errors.
-    const pendingRollbacksRef = useRef(
-        new Map<string, { timeoutId: number; rollback: () => void }>(),
-    );
-    const handlersWrappedRef = useRef(false);
     const RECEIPT_TIMEOUT_MS = 5000;
+    const pendingRollbacksRef = useRef(new Map<string, { timeoutId: number; rollback: () => void }>());
 
-    // Wrap global STOMP/WebSocket error handlers so transmission failures trigger the same rollback path.
     useEffect(() => {
-        if (handlersWrappedRef.current) return;
-        handlersWrappedRef.current = true;
-
-        const prevOnWS = (stompClient as any).onWebSocketError;
-        const prevOnStomp = (stompClient as any).onStompError;
-
-        (stompClient as any).onWebSocketError = (evt: any) => {
+        const fetchListData = async () => {
+            setIsLoading(true);
             try {
-                prevOnWS?.(evt);
-            } catch (e) {
-                console.error("Error in previous onWebSocketError handler:", e);
-            }
-
-            for (const [id, entry] of pendingRollbacksRef.current.entries()) {
-                try {
-                    clearTimeout(entry.timeoutId);
-                    entry.rollback();
-                } catch (err) {
-                    console.error(
-                        "Rollback failed during WebSocket error:",
-                        err,
-                    );
-                }
-                pendingRollbacksRef.current.delete(id);
-            }
-        };
-
-        (stompClient as any).onStompError = (frame: any) => {
-            try {
-                prevOnStomp?.(frame);
-            } catch (e) {
-                console.error("Error in previous onStompError handler:", e);
-            }
-
-            for (const [id, entry] of pendingRollbacksRef.current.entries()) {
-                try {
-                    clearTimeout(entry.timeoutId);
-                    entry.rollback();
-                } catch (err) {
-                    console.error("Rollback failed during STOMP error:", err);
-                }
-                pendingRollbacksRef.current.delete(id);
-            }
-        };
-
-        return () => {
-            (stompClient as any).onWebSocketError = prevOnWS;
-            (stompClient as any).onStompError = prevOnStomp;
-        };
-    }, []);
-
-    // Sync items when ID changes
-    useEffect(() => {
-        setItems(readItems(id));
-    }, [id]);
-
-    // Persist items to localStorage
-    useEffect(() => {
-        if (!id) return;
-        // Sanitize items before writing to browser storage to avoid persisting
-        // potentially malicious payloads.
-        const sanitized = sanitizeItemsForStorage(items);
-        localStorage.setItem(`list-${id}`, JSON.stringify(sanitized));
-    }, [items, id]);
-
-    // Safe Permission Check
-    useEffect(() => {
-        let isMounted = true;
-        let permResult: PermissionStatus | null = null;
-
-        const handler = () => {
-            if (isMounted && permResult) setPermissionStatus(permResult.state);
-        };
-
-        if (navigator.permissions) {
-            navigator.permissions
-                .query({ name: "geolocation" as PermissionName })
-                .then((result) => {
-                    if (!isMounted) return;
-                    permResult = result;
-                    setPermissionStatus(result.state);
-                    result.addEventListener("change", handler);
+                const response = await fetch("http://localhost:8081/api/lists", {
+                    headers: {
+                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+                        "Content-Type": "application/json"
+                    }
                 });
-        }
 
-        return () => {
-            isMounted = false;
-            permResult?.removeEventListener("change", handler);
-        };
-    }, []);
+                if (!response.ok) throw new Error(`Eroare server: ${response.status}`);
 
-    const addItem = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newItemName.trim() === "") return;
-        const newItem: Item = {
-            id: crypto.randomUUID(),
-            name: newItemName,
-            checked: false,
+                const allLists: any[] = await response.json();
+                const currentList = allLists.find(l => l.id === id);
+
+                if (currentList) {
+                    const mappedItems = currentList.items.map((it: any) => ({
+                        id: it.id,
+                        name: it.name,
+                        checked: it.isChecked 
+                    }));
+                    setItems(mappedItems);
+                } else {
+                    throw new Error("Lista nu a fost găsită.");
+                }
+            } catch (err: any) {
+                if (isNavView || id === "default" || !id) {
+                    setItems([
+                        { id: "1", name: "Lapte de ovăz", checked: false },
+                        { id: "2", name: "Pâine integrală", checked: false },
+                        { id: "3", name: "Roșii cherry", checked: false },
+                        { id: "4", name: "Detergent de rufe", checked: false },
+                    ]);
+                }
+            } finally {
+                setIsLoading(false);
+            }
         };
-        setItems([...items, newItem]);
-        setNewItemName("");
-    };
+        fetchListData();
+    }, [id, isNavView]);
 
     const handleCheck = (itemId: string) => {
         const currentItem = items.find((item) => item.id === itemId);
         if (!currentItem) return;
-        const newChecked = !currentItem.checked;
-
-        // Backup state for potential rollback
         const previousItems = [...items];
+        const newChecked = !currentItem.checked;
+        setItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: newChecked } : it));
 
-        // Optimistic UI update (functional form to avoid stale closures)
-        setItems((prevItems) =>
-            prevItems.map((item) =>
-                item.id === itemId ? { ...item, checked: newChecked } : item,
-            ),
-        );
-
-        if (!id) return;
-
-        const payload = new SyncPayloadBuilder()
-            .setListId(id)
-            .setItemId(itemId)
-            .setChecked(newChecked)
-            .build();
-
-        if (!stompClient.connected) {
-            setItems(previousItems);
-            console.error("Unable to sync: WebSocket connection is closed");
-            return;
-        }
-
-        const receiptId = `rcpt-${crypto.randomUUID()}`;
-
-        try {
-            // Register receipt watcher before sending so we don't miss quick receipts.
-            if ((stompClient as any).watchForReceipt) {
-                (stompClient as any).watchForReceipt(receiptId, () => {
-                    const entry = pendingRollbacksRef.current.get(receiptId);
-                    if (entry) {
-                        clearTimeout(entry.timeoutId);
-                        pendingRollbacksRef.current.delete(receiptId);
-                    }
-                });
-            }
-
-            // Prepare rollback + timeout in case no receipt arrives
+        if (id && stompClient.connected) {
+            const payload = JSON.stringify({ eventType: "ITEM_TOGGLED", listId: id, itemId: itemId, checked: newChecked });
+            const receiptId = `rcpt-${crypto.randomUUID()}`;
             const timeoutId = window.setTimeout(() => {
                 const entry = pendingRollbacksRef.current.get(receiptId);
-                if (!entry) return;
-                try {
-                    entry.rollback();
-                } catch (err) {
-                    console.error("Rollback failed (timeout):", err);
-                }
-                pendingRollbacksRef.current.delete(receiptId);
+                if (entry) { entry.rollback(); pendingRollbacksRef.current.delete(receiptId); }
             }, RECEIPT_TIMEOUT_MS);
-
-            pendingRollbacksRef.current.set(receiptId, {
-                timeoutId,
-                rollback: () => {
-                    setItems(previousItems);
-                    console.error(
-                        "Optimistic UI failed (no receipt), state reverted for item:",
-                        itemId,
-                    );
-                },
-            });
-
-            stompClient.publish({
-                destination: "/app/sync",
-                body: payload,
-                headers: { receipt: receiptId },
-            });
-        } catch (error) {
-            const entry = pendingRollbacksRef.current.get(receiptId);
-            if (entry) {
-                clearTimeout(entry.timeoutId);
-                entry.rollback();
-                pendingRollbacksRef.current.delete(receiptId);
-            } else {
-                setItems(previousItems);
-            }
-            console.error(
-                "Optimistic UI failed, state reverted:",
-                error instanceof Error ? error.message : error,
-            );
+            pendingRollbacksRef.current.set(receiptId, { timeoutId, rollback: () => setItems(previousItems) });
+            stompClient.publish({ destination: "/app/sync", body: payload, headers: { receipt: receiptId } });
         }
     };
 
-    return (
-        <div className="list-detail-container">
-            {showBanner && permissionStatus === "denied" && (
-                <div className="location-warning-banner">
-                    <span>
-                        Location access is disabled. Some features may be
-                        limited.
-                    </span>
-                    <button
-                        type="button"
-                        className="close-banner-btn"
-                        onClick={() => setShowBanner(false)}
-                    >
-                        ✕
+    const addItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newItemName.trim() === "") return;
+        const newItem: Item = { id: crypto.randomUUID(), name: newItemName, checked: false };
+        setItems([...items, newItem]);
+        setNewItemName("");
+    };
+
+    // JSX pentru conținutul listei (fără a fi o componentă separată instabilă)
+    const listContent = (
+        <>
+            <div className="sidebar-header">
+                <h3>Shopping List</h3>
+                {isNavView && (
+                    <button className="close-sidebar-btn" onClick={() => setIsSidebarOpen(false)}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
                     </button>
-                </div>
-            )}
-
-            <form onSubmit={addItem} className="add-item-form">
-                <input
-                    type="text"
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    placeholder="Add new item..."
-                    className="add-input"
+                )}
+            </div>
+            <form onSubmit={addItem} className="add-item-form-sidebar">
+                <input 
+                    type="text" 
+                    value={newItemName} 
+                    onChange={(e) => setNewItemName(e.target.value)} 
+                    placeholder="Add item..." 
+                    className="sidebar-input" 
                 />
-                <button type="submit" className="add-button">
-                    Add
-                </button>
+                <button type="submit" className="sidebar-add-btn">Add</button>
             </form>
+            <ShoppingListItems items={items} onCheck={handleCheck} />
+        </>
+    );
 
-            <ul className="shopping-list">
-                {items.map((item) => (
-                    <li
-                        key={item.id}
-                        className={`shopping-item ${item.checked ? "item-completed" : ""}`}
-                    >
-                        <label className="item-label">
-                            <input
-                                type="checkbox"
-                                checked={item.checked}
-                                onChange={() => handleCheck(item.id)}
-                                className="item-checkbox"
-                            />
-                            <span className="item-text">{item.name}</span>
-                        </label>
-                    </li>
-                ))}
-            </ul>
-
-            {items.length === 0 && (
-                <p className="empty-msg">Your list is empty!</p>
+    return (
+        <div className={isNavView ? "nav-sidebar-wrapper" : "full-page-wrapper"}>
+            {isNavView ? (
+                <>
+                    {!isSidebarOpen && (
+                        <div className="open-list-container">
+                            <button className="open-list-btn-modern" onClick={() => setIsSidebarOpen(true)}>
+                                <span className="cart-icon">🛒</span> Open List
+                            </button>
+                        </div>
+                    )}
+                    <div className={`list-detail-sidebar ${isSidebarOpen ? "open" : ""}`}>
+                        {listContent}
+                    </div>
+                </>
+            ) : (
+                <div className="centered-list-card">
+                    {listContent}
+                </div>
             )}
         </div>
     );
