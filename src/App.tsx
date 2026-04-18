@@ -73,12 +73,6 @@ function App() {
     }
   };
 
-  const isStoreMap = location.pathname === "/nav";
-
-  if (isStoreMap) {
-    return <StoreMap />;
-  }
-
   return (
     <div className="app-container">
       {/* Toast Notification */}
@@ -117,7 +111,7 @@ function App() {
           <Link to="/route" className="nav-link">
             Route
           </Link>
-          <Link to="/nav" className="nav-link">
+          <Link to="/nav/default" className="nav-link">
             Store Map
           </Link>
           <Link to="/list/default" className="nav-link">
@@ -149,7 +143,8 @@ function App() {
         </div>
       </header>
 
-      <main className="content">
+      {/* AICI ESTE MODIFICAREA: Schimbăm clasa dinamic dacă suntem pe ruta de hartă */}
+      <main className={location.pathname.includes('/nav') ? "full-width-content" : "content"}>
         <Routes>
           <Route
             path="/login"
@@ -168,7 +163,10 @@ function App() {
             }
           />
           <Route path="/map" element={<MapPage />} />
-          <Route path="/nav" element={<StoreMap />} />
+          
+          {/* Ruta pentru hartă cu parametru */}
+          <Route path="/nav/:id" element={<StoreMap />} />
+          
           <Route path="/route" element={<RoutePage />} />
           <Route path="/list/:id" element={<ListDetail />} />
 

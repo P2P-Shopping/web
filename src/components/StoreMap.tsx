@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import "./StoreMap.css";
-
+import ListDetail from "../pages/ListDetail";
 // 1. Dummy GPS Data
 const USER_GPS = { lat: 44.4268, lng: 26.1025 };
 
@@ -34,10 +34,11 @@ function StoreMap() {
   // --- STATE ---
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // STATE PENTRU SIDEBAR
 
   // --- REFS ---
   const lastPos = useRef({ x: 0, y: 0 });
-  // NEW: Track the ID of the first finger that touches the screen
+  // Track the ID of the first finger that touches the screen
   const activePointerId = useRef<number | null>(null);
 
   useEffect(() => {
@@ -116,6 +117,14 @@ function StoreMap() {
           ←
         </button>
         <h3>In-store navigation</h3>
+        
+        {/* BUTON PENTRU DESCHIDERE/ÎNCHIDERE SIDEBAR */}
+        <button 
+          className="toggle-sidebar-btn"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        >
+          {isSidebarOpen ? "Close List ✕" : "Open List 🛒"}
+        </button>
       </div>
 
       <div className="mapContainer">
@@ -128,6 +137,11 @@ function StoreMap() {
           onPointerLeave={handlePointerUp}
           onPointerCancel={handlePointerUp}
         />
+      </div>
+
+      {/* CONTAINERUL PENTRU SIDEBAR */}
+      <div className={`sidebar ${isSidebarOpen ? "open" : ""}`}>
+        <ListDetail />
       </div>
     </div>
   );

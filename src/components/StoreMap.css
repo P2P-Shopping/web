@@ -1,58 +1,108 @@
 .container {
   width: 100%;
-  height: 100vh;
+  height: 100%; /* Acum preia automat înălțimea din full-width-content */
   display: flex;
   flex-direction: column;
+  position: relative;
   overflow: hidden;
 }
 
+/* --- Bara secundară ("In-store navigation") --- */
 .navbar {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  height: 10vh;
-  padding: 10px;
-  left: 0;
-  background-color: #eee; /* background color */
-  border-bottom: 1px solid #ccc; /* optional border */
-  box-sizing: border-box; /* include padding in width */
-  position: fixed; /* optional, depending on layout */
-  z-index: 1;
+  height: 60px; /* Înălțime fixă pentru stabilitate */
+  padding: 0 20px;
+  background-color: #f1f5f9; /* O nuanță foarte fină de gri */
+  border-bottom: 1px solid #e2e8f0;
+  box-sizing: border-box;
+  /* Am scos position: fixed; acum stă natural în partea de sus! */
+  z-index: 20;
 }
 
 .backButton {
-  margin-right: 10px;
-  font-size: 18px;
+  margin-right: 15px;
+  font-size: 16px;
   cursor: pointer;
+  background-color: #64748b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
 }
 
+.backButton:hover {
+  background-color: #475569;
+}
+
+/* --- Containerul hărții --- */
 .mapContainer {
-  position: absolute;
-  left: 50%;
-  top: 50%;
+  flex: 1; /* Asta e magia: îi spune hărții să ocupe TOT spațiul rămas sub .navbar */
+  position: relative;
   width: 100%;
-  height: 100%;
-  transform: translate(-50%, -50%);
-  overflow: hidden;
   z-index: 0;
+  overflow: hidden;
 }
-
-/* ... rest of your css ... */
 
 canvas {
   width: 100%;
   height: 100%;
   display: block;
   background-color: #ffffff;
-  overflow: hidden;
   cursor: grab;
-
-  /* Critical for mobile: stops browser from zooming/refreshing the page */
   touch-action: none;
   -webkit-touch-callout: none;
 }
 
 canvas.dragging {
   cursor: grabbing;
+}
+
+/* --- Sidebar-ul cu lista --- */
+.sidebar {
+  position: absolute;
+  top: 60px; /* Începe exact de sub bara de In-Store Navigation */
+  right: -400px;
+  width: 350px;
+  height: calc(100% - 60px); /* Ocupă spațiul de sus până jos */
+  background-color: var(--bg-color, #ffffff);
+  border-left: 1px solid #e2e8f0;
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.05);
+  transition: right 0.3s ease-in-out;
+  z-index: 10;
+  overflow-y: auto;
+}
+
+.sidebar.open {
+  right: 0;
+}
+
+.toggle-sidebar-btn {
+  margin-left: auto;
+  padding: 8px 16px;
+  background-color: #111c2f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggle-sidebar-btn:hover {
+  background-color: #1a2a47;
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+    right: -100%;
+  }
 }
