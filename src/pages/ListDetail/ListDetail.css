@@ -110,7 +110,7 @@
     background-color: #ffffff; 
     border-color: black;
     transform: rotate(90deg) scale(1.1);
-    color: white;
+    color: rgb(7, 7, 7);
 }
 
 /* Formular Add Item */

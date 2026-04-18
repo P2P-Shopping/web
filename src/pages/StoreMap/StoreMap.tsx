@@ -139,7 +139,7 @@ const StoreMap = () => {
                 onPointerLeave={handlePointerUp}
                 onPointerCancel={handlePointerUp}
             />
-            <ListDetail />
+            <ListDetail isEmbedded={true} />
         </div>
     );
 };

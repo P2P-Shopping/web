@@ -10,7 +10,11 @@ interface Item {
     checked: boolean;
 }
 
-const ListDetail: React.FC = () => {
+interface ListDetailProps {
+    isEmbedded?: boolean;
+}
+
+const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
     const isNavView = location.pathname.includes("/nav");
@@ -25,14 +29,33 @@ const ListDetail: React.FC = () => {
 
     useEffect(() => {
         const fetchListData = async () => {
+            // 1. VERIFICARE PREVENTIVĂ: Skip fetch pe hartă sau pentru rute demo
+            if (isEmbedded || !id || id === "default") {
+                setItems([
+                    { id: "1", name: "Lapte de ovăz", checked: false },
+                    { id: "2", name: "Pâine integrală", checked: false },
+                    { id: "3", name: "Roșii cherry", checked: false },
+                    { id: "4", name: "Detergent de rufe", checked: false },
+                ]);
+                setIsLoading(false);
+                return; 
+            }
+
             setIsLoading(true);
             try {
-                const response = await fetch("http://localhost:8081/api/lists", {
-                    headers: {
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
-                        "Content-Type": "application/json"
-                    }
-                });
+                // 2. CONFIGURARE URL ȘI TOKEN: Eliminăm hardcodarea portului
+                const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
+                const token = localStorage.getItem("token");
+
+                // 3. SECUTIZARE HEADERS: Evităm "Bearer null"
+                const headers: HeadersInit = {
+                    "Content-Type": "application/json"
+                };
+                if (token) {
+                    headers["Authorization"] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(`${baseUrl}/api/lists`, { headers });
 
                 if (!response.ok) throw new Error(`Eroare server: ${response.status}`);
 
@@ -50,28 +73,25 @@ const ListDetail: React.FC = () => {
                     throw new Error("Lista nu a fost găsită.");
                 }
             } catch (err: any) {
-                if (isNavView || id === "default" || !id) {
-                    setItems([
-                        { id: "1", name: "Lapte de ovăz", checked: false },
-                        { id: "2", name: "Pâine integrală", checked: false },
-                        { id: "3", name: "Roșii cherry", checked: false },
-                        { id: "4", name: "Detergent de rufe", checked: false },
-                    ]);
-                }
+                console.error("Eroare la fetch:", err.message);
             } finally {
                 setIsLoading(false);
             }
         };
+
         fetchListData();
-    }, [id, isNavView]);
+    }, [id, isNavView, isEmbedded]); 
 
     const handleCheck = (itemId: string) => {
         const currentItem = items.find((item) => item.id === itemId);
         if (!currentItem) return;
         const previousItems = [...items];
         const newChecked = !currentItem.checked;
+        
+        // Update local rapid
         setItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: newChecked } : it));
 
+        // Sincronizare live prin WebSockets
         if (id && stompClient.connected) {
             const payload = JSON.stringify({ eventType: "ITEM_TOGGLED", listId: id, itemId: itemId, checked: newChecked });
             const receiptId = `rcpt-${crypto.randomUUID()}`;
@@ -79,20 +99,39 @@ const ListDetail: React.FC = () => {
                 const entry = pendingRollbacksRef.current.get(receiptId);
                 if (entry) { entry.rollback(); pendingRollbacksRef.current.delete(receiptId); }
             }, RECEIPT_TIMEOUT_MS);
+            
             pendingRollbacksRef.current.set(receiptId, { timeoutId, rollback: () => setItems(previousItems) });
             stompClient.publish({ destination: "/app/sync", body: payload, headers: { receipt: receiptId } });
         }
     };
 
-    const addItem = async (e: React.FormEvent) => {
+    const addItem = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newItemName.trim() === "") return;
-        const newItem: Item = { id: crypto.randomUUID(), name: newItemName, checked: false };
-        setItems([...items, newItem]);
+        const trimmedName = newItemName.trim(); // CodeRabbit fix: trimming corect
+        if (trimmedName === "") return;
+
+        const newItem: Item = { 
+            id: crypto.randomUUID(), 
+            name: trimmedName, 
+            checked: false 
+        };
+
+        // Update stării folosind varianta funcțională pentru a evita datele vechi
+        setItems((prevItems) => [...prevItems, newItem]);
         setNewItemName("");
+
+        // Sincronizare live pentru adăugare
+        if (id && stompClient.connected) {
+            const payload = JSON.stringify({
+                eventType: "ITEM_ADDED",
+                listId: id,
+                item: newItem 
+            });
+            stompClient.publish({ destination: "/app/sync", body: payload });
+        }
     };
 
-    // JSX pentru conținutul listei (fără a fi o componentă separată instabilă)
+    // listContent definit aici pentru a păstra focusul la input
     const listContent = (
         <>
             <div className="sidebar-header">
