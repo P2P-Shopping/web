@@ -1,0 +1,152 @@
+/* --- CONTAINERUL LISTEI --- */
+.list-detail-container {
+    padding: 20px;
+    max-width: 500px;
+    margin: 0 auto;
+    font-family: sans-serif;
+    /* Ne asigurăm că containerul nu are un fundal care să încurce */
+    background: transparent;
+}
+
+/* --- TEXTUL PRODUSELOR (Cea mai importantă parte) --- */
+/* Folosim .list-detail-container în față pentru a forța prioritatea */
+.list-detail-container .item-text {
+    color: #ffffff !important; /* ALB pur pentru vizibilitate maximă */
+    font-size: 18px;
+    font-weight: 500;
+}
+
+/* Stil pentru produsele deja bifate (le facem un pic mai șterse) */
+.list-detail-container .item-completed .item-text {
+    color: #a0aec0 !important; /* Un gri deschis */
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* --- INPUT-UL PENTRU PRODUSE NOI --- */
+.list-detail-container .add-input {
+    flex: 1;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 16px;
+    background: rgba(
+        255,
+        255,
+        255,
+        0.1
+    ) !important; /* Fundal ușor transparent */
+    color: #ffffff !important; /* Text alb în interiorul input-ului */
+}
+
+/* Culoarea textului de sugestie (placeholder) */
+.list-detail-container .add-input::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* --- BUTONUL "ADD ITEM" (Asortat cu tema mov) --- */
+.list-detail-container .add-button {
+    padding: 10px 20px;
+    background-color: #aa3bff !important; /* Movul de accent al aplicației tale */
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.list-detail-container .add-button:hover {
+    background-color: #8b2bde !important;
+}
+
+/* --- CHECKBOX-UL --- */
+.list-detail-container .item-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 2px solid #aa3bff;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Bifa din interiorul checkbox-ului */
+.list-detail-container .item-checkbox:checked::after {
+    content: "✔";
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* --- ELEMENTELE DE STRUCTURĂ --- */
+.add-item-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+.shopping-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shopping-item {
+    background-color: rgba(255, 255, 255, 0.05); /* Un fundal foarte discret */
+    border-radius: 8px;
+    padding: 0;
+    transition: background 0.2s;
+}
+
+.item-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    cursor: pointer;
+}
+
+/* --- 1. REPARARE BIFĂ (CHECKBOX) --- */
+/* Când este debifat */
+.list-detail-container .item-checkbox {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    width: 22px !important;
+    height: 22px !important;
+    cursor: pointer !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border: 2px solid #aa3bff !important;
+    border-radius: 4px !important;
+    display: inline-block !important;
+    margin: 0 !important;
+}
+
+/* Când este BIFAT: se face mov și apare bifa desenată din SVG */
+.list-detail-container .item-checkbox:checked {
+    background-color: #aa3bff !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    background-size: 70% !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    border: 2px solid #aa3bff !important;
+}
+
+/* Ascundem bifa veche de text care nu funcționa */
+.list-detail-container .item-checkbox:checked::after {
+    display: none !important;
+}
+
+/* --- 2. REPARARE FUNDAL ALB PENTRU PRODUS BIFAT --- */
+.list-detail-container .shopping-item.item-completed {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    opacity: 0.6 !important;
+}

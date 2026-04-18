@@ -1,400 +1,435 @@
-/* Global styles */
-
+/* src/App.css */
 :root {
-  --bg-color: #f8f9fa;
-  --card-bg: #ffffff;
-  --text-main: #1a1a1a;
-  --text-secondary: #6c757d;
-  --accent-blue: #3b82f6;
-  --border-color: #eaeaea;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --bg-color: #f8f9fa;
+    --card-bg: #ffffff;
+    --text-main: #1a1a1a;
+    --text-secondary: #6c757d;
+    --accent-blue: #3b82f6;
+    --border-color: #eaeaea;
+    --shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 body {
-  margin: 0;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-main);
+    margin: 0;
+    font-family:
+        Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    --indigo-dark: #090820;
+    --purple-dark: #22153d;
+    --purple-medium: #25103e;
+    --lavender: #bca7d6;
+    --blue-neon: #00d4ff;
+    --red-neon: #ff3366;
+    --purple-other: #4a148c;
+
+    --navbar-color: var(--indigo-dark);
+    --navbar-text: white;
+
+    --tab-bg: white;
+    --tab-color: var(--purple-medium);
+    --tab-text: var(--text-secondary);
+
+    --bg-color: var(--purple-dark);
+    --card-bg: var(--lavender);
+
+    --text-main: var(--purple-dark);
+    --text-secondary: white;
+    --text-main-outline: white;
+    --text-secondary-outline: var(--purple-dark);
+
+    --accent-blue: var(--lavender);
+
+    --border-color: #eaeaea;
+    --border-secondary-color: black;
+
+    --shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+body {
+    margin: 0;
+    font-family:
+        Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
 }
 
 .app-container {
-  min-height: 100vh;
+    min-height: 100vh;
 }
 
 /* Header Styles */
 .main-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 5%;
-  background-color: var(--card-bg);
-  border-bottom: 1px solid var(--border-color);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 5%;
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .logo-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .logo-section h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--text-main);
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-main);
 }
 .cart-icon {
-  font-size: 1.5rem;
+    font-size: 1.5rem;
 }
 .team-tag {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
 }
 
 /* Navigation Menu */
 nav {
-  display: flex;
-  gap: 24px;
-  margin-right: 2rem;
+    display: flex;
+    gap: 24px;
+    margin-right: 2rem;
 }
 nav a {
-  text-decoration: none;
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 0.95rem;
-  transition: color 0.2s ease;
-  position: relative;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: color 0.2s ease;
+    position: relative;
 }
 nav a:hover {
-  color: var(--accent-blue);
+    color: var(--accent-blue);
 }
 nav a::after {
-  content: "";
-  position: absolute;
-  width: 0;
-  height: 2px;
-  bottom: -4px;
-  left: 0;
-  background-color: var(--accent-blue);
-  transition: width 0.2s ease;
+    content: "";
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -4px;
+    left: 0;
+    background-color: var(--accent-blue);
+    transition: width 0.2s ease;
 }
 nav a:hover::after {
-  width: 100%;
+    width: 100%;
 }
 
 /* Content & Cards */
 .content {
-  max-width: 800px;
-  margin: 2rem auto;
-  padding: 0 20px;
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 20px;
 }
 .card {
-  background: var(--card-bg);
-  border-radius: 12px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow);
-  margin-bottom: 2rem;
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
 }
 .card-title {
-  font-size: 1rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 0;
-  margin-bottom: 1.25rem;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0;
+    margin-bottom: 1.25rem;
 }
 .coordinates {
-  display: flex;
-  gap: 15px;
-  font-size: 1.2rem;
-  align-items: center;
-  margin-top: 8px;
+    display: flex;
+    gap: 15px;
+    font-size: 1.2rem;
+    align-items: center;
+    margin-top: 8px;
 }
 .coord-box strong {
-  color: var(--accent-blue);
+    color: var(--accent-blue);
 }
 
 /* Route List Styles */
 .section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
 }
 .count-badge {
-  background: #e2e8f0;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
+    background: #e2e8f0;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 .route-list {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 .route-item {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  padding: 1rem;
-  border-radius: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition:
+        transform 0.2s,
+        box-shadow 0.2s;
 }
 .route-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
 }
 .point-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 .point-name {
-  font-weight: 600;
+    font-weight: 600;
 }
 .point-coords {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  background: #f1f5f9;
-  padding: 4px 8px;
-  border-radius: 4px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    background: #f1f5f9;
+    padding: 4px 8px;
+    border-radius: 4px;
 }
 
 /* Authentication */
 
 .auth-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background-color: var(--bg-color);
-  margin: 0;
-  font-family:
-    Inter,
-    -apple-system,
-    sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+    margin: 0;
+    font-family: Inter, -apple-system, sans-serif;
 }
 
 .auth-card {
-  background: white;
-  width: 90%;
-  max-width: 400px;
-  padding: 40px;
-  border-radius: 24px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-  text-align: center;
-  position: relative;
-  box-sizing: border-box;
+    background: white;
+    width: 90%;
+    max-width: 400px;
+    padding: 40px;
+    border-radius: 24px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    position: relative;
+    box-sizing: border-box;
 }
 
 .auth-card h2 {
-  margin-bottom: 8px;
-  font-size: 22px;
-  font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 22px;
+    font-weight: 700;
 }
 .auth-subtitle {
-  color: #888;
-  font-size: 14px;
-  margin-bottom: 30px;
-  line-height: 1.4;
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 30px;
+    line-height: 1.4;
 }
 
 /* Tabs (Login/Register) */
 .auth-tabs {
-  display: flex;
-  background: #f0f0f0;
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 30px;
+    display: flex;
+    background: #f0f0f0;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 30px;
 }
 .tab-btn {
-  flex: 1;
-  border: none;
-  padding: 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  background: transparent;
+    flex: 1;
+    border: none;
+    padding: 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    background: transparent;
 }
 .tab-btn.active {
-  background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .tab-btn:focus-visible,
 .submit-btn:focus-visible {
-  outline: 2px solid #1f6feb;
-  outline-offset: 2px;
+    outline: 2px solid #1f6feb;
+    outline-offset: 2px;
 }
 
 .form-group {
-  text-align: left;
-  margin-bottom: 20px;
+    text-align: left;
+    margin-bottom: 20px;
 }
 .form-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  text-align: left;
-  color: #333;
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: left;
+    color: #333;
 }
 .form-group input {
-  width: 100%;
-  padding: 14px;
-  border: none;
-  background: #f4f6f8;
-  border-radius: 12px;
-  font-size: 15px;
-  box-sizing: border-box;
-  margin-bottom: 5px;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    background: #f4f6f8;
+    border-radius: 12px;
+    font-size: 15px;
+    box-sizing: border-box;
+    margin-bottom: 5px;
 }
 
 .submit-btn {
-  width: 100%;
-  padding: 16px;
-  background: #050509;
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 10px;
+    width: 100%;
+    padding: 16px;
+    background: #050509;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
 }
 .auth-row {
-  display: flex;
-  gap: 12px;
-  width: 100%;
+    display: flex;
+    gap: 12px;
+    width: 100%;
 }
 .auth-row .form-group {
-  flex: 1;
+    flex: 1;
 }
 
 /* UX Validation  */
 .error-msg {
-  color: #e03131;
-  font-size: 11px;
-  margin-top: -8px;
-  margin-bottom: 10px;
-  text-align: left;
-  font-weight: 500;
+    color: #e03131;
+    font-size: 11px;
+    margin-top: -8px;
+    margin-bottom: 10px;
+    text-align: left;
+    font-weight: 500;
 }
 
 /* Mobile responsive */
 @media (max-width: 480px) {
-  .auth-card {
-    padding: 20px;
-    border-radius: 15px;
-  }
-  .auth-row {
-    flex-direction: column;
-    gap: 0;
-  }
+    .auth-card {
+        padding: 20px;
+        border-radius: 15px;
+    }
+    .auth-row {
+        flex-direction: column;
+        gap: 0;
+    }
 }
 
 /*Shopping List */
 
 .list-detail-container {
-  padding: 20px;
-  max-width: 500px;
-  margin: 0 auto;
-  font-family: sans-serif;
+    padding: 20px;
+    max-width: 500px;
+    margin: 0 auto;
+    font-family: sans-serif;
 }
 .location-warning-banner {
-  background: #fff5f5;
-  border: 1px solid #feb2b2;
-  color: #c53030;
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+    color: #c53030;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 .close-banner-btn {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-weight: bold;
-  color: #c53030;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: bold;
+    color: #c53030;
 }
 .add-item-form {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 25px;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
 }
 .add-input {
-  flex: 1;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  font-size: 16px;
+    flex: 1;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    font-size: 16px;
 }
 .add-button {
-  padding: 10px 20px;
-  background: #111c2f;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
+    padding: 10px 20px;
+    background: #111c2f;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
 }
 .shopping-list {
-  list-style: none;
-  padding: 0;
+    list-style: none;
+    padding: 0;
 }
 .shopping-item {
-  padding: 15px;
-  border-bottom: 1px solid #edf2f7;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: background 0.2s;
+    padding: 15px;
+    border-bottom: 1px solid #edf2f7;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.2s;
 }
 .item-completed {
-  background: #f7fafc;
+    background: #f7fafc;
 }
 .item-checkbox {
-  width: 22px;
-  height: 22px;
-  cursor: pointer;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
 }
 .item-text {
-  font-size: 18px;
-  color: #111c2f;
+    font-size: 18px;
+    color: #111c2f;
 }
 .item-completed .item-text {
-  text-decoration: line-through;
-  color: #a0aec0;
+    text-decoration: line-through;
+    color: #a0aec0;
 }
 .empty-msg {
-  text-align: center;
-  color: #888;
-  margin-top: 20px;
+    text-align: center;
+    color: #888;
+    margin-top: 20px;
 }
 
 .full-width-content {
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  height: calc(100vh - 75px);
-  overflow: hidden;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    height: calc(100vh - 75px);
+    overflow: hidden;
+}
+.content {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 20px;
 }

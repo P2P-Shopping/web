@@ -1,5 +1,5 @@
 [
-  { "itemId": "item_101", "name": "Milk", "lat": 47.1518, "lng": 27.588 },
-  { "itemId": "item_102", "name": "Bread", "lat": 47.15185, "lng": 27.58815 },
-  { "itemId": "item_103", "name": "Apples", "lat": 47.1519, "lng": 27.58795 }
+    { "itemId": "item_101", "name": "Milk", "lat": 47.1518, "lng": 27.588 },
+    { "itemId": "item_102", "name": "Bread", "lat": 47.15185, "lng": 27.58815 },
+    { "itemId": "item_103", "name": "Apples", "lat": 47.1519, "lng": 27.58795 }
 ]
