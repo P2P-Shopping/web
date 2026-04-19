@@ -215,3 +215,37 @@
     font-weight: 600;
     margin-top: 20px;
 }
+
+.offline-banner {
+    background-color: #ff922b;
+    color: white;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.error-msg {
+    color: #fa5252;
+    background: #fff5f5;
+    border: 1px solid #ffa8a8;
+    padding: 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-main);
+    font-style: italic;
+}
+
+input:disabled {
+    background-color: #e9ecef !important;
+    cursor: not-allowed;
+}
