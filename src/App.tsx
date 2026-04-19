@@ -1,6 +1,6 @@
 import type { StompSubscription } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, } from "react-router-dom";
 // 2. THIS IS NEW: Import your Navbar from your components/ folder
 import { Navbar } from "./components";
 // 1. Import your pages from your pages/ folder
@@ -16,11 +16,10 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 
 import "./App.css";
-
 function App() {
     const [isConnected, setIsConnected] = useState<boolean>(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
-    const _location = useLocation();
+   // const _location = useLocation();
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const clearToastTimeout = useCallback(() => {
@@ -146,10 +145,9 @@ function App() {
                         }
                     />
                     <Route path="/map" element={<MapPage />} />
-                    <Route path="/nav" element={<StoreMap />} />
+                    <Route path="/nav/:id?" element={<StoreMap />} />
                     <Route path="/route" element={<RoutePage />} />
                     <Route path="/list/:id" element={<ListDetail />} />
-
                     <Route
                         path="/"
                         element={<Navigate to="/login" replace />}

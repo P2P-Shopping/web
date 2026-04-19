@@ -1,125 +1,95 @@
-/* Shopping List Container */
-.list-detail-container {
-    padding: 20px;
-    max-width: 500px;
-    margin: 0 auto;
-    font-family: sans-serif;
-}
-.location-warning-banner {
-    background: #fff5f5;
-    border: 1px solid #feb2b2;
-    color: #c53030;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.close-banner-btn {
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-weight: bold;
-    color: #c53030;
+/* Container Card */
+.centered-list-card {
+    background-color: #b8a9d1;
+    border-radius: 24px;
+    padding: 25px;
+    width: 95%;
+    max-width: 450px;
+    margin: 20px auto;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+    font-family: 'Inter', sans-serif;
+    /* REPARARE LĂȚIME: Toate elementele vor respecta padding-ul */
+    box-sizing: border-box;
 }
 
-/* Form Elements */
-.add-item-form {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 25px;
+/* Asigurăm că toate elementele de tip input/textarea respectă marginile */
+.centered-list-card * {
+    box-sizing: border-box;
 }
-.add-input {
-    flex: 1;
-    padding: 12px;
-    border-radius: 6px;
-    border: 2px solid var(--border-color);
-    font-size: 16px;
-    background: var(--navbar-color);
-    color: var(--text-secondary);
-}
-.add-button {
-    padding: 10px 20px;
-    background: var(--navbar-color);
+
+/* Eroarea roșie - O facem mai discretă și aliniată */
+.error-msg {
+    background: #ff5252;
     color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-    border: 2px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 13px;
+    text-align: center;
+    width: 100%;
 }
 
-/* The List Structure */
-.shopping-list {
-    list-style: none;
-    padding: 0;
+/* Secțiunea AI */
+.ai-import-section {
+    background: linear-gradient(145deg, #2e1a5e, #4a307d);
+    padding: 15px;
+    border-radius: 16px;
+    margin-bottom: 25px;
+    border: 2px solid #7c4dff;
+    width: 100%;
+}
+
+.ai-import-section textarea {
+    width: 100%; /* Acum va sta cuminte în interior datorită box-sizing */
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #6c4ab3;
+    color: white;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    resize: none;
+    font-size: 14px;
+    display: block;
+}
+
+/* Formular Manual */
+.add-item-form-sidebar {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-}
-
-/* The Item Container */
-.shopping-item {
-    border: 2px solid var(--border-color);
-    transition: background 0.2s;
-    background-color: var(--card-bg);
-    border-radius: 12px;
-    /* Remove padding here, move it to the label! */
-    padding: 0;
-}
-
-.item-completed {
-    background: #f7fafc;
-    opacity: 0.8;
-}
-
-.item-label {
-    display: flex;
-    align-items: center;
     gap: 12px;
     width: 100%;
-    padding: 15px; /* Moved padding here so the click area fills the container */
-    cursor: pointer;
-    box-sizing: border-box; /* Ensures padding doesn't break the width */
 }
 
-.item-checkbox {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 22px;
-    height: 22px;
-    cursor: pointer;
-    margin: 0; /* Prevents alignment issues */
-    flex-shrink: 0; /* Prevents the checkbox from shrinking if the text is long */
-
-    background-color: var(--text-secondary);
-    border: 2px solid var(--purple-dark);
-    border-radius: 4px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease-in-out;
-}
-
-/* The checkmark */
-input[type="checkbox"].item-checkbox:checked::after {
-    content: "✔";
-    color: var(--purple-dark);
+.sidebar-input {
+    width: 100%; /* Aliniere perfectă cu restul */
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.1);
+    background: white;
     font-size: 14px;
-    font-weight: bold;
+    color: #2e1a5e;
 }
 
-/* Text */
-.item-text {
-    font-size: 18px;
-    color: var(--text-secondary);
+.row-inputs {
+    display: flex;
+    gap: 10px;
+    width: 100%;
 }
-.item-completed .item-text {
-    text-decoration: line-through;
+
+/* Facem input-urile din rând să fie egale și să nu iasă în afară */
+.row-inputs .sidebar-input {
+    flex: 1;
+    min-width: 0; 
 }
-.empty-msg {
-    text-align: center;
-    color: #888;
-    margin-top: 20px;
+
+.sidebar-add-btn {
+    width: 100%;
+    background-color: #2e1a5e;
+    color: white;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 5px;
 }
