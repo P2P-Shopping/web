@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import stompClient from "../../services/socketService";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import "./ListDetail.css";
@@ -8,96 +8,75 @@ interface Item {
     id: string;
     name: string;
     checked: boolean;
+    brand?: string;
+    quantity?: string;
+    price?: number;
+    category?: string;
+    isRecurrent?: boolean;
 }
 
-const ListDetail: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded = false }) => {
+const ListDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [brand, setBrand] = useState("");
+    const [quantity, setQuantity] = useState("");
+    const [category, setCategory] = useState("Altele");
+    const [isRecurrent, setIsRecurrent] = useState(false);
     
-    // NEW: Stări pentru erori și conectivitate
+    const [recipeText, setRecipeText] = useState("");
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
-    const isNavView = useLocation().pathname.includes("/nav");
-
-    // Monitorizăm conexiunea la internet a dispozitivului
-    useEffect(() => {
-        const handleStatusChange = () => setIsOnline(navigator.onLine);
-        window.addEventListener("online", handleStatusChange);
-        window.addEventListener("offline", handleStatusChange);
-        return () => {
-            window.removeEventListener("online", handleStatusChange);
-            window.removeEventListener("offline", handleStatusChange);
-        };
-    }, []);
-
-    useEffect(() => {
-        const fetchListData = async () => {
-            // Nu încercăm fetch dacă suntem pe o rută demo sau fără ID
-            if (isEmbedded || !id || id === "default") {
-                setIsLoading(false);
-                setError("Select a real list to start syncing.");
-                return;
+    const fetchListData = async () => {
+        if (!id) return;
+        try {
+            const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
+            const token = localStorage.getItem("token");
+            const response = await fetch(`${baseUrl}/api/lists`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const allLists = await response.json();
+            const currentList = allLists.find((l: any) => l.id === id);
+            if (currentList) {
+                setItems(currentList.items.map((it: any) => ({
+                    id: it.id, name: it.name, checked: it.isChecked,
+                    brand: it.brand, price: it.price, quantity: it.quantity,
+                    category: it.category, isRecurrent: it.isRecurrent
+                })));
             }
+        } catch (err) { setError("Failed to sync data."); }
+        finally { setIsLoading(false); }
+    };
 
-            setIsLoading(true);
-            setError(null);
+    useEffect(() => { fetchListData(); }, [id]);
 
-            try {
-                const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
-                const token = localStorage.getItem("token");
-                const headers: HeadersInit = { "Content-Type": "application/json" };
-                
-                if (token) {
-                    headers["Authorization"] = `Bearer ${token}`;
-                } else {
-                    throw new Error("Nu ești logată! Te rugăm să mergi pe pagina de Login.");
-                }
+    const handleAiImport = async () => {
+        if (!recipeText.trim()) return;
+        setIsAiLoading(true);
+        try {
+            const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
+            const token = localStorage.getItem("token");
+            const response = await fetch(`${baseUrl}/api/ai/recipe-to-list`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ rawText: recipeText, listId: id })
+            });
+            if (response.ok) { setRecipeText(""); fetchListData(); }
+        } catch (e) { setError("AI Service unavailable."); }
+        finally { setIsAiLoading(false); }
+    };
 
-                // Revenim la endpoint-ul care știm sigur că există în backend-ul tău
-                const response = await fetch(`${baseUrl}/api/lists`, { headers });
-
-                if (!response.ok) {
-                    throw new Error(`Eroare server: ${response.status} (Verifică dacă token-ul e valid)`);
-                }
-
-                const allLists: any[] = await response.json();
-                const currentList = allLists.find(l => l.id === id);
-
-                if (currentList) {
-                    const mappedItems = currentList.items.map((it: any) => ({
-                        id: it.id,
-                        name: it.name,
-                        checked: it.isChecked 
-                    }));
-                    setItems(mappedItems);
-                } else {
-                    throw new Error("Lista nu a fost găsită în baza de date.");
-                }
-            } catch (err: any) {
-                setError(err.message || "Failed to load items.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchListData();
-    }, [id, isEmbedded]);
-
-    // ... handleCheck și addItem rămân la fel, dar verifică isOnline
     const addItem = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isOnline) return; // Blocăm adăugarea dacă nu avem net
-        
-        const trimmedName = newItemName.trim();
-        if (trimmedName === "") return;
-
-        const newItem: Item = { id: crypto.randomUUID(), name: trimmedName, checked: false };
-        setItems((prev) => [...prev, newItem]);
-        setNewItemName("");
-
+        if (!newItemName.trim()) return;
+        const newItem: Item = {
+            id: crypto.randomUUID(), name: newItemName.trim(), checked: false,
+            brand, quantity, category, isRecurrent
+        };
+        setItems(prev => [...prev, newItem]);
+        setNewItemName(""); setBrand(""); setQuantity("");
         if (id && stompClient.connected) {
             stompClient.publish({
                 destination: "/app/sync",
@@ -107,75 +86,59 @@ const ListDetail: React.FC<{ isEmbedded?: boolean }> = ({ isEmbedded = false }) 
     };
 
     const handleCheck = (itemId: string) => {
-        // Nu permitem modificări dacă suntem offline
-        if (!isOnline) return;
-
-        const currentItem = items.find((item) => item.id === itemId);
+        const currentItem = items.find(it => it.id === itemId);
         if (!currentItem) return;
-
         const newChecked = !currentItem.checked;
-
-        // Update local imediat (Optimistic UI)
         setItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: newChecked } : it));
-
-        // Trimitem modificarea prin WebSocket
         if (id && stompClient.connected) {
-            const payload = JSON.stringify({ 
-                eventType: "ITEM_TOGGLED", 
-                listId: id, 
-                itemId: itemId, 
-                checked: newChecked 
-            });
-            
-            stompClient.publish({ 
-                destination: "/app/sync", 
-                body: payload 
+            stompClient.publish({
+                destination: "/app/sync",
+                body: JSON.stringify({ eventType: "ITEM_TOGGLED", listId: id, itemId, checked: newChecked })
             });
         }
     };
-    
-    const listContent = (
-        <>
-            <div className="sidebar-header">
-                <h3>Shopping List</h3>
-                {isNavView && (
-                    <button className="close-sidebar-btn" >
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                )}
-            </div>
-
-            {/* MUTAT AICI: Mesajele de eroare stau acum sub header, pe propriul lor rând */}
-            {!isOnline && <div className="offline-banner">⚠️ Offline Mode - Changes won't sync</div>}
-            {error && <div className="error-msg">{error}</div>}
-
-            <form onSubmit={addItem} className="add-item-form-sidebar">
-                <input 
-                    type="text" 
-                    value={newItemName} 
-                    onChange={(e) => setNewItemName(e.target.value)} 
-                    placeholder={isOnline ? "Add item..." : "Offline..."}
-                    className="sidebar-input"
-                    disabled={!isOnline}
-                />
-                <button type="submit" className="sidebar-add-btn" disabled={!isOnline || isLoading}>Add</button>
-            </form>
-
-            {isLoading ? (
-                <div className="loading-spinner">Loading list... 🔄</div>
-            ) : (
-                <ShoppingListItems items={items} onCheck={handleCheck} />
-            )}
-        </>
-    );
 
     return (
-        <div className={isNavView ? "nav-sidebar-wrapper" : "full-page-wrapper"}>
-            <div className={isNavView ? "list-detail-sidebar open" : "centered-list-card"}>
-                {listContent}
+        <div className="full-page-wrapper">
+            <div className="centered-list-card">
+                <h3 style={{ textAlign: 'center', color: '#2e1a5e' }}>Shopping List</h3>
+                
+                {error && <div className="error-msg">{error}</div>}
+
+                {/* Secțiunea AI Magic */}
+                <div className="ai-import-section">
+                    <textarea 
+                        rows={3} value={recipeText}
+                        onChange={(e) => setRecipeText(e.target.value)}
+                        placeholder="Paste a recipe (e.g. 2 eggs, Zuzu milk...)"
+                    />
+                    <button onClick={handleAiImport} className="ai-btn" disabled={isAiLoading}>
+                        {isAiLoading ? "✨ Processing..." : "AI Magic Import"}
+                    </button>
+                </div>
+
+                {/* Formular Manual Vertical */}
+                <form onSubmit={addItem} className="add-item-form-sidebar">
+                    <input type="text" value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Item Name*" className="sidebar-input" required />
+                    <div className="row-inputs">
+                        <input type="text" value={brand} onChange={e => setBrand(e.target.value)} placeholder="Brand" className="sidebar-input" />
+                        <input type="text" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="Qty" className="sidebar-input" />
+                    </div>
+                    <select value={category} onChange={e => setCategory(e.target.value)} className="sidebar-input">
+                        <option value="Altele">Category...</option>
+                        <option value="Lactate">Lactate</option>
+                        <option value="Legume">Legume</option>
+                        <option value="Carne">Carne</option>
+                        <option value="Băuturi">Băuturi</option>
+                    </select>
+                    <label className="recurrence-label">
+                        <input type="checkbox" checked={isRecurrent} onChange={e => setIsRecurrent(e.target.checked)} />
+                        Add to frequent items
+                    </label>
+                    <button type="submit" className="sidebar-add-btn">Add to List</button>
+                </form>
+
+                {isLoading ? <p style={{textAlign:'center'}}>Loading...</p> : <ShoppingListItems items={items} onCheck={handleCheck} />}
             </div>
         </div>
     );
