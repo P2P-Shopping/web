@@ -1,125 +1,217 @@
-/* Shopping List Container */
-.list-detail-container {
-    padding: 20px;
-    max-width: 500px;
-    margin: 0 auto;
-    font-family: sans-serif;
-}
-.location-warning-banner {
-    background: #fff5f5;
-    border: 1px solid #feb2b2;
-    color: #c53030;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.close-banner-btn {
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-weight: bold;
-    color: #c53030;
+/* --- 1. BUTONUL OPEN LIST (Harta) --- */
+.open-list-container {
+    position: fixed;
+    top: 95px;
+    right: 8%; 
+    z-index: 99;
 }
 
-/* Form Elements */
-.add-item-form {
+.open-list-btn-modern {
+    background-color: var(--navbar-color); 
+    color: var(--text-secondary);
+    border: 2px solid var(--border-color); 
+    padding: 8px 16px; 
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 13px; 
+    cursor: pointer;
     display: flex;
-    gap: 10px;
-    margin-bottom: 25px;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s;
+    box-shadow: 0 4px 0px rgba(0, 0, 0, 0.1);
 }
-.add-input {
-    flex: 1;
-    padding: 12px;
-    border-radius: 6px;
+
+.open-list-btn-modern:hover { transform: translateY(-2px); }
+.open-list-btn-modern .cart-icon { font-size: 1.2rem; }
+
+/* --- 2. LAYOUT: SIDEBAR (Mod Navigație) --- */
+.list-detail-sidebar {
+    position: fixed;
+    top: 85px; 
+    right: -450px;
+    width: 380px;
+    height: calc(100vh - 105px); 
+    background-color: var(--card-bg); 
+    border: 2px solid black; 
+    border-radius: 24px; 
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    color: var(--text-main);
+    transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 1000;
+    padding: 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.list-detail-sidebar.open {
+    right: 20px; 
+}
+
+/* --- 3. LAYOUT: PAGINA CENTRATĂ (Mod Listă) --- */
+.full-page-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 80px);
+    background-color: var(--bg-color);
+    padding: 20px;
+}
+
+.centered-list-card {
+    background-color: var(--card-bg);
+    width: 100%;
+    max-width: 450px;
+    padding: 40px;
+    border-radius: 24px;
+    border: 2px solid black;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+}
+
+/* --- 4. COMPONENTE INTERNE (Comune) --- */
+
+/* Header & Close Button */
+.sidebar-header {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.sidebar-header h3 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-main);
+}
+
+.close-sidebar-btn {
+    position: absolute;
+    top: -15px; 
+    right: -15px;
+    background-color: var(--navbar-color);
+    color: var(--text-secondary);
     border: 2px solid var(--border-color);
-    font-size: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.close-sidebar-btn:hover {
+    background-color: #ffffff; 
+    border-color: black;
+    transform: rotate(90deg) scale(1.1);
+    color: rgb(7, 7, 7);
+}
+
+/* Formular Add Item */
+.add-item-form-sidebar {
+    display: flex;
+    gap: 8px;
+    margin: 25px 0;
+}
+
+.sidebar-input {
+    flex: 1;
+    background: #f4f6f8; 
+    border: 2px solid var(--text-main);
+    padding: 12px;
+    border-radius: 12px;
+    color: var(--text-main);
+    font-size: 14px;
+}
+
+.sidebar-add-btn {
     background: var(--navbar-color);
     color: var(--text-secondary);
-}
-.add-button {
-    padding: 10px 20px;
-    background: var(--navbar-color);
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
     border: 2px solid var(--border-color);
+    padding: 0 15px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-/* The List Structure */
+/* --- 5. STILURI LISTĂ ȘI ELEMENTE --- */
 .shopping-list {
     list-style: none;
     padding: 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 4px;
 }
 
-/* The Item Container */
 .shopping-item {
-    border: 2px solid var(--border-color);
-    transition: background 0.2s;
-    background-color: var(--card-bg);
+    background: white; 
+    border: 2px solid var(--text-main);
     border-radius: 12px;
-    /* Remove padding here, move it to the label! */
-    padding: 0;
-}
-
-.item-completed {
-    background: #f7fafc;
-    opacity: 0.8;
+    margin-bottom: 8px;
+    transition: all 0.2s;
 }
 
 .item-label {
     display: flex;
     align-items: center;
+    padding: 12px 15px;
     gap: 12px;
-    width: 100%;
-    padding: 15px; /* Moved padding here so the click area fills the container */
     cursor: pointer;
-    box-sizing: border-box; /* Ensures padding doesn't break the width */
+    font-weight: 600;
+    color: var(--text-main);
 }
 
 .item-checkbox {
     appearance: none;
-    -webkit-appearance: none;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-main);
+    border-radius: 6px;
+    background: transparent;
     cursor: pointer;
-    margin: 0; /* Prevents alignment issues */
-    flex-shrink: 0; /* Prevents the checkbox from shrinking if the text is long */
-
-    background-color: var(--text-secondary);
-    border: 2px solid var(--purple-dark);
-    border-radius: 4px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease-in-out;
+    position: relative;
 }
 
-/* The checkmark */
-input[type="checkbox"].item-checkbox:checked::after {
-    content: "✔";
-    color: var(--purple-dark);
+.item-checkbox:checked {
+    background: var(--tab-color);
+    transform: scale(1.1);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.item-checkbox:checked::after {
+    content: "✓";
+    position: absolute;
+    color: var(--tab-text);
     font-size: 14px;
-    font-weight: bold;
+    left: 3px;
+    top: -1px;
 }
 
-/* Text */
-.item-text {
-    font-size: 18px;
-    color: var(--text-secondary);
+/* Efecte Finalizat */
+.shopping-item.item-completed {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+    transform: scale(0.98);
 }
+
 .item-completed .item-text {
     text-decoration: line-through;
+    color: #6c757d;
+    font-weight: 400;
 }
+
 .empty-msg {
     text-align: center;
-    color: #888;
+    color: var(--text-main);
+    font-weight: 600;
     margin-top: 20px;
 }
