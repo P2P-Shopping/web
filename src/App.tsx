@@ -5,6 +5,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Navbar } from "./components";
 // 1. Import your pages from your pages/ folder
 import {
+    Dashboard,
     ListDetail,
     LoginPage,
     MapPage,
@@ -146,6 +147,7 @@ function App() {
                         }
                     />
                     <Route path="/map" element={<MapPage />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/nav" element={<StoreMap />} />
                     <Route path="/route" element={<RoutePage />} />
                     <Route path="/list/:id" element={<ListDetail />} />

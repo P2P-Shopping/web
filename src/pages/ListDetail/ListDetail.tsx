@@ -8,6 +8,13 @@ interface Item {
     id: string;
     name: string;
     checked: boolean;
+    // New fields from Backend
+    brand?: string;
+    quantity?: string;
+    category?: string;
+    price?: number;
+    isRecurrent?: boolean;
+    isChecked?: boolean;
 }
 
 interface ListDetailProps {
