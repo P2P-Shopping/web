@@ -1,6 +1,6 @@
 import type { StompSubscription } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 // 2. THIS IS NEW: Import your Navbar from your components/ folder
 import { Navbar } from "./components";
 // 1. Import your pages from your pages/ folder
@@ -21,7 +21,6 @@ import "./App.css";
 function App() {
     const [isConnected, setIsConnected] = useState<boolean>(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
-    const _location = useLocation();
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const clearToastTimeout = useCallback(() => {

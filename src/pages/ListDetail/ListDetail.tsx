@@ -29,7 +29,8 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const [items, setItems] = useState<Item[]>([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [newItemName, setNewItemName] = useState("");
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_isLoading, setIsLoading] = useState<boolean>(true);
 
     const RECEIPT_TIMEOUT_MS = 5000;
     const pendingRollbacksRef = useRef(new Map<string, { timeoutId: number; rollback: () => void }>());
