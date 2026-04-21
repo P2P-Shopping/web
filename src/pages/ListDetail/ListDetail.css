@@ -164,21 +164,48 @@
 }
 
 .item-checkbox {
-    margin-top: 3px;
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: #2e1a5e;
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 .item-inline-remove {
     border: none;
     background: transparent;
     color: #7a6f8f;
-    font-size: 14px;
+    font-size: 18px;
+    font-weight: 400;
     line-height: 1;
     cursor: pointer;
-    padding: 4px 2px;
+    padding: 0 2px;
+    margin-top: 1px;
+    opacity: 0.7;
 }
 
 .item-inline-remove:hover {
     color: #d14343;
+    opacity: 1;
+}
+
+.item-name-text {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #2e1a5e;
+}
+
+.item-meta-text {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #444;
+}
+
+.item-category-text {
+    font-style: italic;
+    color: #6c4ab3;
 }
 
 .empty-msg {

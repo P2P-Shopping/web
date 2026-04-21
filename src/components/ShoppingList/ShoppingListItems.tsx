@@ -16,6 +16,8 @@ interface Props {
     onDelete?: (id: string) => void;
 }
 
+const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
+
 const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
     if (items.length === 0) {
         return <p className="empty-msg">Your list is empty!</p>;
@@ -26,9 +28,9 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
             {items.map((item) => (
                 <li
                     key={item.id}
-                    className={`shopping-list-item ${item.checked ? "item-completed" : ""}`}
+                    className={`shopping-item ${item.checked ? "item-completed" : ""}`}
                 >
-                    <label className="shopping-item-label">
+                    <label className="item-label">
                         <input
                             type="checkbox"
                             className="item-checkbox"
@@ -37,11 +39,17 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                         />
                         <div>
                             <span
-                                className={`shopping-item-name ${item.checked ? "completed" : ""}`}
+                                className="item-name-text"
+                                style={{
+                                    textDecoration: item.checked
+                                        ? "line-through"
+                                        : "none",
+                                    opacity: item.checked ? 0.6 : 1,
+                                }}
                             >
                                 {item.name}
                             </span>
-                            <div className="shopping-item-meta">
+                            <div className="item-meta-text">
                                 {item.brand && <span>{item.brand}</span>}
                                 {item.quantity && (
                                     <span> • {item.quantity}</span>
@@ -50,7 +58,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                                     <span> • {formatPrice(item.price)}</span>
                                 )}
                                 {item.category && (
-                                    <span className="shopping-item-category">
+                                    <span className="item-category-text">
                                         {` [${item.category}]`}
                                     </span>
                                 )}
@@ -64,7 +72,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                             onClick={() => onDelete(item.id)}
                             aria-label="Remove item"
                         >
-                            x
+                            ×
                         </button>
                     )}
                 </li>

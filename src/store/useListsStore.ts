@@ -164,11 +164,33 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }));
     },
 
-    deleteList: async (_id: string) => {
-        set({
-            error: "List deletion is not available because the backend has no delete-list endpoint yet.",
-        });
-        return false;
+    deleteList: async (id: string) => {
+        try {
+            const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
+                method: "DELETE",
+                headers: getAuthHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to delete list (${response.status})`);
+            }
+
+            set((state) => ({
+                lists: state.lists.filter((list) => list.id !== id),
+                currentList:
+                    state.currentList?.id === id ? null : state.currentList,
+                error: null,
+            }));
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to delete list",
+            });
+            return false;
+        }
     },
 
     setCurrentList: (list: ShoppingList | null) => {

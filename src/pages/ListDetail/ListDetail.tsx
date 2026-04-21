@@ -179,7 +179,7 @@ const ListDetail = ({
             setRecipeText("");
 
             if (effectiveListId === "default") {
-                navigate(`/list/${targetListId}`);
+                navigate(`/dashboard?list=${targetListId}`);
                 return;
             }
 
