@@ -1,9 +1,8 @@
 import type { StompSubscription } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes, } from "react-router-dom";
-// 2. THIS IS NEW: Import your Navbar from your components/ folder
-import { Navbar } from "./components";
-// 1. Import your pages from your pages/ folder
+import { Navigate, Route, Routes } from "react-router-dom";
+import { Navbar, OfflineBanner } from "./components";
+import { useNetworkState } from "./hooks/useNetworkState";
 import {
     ListDetail,
     LoginPage,
@@ -17,9 +16,10 @@ import stompClient from "./services/socketService";
 
 import "./App.css";
 function App() {
+    useNetworkState();
+
     const [isConnected, setIsConnected] = useState<boolean>(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
-   // const _location = useLocation();
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const clearToastTimeout = useCallback(() => {
@@ -96,6 +96,7 @@ function App() {
 
     return (
         <div className="app-container">
+            <OfflineBanner />
             {/* Toast Notification */}
             {toastMessage && (
                 <div
