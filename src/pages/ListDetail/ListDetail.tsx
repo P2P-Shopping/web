@@ -5,7 +5,6 @@ import { PresenceBar } from "../../components";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { type Item, useStore } from "../../context/useStore";
 import stompClient from "../../services/socketService";
-
 import "./ListDetail.css";
 
 interface ListDetailProps {
@@ -20,6 +19,15 @@ const DEMO_ITEMS: Item[] = [
 ];
 
 const RECEIPT_TIMEOUT_MS = 5000;
+
+interface StompLikeClient {
+    connected: boolean;
+    onConnect: (() => void) | undefined;
+    onWebSocketError?: ((evt: unknown) => void) | undefined;
+    onStompError?: ((frame: unknown) => void) | undefined;
+    subscribe: typeof stompClient.subscribe;
+    publish: typeof stompClient.publish;
+}
 
 const removeScriptBlocks = (input: string): string => {
     const lowerInput = input.toLowerCase();
@@ -88,7 +96,7 @@ const readItems = (id: string | undefined): Item[] => {
 const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
-    const isNavView = location.pathname.includes("/nav");
+    const isNavView = location.pathname.includes("/nav") || isEmbedded;
 
     const items = useStore((state) => state.items);
     const setItems = useStore((state) => state.setItems);
@@ -155,8 +163,9 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         if (handlersWrappedRef.current) return;
         handlersWrappedRef.current = true;
 
-        const prevOnWS = (stompClient as any).onWebSocketError;
-        const prevOnStomp = (stompClient as any).onStompError;
+        const client = stompClient as StompLikeClient;
+        const prevOnWS = client.onWebSocketError;
+        const prevOnStomp = client.onStompError;
 
         const rollbackAllPending = () => {
             for (const [
@@ -172,7 +181,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             }
         };
 
-        (stompClient as any).onWebSocketError = (evt: unknown) => {
+        client.onWebSocketError = (evt: unknown) => {
             try {
                 prevOnWS?.(evt);
             } catch (error) {
@@ -184,7 +193,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             rollbackAllPending();
         };
 
-        (stompClient as any).onStompError = (frame: unknown) => {
+        client.onStompError = (frame: unknown) => {
             try {
                 prevOnStomp?.(frame);
             } catch (error) {
@@ -194,8 +203,8 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         };
 
         return () => {
-            (stompClient as any).onWebSocketError = prevOnWS;
-            (stompClient as any).onStompError = prevOnStomp;
+            client.onWebSocketError = prevOnWS;
+            client.onStompError = prevOnStomp;
         };
     }, []);
 
@@ -249,9 +258,9 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     useEffect(() => {
         if (!id) return;
 
-        let rejectSub: any;
-        let presenceSub: any;
-        let updateSub: any;
+        let rejectSub: { unsubscribe: () => void } | undefined;
+        let presenceSub: { unsubscribe: () => void } | undefined;
+        let updateSub: { unsubscribe: () => void } | undefined;
 
         const connectAndSubscribe = () => {
             if (!stompClient.connected) return;
@@ -424,7 +433,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     };
 
     const handleCheck = (itemId: string) => {
-        const currentItem = items.find((item) => item.id === itemId);
+        const currentItem = items.find((it) => it.id === itemId);
         if (!currentItem) return;
 
         const newChecked = !currentItem.checked;

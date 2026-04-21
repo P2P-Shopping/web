@@ -10,10 +10,16 @@ export const loginRequest = async (email: string, password: string) => {
             { email, password },
             { withCredentials: true },
         );
+
+        if (response.data?.token) {
+            localStorage.setItem("token", response.data.token);
+        }
+
         return response.data;
     } catch (error) {
         console.error("Eroare autentificare (Backend Offline):", error);
         if (email === "your@email.com" && password === "12345678") {
+            localStorage.setItem("token", "mock-token");
             return MOCK_USER;
         }
         throw new Error("Date incorecte (Modul Mock)");

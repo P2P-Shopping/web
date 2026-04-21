@@ -1,9 +1,8 @@
 import type { StompSubscription } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-// 2. THIS IS NEW: Import your Navbar from your components/ folder
 import { Navbar, OfflineBanner } from "./components";
-// 1. Import your pages from your pages/ folder
+import { useNetworkState } from "./hooks/useNetworkState";
 import {
     ListDetail,
     LoginPage,
@@ -14,10 +13,8 @@ import {
 } from "./pages";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
-import { useNetworkState } from "./hooks/useNetworkState";
 
 import "./App.css";
-
 function App() {
     useNetworkState();
 
@@ -149,10 +146,9 @@ function App() {
                         }
                     />
                     <Route path="/map" element={<MapPage />} />
-                    <Route path="/nav" element={<StoreMap />} />
+                    <Route path="/nav/:id?" element={<StoreMap />} />
                     <Route path="/route" element={<RoutePage />} />
                     <Route path="/list/:id" element={<ListDetail />} />
-
                     <Route
                         path="/"
                         element={<Navigate to="/login" replace />}

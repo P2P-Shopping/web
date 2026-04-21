@@ -3,26 +3,27 @@ import { useEffect, useRef, useState } from "react";
 import "./StoreMap.css";
 import ListDetail from "../ListDetail/ListDetail";
 
-// ==========================================
-// 1. TYPES & INTERFACES
-// ==========================================
 interface Coordinate {
     lat: number;
     lng: number;
 }
+
 interface Product extends Coordinate {
     id: number;
     name: string;
 }
+
 interface Point {
     x: number;
     y: number;
 }
+
 interface CameraState {
     x: number;
     y: number;
     zoom: number;
 }
+
 interface ThemeColors {
     product: string;
     user: string;
@@ -41,9 +42,6 @@ interface CameraBounds {
     maxY: number;
 }
 
-// ==========================================
-// 2. CONFIGURATION
-// ==========================================
 const MAP_CONFIG = {
     METERS_PER_DEGREE_LAT: 111320,
     PIXELS_PER_METER: 20,
@@ -53,9 +51,6 @@ const MAP_CONFIG = {
     PAN_PADDING: 96,
 };
 
-// ==========================================
-// 3. PURE HELPER FUNCTIONS
-// ==========================================
 const getRelativePixels = (
     target: Coordinate,
     reference: Coordinate,
@@ -72,7 +67,6 @@ const getRelativePixels = (
     return { x, y };
 };
 
-// Procedurally scatters products ~10 to 30 meters around a central GPS point
 const generateLocalProducts = (centerGps: Coordinate): Product[] => {
     const latOffset = 0.00015;
     const lngOffset = 0.00015;
@@ -105,7 +99,6 @@ const generateLocalProducts = (centerGps: Coordinate): Product[] => {
     ];
 };
 
-// Algorithmic pathfinding extracted to reduce render loop cognitive complexity
 const calculateNearestNeighborRoute = (
     startPoint: Point,
     products: Product[],
@@ -180,24 +173,17 @@ const getCameraConstraints = (
     };
 };
 
-// ==========================================
-// 4. CUSTOM HOOK: MAP ENGINE
-// ==========================================
 const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const [isDragging, setIsDragging] = useState(false);
     const [hasLocationLock, setHasLocationLock] = useState(false);
     const [gpsError, setGpsError] = useState<string | null>(null);
 
-    // --- Dynamic Map State ---
     const originGps = useRef<Coordinate | null>(null);
     const targetGps = useRef<Coordinate>({ lat: 0, lng: 0 });
     const currentRenderedGps = useRef<Coordinate>({ lat: 0, lng: 0 });
     const localProducts = useRef<Product[]>([]);
-
     const isFirstLocationUpdate = useRef(true);
     const camera = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
-
-    // --- Touch/Mouse Tracking ---
     const lastPanPoint = useRef<Point | null>(null);
     const gestureState = useRef<{
         initialDist: number;
@@ -246,8 +232,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         camera.current.y = clamp(nextY, constraints.minY, constraints.maxY);
     };
 
-    // --- Core Render Loop ---
-    // --- Core Render Loop ---
     useEffect(() => {
         if (!hasLocationLock) return;
 
@@ -267,23 +251,17 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
         let animationFrameId: number;
         let consecutiveErrors = 0;
-
-        // FIX: Track the timestamp of the last frame
         let lastTime: number | null = null;
 
-        // requestAnimationFrame automatically passes the current timestamp to this function
         const renderLoop = (timestamp: number) => {
-            // Calculate Delta Time (dt) in seconds
             if (lastTime === null) lastTime = timestamp;
             const dt = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
 
-            // Clamp dt to a maximum of 100ms to prevent massive jumps when switching browser tabs
             const safeDt = Math.min(dt, 0.1);
 
             let didSave = false;
             try {
-                // Resize
                 const rect = canvas.parentElement?.getBoundingClientRect();
                 const targetW = Math.max(
                     1,
@@ -297,19 +275,15 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                 const backingW = Math.max(1, Math.round(targetW * dpr));
                 const backingH = Math.max(1, Math.round(targetH * dpr));
 
-                if (canvas.style.width !== `${targetW}px`) {
+                if (canvas.style.width !== `${targetW}px`)
                     canvas.style.width = `${targetW}px`;
-                }
-                if (canvas.style.height !== `${targetH}px`) {
+                if (canvas.style.height !== `${targetH}px`)
                     canvas.style.height = `${targetH}px`;
-                }
                 if (canvas.width !== backingW) canvas.width = backingW;
                 if (canvas.height !== backingH) canvas.height = backingH;
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 ctx.clearRect(0, 0, targetW, targetH);
 
-                // FIX: Frame-Rate Independent Physics (Exponential Decay Lerp)
-                // Multiplying GLIDE_SPEED by 60 keeps the visual speed identical to the old 60fps math
                 const decayRate = MAP_CONFIG.GLIDE_SPEED * 60;
                 const lerpFactor = 1 - Math.exp(-decayRate * safeDt);
 
@@ -320,7 +294,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     (targetGps.current.lng - currentRenderedGps.current.lng) *
                     lerpFactor;
 
-                // Camera Setup
                 ctx.save();
                 didSave = true;
                 ctx.translate(
@@ -336,16 +309,13 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     anchor,
                 );
 
-                // Nearest Neighbor Routing
                 if (localProducts.current.length > 0) {
-                    // Call the newly extracted helper function here
                     const orderedRoute = calculateNearestNeighborRoute(
                         userPos,
                         localProducts.current,
                         anchor,
                     );
 
-                    // Draw Route Path
                     ctx.beginPath();
                     ctx.strokeStyle = theme.route;
                     ctx.lineWidth = 4 / camera.current.zoom;
@@ -362,7 +332,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     ctx.setLineDash([]);
                 }
 
-                // Draw Products
                 localProducts.current.forEach((product) => {
                     const { x, y } = getRelativePixels(product, anchor);
                     ctx.beginPath();
@@ -371,7 +340,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     ctx.fill();
                 });
 
-                // Draw User
                 ctx.beginPath();
                 ctx.arc(
                     userPos.x,
@@ -402,7 +370,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         return () => cancelAnimationFrame(animationFrameId);
     }, [canvasRef, hasLocationLock]);
 
-    // --- Native GPS Stream ---
     useEffect(() => {
         if (!("geolocation" in navigator)) {
             setGpsError("Geolocation is not supported by your browser.");
@@ -425,7 +392,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     setHasLocationLock(true);
                 } else {
                     targetGps.current = { ...newCoords };
-                    // Optional: Clear any lingering soft errors once signal returns
                     setGpsError(null);
                     setHasLocationLock(true);
                 }
@@ -459,7 +425,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         return () => navigator.geolocation.clearWatch(watchId);
     }, []);
 
-    // --- Touch Handlers ---
     const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
         if (e.touches.length === 1) {
             lastPanPoint.current = {
@@ -560,7 +525,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         gestureState.current.initialPinchWorld = null;
     };
 
-    // --- Mouse Handlers (Desktop Testing) ---
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         setIsDragging(true);
         lastPanPoint.current = { x: e.clientX, y: e.clientY };
@@ -580,13 +544,10 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const recenterCamera = () => {
         if (!originGps.current) return;
 
-        // Find exactly where the user is right now relative to the anchor
         const userPos = getRelativePixels(
             currentRenderedGps.current,
             originGps.current,
         );
-
-        // Shift the camera in the exact opposite direction, scaled by the current zoom
         clampCameraPosition(
             -userPos.x * camera.current.zoom,
             -userPos.y * camera.current.zoom,
@@ -611,15 +572,11 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     };
 };
 
-// ==========================================
-// 5. PRESENTATIONAL COMPONENT (UI Layer)
-// ==========================================
 const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { isDragging, hasLocationLock, gpsError, handlers, recenterCamera } =
         useMapEngine(canvasRef);
 
-    // INTERCEPTOR: Shows error message if denied/failed, otherwise shows loading text
     if (!hasLocationLock) {
         return (
             <div className="map-loading-screen">
