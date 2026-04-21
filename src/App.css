@@ -18,15 +18,20 @@
 
     --bg-color: var(--purple-dark);
     --card-bg: var(--lavender);
+    --bg-surface: #ffffff;
+    --bg-card: #ffffff;
 
     --text-main: var(--purple-dark);
     --text-secondary: white;
+    --text-primary: #1a1a1a;
+    --text-muted: #666666;
     --text-main-outline: white;
     --text-secondary-outline: var(--purple-dark);
 
     --accent-blue: var(--lavender);
 
     --border-color: #eaeaea;
+    --border-subtle: #f0f0f0;
     --border-secondary-color: black;
 
     --shadow:

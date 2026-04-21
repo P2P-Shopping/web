@@ -3,8 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { PresenceBar } from "../../components";
 import { usePresenceStore } from "../../context/usePresenceStore";
-import { type Item, useStore } from "../../context/useStore";
+import { useStore } from "../../context/useStore";
 import stompClient from "../../services/socketService";
+import type { Item } from "../../types";
+import { uuid } from "../../utils/uuid";
 import "./ListDetail.css";
 
 interface ListDetailProps {
@@ -84,7 +86,7 @@ const readItems = (id: string | undefined): Item[] => {
         if (!Array.isArray(parsed)) return [];
 
         return parsed.map((item) => ({
-            id: String(item.id ?? crypto.randomUUID()),
+            id: String(item.id ?? uuid()),
             name: sanitizeString(item.name ?? ""),
             checked: Boolean(item.checked),
         }));
@@ -292,8 +294,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                             (payload.action === "UPDATE_ITEM" ||
                                 payload.actionType === "UPDATE_ITEM")
                         ) {
-                            const newChecked =
-                                payload.checked ?? payload.isChecked;
+                            const newChecked = payload.checked;
                             if (typeof newChecked === "boolean") {
                                 setItems((prevItems) =>
                                     prevItems.map((item) =>
@@ -412,7 +413,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         if (!trimmedName) return;
 
         const newItem: Item = {
-            id: crypto.randomUUID(),
+            id: uuid(),
             name: trimmedName,
             checked: false,
         };
@@ -451,7 +452,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             return;
         }
 
-        const receiptId = `rcpt-${crypto.randomUUID()}`;
+        const receiptId = `rcpt-${uuid()}`;
         const timeoutId = globalThis.setTimeout(() => {
             const entry = pendingRollbacksRef.current.get(receiptId);
             if (!entry) return;

@@ -17,17 +17,7 @@ interface Props {
 
 const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
     if (items.length === 0) {
-        return (
-            <p
-                style={{
-                    textAlign: "center",
-                    color: "#555",
-                    marginTop: "20px",
-                }}
-            >
-                Your list is empty!
-            </p>
-        );
+        return <p className="empty-msg">Your list is empty!</p>;
     }
 
     return (
@@ -35,41 +25,16 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
             {items.map((item) => (
                 <li
                     key={item.id}
-                    style={{
-                        display: "flex",
-                        padding: "15px",
-                        backgroundColor: "rgba(255,255,255,0.4)",
-                        borderRadius: "12px",
-                        marginBottom: "10px",
-                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
-                    }}
+                    className={`shopping-item ${item.checked ? "item-completed" : ""}`}
                 >
-                    <label
-                        style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "12px",
-                            width: "100%",
-                            cursor: "pointer",
-                        }}
-                    >
+                    <label className="item-label">
                         <input
                             type="checkbox"
+                            className="item-checkbox"
                             checked={item.checked}
                             onChange={() => onCheck(item.id)}
-                            style={{
-                                width: "18px",
-                                height: "18px",
-                                marginTop: "4px",
-                            }}
                         />
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                flex: 1,
-                            }}
-                        >
+                        <div>
                             <span
                                 style={{
                                     fontSize: "16px",
@@ -83,13 +48,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
                             >
                                 {item.name}
                             </span>
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "#444",
-                                    marginTop: "4px",
-                                }}
-                            >
+                            <div style={{ fontSize: "12px", color: "#444" }}>
                                 {item.brand && <span>{item.brand}</span>}
                                 {item.quantity && (
                                     <span> • {item.quantity}</span>

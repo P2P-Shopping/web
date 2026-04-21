@@ -21,6 +21,14 @@
     box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
 }
 
+.open-list-btn-modern:focus-visible,
+.close-sidebar-btn:focus-visible,
+.sidebar-add-btn:focus-visible,
+.close-banner-btn:focus-visible {
+    outline: 3px solid var(--accent, #aa3bff);
+    outline-offset: 3px;
+}
+
 .open-list-btn-modern:hover {
     transform: translateY(-2px);
 }
@@ -275,14 +283,17 @@
     }
 }
 
-.sidebar-add-btn {
-    width: 100%;
-    background-color: #2e1a5e;
-    color: white;
-    padding: 14px;
-    border-radius: 10px;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 5px;
+@media (prefers-reduced-motion: reduce) {
+    .open-list-btn-modern,
+    .open-list-btn-modern:hover,
+    .list-detail-sidebar,
+    .shopping-item,
+    .shopping-item.item-completed,
+    .shopping-item.item-conflict,
+    .item-checkbox:checked,
+    .close-sidebar-btn:hover {
+        transition: none;
+        animation: none;
+        transform: none;
+    }
 }

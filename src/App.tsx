@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Navbar, OfflineBanner } from "./components";
 import { useNetworkState } from "./hooks/useNetworkState";
 import {
+    Dashboard,
     ListDetail,
     LoginPage,
     MapPage,
@@ -15,6 +16,7 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 
 import "./App.css";
+
 function App() {
     useNetworkState();
 
@@ -97,7 +99,6 @@ function App() {
     return (
         <div className="app-container">
             <OfflineBanner />
-            {/* Toast Notification */}
             {toastMessage && (
                 <div
                     style={{
@@ -118,8 +119,6 @@ function App() {
                 </div>
             )}
 
-            {/* 3. THIS IS NEW: Drop in your reusable Navbar component! 
-          We pass it the variables it needs to make the Ping button work. */}
             <Navbar
                 isConnected={isConnected}
                 handlePingPress={handlePingPress}
@@ -146,6 +145,7 @@ function App() {
                         }
                     />
                     <Route path="/map" element={<MapPage />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/nav/:id?" element={<StoreMap />} />
                     <Route path="/route" element={<RoutePage />} />
                     <Route path="/list/:id" element={<ListDetail />} />
