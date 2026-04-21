@@ -15,12 +15,12 @@ const ConfirmDeleteModal = ({
     onConfirm,
 }: ConfirmDeleteModalProps) => {
     const dialogRef = useRef<HTMLDialogElement | null>(null);
-    const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+    const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
 
     useEffect(() => {
         dialogRef.current?.showModal();
         const rafId = window.requestAnimationFrame(() => {
-            confirmButtonRef.current?.focus();
+            cancelButtonRef.current?.focus();
         });
 
         return () => {
@@ -82,6 +82,7 @@ const ConfirmDeleteModal = ({
 
                 <div className="modal-footer">
                     <button
+                        ref={cancelButtonRef}
                         type="button"
                         className="cancel-btn"
                         onClick={onCancel}
@@ -89,7 +90,6 @@ const ConfirmDeleteModal = ({
                         Renunță
                     </button>
                     <button
-                        ref={confirmButtonRef}
                         type="button"
                         className="submit-btn"
                         onClick={() => onConfirm(listId)}

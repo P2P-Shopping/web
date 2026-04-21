@@ -30,6 +30,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
                     <label className="item-label">
                         <input
                             type="checkbox"
+                            className="item-checkbox"
                             checked={item.checked}
                             onChange={() => onCheck(item.id)}
                         />

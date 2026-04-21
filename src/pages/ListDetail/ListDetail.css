@@ -285,8 +285,11 @@
 
 @media (prefers-reduced-motion: reduce) {
     .open-list-btn-modern,
+    .open-list-btn-modern:hover,
     .list-detail-sidebar,
     .shopping-item,
+    .shopping-item.item-completed,
+    .shopping-item.item-conflict,
     .item-checkbox:checked,
     .close-sidebar-btn:hover {
         transition: none;

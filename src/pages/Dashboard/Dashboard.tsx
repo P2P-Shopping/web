@@ -1,5 +1,5 @@
 import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item } from "../../types";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
@@ -7,7 +7,6 @@ import CreateListModal from "./CreateListModal";
 import "./Dashboard.css";
 
 const Dashboard = () => {
-    const navigate = useNavigate();
     const [deleteTarget, setDeleteTarget] = useState<{
         id: string;
         name: string;
@@ -38,11 +37,6 @@ const Dashboard = () => {
         });
     };
 
-    // Handle list click - navigate to detail
-    const handleListClick = (listId: string) => {
-        navigate(`/list/${listId}`);
-    };
-
     // Handle delete list
     const handleDeleteList = (
         e: MouseEvent<HTMLButtonElement>,
@@ -53,9 +47,11 @@ const Dashboard = () => {
         setDeleteTarget({ id: listId, name: listName });
     };
 
-    const confirmDeleteList = (listId: string) => {
-        deleteList(listId);
-        setDeleteTarget(null);
+    const confirmDeleteList = async (listId: string) => {
+        const deleted = await deleteList(listId);
+        if (deleted) {
+            setDeleteTarget(null);
+        }
     };
 
     const cancelDeleteList = () => {
@@ -96,10 +92,10 @@ const Dashboard = () => {
             <div className="lists-grid">
                 {lists.map((list) => (
                     <div key={list.id} className="list-card-shell">
-                        <button
-                            type="button"
+                        <Link
+                            to={`/list/${list.id}`}
                             className="list-card"
-                            onClick={() => handleListClick(list.id)}
+                            aria-label={`Deschide lista ${list.name}`}
                         >
                             <div className="card-header">
                                 <h3>{list.name}</h3>
@@ -143,7 +139,7 @@ const Dashboard = () => {
                                     {formatDate(list.updatedAt)}
                                 </span>
                             </div>
-                        </button>
+                        </Link>
 
                         <button
                             type="button"

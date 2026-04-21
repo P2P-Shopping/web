@@ -27,6 +27,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
 
     useEffect(() => {
         previousFocusRef.current = document.activeElement as HTMLElement | null;
+        isMountedRef.current = true;
         dialogRef.current?.showModal();
         const rafId = window.requestAnimationFrame(() => {
             listNameInputRef.current?.focus();

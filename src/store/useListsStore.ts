@@ -4,14 +4,10 @@
 
 import { create } from "zustand";
 import type { Item, ShoppingList } from "../types";
+import { uuid } from "../utils/uuid";
 
 const USE_MOCK_LISTS =
     import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCK_LISTS === "true";
-
-const uuid = () =>
-    globalThis.crypto && "randomUUID" in globalThis.crypto
-        ? globalThis.crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -101,7 +97,7 @@ interface ListsState {
     fetchLists: () => Promise<void>;
     addList: (name: string) => Promise<boolean>;
     updateList: (id: string, updates: Partial<ShoppingList>) => void;
-    deleteList: (id: string) => void;
+    deleteList: (id: string) => Promise<boolean>;
     setCurrentList: (list: ShoppingList | null) => void;
 
     // Actions - Items (within current list)
@@ -267,10 +263,52 @@ export const useListsStore = create<ListsState>((set, get) => ({
     },
 
     // Delete list
-    deleteList: (id: string) => {
+    deleteList: async (id: string) => {
+        const previousState = get();
+
         set((state) => ({
             lists: state.lists.filter((list) => list.id !== id),
+            currentList:
+                state.currentList?.id === id ? null : state.currentList,
+            error: null,
         }));
+
+        if (USE_MOCK_LISTS) {
+            return true;
+        }
+
+        try {
+            const baseUrl =
+                import.meta.env.VITE_API_URL ||
+                import.meta.env.VITE_API_BASE_URL ||
+                "http://localhost:8081";
+            const token = localStorage.getItem("token");
+            const response = await fetch(`${baseUrl}/api/lists/${id}`, {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to delete list (${response.status})`);
+            }
+        } catch (error) {
+            console.error("Failed to delete list:", error);
+            set({
+                lists: previousState.lists,
+                currentList: previousState.currentList,
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to delete list",
+            });
+            return false;
+        }
+
+        await get().fetchLists();
+        return true;
     },
 
     // Set current list for detail view
