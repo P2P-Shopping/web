@@ -59,11 +59,11 @@ const ListDetail = ({
     const [newItemName, setNewItemName] = useState("");
     const [brand, setBrand] = useState("");
     const [quantity, setQuantity] = useState("");
-    const [category, setCategory] = useState("Altele");
+    const [category, setCategory] = useState("");
     const [isRecurrent, setIsRecurrent] = useState(false);
     const [recipeText, setRecipeText] = useState("");
     const [isAiLoading, setIsAiLoading] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const getBaseUrl = () => import.meta.env.VITE_API_URL || "http://localhost:8081";
@@ -432,3 +432,4 @@ const ListDetail = ({
 };
 
 export default ListDetail;
+
