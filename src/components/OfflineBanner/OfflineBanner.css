@@ -1,0 +1,37 @@
+/* Styled for a seamless UI integration, keeping consistent clean aesthetic */
+.offline-banner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: #fca5a5; /* nice soft red/orange tone */
+    color: #7f1d1d; /* darker tone for contrast */
+    text-align: center;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    animation: slideDown 0.3s ease-out forwards;
+}
+
+.offline-icon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.offline-text {
+    letter-spacing: 0.5px;
+}
+
+@keyframes slideDown {
+    0% {
+        transform: translateY(-100%);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
