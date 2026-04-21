@@ -29,6 +29,18 @@ interface ThemeColors {
     route: string;
 }
 
+interface ViewportSize {
+    width: number;
+    height: number;
+}
+
+interface CameraBounds {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+}
+
 // ==========================================
 // 2. CONFIGURATION
 // ==========================================
@@ -38,6 +50,7 @@ const MAP_CONFIG = {
     GLIDE_SPEED: 0.1,
     MIN_ZOOM: 0.3,
     MAX_ZOOM: 4,
+    PAN_PADDING: 96,
 };
 
 // ==========================================
@@ -125,6 +138,48 @@ const calculateNearestNeighborRoute = (
     return orderedRoute;
 };
 
+const clamp = (value: number, min: number, max: number): number =>
+    Math.min(Math.max(value, min), max);
+
+const getBounds = (points: Point[]): CameraBounds | null => {
+    if (points.length === 0) return null;
+
+    return points.slice(1).reduce(
+        (bounds, point) => ({
+            minX: Math.min(bounds.minX, point.x),
+            maxX: Math.max(bounds.maxX, point.x),
+            minY: Math.min(bounds.minY, point.y),
+            maxY: Math.max(bounds.maxY, point.y),
+        }),
+        {
+            minX: points[0].x,
+            maxX: points[0].x,
+            minY: points[0].y,
+            maxY: points[0].y,
+        },
+    );
+};
+
+const getCameraConstraints = (
+    points: Point[],
+    viewport: ViewportSize,
+    zoom: number,
+    padding: number,
+): CameraBounds | null => {
+    const bounds = getBounds(points);
+    if (!bounds) return null;
+
+    const halfWidth = viewport.width / 2;
+    const halfHeight = viewport.height / 2;
+
+    return {
+        minX: padding - halfWidth - bounds.minX * zoom,
+        maxX: halfWidth - padding - bounds.maxX * zoom,
+        minY: padding - halfHeight - bounds.minY * zoom,
+        maxY: halfHeight - padding - bounds.maxY * zoom,
+    };
+};
+
 // ==========================================
 // 4. CUSTOM HOOK: MAP ENGINE
 // ==========================================
@@ -149,6 +204,47 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         initialZoom: number;
         initialPinchWorld: Point | null;
     }>({ initialDist: 0, initialZoom: 1, initialPinchWorld: null });
+
+    const clampCameraPosition = (
+        nextX: number,
+        nextY: number,
+        nextZoom = camera.current.zoom,
+    ) => {
+        const canvas = canvasRef.current;
+        const anchor = originGps.current;
+
+        if (!canvas || !anchor) {
+            camera.current.x = nextX;
+            camera.current.y = nextY;
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const viewport = {
+            width: Math.max(1, Math.round(rect.width || window.innerWidth)),
+            height: Math.max(1, Math.round(rect.height || window.innerHeight)),
+        };
+
+        const userPos = getRelativePixels(currentRenderedGps.current, anchor);
+        const productPoints = localProducts.current.map((product) =>
+            getRelativePixels(product, anchor),
+        );
+        const constraints = getCameraConstraints(
+            [userPos, ...productPoints],
+            viewport,
+            nextZoom,
+            MAP_CONFIG.PAN_PADDING,
+        );
+
+        if (!constraints) {
+            camera.current.x = nextX;
+            camera.current.y = nextY;
+            return;
+        }
+
+        camera.current.x = clamp(nextX, constraints.minX, constraints.maxX);
+        camera.current.y = clamp(nextY, constraints.minY, constraints.maxY);
+    };
 
     // --- Core Render Loop ---
     // --- Core Render Loop ---
@@ -189,11 +285,28 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
             try {
                 // Resize
                 const rect = canvas.parentElement?.getBoundingClientRect();
-                const targetW = rect?.width || window.innerWidth;
-                const targetH = rect?.height || window.innerHeight;
-                if (canvas.width !== targetW) canvas.width = targetW;
-                if (canvas.height !== targetH) canvas.height = targetH;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const targetW = Math.max(
+                    1,
+                    Math.round(rect?.width || window.innerWidth),
+                );
+                const targetH = Math.max(
+                    1,
+                    Math.round(rect?.height || window.innerHeight),
+                );
+                const dpr = window.devicePixelRatio || 1;
+                const backingW = Math.max(1, Math.round(targetW * dpr));
+                const backingH = Math.max(1, Math.round(targetH * dpr));
+
+                if (canvas.style.width !== `${targetW}px`) {
+                    canvas.style.width = `${targetW}px`;
+                }
+                if (canvas.style.height !== `${targetH}px`) {
+                    canvas.style.height = `${targetH}px`;
+                }
+                if (canvas.width !== backingW) canvas.width = backingW;
+                if (canvas.height !== backingH) canvas.height = backingH;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.clearRect(0, 0, targetW, targetH);
 
                 // FIX: Frame-Rate Independent Physics (Exponential Decay Lerp)
                 // Multiplying GLIDE_SPEED by 60 keeps the visual speed identical to the old 60fps math
@@ -211,12 +324,13 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                 ctx.save();
                 didSave = true;
                 ctx.translate(
-                    canvas.width / 2 + camera.current.x,
-                    canvas.height / 2 + camera.current.y,
+                    targetW / 2 + camera.current.x,
+                    targetH / 2 + camera.current.y,
                 );
                 ctx.scale(camera.current.zoom, camera.current.zoom);
 
-                const anchor = originGps.current!;
+                const anchor = originGps.current;
+                if (!anchor) return;
                 const userPos = getRelativePixels(
                     currentRenderedGps.current,
                     anchor,
@@ -331,8 +445,9 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     setGpsError("Unable to acquire GPS signal.");
                 }
 
-                // FIX: Instantly drop the location lock to surface the gpsError overlay
-                setHasLocationLock(false);
+                if (error.code === error.PERMISSION_DENIED) {
+                    setHasLocationLock(false);
+                }
             },
             {
                 enableHighAccuracy: true,
@@ -345,7 +460,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     }, []);
 
     // --- Touch Handlers ---
-    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
         if (e.touches.length === 1) {
             lastPanPoint.current = {
                 x: e.touches[0].clientX,
@@ -382,11 +497,14 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         }
     };
 
-    const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
         if (e.touches.length === 1 && lastPanPoint.current) {
             const t = e.touches[0];
-            camera.current.x += t.clientX - lastPanPoint.current.x;
-            camera.current.y += t.clientY - lastPanPoint.current.y;
+            const nextX =
+                camera.current.x + (t.clientX - lastPanPoint.current.x);
+            const nextY =
+                camera.current.y + (t.clientY - lastPanPoint.current.y);
+            clampCameraPosition(nextX, nextY);
             lastPanPoint.current = { x: t.clientX, y: t.clientY };
         } else if (
             e.touches.length === 2 &&
@@ -416,19 +534,20 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
             const pinchScreenX = (t1.clientX + t2.clientX) / 2 - rect.left;
             const pinchScreenY = (t1.clientY + t2.clientY) / 2 - rect.top;
 
-            camera.current.x =
+            const nextX =
                 pinchScreenX -
                 rect.width / 2 -
                 gestureState.current.initialPinchWorld.x * newZoom;
-            camera.current.y =
+            const nextY =
                 pinchScreenY -
                 rect.height / 2 -
                 gestureState.current.initialPinchWorld.y * newZoom;
             camera.current.zoom = newZoom;
+            clampCameraPosition(nextX, nextY, newZoom);
         }
     };
 
-    const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
         if (e.touches.length === 1) {
             lastPanPoint.current = {
                 x: e.touches[0].clientX,
@@ -442,14 +561,15 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     };
 
     // --- Mouse Handlers (Desktop Testing) ---
-    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         setIsDragging(true);
         lastPanPoint.current = { x: e.clientX, y: e.clientY };
     };
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (!isDragging || !lastPanPoint.current) return;
-        camera.current.x += e.clientX - lastPanPoint.current.x;
-        camera.current.y += e.clientY - lastPanPoint.current.y;
+        const nextX = camera.current.x + (e.clientX - lastPanPoint.current.x);
+        const nextY = camera.current.y + (e.clientY - lastPanPoint.current.y);
+        clampCameraPosition(nextX, nextY);
         lastPanPoint.current = { x: e.clientX, y: e.clientY };
     };
     const handleMouseUp = () => {
@@ -467,8 +587,10 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         );
 
         // Shift the camera in the exact opposite direction, scaled by the current zoom
-        camera.current.x = -userPos.x * camera.current.zoom;
-        camera.current.y = -userPos.y * camera.current.zoom;
+        clampCameraPosition(
+            -userPos.x * camera.current.zoom,
+            -userPos.y * camera.current.zoom,
+        );
     };
 
     return {
@@ -507,11 +629,14 @@ const StoreMap: React.FC = () => {
     }
 
     return (
-        <div
-            className={`mapContainer ${isDragging ? "dragging" : ""}`}
-            {...handlers}
-        >
-            <canvas ref={canvasRef} className="map-canvas" />
+        <div className={`mapContainer ${isDragging ? "dragging" : ""}`}>
+            <canvas ref={canvasRef} className="map-canvas" {...handlers} />
+
+            {gpsError && hasLocationLock && (
+                <div className="map-status-banner" role="status">
+                    {gpsError}
+                </div>
+            )}
 
             <button
                 type="button"
