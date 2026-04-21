@@ -1,5 +1,5 @@
 import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item } from "../../types";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
@@ -7,6 +7,7 @@ import CreateListModal from "./CreateListModal";
 import "./Dashboard.css";
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const [deleteTarget, setDeleteTarget] = useState<{
         id: string;
         name: string;
@@ -17,14 +18,43 @@ const Dashboard = () => {
         isModalOpen,
         fetchLists,
         deleteList,
+        addItem,
+        toggleItem,
+        deleteItem,
         openModal,
         closeModal,
     } = useListsStore();
+
+    const [newItemName, setNewItemName] = useState<{ [key: string]: string }>(
+        {},
+    );
 
     // Fetch lists on mount
     useEffect(() => {
         fetchLists();
     }, [fetchLists]);
+
+    // Handle Card Click
+    const handleCardClick = (listId: string) => {
+        navigate(`/list/${listId}`);
+    };
+
+    // Handle Quick Add
+    const handleQuickAdd = (e: React.FormEvent, listId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const name = newItemName[listId]?.trim();
+        if (!name) return;
+
+        addItem(listId, {
+            name,
+            checked: false,
+            quantity: "1",
+            category: "General",
+        });
+
+        setNewItemName((prev) => ({ ...prev, [listId]: "" }));
+    };
 
     // Format date nicely
     const formatDate = (dateString: string) => {
@@ -43,6 +73,7 @@ const Dashboard = () => {
         listId: string,
         listName: string,
     ) => {
+        e.preventDefault();
         e.stopPropagation();
         setDeleteTarget({ id: listId, name: listName });
     };
@@ -61,7 +92,11 @@ const Dashboard = () => {
     // Calculate items count
     const getItemsCount = (items: Item[]) => {
         const checked = items.filter((item) => item.checked).length;
-        return `${checked}/${items.length}`;
+        if (items.length === 0) {
+            return "Fără produse";
+        }
+
+        return `${checked}/${items.length} produse`;
     };
 
     let mainContent: ReactNode;
@@ -92,21 +127,62 @@ const Dashboard = () => {
             <div className="lists-grid">
                 {lists.map((list) => (
                     <div key={list.id} className="list-card-shell">
-                        <Link
-                            to={`/list/${list.id}`}
+                        <div
                             className="list-card"
+                            onClick={() => handleCardClick(list.id)}
+                            onKeyUp={(e) =>
+                                e.key === "Enter" && handleCardClick(list.id)
+                            }
+                            tabIndex={0}
+                            role="button"
                             aria-label={`Deschide lista ${list.name}`}
                         >
                             <div className="card-header">
-                                <h3>{list.name}</h3>
+                                <div className="card-title-group">
+                                    <p className="card-kicker">
+                                        Listă partajată
+                                    </p>
+                                    <h3>{list.name}</h3>
+                                </div>
+                                <div className="card-actions">
+                                    <span className="updated-pill">
+                                        {formatDate(list.updatedAt)}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="delete-btn"
+                                        onClick={(e) =>
+                                            handleDeleteList(
+                                                e,
+                                                list.id,
+                                                list.name,
+                                            )
+                                        }
+                                        title="Șterge lista"
+                                        aria-label="Șterge lista"
+                                    >
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            width="16"
+                                            height="16"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            fill="none"
+                                            aria-hidden="true"
+                                        >
+                                            <polyline points="3,6 5,6 21,6" />
+                                            <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="card-body">
                                 <div className="list-stats">
-                                    <span className="stat">
-                                        📦 {getItemsCount(list.items)} produse
+                                    <span className="stat stat-pill">
+                                        📦 {getItemsCount(list.items)}
                                     </span>
-                                    <span className="stat">
+                                    <span className="stat stat-pill">
                                         👤 {list.ownerName || "Tu"}
                                     </span>
                                 </div>
@@ -117,52 +193,81 @@ const Dashboard = () => {
                                             key={item.id}
                                             className={`item-preview ${item.checked ? "checked" : ""}`}
                                         >
-                                            <span className="checkbox">
+                                            <button
+                                                type="button"
+                                                className="checkbox-icon"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    toggleItem(
+                                                        list.id,
+                                                        item.id,
+                                                    );
+                                                }}
+                                            >
                                                 {item.checked ? "✓" : ""}
-                                            </span>
+                                            </button>
                                             <span className="item-name">
                                                 {item.name}
                                             </span>
+                                            <button
+                                                type="button"
+                                                className="item-remove-btn"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    deleteItem(
+                                                        list.id,
+                                                        item.id,
+                                                    );
+                                                }}
+                                                aria-label="Șterge produs"
+                                            >
+                                                ×
+                                            </button>
                                         </div>
                                     ))}
                                     {list.items.length > 3 && (
                                         <div className="more-items">
-                                            +{list.items.length - 3} mai
-                                            multe...
+                                            +{list.items.length - 3} produse în
+                                            plus
                                         </div>
                                     )}
                                 </div>
-                            </div>
 
-                            <div className="card-footer">
-                                <span className="date">
-                                    {formatDate(list.updatedAt)}
-                                </span>
+                                <div
+                                    className="quick-add"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyUp={(e) => e.stopPropagation()}
+                                >
+                                    <form
+                                        onSubmit={(e) =>
+                                            handleQuickAdd(e, list.id)
+                                        }
+                                    >
+                                        <input
+                                            type="text"
+                                            placeholder="Adaugă produs..."
+                                            value={newItemName[list.id] || ""}
+                                            onChange={(e) =>
+                                                setNewItemName((prev) => ({
+                                                    ...prev,
+                                                    [list.id]: e.target.value,
+                                                }))
+                                            }
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={
+                                                !newItemName[list.id]?.trim()
+                                            }
+                                        >
+                                            +
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                        </Link>
-
-                        <button
-                            type="button"
-                            className="delete-btn"
-                            onClick={(e) =>
-                                handleDeleteList(e, list.id, list.name)
-                            }
-                            title="Șterge lista"
-                            aria-label="Șterge lista"
-                        >
-                            <svg
-                                viewBox="0 0 24 24"
-                                width="16"
-                                height="16"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                fill="none"
-                                aria-hidden="true"
-                            >
-                                <polyline points="3,6 5,6 21,6" />
-                                <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2" />
-                            </svg>
-                        </button>
+                        </div>
                     </div>
                 ))}
             </div>
