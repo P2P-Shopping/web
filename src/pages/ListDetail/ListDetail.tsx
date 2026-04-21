@@ -15,9 +15,26 @@ interface Item {
     isRecurrent?: boolean;
 }
 
-const ListDetail: React.FC = () => {
+const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const { id } = useParams<{ id: string }>();
-    const [items, setItems] = useState<Item[]>([]);
+    const location = useLocation();
+    const isNavView = location.pathname.includes("/nav") || isEmbedded;
+
+    const items = useStore((state) => state.items);
+    const setItems = useStore((state) => state.setItems);
+    const backupItemState = useStore((state) => state.backupItemState);
+    const rollbackItemState = useStore((state) => state.rollbackItemState);
+    const conflictItems = useStore((state) => state.conflictItems);
+    const setItemConflict = useStore((state) => state.setItemConflict);
+    const isOnline = useStore((state) => state.isOnline);
+    const handlePresenceEvent = usePresenceStore(
+        (state) => state.handlePresenceEvent,
+    );
+    const clearAllTimeouts = usePresenceStore(
+        (state) => state.clearAllTimeouts,
+    );
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [newItemName, setNewItemName] = useState("");
     const [brand, setBrand] = useState("");
     const [quantity, setQuantity] = useState("");
@@ -128,6 +145,7 @@ const ListDetail: React.FC = () => {
     const handleCheck = (itemId: string) => {
         const currentItem = items.find(it => it.id === itemId);
         if (!currentItem) return;
+
 
         const newChecked = !currentItem.checked;
         
