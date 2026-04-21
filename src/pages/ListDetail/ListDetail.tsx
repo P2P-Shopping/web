@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import stompClient from "../../services/socketService";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
@@ -33,7 +34,9 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const [_isLoading, setIsLoading] = useState<boolean>(true);
 
     const RECEIPT_TIMEOUT_MS = 5000;
-    const pendingRollbacksRef = useRef(new Map<string, { timeoutId: number; rollback: () => void }>());
+    const pendingRollbacksRef = useRef(
+        new Map<string, { timeoutId: number; rollback: () => void }>(),
+    );
 
     useEffect(() => {
         const fetchListData = async () => {
@@ -46,35 +49,39 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     { id: "4", name: "Detergent de rufe", checked: false },
                 ]);
                 setIsLoading(false);
-                return; 
+                return;
             }
 
             setIsLoading(true);
             try {
                 // 2. CONFIGURARE URL ȘI TOKEN: Eliminăm hardcodarea portului
-                const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
+                const baseUrl =
+                    import.meta.env.VITE_API_URL || "http://localhost:8081";
                 const token = localStorage.getItem("token");
 
                 // 3. SECUTIZARE HEADERS: Evităm "Bearer null"
                 const headers: HeadersInit = {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 };
                 if (token) {
-                    headers["Authorization"] = `Bearer ${token}`;
+                    headers.Authorization = `Bearer ${token}`;
                 }
 
-                const response = await fetch(`${baseUrl}/api/lists`, { headers });
+                const response = await fetch(`${baseUrl}/api/lists`, {
+                    headers,
+                });
 
-                if (!response.ok) throw new Error(`Eroare server: ${response.status}`);
+                if (!response.ok)
+                    throw new Error(`Eroare server: ${response.status}`);
 
                 const allLists: any[] = await response.json();
-                const currentList = allLists.find(l => l.id === id);
+                const currentList = allLists.find((l) => l.id === id);
 
                 if (currentList) {
                     const mappedItems = currentList.items.map((it: any) => ({
                         id: it.id,
                         name: it.name,
-                        checked: it.isChecked 
+                        checked: it.isChecked,
                     }));
                     setItems(mappedItems);
                 } else {
@@ -88,28 +95,47 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         };
 
         fetchListData();
-    }, [id, isNavView, isEmbedded]); 
+    }, [id, isEmbedded]);
 
     const handleCheck = (itemId: string) => {
         const currentItem = items.find((item) => item.id === itemId);
         if (!currentItem) return;
         const previousItems = [...items];
         const newChecked = !currentItem.checked;
-        
+
         // Update local rapid
-        setItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: newChecked } : it));
+        setItems((prev) =>
+            prev.map((it) =>
+                it.id === itemId ? { ...it, checked: newChecked } : it,
+            ),
+        );
 
         // Sincronizare live prin WebSockets
         if (id && stompClient.connected) {
-            const payload = JSON.stringify({ eventType: "ITEM_TOGGLED", listId: id, itemId: itemId, checked: newChecked });
+            const payload = JSON.stringify({
+                eventType: "ITEM_TOGGLED",
+                listId: id,
+                itemId: itemId,
+                checked: newChecked,
+            });
             const receiptId = `rcpt-${crypto.randomUUID()}`;
             const timeoutId = window.setTimeout(() => {
                 const entry = pendingRollbacksRef.current.get(receiptId);
-                if (entry) { entry.rollback(); pendingRollbacksRef.current.delete(receiptId); }
+                if (entry) {
+                    entry.rollback();
+                    pendingRollbacksRef.current.delete(receiptId);
+                }
             }, RECEIPT_TIMEOUT_MS);
-            
-            pendingRollbacksRef.current.set(receiptId, { timeoutId, rollback: () => setItems(previousItems) });
-            stompClient.publish({ destination: "/app/sync", body: payload, headers: { receipt: receiptId } });
+
+            pendingRollbacksRef.current.set(receiptId, {
+                timeoutId,
+                rollback: () => setItems(previousItems),
+            });
+            stompClient.publish({
+                destination: "/app/sync",
+                body: payload,
+                headers: { receipt: receiptId },
+            });
         }
     };
 
@@ -118,10 +144,10 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         const trimmedName = newItemName.trim(); // CodeRabbit fix: trimming corect
         if (trimmedName === "") return;
 
-        const newItem: Item = { 
-            id: crypto.randomUUID(), 
-            name: trimmedName, 
-            checked: false 
+        const newItem: Item = {
+            id: crypto.randomUUID(),
+            name: trimmedName,
+            checked: false,
         };
 
         // Update stării folosind varianta funcțională pentru a evita datele vechi
@@ -133,7 +159,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             const payload = JSON.stringify({
                 eventType: "ITEM_ADDED",
                 listId: id,
-                item: newItem 
+                item: newItem,
             });
             stompClient.publish({ destination: "/app/sync", body: payload });
         }
@@ -145,8 +171,23 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             <div className="sidebar-header">
                 <h3>Shopping List</h3>
                 {isNavView && (
-                    <button className="close-sidebar-btn" onClick={() => setIsSidebarOpen(false)}>
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                    <button
+                        type="button"
+                        className="close-sidebar-btn"
+                        onClick={() => setIsSidebarOpen(false)}
+                        aria-label="Închide lista"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="20"
+                            height="20"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                        >
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
@@ -154,38 +195,46 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                 )}
             </div>
             <form onSubmit={addItem} className="add-item-form-sidebar">
-                <input 
-                    type="text" 
-                    value={newItemName} 
-                    onChange={(e) => setNewItemName(e.target.value)} 
-                    placeholder="Add item..." 
-                    className="sidebar-input" 
+                <input
+                    type="text"
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    placeholder="Add item..."
+                    className="sidebar-input"
                 />
-                <button type="submit" className="sidebar-add-btn">Add</button>
+                <button type="submit" className="sidebar-add-btn">
+                    Add
+                </button>
             </form>
             <ShoppingListItems items={items} onCheck={handleCheck} />
         </>
     );
 
     return (
-        <div className={isNavView ? "nav-sidebar-wrapper" : "full-page-wrapper"}>
+        <div
+            className={isNavView ? "nav-sidebar-wrapper" : "full-page-wrapper"}
+        >
             {isNavView ? (
                 <>
                     {!isSidebarOpen && (
                         <div className="open-list-container">
-                            <button className="open-list-btn-modern" onClick={() => setIsSidebarOpen(true)}>
+                            <button
+                                type="button"
+                                className="open-list-btn-modern"
+                                onClick={() => setIsSidebarOpen(true)}
+                            >
                                 <span className="cart-icon">🛒</span> Open List
                             </button>
                         </div>
                     )}
-                    <div className={`list-detail-sidebar ${isSidebarOpen ? "open" : ""}`}>
+                    <div
+                        className={`list-detail-sidebar ${isSidebarOpen ? "open" : ""}`}
+                    >
                         {listContent}
                     </div>
                 </>
             ) : (
-                <div className="centered-list-card">
-                    {listContent}
-                </div>
+                <div className="centered-list-card">{listContent}</div>
             )}
         </div>
     );

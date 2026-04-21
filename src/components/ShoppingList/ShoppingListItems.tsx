@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 
 interface Item {
     id: string;
@@ -12,12 +12,16 @@ interface Props {
 }
 
 const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
-    if (items.length === 0) return <p className="empty-msg">Your list is empty!</p>;
+    if (items.length === 0)
+        return <p className="empty-msg">Your list is empty!</p>;
 
     return (
         <ul className="shopping-list">
             {items.map((item) => (
-                <li key={item.id} className={`shopping-item ${item.checked ? "item-completed" : ""}`}>
+                <li
+                    key={item.id}
+                    className={`shopping-item ${item.checked ? "item-completed" : ""}`}
+                >
                     <label className="item-label">
                         <input
                             type="checkbox"

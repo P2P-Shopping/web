@@ -44,7 +44,7 @@ const Dashboard = () => {
     // Handle delete list
     const handleDeleteList = async (e: React.MouseEvent, listId: string) => {
         e.stopPropagation();
-        if (window.confirm("Ești sigur că vrei să ștergi această listă?")) {
+        if (globalThis.confirm("Ești sigur că vrei să ștergi această listă?")) {
             await deleteList(listId);
         }
     };
@@ -69,7 +69,11 @@ const Dashboard = () => {
                         {lists.length} {lists.length === 1 ? "listă" : "liste"}
                     </p>
                 </div>
-                <button className="create-btn" onClick={openModal}>
+                <button
+                    type="button"
+                    className="create-btn"
+                    onClick={openModal}
+                >
                     <svg
                         viewBox="0 0 24 24"
                         width="20"
@@ -77,6 +81,7 @@ const Dashboard = () => {
                         stroke="currentColor"
                         strokeWidth="2"
                         fill="none"
+                        aria-label="Adaugă listă"
                     >
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <line x1="5" y1="12" x2="19" y2="12" />
@@ -97,14 +102,19 @@ const Dashboard = () => {
                         <div className="empty-icon">🛒</div>
                         <h2>Nu ai nicio listă</h2>
                         <p>Crează prima ta listă de cumpărături!</p>
-                        <button className="create-btn-primary" onClick={openModal}>
+                        <button
+                            type="button"
+                            className="create-btn-primary"
+                            onClick={openModal}
+                        >
                             Creează Listă
                         </button>
                     </div>
                 ) : (
                     <div className="lists-grid">
                         {lists.map((list) => (
-                            <div
+                            <button
+                                type="button"
                                 key={list.id}
                                 className="list-card"
                                 onClick={() => handleListClick(list.id)}
@@ -112,9 +122,13 @@ const Dashboard = () => {
                                 <div className="card-header">
                                     <h3>{list.name}</h3>
                                     <button
+                                        type="button"
                                         className="delete-btn"
-                                        onClick={(e) => handleDeleteList(e, list.id)}
+                                        onClick={(e) =>
+                                            handleDeleteList(e, list.id)
+                                        }
                                         title="Șterge lista"
+                                        aria-label="Șterge lista"
                                     >
                                         <svg
                                             viewBox="0 0 24 24"
@@ -123,6 +137,7 @@ const Dashboard = () => {
                                             stroke="currentColor"
                                             strokeWidth="2"
                                             fill="none"
+                                            aria-hidden="true"
                                         >
                                             <polyline points="3,6 5,6 21,6" />
                                             <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2" />
@@ -133,7 +148,8 @@ const Dashboard = () => {
                                 <div className="card-body">
                                     <div className="list-stats">
                                         <span className="stat">
-                                            📦 {getItemsCount(list.items)} produse
+                                            📦 {getItemsCount(list.items)}{" "}
+                                            produse
                                         </span>
                                         <span className="stat">
                                             👤 {list.ownerName || "Tu"}
@@ -146,11 +162,13 @@ const Dashboard = () => {
                                             <div
                                                 key={item.id}
                                                 className={`item-preview ${
-                                                    item.checked ? "checked" : ""
+                                                    item.checked
+                                                        ? "checked"
+                                                        : ""
                                                 }`}
                                             >
                                                 <span className="checkbox">
-                                                    {item.checked && "✓"}
+                                                    {item.checked ? "✓" : ""}
                                                 </span>
                                                 <span className="item-name">
                                                     {item.name}
@@ -159,7 +177,8 @@ const Dashboard = () => {
                                         ))}
                                         {list.items.length > 3 && (
                                             <div className="more-items">
-                                                +{list.items.length - 3} mai multe...
+                                                +{list.items.length - 3} mai
+                                                multe...
                                             </div>
                                         )}
                                     </div>
@@ -170,7 +189,7 @@ const Dashboard = () => {
                                         {formatDate(list.updatedAt)}
                                     </span>
                                 </div>
-                            </div>
+                            </button>
                         ))}
                     </div>
                 )}

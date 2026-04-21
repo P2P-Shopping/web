@@ -24,7 +24,7 @@ export const registerRequest = async (data: Record<string, unknown>) => {
         const response = await axios.post(
             `${API_URL}/api/auth/register`,
             data,
-            { withCredentials: true }
+            { withCredentials: true },
         );
         return response.data;
     } catch (error) {
