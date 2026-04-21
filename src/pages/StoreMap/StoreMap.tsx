@@ -10,11 +10,6 @@ interface Coordinate {
     lng: number;
 }
 
-interface Product extends Coordinate {
-    id: number | string;
-    name: string;
-}
-
 interface Point {
     x: number;
     y: number;
@@ -71,31 +66,31 @@ const getRelativePixels = (
     return { x, y };
 };
 
-const generateLocalProducts = (centerGps: Coordinate): Product[] => {
+const generateLocalProducts = (centerGps: Coordinate): RoutePoint[] => {
     const latOffset = 0.00015;
     const lngOffset = 0.00015;
 
     return [
         {
-            id: 1,
+            itemId: "1",
             lat: centerGps.lat + latOffset,
             lng: centerGps.lng + lngOffset,
             name: "Milk",
         },
         {
-            id: 2,
+            itemId: "2",
             lat: centerGps.lat - latOffset,
             lng: centerGps.lng - lngOffset,
             name: "Bread",
         },
         {
-            id: 3,
+            itemId: "3",
             lat: centerGps.lat + latOffset * 1.5,
             lng: centerGps.lng - lngOffset * 0.5,
             name: "Apples",
         },
         {
-            id: 4,
+            itemId: "4",
             lat: centerGps.lat - latOffset * 0.8,
             lng: centerGps.lng + lngOffset * 1.2,
             name: "Coffee",
@@ -105,11 +100,11 @@ const generateLocalProducts = (centerGps: Coordinate): Product[] => {
 
 const calculateNearestNeighborRoute = (
     startPoint: Point,
-    products: Product[],
+    products: RoutePoint[],
     anchor: Coordinate,
-): Product[] => {
+): RoutePoint[] => {
     const unvisited = [...products];
-    const orderedRoute: Product[] = [];
+    const orderedRoute: RoutePoint[] = [];
     let currentPoint = { ...startPoint };
 
     while (unvisited.length > 0) {
@@ -177,6 +172,13 @@ const getCameraConstraints = (
     };
 };
 
+interface RoutePoint {
+    itemId: string;
+    name: string;
+    lat: number;
+    lng: number;
+}
+
 const useMapEngine = (
     canvasRef: React.RefObject<HTMLCanvasElement | null>,
     listId: string | undefined,
@@ -189,7 +191,7 @@ const useMapEngine = (
     const originGps = useRef<Coordinate | null>(null);
     const targetGps = useRef<Coordinate>({ lat: 0, lng: 0 });
     const currentRenderedGps = useRef<Coordinate>({ lat: 0, lng: 0 });
-    const routePoints = useRef<Product[]>([]);
+    const routePoints = useRef<RoutePoint[]>([]);
     const isFirstLocationUpdate = useRef(true);
     const camera = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
     const lastPanPoint = useRef<Point | null>(null);
@@ -245,6 +247,7 @@ const useMapEngine = (
     };
 
     useEffect(() => {
+        const controller = new AbortController();
         const fetchRoute = async () => {
             if (!listId || listId === "default") {
                 if (originGps.current) {
@@ -263,6 +266,7 @@ const useMapEngine = (
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
+                        signal: controller.signal,
                         body: JSON.stringify({
                             listId: listId,
                             userLat:
@@ -273,16 +277,19 @@ const useMapEngine = (
                     },
                 );
 
+                if (controller.signal.aborted) return;
+
                 if (response.ok) {
                     const data = await response.json();
                     if (data.route) {
-                        const productsOnly = data.route.filter(
-                            (p: any) => p.itemId !== "user_loc",
+                        const productsOnly: RoutePoint[] = data.route.filter(
+                            (p: RoutePoint) => p.itemId !== "user_loc",
                         );
                         routePoints.current = productsOnly;
                     }
                 }
             } catch (error) {
+                if (controller.signal.aborted) return;
                 console.error(error);
                 if (originGps.current) {
                     routePoints.current = generateLocalProducts(
@@ -290,12 +297,15 @@ const useMapEngine = (
                     );
                 }
             } finally {
-                setIsRouting(false);
+                if (!controller.signal.aborted) {
+                    setIsRouting(false);
+                }
             }
         };
         if (hasLocationLock) {
             fetchRoute();
         }
+        return () => controller.abort();
     }, [listId, hasLocationLock]);
 
     useEffect(() => {

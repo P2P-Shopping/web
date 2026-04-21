@@ -98,6 +98,22 @@ const readItems = (id: string | undefined): Item[] => {
     }
 };
 
+interface ServerItem {
+    id: string;
+    name: string;
+    isChecked: boolean;
+    brand?: string;
+    price?: number;
+    quantity?: string;
+    category?: string;
+    isRecurrent?: boolean;
+}
+
+interface ServerList {
+    id: string;
+    items: ServerItem[];
+}
+
 const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
@@ -107,7 +123,6 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const setItems = useStore((state) => state.setItems);
     const backupItemState = useStore((state) => state.backupItemState);
     const rollbackItemState = useStore((state) => state.rollbackItemState);
-    const conflictItems = useStore((state) => state.conflictItems);
     const setItemConflict = useStore((state) => state.setItemConflict);
     const isOnline = useStore((state) => state.isOnline);
     const handlePresenceEvent = usePresenceStore(
@@ -121,8 +136,18 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     const [newItemName, setNewItemName] = useState("");
     const [brand, setBrand] = useState("");
     const [quantity, setQuantity] = useState("");
-    const [category, setCategory] = useState("Altele");
+    const [category, setCategory] = useState("");
     const [isRecurrent, setIsRecurrent] = useState(false);
+
+    const [, setPendingMutations] = useState<
+        Array<{
+            id: string;
+            destination: string;
+            body: string;
+            headers?: Record<string, string>;
+            rollback: () => void;
+        }>
+    >([]);
 
     const [recipeText, setRecipeText] = useState("");
     const [isAiLoading, setIsAiLoading] = useState(false);
@@ -140,11 +165,29 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     });
 
     const pendingRollbacksRef = useRef(
-        new Map<string, { timeoutId: number; rollback: () => void }>(),
+        new Map<
+            string,
+            { timeoutId: ReturnType<typeof setTimeout>; rollback: () => void }
+        >(),
     );
-    const conflictTimeoutsRef = useRef<Record<string, number>>({});
+    const conflictTimeoutsRef = useRef<
+        Record<string, ReturnType<typeof setTimeout>>
+    >({});
     const handlersWrappedRef = useRef(false);
     const lastTypingEmitRef = useRef(0);
+    const itemsRef = useRef<Item[]>(items);
+
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
+    const commitItems = useCallback(
+        (nextItems: Item[]) => {
+            itemsRef.current = nextItems;
+            setItems(nextItems);
+        },
+        [setItems],
+    );
 
     const fetchListData = useCallback(async () => {
         if (!id || id === "default") {
@@ -153,19 +196,19 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         setIsLoading(true);
         try {
             const baseUrl =
-                import.meta.env.VITE_API_URL || "http://localhost:8081";
+                (import.meta as any).env.VITE_API_URL ||
+                "http://localhost:8081";
             const token = localStorage.getItem("token");
             const response = await fetch(`${baseUrl}/api/lists`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
             if (!response.ok) throw new Error("Failed to fetch lists");
-
-            const allLists = await response.json();
-            const currentList = allLists.find((l: any) => l.id === id);
+            const allLists: ServerList[] = await response.json();
+            const currentList = allLists.find((l) => l.id === id);
 
             if (currentList) {
-                const mappedItems = currentList.items.map((it: any) => ({
+                const mappedItems: Item[] = currentList.items.map((it) => ({
                     id: it.id,
                     name: it.name,
                     checked: it.isChecked,
@@ -175,18 +218,17 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     category: it.category,
                     isRecurrent: it.isRecurrent,
                 }));
-                setItems(mappedItems);
+                commitItems(mappedItems);
             } else {
-                // Fallback to local storage if not in remote lists
-                setItems(readItems(id));
+                commitItems(readItems(id));
             }
         } catch (err) {
-            setError("Nu s-a putut sincroniza lista.");
-            setItems(readItems(id));
+            setError("Could not sync the list.");
+            commitItems(readItems(id));
         } finally {
             setIsLoading(false);
         }
-    }, [id, setItems]);
+    }, [id, commitItems]);
 
     const handleAiImport = async () => {
         if (!recipeText.trim() || !id) return;
@@ -194,7 +236,8 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         setError(null);
         try {
             const baseUrl =
-                import.meta.env.VITE_API_URL || "http://localhost:8081";
+                (import.meta as any).env.VITE_API_URL ||
+                "http://localhost:8081";
             const token = localStorage.getItem("token");
 
             const response = await fetch(`${baseUrl}/api/ai/recipe-to-list`, {
@@ -208,12 +251,12 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
 
             if (response.ok) {
                 setRecipeText("");
-                await fetchListData(); // Refresh list
+                await fetchListData();
             } else {
                 throw new Error("AI Service error");
             }
         } catch (err) {
-            setError("Eroare la procesarea AI. Verifică backend-ul.");
+            setError("AI processing error. Check the backend.");
         } finally {
             setIsAiLoading(false);
         }
@@ -273,10 +316,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             try {
                 prevOnWS?.(evt);
             } catch (error) {
-                console.error(
-                    "Error in previous onWebSocketError handler:",
-                    error,
-                );
+                console.error("Error in previous WS handler:", error);
             }
             rollbackAllPending();
         };
@@ -285,7 +325,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             try {
                 prevOnStomp?.(frame);
             } catch (error) {
-                console.error("Error in previous onStompError handler:", error);
+                console.error("Error in previous STOMP handler:", error);
             }
             rollbackAllPending();
         };
@@ -298,12 +338,10 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
 
     useEffect(() => {
         if (!id) return;
-
         if (isEmbedded || id === "default") {
             setItems(DEMO_ITEMS);
             return;
         }
-
         fetchListData();
     }, [id, isEmbedded, fetchListData, setItems]);
 
@@ -318,11 +356,9 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     useEffect(() => {
         let isMounted = true;
         let permResult: PermissionStatus | null = null;
-
         const handler = () => {
             if (isMounted && permResult) setPermissionStatus(permResult.state);
         };
-
         if (navigator.permissions) {
             navigator.permissions
                 .query({ name: "geolocation" as PermissionName })
@@ -332,9 +368,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     setPermissionStatus(result.state);
                     result.addEventListener("change", handler);
                 })
-                .catch(() => {
-                    // Ignore permission API failures.
-                });
+                .catch(() => {});
         }
         return () => {
             isMounted = false;
@@ -342,12 +376,61 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         };
     }, []);
 
+    const handleTyping = () => {
+        const now = Date.now();
+        if (
+            now - lastTypingEmitRef.current <= 500 ||
+            !stompClient.connected ||
+            !id ||
+            !isOnline
+        )
+            return;
+        lastTypingEmitRef.current = now;
+        stompClient.publish({
+            destination: `/app/list/${id}/presence`,
+            body: JSON.stringify({
+                eventType: "TYPING",
+                username: myUsername,
+                listId: id,
+            }),
+        });
+        handlePresenceEvent({
+            eventType: "TYPING",
+            username: myUsername,
+            listId: id,
+        });
+    };
+
+    const flushPendingMutations = useCallback(() => {
+        if (!stompClient.connected) return;
+        setPendingMutations((prev) => {
+            if (prev.length === 0) return prev;
+            for (const mutation of prev) {
+                try {
+                    stompClient.publish({
+                        destination: mutation.destination,
+                        body: mutation.body,
+                        headers: mutation.headers,
+                    });
+                } catch (error) {
+                    console.error("Failed to flush mutation:", error);
+                    mutation.rollback();
+                }
+            }
+            return [];
+        });
+    }, []);
+
+    useEffect(() => {
+        if (stompClient.connected) flushPendingMutations();
+    }, [flushPendingMutations]);
+
     useEffect(() => {
         if (!id) return;
-
         let rejectSub: { unsubscribe: () => void } | undefined;
         let presenceSub: { unsubscribe: () => void } | undefined;
         let updateSub: { unsubscribe: () => void } | undefined;
+        const prevOnConnect = stompClient.onConnect;
 
         const connectAndSubscribe = () => {
             if (!stompClient.connected) return;
@@ -373,7 +456,6 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                             handleRejection(payload.itemId);
                             return;
                         }
-
                         if (
                             payload.itemId &&
                             (payload.action === "UPDATE_ITEM" ||
@@ -381,8 +463,8 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                         ) {
                             const newChecked = payload.checked;
                             if (typeof newChecked === "boolean") {
-                                setItems((prevItems) =>
-                                    prevItems.map((item) =>
+                                commitItems(
+                                    itemsRef.current.map((item) =>
                                         item.id === payload.itemId
                                             ? { ...item, checked: newChecked }
                                             : item,
@@ -430,10 +512,15 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         if (stompClient.connected) {
             connectAndSubscribe();
         } else {
-            stompClient.onConnect = () => connectAndSubscribe();
+            stompClient.onConnect = (frame) => {
+                prevOnConnect?.(frame);
+                connectAndSubscribe();
+                flushPendingMutations();
+            };
         }
 
         return () => {
+            stompClient.onConnect = prevOnConnect;
             if (stompClient.connected) {
                 stompClient.publish({
                     destination: `/app/list/${id}/presence`,
@@ -444,14 +531,10 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     }),
                 });
             }
-
             rejectSub?.unsubscribe();
             presenceSub?.unsubscribe();
             updateSub?.unsubscribe();
-
-            Object.values(conflictTimeoutsRef.current).forEach((timeoutId) => {
-                clearTimeout(timeoutId);
-            });
+            Object.values(conflictTimeoutsRef.current).forEach(clearTimeout);
             conflictTimeoutsRef.current = {};
             clearAllTimeouts();
         };
@@ -460,40 +543,13 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         handlePresenceEvent,
         myUsername,
         clearAllTimeouts,
-        setItems,
+        commitItems,
         handleRejection,
+        flushPendingMutations,
     ]);
-
-    const handleTyping = () => {
-        const now = Date.now();
-        if (
-            now - lastTypingEmitRef.current <= 500 ||
-            !stompClient.connected ||
-            !id ||
-            !isOnline
-        ) {
-            return;
-        }
-
-        lastTypingEmitRef.current = now;
-        stompClient.publish({
-            destination: `/app/list/${id}/presence`,
-            body: JSON.stringify({
-                eventType: "TYPING",
-                username: myUsername,
-                listId: id,
-            }),
-        });
-        handlePresenceEvent({
-            eventType: "TYPING",
-            username: myUsername,
-            listId: id,
-        });
-    };
 
     const addItem = (e: React.FormEvent) => {
         e.preventDefault();
-
         const trimmedName = newItemName.trim();
         if (!trimmedName) return;
 
@@ -501,45 +557,87 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             id: uuid(),
             name: trimmedName,
             checked: false,
-            brand: brand || undefined,
-            quantity: quantity || undefined,
-            category: category,
-            isRecurrent: isRecurrent,
         };
 
-        setItems((prevItems) => [...prevItems, newItem]);
+        const previousItems = itemsRef.current;
+        commitItems([...previousItems, newItem]);
         setNewItemName("");
         setBrand("");
         setQuantity("");
 
-        if (id && stompClient.connected) {
-            stompClient.publish({
-                destination: "/app/sync",
-                body: JSON.stringify({
-                    eventType: "ITEM_ADDED",
-                    listId: id,
-                    item: newItem,
-                }),
-            });
+        if (!id) return;
+        const mutationBody = JSON.stringify({
+            eventType: "ITEM_ADDED",
+            listId: id,
+            item: newItem,
+        });
+        const rollback = () => {
+            commitItems(previousItems);
+            setError("Failed to add item. Reverting changes.");
+        };
+
+        if (stompClient.connected && isOnline) {
+            try {
+                stompClient.publish({
+                    destination: "/app/sync",
+                    body: mutationBody,
+                });
+            } catch (error) {
+                console.error("Failed to publish item:", error);
+                rollback();
+            }
+        } else {
+            setPendingMutations((prev) => [
+                ...prev,
+                {
+                    id: uuid(),
+                    destination: "/app/sync",
+                    body: mutationBody,
+                    rollback,
+                },
+            ]);
+            setError("Connection lost. Item will be synced when back online.");
         }
     };
 
     const handleCheck = (itemId: string) => {
-        const currentItem = items.find((it) => it.id === itemId);
+        const currentItem = itemsRef.current.find((it) => it.id === itemId);
         if (!currentItem) return;
 
         const newChecked = !currentItem.checked;
         backupItemState({ ...currentItem });
-        setItems((prevItems) =>
-            prevItems.map((item) =>
+        const previousItems = itemsRef.current;
+        commitItems(
+            itemsRef.current.map((item) =>
                 item.id === itemId ? { ...item, checked: newChecked } : item,
             ),
         );
 
         if (!id) return;
+        const mutationBody = JSON.stringify({
+            eventType: "ITEM_TOGGLED",
+            listId: id,
+            itemId,
+            checked: newChecked,
+        });
+        const rollback = () => {
+            commitItems(previousItems);
+            setError("Failed to sync item state. Reverting.");
+        };
 
         if (!stompClient.connected || !isOnline) {
-            handleRejection(itemId);
+            setPendingMutations((prev) => [
+                ...prev,
+                {
+                    id: uuid(),
+                    destination: "/app/sync",
+                    body: mutationBody,
+                    rollback,
+                },
+            ]);
+            setError(
+                "Connection lost. Change will be synced when back online.",
+            );
             return;
         }
 
@@ -565,12 +663,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
         try {
             stompClient.publish({
                 destination: "/app/sync",
-                body: JSON.stringify({
-                    eventType: "ITEM_TOGGLED",
-                    listId: id,
-                    itemId,
-                    checked: newChecked,
-                }),
+                body: mutationBody,
                 headers: { receipt: receiptId },
             });
         } catch (error) {
@@ -613,9 +706,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     </button>
                 )}
             </div>
-
             {error && <div className="error-msg">⚠️ {error}</div>}
-
             <div className="ai-import-section">
                 <textarea
                     rows={3}
@@ -632,7 +723,6 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     {isAiLoading ? "✨ Processing..." : "AI Magic Import"}
                 </button>
             </div>
-
             <form onSubmit={addItem} className="add-item-form-sidebar">
                 <input
                     type="text"
@@ -665,8 +755,12 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     className="sidebar-input"
+                    required
                 >
-                    <option value="Altele">Category...</option>
+                    <option value="" disabled hidden>
+                        Category...
+                    </option>
+                    <option value="Altele">Altele</option>
                     <option value="Lactate">Lactate</option>
                     <option value="Legume">Legume</option>
                     <option value="Carne">Carne</option>
@@ -685,7 +779,6 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     Add to List
                 </button>
             </form>
-
             {isLoading ? (
                 <p style={{ textAlign: "center", marginTop: "20px" }}>
                     Loading list...
@@ -715,9 +808,7 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
                     </button>
                 </div>
             )}
-
             <PresenceBar />
-
             {isNavView ? (
                 <>
                     {!isSidebarOpen && (

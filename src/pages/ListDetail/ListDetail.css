@@ -82,6 +82,7 @@
     border: 2px solid black;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     box-sizing: border-box;
+    font-family: Inter, sans-serif;
 }
 
 .sidebar-header {
@@ -171,7 +172,43 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 12px;
+}
+
+.shopping-list-item {
+    background: white;
+    border: 2px solid var(--text-main);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.shopping-item-label {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.shopping-item-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #2e1a5e;
+}
+
+.shopping-item-name.completed {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.shopping-item-meta {
+    font-size: 12px;
+    color: #444;
+}
+
+.shopping-item-category {
+    font-style: italic;
+    color: #6c4ab3;
 }
 
 .shopping-item {

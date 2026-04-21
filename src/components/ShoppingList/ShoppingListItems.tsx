@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type React from "react";
 
 interface Item {
@@ -13,21 +14,46 @@ interface Item {
 interface Props {
     items: Item[];
     onCheck: (id: string) => void;
+    currency?: string;
+    locale?: string;
 }
 
-const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
+const ShoppingListItems: React.FC<Props> = ({
+    items,
+    onCheck,
+    currency = "RON",
+    locale = "ro-RO",
+}) => {
+    const formatter = useMemo(() => {
+        try {
+            return new Intl.NumberFormat(locale, {
+                style: "currency",
+                currency: currency,
+            });
+        } catch {
+            return null;
+        }
+    }, [locale, currency]);
+
     if (items.length === 0) {
         return <p className="empty-msg">Your list is empty!</p>;
     }
+
+    const formatPrice = (price: number) => {
+        if (formatter) {
+            return formatter.format(price);
+        }
+        return `${price.toFixed(2)} ${currency}`;
+    };
 
     return (
         <ul className="shopping-list">
             {items.map((item) => (
                 <li
                     key={item.id}
-                    className={`shopping-item ${item.checked ? "item-completed" : ""}`}
+                    className={`shopping-list-item ${item.checked ? "item-completed" : ""}`}
                 >
-                    <label className="item-label">
+                    <label className="shopping-item-label">
                         <input
                             type="checkbox"
                             className="item-checkbox"
@@ -36,33 +62,20 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
                         />
                         <div>
                             <span
-                                style={{
-                                    fontSize: "16px",
-                                    fontWeight: "bold",
-                                    color: "#2e1a5e",
-                                    textDecoration: item.checked
-                                        ? "line-through"
-                                        : "none",
-                                    opacity: item.checked ? 0.6 : 1,
-                                }}
+                                className={`shopping-item-name ${item.checked ? "completed" : ""}`}
                             >
                                 {item.name}
                             </span>
-                            <div style={{ fontSize: "12px", color: "#444" }}>
+                            <div className="shopping-item-meta">
                                 {item.brand && <span>{item.brand}</span>}
                                 {item.quantity && (
                                     <span> • {item.quantity}</span>
                                 )}
                                 {item.price != null && (
-                                    <span> • {item.price.toFixed(2)} RON</span>
+                                    <span> • {formatPrice(item.price)}</span>
                                 )}
                                 {item.category && (
-                                    <span
-                                        style={{
-                                            fontStyle: "italic",
-                                            color: "#6c4ab3",
-                                        }}
-                                    >
+                                    <span className="shopping-item-category">
                                         {` [${item.category}]`}
                                     </span>
                                 )}
