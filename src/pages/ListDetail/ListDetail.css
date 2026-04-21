@@ -1,3 +1,17 @@
+.full-page-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: calc(100vh - 80px);
+    padding: 20px;
+}
+
+.list-detail-sidebar {
+    width: min(100%, 420px);
+    margin-left: auto;
+    padding: 20px;
+}
+
 /* Container Card */
 .centered-list-card {
     background-color: #b8a9d1;
@@ -29,6 +43,13 @@
     width: 100%;
 }
 
+.list-detail-helper {
+    margin: 0 0 16px;
+    color: #2e1a5e;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
 /* Secțiunea AI */
 .ai-import-section {
     background: linear-gradient(145deg, #2e1a5e, #4a307d);
@@ -50,6 +71,23 @@
     resize: none;
     font-size: 14px;
     display: block;
+}
+
+.ai-btn {
+    width: 100%;
+    background-color: #f4eaff;
+    color: #2e1a5e;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.ai-btn:disabled,
+.sidebar-add-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
 /* Formular Manual */
@@ -92,4 +130,60 @@
     font-weight: bold;
     cursor: pointer;
     margin-top: 5px;
+}
+
+.shopping-list {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.shopping-item {
+    background: white;
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.shopping-item.item-completed {
+    opacity: 0.75;
+}
+
+.item-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.item-checkbox {
+    margin-top: 3px;
+}
+
+.item-inline-remove {
+    border: none;
+    background: transparent;
+    color: #7a6f8f;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 2px;
+}
+
+.item-inline-remove:hover {
+    color: #d14343;
+}
+
+.empty-msg {
+    text-align: center;
+    margin-top: 20px;
+    color: #2e1a5e;
+    font-weight: 600;
 }

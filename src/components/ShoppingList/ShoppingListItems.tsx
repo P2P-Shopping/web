@@ -13,9 +13,10 @@ interface Item {
 interface Props {
     items: Item[];
     onCheck: (id: string) => void;
+    onDelete?: (id: string) => void;
 }
 
-const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
+const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
     if (items.length === 0) {
         return <p className="empty-msg">Your list is empty!</p>;
     }
@@ -69,6 +70,16 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
                             </div>
                         </div>
                     </label>
+                    {onDelete && (
+                        <button
+                            type="button"
+                            className="item-inline-remove"
+                            onClick={() => onDelete(item.id)}
+                            aria-label="Remove item"
+                        >
+                            x
+                        </button>
+                    )}
                 </li>
             ))}
         </ul>

@@ -19,6 +19,9 @@ export default function Navbar({ isConnected, handlePingPress }: NavbarProps) {
                 <Link to="/map" className="nav-link">
                     Map
                 </Link>
+                <Link to="/dashboard" className="nav-link">
+                    My Lists
+                </Link>
                 <Link to="/route" className="nav-link">
                     Route
                 </Link>
@@ -26,7 +29,7 @@ export default function Navbar({ isConnected, handlePingPress }: NavbarProps) {
                     Store Map
                 </Link>
                 <Link to="/list/default" className="nav-link">
-                    List
+                    AI
                 </Link>
 
                 <button
@@ -39,7 +42,7 @@ export default function Navbar({ isConnected, handlePingPress }: NavbarProps) {
                         cursor: isConnected ? "pointer" : "not-allowed",
                     }}
                 >
-                    {isConnected ? "🟢 Ping Server" : "🔴 Disconnected"}
+                    {isConnected ? "Ping Server" : "Disconnected"}
                 </button>
             </nav>
             <div className="logo-section">

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import stompClient from "../../services/socketService";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
+import stompClient from "../../services/socketService";
+import { useListsStore } from "../../store/useListsStore";
 import "./ListDetail.css";
 
 interface Item {
@@ -15,68 +16,111 @@ interface Item {
     isRecurrent?: boolean;
 }
 
-const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
+interface ApiListItem {
+    id: string;
+    name: string;
+    isChecked?: boolean;
+    brand?: string;
+    quantity?: string;
+    price?: number;
+    category?: string;
+    isRecurrent?: boolean;
+}
+
+interface ApiShoppingList {
+    id: string;
+    items?: ApiListItem[];
+}
+
+interface CreatedListResponse {
+    id: string;
+}
+
+interface ListDetailProps {
+    isEmbedded?: boolean;
+    listIdOverride?: string;
+    listTitle?: string;
+    showAiImport?: boolean;
+}
+
+const ListDetail = ({
+    isEmbedded = false,
+    listIdOverride,
+    listTitle,
+    showAiImport = true,
+}: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
-    const location = useLocation();
-    const isNavView = location.pathname.includes("/nav") || isEmbedded;
+    const navigate = useNavigate();
+    const effectiveListId = listIdOverride ?? id;
+    const isNewListPage = effectiveListId === "default" && showAiImport;
+    const { updateList } = useListsStore();
 
-    const items = useStore((state) => state.items);
-    const setItems = useStore((state) => state.setItems);
-    const backupItemState = useStore((state) => state.backupItemState);
-    const rollbackItemState = useStore((state) => state.rollbackItemState);
-    const conflictItems = useStore((state) => state.conflictItems);
-    const setItemConflict = useStore((state) => state.setItemConflict);
-    const isOnline = useStore((state) => state.isOnline);
-    const handlePresenceEvent = usePresenceStore(
-        (state) => state.handlePresenceEvent,
-    );
-    const clearAllTimeouts = usePresenceStore(
-        (state) => state.clearAllTimeouts,
-    );
-
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
     const [brand, setBrand] = useState("");
     const [quantity, setQuantity] = useState("");
     const [category, setCategory] = useState("Altele");
     const [isRecurrent, setIsRecurrent] = useState(false);
-    
     const [recipeText, setRecipeText] = useState("");
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchListData = async () => {
-        if (!id || id === "default") {
+    const getBaseUrl = () => import.meta.env.VITE_API_URL || "http://localhost:8081";
+
+    const getAuthHeaders = (withContentType = false): HeadersInit => {
+        const token = localStorage.getItem("token");
+        return {
+            ...(withContentType ? { "Content-Type": "application/json" } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+    };
+
+    const syncListItemsInStore = (nextItems: Item[], targetListId = effectiveListId) => {
+        if (!targetListId || targetListId === "default") {
+            return;
+        }
+        updateList(targetListId, { items: nextItems });
+    };
+
+    const fetchListData = async (targetListId = effectiveListId) => {
+        if (!targetListId || targetListId === "default") {
+            setItems([]);
             setIsLoading(false);
             return;
         }
+
         try {
-            const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
-            const token = localStorage.getItem("token");
-            const response = await fetch(`${baseUrl}/api/lists`, {
-                headers: { "Authorization": `Bearer ${token}` }
+            const response = await fetch(`${getBaseUrl()}/api/lists`, {
+                headers: getAuthHeaders(),
             });
 
-            if (!response.ok) throw new Error("Failed to fetch lists");
-
-            const allLists = await response.json();
-            const currentList = allLists.find((l: any) => l.id === id);
-
-            if (currentList) {
-                const mappedItems = currentList.items.map((it: any) => ({
-                    id: it.id,
-                    name: it.name,
-                    checked: it.isChecked,
-                    brand: it.brand,
-                    price: it.price,
-                    quantity: it.quantity,
-                    category: it.category,
-                    isRecurrent: it.isRecurrent
-                }));
-                setItems(mappedItems);
+            if (!response.ok) {
+                throw new Error("Failed to fetch lists");
             }
-        } catch (err: any) {
+
+            const allLists = (await response.json()) as ApiShoppingList[];
+            const currentList = allLists.find((list) => list.id === targetListId);
+
+            if (!currentList) {
+                setItems([]);
+                return;
+            }
+
+            const mappedItems = (currentList.items ?? []).map((item) => ({
+                id: item.id,
+                name: item.name,
+                checked: Boolean(item.isChecked),
+                brand: item.brand,
+                price: item.price,
+                quantity: item.quantity,
+                category: item.category,
+                isRecurrent: item.isRecurrent,
+            }));
+
+            setItems(mappedItems);
+            syncListItemsInStore(mappedItems, targetListId);
+        } catch {
             setError("Nu s-a putut sincroniza lista.");
         } finally {
             setIsLoading(false);
@@ -84,42 +128,74 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     };
 
     useEffect(() => {
-        fetchListData();
-    }, [id]);
+        setIsLoading(true);
+        void fetchListData();
+    }, [effectiveListId]);
+
+    const createListFromPlaceholder = async (): Promise<string> => {
+        const response = await fetch(`${getBaseUrl()}/api/lists`, {
+            method: "POST",
+            headers: getAuthHeaders(true),
+            body: JSON.stringify({
+                title: `AI Generated ${new Date().toISOString().slice(0, 10)}`,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to create list");
+        }
+
+        const createdList = (await response.json()) as CreatedListResponse;
+        return createdList.id;
+    };
 
     const handleAiImport = async () => {
-        if (!recipeText.trim() || !id) return;
+        if (!recipeText.trim() || !id) {
+            return;
+        }
+
         setIsAiLoading(true);
         setError(null);
+
         try {
-            const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8081";
-            const token = localStorage.getItem("token");
-            
-            const response = await fetch(`${baseUrl}/api/ai/recipe-to-list`, {
+            const targetListId =
+                effectiveListId === "default"
+                    ? await createListFromPlaceholder()
+                    : effectiveListId;
+
+            const response = await fetch(`${getBaseUrl()}/api/ai/recipe-to-list`, {
                 method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ rawText: recipeText, listId: id })
+                headers: getAuthHeaders(true),
+                body: JSON.stringify({
+                    text: recipeText,
+                    listId: targetListId,
+                }),
             });
 
-            if (response.ok) {
-                setRecipeText("");
-                await fetchListData(); // Refresh listă
-            } else {
+            if (!response.ok) {
                 throw new Error("AI Service error");
             }
-        } catch (err) {
+
+            setRecipeText("");
+
+            if (effectiveListId === "default") {
+                navigate(`/list/${targetListId}`);
+                return;
+            }
+
+            await fetchListData(targetListId);
+        } catch {
             setError("Eroare la procesarea AI. Verifică backend-ul.");
         } finally {
             setIsAiLoading(false);
         }
     };
 
-    const addItem = (e: React.FormEvent) => {
+    const addItem = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (newItemName.trim() === "") return;
+        if (newItemName.trim() === "") {
+            return;
+        }
 
         const newItem: Item = {
             id: crypto.randomUUID(),
@@ -127,110 +203,228 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
             checked: false,
             brand: brand || undefined,
             quantity: quantity || undefined,
-            category: category,
-            isRecurrent: isRecurrent
+            category,
+            isRecurrent,
         };
 
-        setItems(prev => [...prev, newItem]);
-        setNewItemName(""); setBrand(""); setQuantity(""); // Reset formular
+        const optimisticItems = [...items, newItem];
+        setItems(optimisticItems);
+        syncListItemsInStore(optimisticItems);
+        setNewItemName("");
+        setBrand("");
+        setQuantity("");
+        setCategory("Altele");
+        setIsRecurrent(false);
 
-        if (id && stompClient.connected) {
+        void fetch(`${getBaseUrl()}/api/lists/${effectiveListId}/items`, {
+            method: "POST",
+            headers: getAuthHeaders(true),
+            body: JSON.stringify({
+                name: newItem.name,
+                isChecked: newItem.checked,
+                brand: newItem.brand ?? null,
+                quantity: newItem.quantity ?? null,
+                price: newItem.price ?? null,
+                category: newItem.category ?? null,
+                isRecurrent: newItem.isRecurrent ?? false,
+                timestamp: Date.now(),
+            }),
+        })
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to add item");
+                }
+                await fetchListData(effectiveListId);
+            })
+            .catch(() => {
+                setError("Nu s-a putut adăuga produsul.");
+                const rolledBackItems = optimisticItems.filter(
+                    (item) => item.id !== newItem.id,
+                );
+                setItems(rolledBackItems);
+                syncListItemsInStore(rolledBackItems);
+            });
+
+        if (effectiveListId && stompClient.connected) {
             stompClient.publish({
                 destination: "/app/sync",
-                body: JSON.stringify({ eventType: "ITEM_ADDED", listId: id, item: newItem })
+                body: JSON.stringify({
+                    eventType: "ITEM_ADDED",
+                    listId: effectiveListId,
+                    item: newItem,
+                }),
             });
         }
     };
 
     const handleCheck = (itemId: string) => {
-        const currentItem = items.find(it => it.id === itemId);
-        if (!currentItem) return;
-
+        const currentItem = items.find((item) => item.id === itemId);
+        if (!currentItem) {
+            return;
+        }
 
         const newChecked = !currentItem.checked;
-        
-        // Optimistic UI
-        setItems(prev => prev.map(it => it.id === itemId ? { ...it, checked: newChecked } : it));
+        const nextItems = items.map((item) =>
+            item.id === itemId ? { ...item, checked: newChecked } : item,
+        );
 
-        if (id && stompClient.connected) {
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        void fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+            method: "PUT",
+            headers: getAuthHeaders(true),
+            body: JSON.stringify({
+                name: currentItem.name,
+                isChecked: newChecked,
+                brand: currentItem.brand ?? null,
+                quantity: currentItem.quantity ?? null,
+                price: currentItem.price ?? null,
+                category: currentItem.category ?? null,
+                isRecurrent: currentItem.isRecurrent ?? false,
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {
+            setError("Nu s-a putut actualiza produsul.");
+            const rolledBackItems = items.map((item) =>
+                item.id === itemId
+                    ? { ...item, checked: currentItem.checked }
+                    : item,
+            );
+            setItems(rolledBackItems);
+            syncListItemsInStore(rolledBackItems);
+        });
+
+        if (effectiveListId && stompClient.connected) {
             stompClient.publish({
                 destination: "/app/sync",
-                body: JSON.stringify({ 
-                    eventType: "ITEM_TOGGLED", 
-                    listId: id, 
-                    itemId: itemId, 
-                    checked: newChecked 
-                })
+                body: JSON.stringify({
+                    eventType: "ITEM_TOGGLED",
+                    listId: effectiveListId,
+                    itemId,
+                    checked: newChecked,
+                }),
             });
         }
     };
 
+    const handleDelete = (itemId: string) => {
+        const previousItems = items;
+        const nextItems = previousItems.filter((item) => item.id !== itemId);
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        void fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(),
+        }).catch(() => {
+            setError("Nu s-a putut șterge produsul.");
+            setItems(previousItems);
+            syncListItemsInStore(previousItems);
+        });
+    };
+
     return (
-        <div className="full-page-wrapper">
+        <div className={isEmbedded ? "list-detail-sidebar open" : "full-page-wrapper"}>
             <div className="centered-list-card">
-                <h3 style={{ textAlign: 'center', color: '#2e1a5e', marginBottom: '20px' }}>Shopping List</h3>
-                
-                {error && <div className="error-msg">⚠️ {error}</div>}
+                <h3
+                    style={{
+                        textAlign: "center",
+                        color: "#2e1a5e",
+                        marginBottom: "20px",
+                    }}
+                >
+                    {isNewListPage ? "AI List Generator" : listTitle || "Shopping List"}
+                </h3>
 
-                {/* Task 13: Secțiunea AI Magic */}
-                <div className="ai-import-section">
-                    <textarea 
-                        rows={3}
-                        value={recipeText}
-                        onChange={(e) => setRecipeText(e.target.value)}
-                        placeholder="Paste your recipe here (e.g. 2 eggs, milk...)"
-                    />
-                    <button onClick={handleAiImport} className="ai-btn" disabled={isAiLoading}>
-                        {isAiLoading ? "✨ Processing..." : "AI Magic Import"}
-                    </button>
-                </div>
+                {error && <div className="error-msg">{error}</div>}
 
-                {/* Task 12: Formular Adăugare Manuală */}
-                <form onSubmit={addItem} className="add-item-form-sidebar">
-                    <input 
-                        type="text" value={newItemName} 
-                        onChange={e => setNewItemName(e.target.value)} 
-                        placeholder="Item Name*" className="sidebar-input" required 
-                    />
-                    <div className="row-inputs">
-                        <input 
-                            type="text" value={brand} 
-                            onChange={e => setBrand(e.target.value)} 
-                            placeholder="Brand" className="sidebar-input" 
-                        />
-                        <input 
-                            type="text" value={quantity} 
-                            onChange={e => setQuantity(e.target.value)} 
-                            placeholder="Qty" className="sidebar-input" 
-                        />
-                    </div>
-                    <select 
-                        value={category} 
-                        onChange={e => setCategory(e.target.value)} 
-                        className="sidebar-input"
-                    >
-                        <option value="Altele">Category...</option>
-                        <option value="Lactate">Lactate</option>
-                        <option value="Legume">Legume</option>
-                        <option value="Carne">Carne</option>
-                        <option value="Băuturi">Băuturi</option>
-                        <option value="Dulciuri">Dulciuri</option>
-                    </select>
-                    <label className="recurrence-label">
-                        <input 
-                            type="checkbox" 
-                            checked={isRecurrent} 
-                            onChange={e => setIsRecurrent(e.target.checked)} 
-                        />
-                        Add to frequent items
-                    </label>
-                    <button type="submit" className="sidebar-add-btn">Add to List</button>
-                </form>
-
-                {isLoading ? (
-                    <p style={{ textAlign: 'center', marginTop: '20px' }}>Loading list...</p>
+                {isNewListPage ? (
+                    <>
+                        <p className="list-detail-helper">
+                            Paste a recipe or ingredient list and a new shopping list will be created automatically.
+                        </p>
+                        <div className="ai-import-section">
+                            <textarea
+                                rows={5}
+                                value={recipeText}
+                                onChange={(e) => setRecipeText(e.target.value)}
+                                placeholder="Paste your recipe here (e.g. 2 eggs, milk...)"
+                            />
+                            <button
+                                onClick={handleAiImport}
+                                className="ai-btn"
+                                disabled={isAiLoading}
+                                type="button"
+                            >
+                                {isAiLoading ? "Processing..." : "Generate List"}
+                            </button>
+                        </div>
+                    </>
                 ) : (
-                    <ShoppingListItems items={items} onCheck={handleCheck} />
+                    <>
+                        <form onSubmit={addItem} className="add-item-form-sidebar">
+                            <input
+                                type="text"
+                                value={newItemName}
+                                onChange={(e) => setNewItemName(e.target.value)}
+                                placeholder="Item Name*"
+                                className="sidebar-input"
+                                required
+                            />
+                            <div className="row-inputs">
+                                <input
+                                    type="text"
+                                    value={brand}
+                                    onChange={(e) => setBrand(e.target.value)}
+                                    placeholder="Brand"
+                                    className="sidebar-input"
+                                />
+                                <input
+                                    type="text"
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(e.target.value)}
+                                    placeholder="Qty"
+                                    className="sidebar-input"
+                                />
+                            </div>
+                            <select
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="sidebar-input"
+                            >
+                                <option value="Altele">Category...</option>
+                                <option value="Lactate">Lactate</option>
+                                <option value="Legume">Legume</option>
+                                <option value="Carne">Carne</option>
+                                <option value="Băuturi">Băuturi</option>
+                                <option value="Dulciuri">Dulciuri</option>
+                            </select>
+                            <label className="recurrence-label">
+                                <input
+                                    type="checkbox"
+                                    checked={isRecurrent}
+                                    onChange={(e) => setIsRecurrent(e.target.checked)}
+                                />
+                                Add to frequent items
+                            </label>
+                            <button type="submit" className="sidebar-add-btn">
+                                Add to List
+                            </button>
+                        </form>
+
+                        {isLoading ? (
+                            <p style={{ textAlign: "center", marginTop: "20px" }}>
+                                Loading list...
+                            </p>
+                        ) : (
+                            <ShoppingListItems
+                                items={items}
+                                onCheck={handleCheck}
+                                onDelete={handleDelete}
+                            />
+                        )}
+                    </>
                 )}
             </div>
         </div>
