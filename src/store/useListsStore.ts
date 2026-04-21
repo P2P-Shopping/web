@@ -3,7 +3,25 @@
 // ============================================
 
 import { create } from "zustand";
-import type { ShoppingList, Item } from "../types";
+import type { Item, ShoppingList } from "../types";
+
+const USE_MOCK_LISTS =
+    import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCK_LISTS === "true";
+
+const uuid = () =>
+    globalThis.crypto && "randomUUID" in globalThis.crypto
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const normalizeListFromApi = (list: ShoppingList & { items?: Item[] }) => ({
+    ...list,
+    items: (list.items ?? []).map((item) => ({
+        ...item,
+        checked: Boolean(item.checked),
+    })),
+});
 
 // Mock data for development (without backend)
 const MOCK_LISTS: ShoppingList[] = [
@@ -81,15 +99,15 @@ interface ListsState {
 
     // Actions - Lists
     fetchLists: () => Promise<void>;
-    addList: (name: string) => Promise<void>;
-    updateList: (id: string, updates: Partial<ShoppingList>) => Promise<void>;
-    deleteList: (id: string) => Promise<void>;
+    addList: (name: string) => Promise<boolean>;
+    updateList: (id: string, updates: Partial<ShoppingList>) => void;
+    deleteList: (id: string) => void;
     setCurrentList: (list: ShoppingList | null) => void;
 
     // Actions - Items (within current list)
-    addItem: (listId: string, item: Omit<Item, "id">) => Promise<void>;
-    toggleItem: (listId: string, itemId: string) => Promise<void>;
-    deleteItem: (listId: string, itemId: string) => Promise<void>;
+    addItem: (listId: string, item: Omit<Item, "id">) => void;
+    toggleItem: (listId: string, itemId: string) => void;
+    deleteItem: (listId: string, itemId: string) => void;
 
     // Actions - Modal
     openModal: () => void;
@@ -111,16 +129,55 @@ export const useListsStore = create<ListsState>((set, get) => ({
     fetchLists: async () => {
         set({ isLoading: true, error: null });
         try {
-            // TODO: Replace with actual API call when backend is ready
-            // const response = await fetch(`${import.meta.env.VITE_API_URL}/api/lists`);
-            // const data = await response.json();
+            if (USE_MOCK_LISTS) {
+                await delay(500);
+                const existingLists = get().lists;
+                const existingIds = new Set(
+                    existingLists.map((list) => list.id),
+                );
+                const mergedLists = [
+                    ...existingLists,
+                    ...MOCK_LISTS.filter((list) => !existingIds.has(list.id)),
+                ];
 
-            // Mock delay to simulate API
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            set({ lists: MOCK_LISTS, isLoading: false });
+                set({
+                    lists: mergedLists,
+                    isLoading: false,
+                });
+                return;
+            }
+
+            const baseUrl =
+                import.meta.env.VITE_API_URL ||
+                import.meta.env.VITE_API_BASE_URL ||
+                "http://localhost:8081";
+            const token = localStorage.getItem("token");
+            const headers: HeadersInit = {
+                "Content-Type": "application/json",
+            };
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${baseUrl}/api/lists`, { headers });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch lists (${response.status})`);
+            }
+
+            const data = await response.json();
+            const nextLists = Array.isArray(data)
+                ? data.map(normalizeListFromApi)
+                : [];
+            set({ lists: nextLists, isLoading: false });
         } catch (error) {
             console.error("Failed to fetch lists:", error);
-            set({ error: "Failed to fetch lists", isLoading: false });
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to fetch lists",
+                isLoading: false,
+            });
         }
     },
 
@@ -128,12 +185,14 @@ export const useListsStore = create<ListsState>((set, get) => ({
     addList: async (name: string) => {
         set({ isLoading: true, error: null });
         try {
-            // TODO: Replace with actual API call
-            // await axios.post(`${import.meta.env.VITE_API_URL}/api/lists`, { name });
+            const trimmedName = name.trim();
+            if (!trimmedName) {
+                throw new Error("List name cannot be empty");
+            }
 
             const newList: ShoppingList = {
-                id: crypto.randomUUID(),
-                name,
+                id: uuid(),
+                name: trimmedName,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 status: "active",
@@ -141,20 +200,62 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 ownerName: "Tu",
             };
 
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            if (!USE_MOCK_LISTS) {
+                const baseUrl =
+                    import.meta.env.VITE_API_URL ||
+                    import.meta.env.VITE_API_BASE_URL ||
+                    "http://localhost:8081";
+                const token = localStorage.getItem("token");
+                const response = await fetch(`${baseUrl}/api/lists`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ name: trimmedName }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Failed to create list (${response.status})`,
+                    );
+                }
+
+                const createdList = await response.json();
+                const normalizedList = normalizeListFromApi({
+                    ...newList,
+                    ...createdList,
+                });
+                set((state) => ({
+                    lists: [normalizedList, ...state.lists],
+                    isLoading: false,
+                    isModalOpen: false,
+                }));
+                return true;
+            }
+
+            await delay(300);
             set((state) => ({
                 lists: [newList, ...state.lists],
                 isLoading: false,
                 isModalOpen: false,
             }));
+            return true;
         } catch (error) {
             console.error("Failed to create list:", error);
-            set({ error: "Failed to create list", isLoading: false });
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to create list",
+                isLoading: false,
+            });
+            return false;
         }
     },
 
     // Update existing list
-    updateList: async (id: string, updates: Partial<ShoppingList>) => {
+    updateList: (id: string, updates: Partial<ShoppingList>) => {
         const updatedAt = new Date().toISOString();
         const updateListItem = (list: ShoppingList) => {
             if (list.id !== id) return list;
@@ -166,7 +267,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     },
 
     // Delete list
-    deleteList: async (id: string) => {
+    deleteList: (id: string) => {
         set((state) => ({
             lists: state.lists.filter((list) => list.id !== id),
         }));
@@ -178,8 +279,8 @@ export const useListsStore = create<ListsState>((set, get) => ({
     },
 
     // Add item to a list
-    addItem: async (listId: string, item: Omit<Item, "id">) => {
-        const newItem: Item = { ...item, id: crypto.randomUUID() };
+    addItem: (listId: string, item: Omit<Item, "id">) => {
+        const newItem: Item = { ...item, id: uuid() };
         set((state) => ({
             lists: state.lists.map((list) =>
                 list.id === listId
@@ -194,7 +295,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     },
 
     // Toggle item checked state
-    toggleItem: async (listId: string, itemId: string) => {
+    toggleItem: (listId: string, itemId: string) => {
         const updatedAt = new Date().toISOString();
         const toggleItemInList = (list: ShoppingList) => {
             if (list.id !== listId) return list;
@@ -210,7 +311,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     },
 
     // Delete item from list
-    deleteItem: async (listId: string, itemId: string) => {
+    deleteItem: (listId: string, itemId: string) => {
         const updatedAt = new Date().toISOString();
         const deleteItemFromList = (list: ShoppingList) => {
             if (list.id !== listId) return list;

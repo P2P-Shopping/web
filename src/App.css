@@ -6,6 +6,7 @@
     --lavender: #bca7d6;
     --blue-neon: #00d4ff;
     --red-neon: #ff3366;
+    --green-neon: #4aff9c8c;
     --purple-other: #4a148c;
 
     --navbar-color: var(--indigo-dark);
@@ -17,15 +18,20 @@
 
     --bg-color: var(--purple-dark);
     --card-bg: var(--lavender);
+    --bg-surface: #ffffff;
+    --bg-card: #ffffff;
 
     --text-main: var(--purple-dark);
     --text-secondary: white;
+    --text-primary: #1a1a1a;
+    --text-muted: #666666;
     --text-main-outline: white;
     --text-secondary-outline: var(--purple-dark);
 
     --accent-blue: var(--lavender);
 
     --border-color: #eaeaea;
+    --border-subtle: #f0f0f0;
     --border-secondary-color: black;
 
     --shadow:

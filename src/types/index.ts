@@ -12,8 +12,6 @@ export interface Item {
     category?: string;
     price?: number;
     isRecurrent?: boolean;
-    // Alias for isChecked (API uses checked)
-    isChecked?: boolean;
 }
 
 export interface ShoppingList {

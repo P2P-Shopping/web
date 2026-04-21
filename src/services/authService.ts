@@ -10,10 +10,16 @@ export const loginRequest = async (email: string, password: string) => {
             { email, password },
             { withCredentials: true },
         );
+
+        if (response.data?.token) {
+            localStorage.setItem("token", response.data.token);
+        }
+
         return response.data;
     } catch (error) {
         console.error("Eroare autentificare (Backend Offline):", error);
         if (email === "your@email.com" && password === "12345678") {
+            localStorage.setItem("token", "mock-token");
             return MOCK_USER;
         }
         throw new Error("Date incorecte (Modul Mock)");
@@ -28,9 +34,15 @@ export const registerRequest = async (data: Record<string, unknown>) => {
         );
         return response.data;
     } catch (error) {
-        console.error("Eroare înregistrare (Backend Offline):", error);
-        // Mock fallback for development - auto-succeed
-        console.log("Mock registration:", data);
-        return { message: "User registered successfully (Mock Mode)" };
+        console.error("Eroare înregistrare:", error);
+
+        const useMockAuth =
+            import.meta.env.DEV || import.meta.env.ENABLE_MOCK_AUTH === "true";
+
+        if (useMockAuth) {
+            return { message: "User registered successfully (Mock Mode)" };
+        }
+
+        throw error;
     }
 };
