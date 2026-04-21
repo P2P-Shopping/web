@@ -1,40 +1,47 @@
-/* --- 1. BUTONUL OPEN LIST (Harta) --- */
 .open-list-container {
     position: fixed;
     top: 95px;
-    right: 8%; 
+    right: 8%;
     z-index: 99;
 }
 
 .open-list-btn-modern {
-    background-color: var(--navbar-color); 
+    background-color: var(--navbar-color);
     color: var(--text-secondary);
-    border: 2px solid var(--border-color); 
-    padding: 8px 16px; 
+    border: 2px solid var(--border-color);
+    padding: 8px 16px;
     border-radius: 12px;
     font-weight: 600;
-    font-size: 13px; 
+    font-size: 13px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 8px;
     transition: transform 0.2s;
-    box-shadow: 0 4px 0px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
 }
 
-.open-list-btn-modern:hover { transform: translateY(-2px); }
-.open-list-btn-modern .cart-icon { font-size: 1.2rem; }
+.open-list-btn-modern:hover {
+    transform: translateY(-2px);
+}
 
-/* --- 2. LAYOUT: SIDEBAR (Mod Navigație) --- */
+.open-list-btn-modern .cart-icon {
+    font-size: 1.2rem;
+}
+
+.nav-sidebar-wrapper {
+    min-height: calc(100vh - 80px);
+}
+
 .list-detail-sidebar {
     position: fixed;
-    top: 85px; 
+    top: 85px;
     right: -450px;
     width: 380px;
-    height: calc(100vh - 105px); 
-    background-color: var(--card-bg); 
-    border: 2px solid black; 
-    border-radius: 24px; 
+    height: calc(100vh - 105px);
+    background-color: var(--card-bg);
+    border: 2px solid black;
+    border-radius: 24px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     color: var(--text-main);
     transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -46,10 +53,9 @@
 }
 
 .list-detail-sidebar.open {
-    right: 20px; 
+    right: 20px;
 }
 
-/* --- 3. LAYOUT: PAGINA CENTRATĂ (Mod Listă) --- */
 .full-page-wrapper {
     display: flex;
     justify-content: center;
@@ -70,9 +76,6 @@
     box-sizing: border-box;
 }
 
-/* --- 4. COMPONENTE INTERNE (Comune) --- */
-
-/* Header & Close Button */
 .sidebar-header {
     position: relative;
     display: flex;
@@ -90,7 +93,7 @@
 
 .close-sidebar-btn {
     position: absolute;
-    top: -15px; 
+    top: -15px;
     right: -15px;
     background-color: var(--navbar-color);
     color: var(--text-secondary);
@@ -107,13 +110,12 @@
 }
 
 .close-sidebar-btn:hover {
-    background-color: #ffffff; 
+    background-color: #ffffff;
     border-color: black;
     transform: rotate(90deg) scale(1.1);
     color: rgb(7, 7, 7);
 }
 
-/* Formular Add Item */
 .add-item-form-sidebar {
     display: flex;
     gap: 8px;
@@ -122,7 +124,7 @@
 
 .sidebar-input {
     flex: 1;
-    background: #f4f6f8; 
+    background: #f4f6f8;
     border: 2px solid var(--text-main);
     padding: 12px;
     border-radius: 12px;
@@ -140,7 +142,6 @@
     cursor: pointer;
 }
 
-/* --- 5. STILURI LISTĂ ȘI ELEMENTE --- */
 .shopping-list {
     list-style: none;
     padding: 0;
@@ -151,11 +152,24 @@
 }
 
 .shopping-item {
-    background: white; 
+    background: white;
     border: 2px solid var(--text-main);
     border-radius: 12px;
     margin-bottom: 8px;
     transition: all 0.2s;
+}
+
+.shopping-item.item-completed {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+    transform: scale(0.98);
+}
+
+.shopping-item.item-conflict {
+    border: 1px solid #ff4444;
+    animation: shake 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
 .item-label {
@@ -194,13 +208,9 @@
     top: -1px;
 }
 
-/* Efecte Finalizat */
-.shopping-item.item-completed {
-    background-color: #e9ecef;
-    border-color: #adb5bd;
-    opacity: 0.7;
-    transition: all 0.3s ease;
-    transform: scale(0.98);
+.item-text {
+    font-size: 18px;
+    color: #000000;
 }
 
 .item-completed .item-text {
@@ -209,9 +219,58 @@
     font-weight: 400;
 }
 
+.warning-icon {
+    font-size: 14px;
+    margin-left: 6px;
+    color: #ff4444;
+}
+
 .empty-msg {
     text-align: center;
     color: var(--text-main);
     font-weight: 600;
     margin-top: 20px;
+}
+
+.location-warning-banner {
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+    color: #c53030;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.close-banner-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: bold;
+    color: #c53030;
+}
+
+@keyframes shake {
+    10%,
+    90% {
+        transform: translate3d(-1px, 0, 0);
+    }
+
+    20%,
+    80% {
+        transform: translate3d(2px, 0, 0);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-4px, 0, 0);
+    }
+
+    40%,
+    60% {
+        transform: translate3d(4px, 0, 0);
+    }
 }
