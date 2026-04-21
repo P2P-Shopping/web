@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 
 interface Item {
     id: string;
@@ -16,35 +16,56 @@ interface Props {
 }
 
 const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
-    if (items.length === 0) return <p style={{textAlign:'center', color:'#555', marginTop:'20px'}}>Your list is empty!</p>;
+    if (items.length === 0) {
+        return <p className="empty-msg">Your list is empty!</p>;
+    }
 
     return (
         <ul className="shopping-list">
             {items.map((item) => (
-                <li key={item.id} style={{ 
-                    display: 'flex', padding: '15px', backgroundColor: 'rgba(255,255,255,0.4)', 
-                    borderRadius: '12px', marginBottom: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
-                }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', width: '100%', cursor: 'pointer' }}>
+                <li
+                    key={item.id}
+                    className={`shopping-item ${item.checked ? "item-completed" : ""}`}
+                >
+                    <label className="item-label">
                         <input
-                            type="checkbox" checked={item.checked}
+                            type="checkbox"
+                            className="item-checkbox"
+                            checked={item.checked}
                             onChange={() => onCheck(item.id)}
-                            style={{ width: '18px', height: '18px', marginTop: '4px' }}
                         />
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                            <span style={{ 
-                                fontSize: '16px', fontWeight: 'bold', color: '#2e1a5e',
-                                textDecoration: item.checked ? 'line-through' : 'none',
-                                opacity: item.checked ? 0.6 : 1
-                            }}>
+                        <div>
+                            <span
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "bold",
+                                    color: "#2e1a5e",
+                                    textDecoration: item.checked
+                                        ? "line-through"
+                                        : "none",
+                                    opacity: item.checked ? 0.6 : 1,
+                                }}
+                            >
                                 {item.name}
                             </span>
-                            {/* Metadata - Null Safety */}
-                            <div style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>
+                            <div style={{ fontSize: "12px", color: "#444" }}>
                                 {item.brand && <span>{item.brand}</span>}
-                                {item.quantity && <span> • {item.quantity}</span>}
-                                {item.price != null && <span> • {item.price.toFixed(2)} RON</span>}
-                                {item.category && <span style={{ fontStyle: 'italic', color: '#6c4ab3' }}> [{item.category}]</span>}
+                                {item.quantity && (
+                                    <span> • {item.quantity}</span>
+                                )}
+                                {item.price != null && (
+                                    <span> • {item.price.toFixed(2)} RON</span>
+                                )}
+                                {item.category && (
+                                    <span
+                                        style={{
+                                            fontStyle: "italic",
+                                            color: "#6c4ab3",
+                                        }}
+                                    >
+                                        {` [${item.category}]`}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </label>

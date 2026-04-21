@@ -1,10 +1,10 @@
 import type { StompSubscription } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes, } from "react-router-dom";
-// 2. THIS IS NEW: Import your Navbar from your components/ folder
-import { Navbar } from "./components";
-// 1. Import your pages from your pages/ folder
+import { Navigate, Route, Routes } from "react-router-dom";
+import { Navbar, OfflineBanner } from "./components";
+import { useNetworkState } from "./hooks/useNetworkState";
 import {
+    Dashboard,
     ListDetail,
     LoginPage,
     MapPage,
@@ -17,9 +17,10 @@ import stompClient from "./services/socketService";
 
 import "./App.css";
 function App() {
+    useNetworkState();
+
     const [isConnected, setIsConnected] = useState<boolean>(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
-   // const _location = useLocation();
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const clearToastTimeout = useCallback(() => {
@@ -96,7 +97,7 @@ function App() {
 
     return (
         <div className="app-container">
-            {/* Toast Notification */}
+            <OfflineBanner />
             {toastMessage && (
                 <div
                     style={{
@@ -117,8 +118,6 @@ function App() {
                 </div>
             )}
 
-            {/* 3. THIS IS NEW: Drop in your reusable Navbar component! 
-          We pass it the variables it needs to make the Ping button work. */}
             <Navbar
                 isConnected={isConnected}
                 handlePingPress={handlePingPress}
@@ -145,6 +144,7 @@ function App() {
                         }
                     />
                     <Route path="/map" element={<MapPage />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/nav/:id?" element={<StoreMap />} />
                     <Route path="/route" element={<RoutePage />} />
                     <Route path="/list/:id" element={<ListDetail />} />

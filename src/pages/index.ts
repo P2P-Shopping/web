@@ -1,3 +1,4 @@
+export { default as Dashboard } from "./Dashboard/Dashboard";
 export { default as ListDetail } from "./ListDetail/ListDetail";
 export { default as LoginPage } from "./LoginPage/LoginPage";
 export { default as MapPage } from "./MapPage/MapPage";
