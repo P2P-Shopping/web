@@ -1,3 +1,4 @@
+import { Check, Trash2 } from "lucide-react";
 import type React from "react";
 
 interface Item {
@@ -44,21 +45,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                             className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all shrink-0 ${item.checked ? "bg-success border-success" : "bg-surface border-border-strong group-hover:border-accent"}`}
                         >
                             {item.checked && (
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    width="14"
-                                    height="14"
-                                    stroke="white"
-                                    strokeWidth="4"
-                                    fill="none"
-                                    role="img"
-                                    aria-labelledby={`check-icon-${item.id}`}
-                                >
-                                    <title id={`check-icon-${item.id}`}>
-                                        Checked
-                                    </title>
-                                    <path d="M20 6L9 17L4 12" />
-                                </svg>
+                                <Check size={14} strokeWidth={4} className="text-white" />
                             )}
                         </div>
                         <div className="flex flex-col min-w-0">
@@ -100,21 +87,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                             }}
                             aria-label="Remove item"
                         >
-                            <svg
-                                viewBox="0 0 24 24"
-                                width="18"
-                                height="18"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                fill="none"
-                                role="img"
-                                aria-labelledby={`remove-icon-${item.id}`}
-                            >
-                                <title id={`remove-icon-${item.id}`}>
-                                    Șterge
-                                </title>
-                                <path d="M18 6L6 18M6 6l12 12" />
-                            </svg>
+                            <Trash2 size={18} />
                         </button>
                     )}
                 </li>

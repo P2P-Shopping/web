@@ -1,3 +1,4 @@
+import { WifiOff, Unplug } from "lucide-react";
 import type React from "react";
 import { useStore } from "../../context/useStore";
 
@@ -18,9 +19,9 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
     if (!isOnline) {
         return (
             <div
-                className={`fixed left-0 right-0 z-100 flex items-center justify-center gap-2 py-2 px-4 bg-danger text-white text-sm font-bold shadow-lg animate-in slide-in-from-top duration-300 ${hasNavbar ? "top-[60px]" : "top-0"}`}
+                className="fixed left-0 right-0 top-0 z-100 flex items-center justify-center gap-2 py-2 px-4 bg-danger text-white text-sm font-bold shadow-lg animate-in slide-in-from-top duration-300"
             >
-                <span className="text-base">⚠️</span>
+                <WifiOff size={16} />
                 <span>Working Offline (No Internet)</span>
             </div>
         );
@@ -29,9 +30,9 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
     if (!isServerConnected) {
         return (
             <div
-                className={`fixed left-0 right-0 z-100 flex items-center justify-center gap-2 py-2 px-4 bg-warning text-white text-sm font-bold shadow-lg animate-in slide-in-from-top duration-300 ${hasNavbar ? "top-[60px]" : "top-0"}`}
+                className="fixed left-0 right-0 top-0 z-100 flex items-center justify-center gap-2 py-2 px-4 bg-warning text-white text-sm font-bold shadow-lg animate-in slide-in-from-top duration-300"
             >
-                <span className="text-base">🔌</span>
+                <Unplug size={16} />
                 <span>Server Connection Lost</span>
             </div>
         );

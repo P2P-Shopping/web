@@ -1,4 +1,12 @@
 import {
+    Check,
+    ChevronLeft,
+    Plus,
+    Search,
+    Send,
+    Trash2,
+} from "lucide-react";
+import {
     type MouseEvent,
     type ReactNode,
     useEffect,
@@ -120,6 +128,7 @@ const Dashboard = () => {
                     className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
                     onClick={openModal}
                 >
+                    <Plus size={20} />
                     Create a List
                 </button>
             </div>
@@ -149,9 +158,6 @@ const Dashboard = () => {
                         >
                             <div className="flex justify-between items-start gap-3">
                                 <div className="flex-1 min-w-0 pr-12">
-                                    {/* <p className="text-[10px] font-bold tracking-widest uppercase text-accent mb-1.5 opacity-80">
-                                        Listă partajată
-                                    </p> */}
                                     <h3 className="text-lg font-bold text-text-strong leading-tight break-words">
                                         {list.name}
                                     </h3>
@@ -186,7 +192,7 @@ const Dashboard = () => {
                                                     aria-hidden="true"
                                                 >
                                                     {item.checked && (
-                                                        <span className="w-[9px] h-[5px] border-l-2 border-b-2 border-white -rotate-45 -translate-y-px" />
+                                                        <Check size={12} strokeWidth={4} className="text-white" />
                                                     )}
                                                 </span>
                                                 <span
@@ -217,22 +223,7 @@ const Dashboard = () => {
                             title="Șterge lista"
                             aria-label="Șterge lista"
                         >
-                            <svg
-                                viewBox="0 0 24 24"
-                                width="16"
-                                height="16"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                fill="none"
-                                role="img"
-                                aria-labelledby={`delete-title-${list.id}`}
-                            >
-                                <title id={`delete-title-${list.id}`}>
-                                    Șterge
-                                </title>
-                                <polyline points="3,6 5,6 21,6" />
-                                <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2" />
-                            </svg>
+                            <Trash2 size={16} />
                         </button>
                     </div>
                 ))}
@@ -243,7 +234,7 @@ const Dashboard = () => {
     return (
         <div className="flex flex-col bg-bg">
             {/* Header */}
-            <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-[60px] z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
+            <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
                 {selectedList ? (
                     <>
                         <button
@@ -252,19 +243,7 @@ const Dashboard = () => {
                             onClick={clearSelectedList}
                             aria-label="Înapoi la liste"
                         >
-                            <svg
-                                viewBox="0 0 24 24"
-                                width="20"
-                                height="20"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                fill="none"
-                                role="img"
-                                aria-labelledby="back-title"
-                            >
-                                <title id="back-title">Înapoi</title>
-                                <path d="M15 18l-6-6 6-6" />
-                            </svg>
+                            <ChevronLeft size={20} />
                         </button>
                         <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
                             {selectedList.name}
@@ -275,47 +254,14 @@ const Dashboard = () => {
                                 className="inline-flex items-center gap-1.5 px-3.5 py-2 border-1.5 border-border-strong rounded-md bg-bg-muted text-text-strong text-sm font-semibold transition-all duration-200 ease-out hover:bg-surface hover:border-border-strong shrink-0"
                                 onClick={() => setShowStoresModal(true)}
                             >
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    width="18"
-                                    height="18"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    fill="none"
-                                    role="img"
-                                    aria-labelledby="find-stores-title"
-                                >
-                                    <title id="find-stores-title">
-                                        Caută magazine
-                                    </title>
-                                    <circle cx="11" cy="11" r="8" />
-                                    <line
-                                        x1="21"
-                                        y1="21"
-                                        x2="16.65"
-                                        y2="16.65"
-                                    />
-                                </svg>
+                                <Search size={18} />
                                 <span>Find Stores</span>
                             </button>
                             <button
                                 type="button"
                                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-text-strong text-bg text-sm font-semibold transition-all duration-200 ease-out hover:opacity-85 hover:-translate-y-px shrink-0 active:translate-y-0"
                             >
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    width="18"
-                                    height="18"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    fill="none"
-                                    role="img"
-                                    aria-labelledby="navigate-title"
-                                >
-                                    <title id="navigate-title">Navigare</title>
-                                    <line x1="22" y1="2" x2="11" y2="13" />
-                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                                </svg>
+                                <Send size={18} />
                                 <span>Navigate</span>
                             </button>
                         </div>
@@ -335,20 +281,7 @@ const Dashboard = () => {
                             className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:w-full max-[600px]:justify-center"
                             onClick={openModal}
                         >
-                            <svg
-                                viewBox="0 0 24 24"
-                                width="20"
-                                height="20"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                fill="none"
-                                role="img"
-                                aria-labelledby="new-list-title"
-                            >
-                                <title id="new-list-title">Listă nouă</title>
-                                <line x1="12" y1="5" x2="12" y2="19" />
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
+                            <Plus size={20} />
                             New List
                         </button>
                     </>

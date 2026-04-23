@@ -1,48 +1,127 @@
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { 
+    LayoutDashboard, 
+    Sparkles, 
+    Route as RouteIcon, 
+    MapPinned, 
+    Map, 
+    MoreHorizontal,
+    X
+} from "lucide-react";
 import { ThemeSwitcher } from "..";
 
 const NAV_LINKS = [
-    { to: "/dashboard", label: "My Lists" },
-    { to: "/list/default", label: "AI Import" },
-    { to: "/route", label: "Route" },
-    { to: "/nav", label: "Store Map" },
-    { to: "/map", label: "Map" },
+    { to: "/dashboard", label: "My Lists", icon: LayoutDashboard },
+    { to: "/list/default", label: "AI Import", icon: Sparkles },
+    { to: "/route", label: "Route", icon: RouteIcon },
+    { to: "/nav", label: "Store Map", icon: MapPinned },
+    { to: "/map", label: "Map", icon: Map },
 ];
 
 export default function Navbar() {
     const { pathname } = useLocation();
+    const [isMoreOpen, setIsMoreOpen] = useState(false);
+    const moreMenuRef = useRef<HTMLDivElement>(null);
+
+    // Close more menu when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+                setIsMoreOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Close more menu on navigation
+    useEffect(() => {
+        setIsMoreOpen(false);
+    }, [pathname]);
+
+    // Split links into priority (visible) and extra (in more menu)
+    // On mobile we might want fewer visible items. Let's show 4 + More.
+    const priorityLinks = NAV_LINKS.slice(0, 4);
+    const extraLinks = NAV_LINKS.slice(4);
 
     return (
-        <header className="sticky top-0 z-100 bg-surface/80 backdrop-blur-md border-b border-border h-[60px] flex items-center">
-            <div className="max-w-[1200px] w-full mx-auto px-7 flex items-center justify-between gap-6">
-                <Link to="/dashboard" className="flex items-center group">
-                    <span className="text-xl font-black text-text-strong tracking-tighter group-hover:text-accent transition-colors">
-                        P2P Shopping
-                    </span>
-                </Link>
-
-                <nav
-                    className="flex items-center gap-1 overflow-x-auto scrollbar-none"
-                    aria-label="Main navigation"
-                >
-                    {NAV_LINKS.map(({ to, label }) => (
-                        <Link
-                            key={to}
-                            to={to}
-                            className={`px-3 py-2 rounded-md text-sm font-semibold transition-all whitespace-nowrap ${
-                                pathname.startsWith(to)
-                                    ? "text-accent bg-accent-subtle"
-                                    : "text-text-muted hover:text-text-strong hover:bg-bg-muted"
-                            }`}
-                        >
+        <nav className="fixed bottom-0 left-0 right-0 z-100 bg-surface/80 backdrop-blur-xl border-t border-border h-[72px] pb-safe flex items-center shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+            <div className="max-w-[600px] w-full mx-auto px-4 flex items-center justify-around relative">
+                {priorityLinks.map(({ to, label, icon: Icon }) => (
+                    <Link
+                        key={to}
+                        to={to}
+                        className={`flex flex-col items-center gap-1 group relative py-1 px-3 transition-all duration-300 ${
+                            pathname.startsWith(to)
+                                ? "text-accent"
+                                : "text-text-muted hover:text-text-strong"
+                        }`}
+                    >
+                        <div className={`p-2 rounded-xl transition-all duration-300 ${
+                            pathname.startsWith(to) 
+                                ? "bg-accent-subtle scale-110 shadow-[0_0_20px_var(--color-accent-glow)]" 
+                                : "group-hover:bg-bg-muted"
+                        }`}>
+                            <Icon size={22} strokeWidth={pathname.startsWith(to) ? 2.5 : 2} />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider">
                             {label}
-                        </Link>
-                    ))}
-                    <div className="ml-4 pl-4 border-l border-border/50 flex items-center">
-                        <ThemeSwitcher />
+                        </span>
+                        {pathname.startsWith(to) && (
+                            <div className="absolute -top-1 w-1 h-1 bg-accent rounded-full animate-in fade-in zoom-in duration-300" />
+                        )}
+                    </Link>
+                ))}
+
+                {/* More Menu Toggle */}
+                <button
+                    type="button"
+                    onClick={() => setIsMoreOpen(!isMoreOpen)}
+                    className={`flex flex-col items-center gap-1 group py-1 px-3 transition-all duration-300 ${
+                        isMoreOpen ? "text-accent" : "text-text-muted hover:text-text-strong"
+                    }`}
+                >
+                    <div className={`p-2 rounded-xl transition-all duration-300 ${
+                        isMoreOpen ? "bg-accent-subtle scale-110" : "group-hover:bg-bg-muted"
+                    }`}>
+                        {isMoreOpen ? <X size={22} /> : <MoreHorizontal size={22} />}
                     </div>
-                </nav>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                        More
+                    </span>
+                </button>
+
+                {/* More Menu Content */}
+                {isMoreOpen && (
+                    <div 
+                        ref={moreMenuRef}
+                        className="absolute bottom-[84px] right-4 bg-surface border border-border rounded-2xl p-2 shadow-2xl min-w-[180px] animate-in slide-in-from-bottom-4 fade-in duration-300"
+                    >
+                        <div className="flex flex-col gap-1">
+                            {extraLinks.map(({ to, label, icon: Icon }) => (
+                                <Link
+                                    key={to}
+                                    to={to}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                                        pathname.startsWith(to)
+                                            ? "text-accent bg-accent-subtle font-bold"
+                                            : "text-text-muted hover:text-text-strong hover:bg-bg-muted"
+                                    }`}
+                                >
+                                    <Icon size={20} />
+                                    <span className="text-sm">{label}</span>
+                                </Link>
+                            ))}
+                            <div className="h-px bg-border my-1" />
+                            <div className="px-4 py-2 flex items-center justify-between">
+                                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Theme</span>
+                                <ThemeSwitcher />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-        </header>
+        </nav>
     );
 }

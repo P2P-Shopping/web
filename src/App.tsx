@@ -117,12 +117,12 @@ function App() {
                 </div>
             )}
 
-            <main className="flex-1 flex flex-col">
+            <main className={`flex-1 flex flex-col ${showNavbar ? "pb-[72px]" : ""}`}>
                 <Routes>
                     <Route
                         path="/login"
                         element={
-                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-[calc(100svh-60px)]">
+                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
                                 <LoginPage />
                             </div>
                         }
@@ -130,7 +130,7 @@ function App() {
                     <Route
                         path="/register"
                         element={
-                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-[calc(100svh-60px)]">
+                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
                                 <RegistrationPage
                                     onAuthSuccess={handleAuthSuccess}
                                 />

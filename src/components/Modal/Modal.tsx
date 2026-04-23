@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 
 interface ModalProps {
@@ -111,20 +112,7 @@ export default function Modal({
                         onClick={onClose}
                         aria-label="Close"
                     >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="20"
-                            height="20"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            fill="none"
-                            role="img"
-                            aria-labelledby="close-modal-title"
-                        >
-                            <title id="close-modal-title">Închide</title>
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
+                        <X size={20} />
                     </button>
                 </div>
 

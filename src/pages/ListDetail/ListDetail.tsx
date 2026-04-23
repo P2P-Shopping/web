@@ -1,3 +1,4 @@
+import { ChevronDown, Plus, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Modal } from "../../components";
@@ -458,20 +459,7 @@ const ListDetail = ({
                                 type="submit"
                                 className="inline-flex items-center gap-1.5 px-4 py-1.5 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all duration-200 hover:opacity-85 hover:-translate-y-px active:translate-y-0 shrink-0 whitespace-nowrap"
                             >
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    width="16"
-                                    height="16"
-                                    stroke="currentColor"
-                                    strokeWidth="2.5"
-                                    fill="none"
-                                    role="img"
-                                    aria-labelledby="add-icon-desktop"
-                                >
-                                    <title id="add-icon-desktop">Adaugă</title>
-                                    <line x1="12" y1="5" x2="12" y2="19" />
-                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                </svg>
+                                <Plus size={16} strokeWidth={2.5} />
                                 Add
                             </button>
                         </form>
@@ -500,24 +488,11 @@ const ListDetail = ({
             {/* Mobile FAB */}
             <button
                 type="button"
-                className="hidden max-[600px]:flex fixed bottom-6 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
+                className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
                 onClick={() => setShowMobileAddModal(true)}
                 aria-label="Add Item"
             >
-                <svg
-                    viewBox="0 0 24 24"
-                    width="28"
-                    height="28"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    fill="none"
-                    role="img"
-                    aria-labelledby="add-icon-mobile"
-                >
-                    <title id="add-icon-mobile">Adaugă Produs</title>
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+                <Plus size={28} strokeWidth={3} />
             </button>
 
             {/* ── Mobile Add Item Modal ── */}
@@ -578,27 +553,15 @@ const ListDetail = ({
                         {showExpandedDetails
                             ? "Mai puține detalii"
                             : "Adaugă detalii (cantitate, preț...)"}
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="16"
-                            height="16"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="none"
+                        <ChevronDown
+                            size={16}
                             className="transition-transform duration-200"
                             style={{
                                 transform: showExpandedDetails
                                     ? "rotate(180deg)"
                                     : "none",
                             }}
-                            role="img"
-                            aria-labelledby="expand-details-icon"
-                        >
-                            <title id="expand-details-icon">
-                                {showExpandedDetails ? "Restrânge" : "Extinde"}
-                            </title>
-                            <path d="M6 9l6 6 6-6" />
-                        </svg>
+                        />
                     </button>
 
                     {showExpandedDetails && (
@@ -801,22 +764,7 @@ const ListDetail = ({
                                 type="button"
                                 className="inline-flex items-center gap-1.5 px-4 py-2 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all hover:opacity-80 hover:-translate-y-px active:translate-y-0 shrink-0"
                             >
-                                <svg
-                                    viewBox="0 0 24 24"
-                                    width="15"
-                                    height="15"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    fill="none"
-                                    role="img"
-                                    aria-labelledby={`go-store-${store.id}`}
-                                >
-                                    <title id={`go-store-${store.id}`}>
-                                        Navighează la magazin
-                                    </title>
-                                    <line x1="22" y1="2" x2="11" y2="13" />
-                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                                </svg>
+                                <Send size={15} />
                                 Go
                             </button>
                         </div>
