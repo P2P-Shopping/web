@@ -3,8 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import ListDetail from "../ListDetail/ListDetail";
 
-import "./StoreMap.css";
-
 interface Coordinate {
     lat: number;
     lng: number;
@@ -318,11 +316,14 @@ const useMapEngine = (
         const rootStyles = getComputedStyle(document.documentElement);
         const theme: ThemeColors = {
             product:
-                rootStyles.getPropertyValue("--red-neon").trim() || "#FF3366",
+                rootStyles.getPropertyValue("--color-accent").trim() ||
+                "#FF3366",
             user:
-                rootStyles.getPropertyValue("--blue-neon").trim() || "#00D4FF",
+                rootStyles.getPropertyValue("--color-blue-neon").trim() ||
+                "#00D4FF",
             route:
-                rootStyles.getPropertyValue("--green-neon").trim() || "#00FF66",
+                rootStyles.getPropertyValue("--color-green-neon").trim() ||
+                "#00FF66",
         };
 
         let animationFrameId: number;
@@ -416,7 +417,7 @@ const useMapEngine = (
                     ctx.fill();
 
                     ctx.fillStyle = "white";
-                    ctx.font = `${12 / camera.current.zoom}px Arial`;
+                    ctx.font = `bold ${12 / camera.current.zoom}px Outfit, sans-serif`;
                     ctx.fillText(
                         product.name,
                         x + 12 / camera.current.zoom,
@@ -457,7 +458,6 @@ const useMapEngine = (
     useEffect(() => {
         if (!("geolocation" in navigator)) {
             setGpsError("Geolocation is not supported by your browser.");
-            // Fallback for development if needed
             const newCoords = USER_GPS_DEFAULT;
             originGps.current = { ...newCoords };
             targetGps.current = { ...newCoords };
@@ -487,21 +487,7 @@ const useMapEngine = (
             },
             (error) => {
                 console.warn("GPS Error:", error.message);
-
-                if (error.code === error.PERMISSION_DENIED) {
-                    setGpsError(
-                        "Location access denied. Please allow GPS to use the map.",
-                    );
-                } else if (error.code === error.TIMEOUT) {
-                    setGpsError(
-                        "GPS signal lost. Make sure you are outside or have clear sky view.",
-                    );
-                } else {
-                    setGpsError("Unable to acquire GPS signal.");
-                }
-
                 if (isFirstLocationUpdate.current) {
-                    // Fallback for testing
                     const newCoords = USER_GPS_DEFAULT;
                     originGps.current = { ...newCoords };
                     targetGps.current = { ...newCoords };
@@ -682,28 +668,43 @@ const StoreMap: React.FC = () => {
 
     if (!hasLocationLock) {
         return (
-            <div className="map-loading-screen">
-                <h2>{gpsError ? gpsError : "Acquiring GPS Signal... 🛰️"}</h2>
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4 bg-bg">
+                <div className="w-12 h-12 border-4 border-border border-t-accent rounded-full animate-spin" />
+                <h2 className="text-xl font-bold text-text-strong tracking-tight">
+                    {gpsError ? gpsError : "Acquiring GPS Signal... 🛰️"}
+                </h2>
             </div>
         );
     }
 
     return (
-        <div className={`mapContainer ${isDragging ? "dragging" : ""}`}>
+        <div
+            className={`relative flex-1 h-[calc(100svh-60px)] overflow-hidden bg-bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+        >
             {isRouting && (
-                <div className="routing-loader">Calculating route...</div>
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-text-strong text-bg rounded-full text-xs font-bold shadow-lg animate-pulse">
+                    Calculating route...
+                </div>
             )}
-            <canvas ref={canvasRef} className="map-canvas" {...handlers} />
+
+            <canvas
+                ref={canvasRef}
+                className="w-full h-full block bg-bg-muted"
+                {...handlers}
+            />
 
             {gpsError && (
-                <div className="map-status-banner" role="status">
+                <div
+                    className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
+                    role="status"
+                >
                     {gpsError}
                 </div>
             )}
 
             <button
                 type="button"
-                className="recenter-button"
+                className="absolute bottom-6 left-6 z-20 px-6 py-3 bg-accent text-text-on-accent rounded-full text-xs font-black tracking-widest shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
                 onClick={(e) => {
                     e.stopPropagation();
                     recenterCamera();
@@ -712,7 +713,9 @@ const StoreMap: React.FC = () => {
                 RECENTER
             </button>
 
-            <ListDetail isEmbedded={true} />
+            <div className="absolute top-0 right-0 bottom-0 w-[400px] bg-surface/90 backdrop-blur-md border-l border-border shadow-2xl z-10 overflow-y-auto max-[1000px]:hidden">
+                <ListDetail isEmbedded={true} />
+            </div>
         </div>
     );
 };

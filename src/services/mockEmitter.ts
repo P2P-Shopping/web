@@ -15,7 +15,7 @@ export const startMockEmitter = () => {
         window.crypto.getRandomValues(randArray);
         const randLat = randArray[0] / 4294967295;
         const randLng = randArray[1] / 4294967295;
-        
+
         currentLat += (randLat - 0.5) * 0.00005;
         currentLng += (randLng - 0.5) * 0.00005;
 

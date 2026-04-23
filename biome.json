@@ -27,6 +27,14 @@
             "quoteStyle": "double"
         }
     },
+    "css": {
+        "formatter": {
+            "enabled": true
+        },
+        "parser": {
+            "tailwindDirectives": true
+        }
+    },
     "assist": {
         "enabled": true,
         "actions": {

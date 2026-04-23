@@ -11,7 +11,6 @@ import type { Item } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
-import "./Dashboard.css";
 
 const Dashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -96,22 +95,26 @@ const Dashboard = () => {
     let mainContent: ReactNode;
     if (isLoading) {
         mainContent = (
-            <div className="loading-state">
-                <div className="spinner" />
+            <div className="flex flex-col items-center justify-center gap-4 py-20 text-text-muted text-sm">
+                <div className="w-9 h-9 border-3 border-border border-t-accent rounded-full animate-spin" />
                 <p>Se încarcă listele...</p>
             </div>
         );
     } else if (lists.length === 0) {
         mainContent = (
-            <div className="empty-state">
-                <span className="empty-state-icon" aria-hidden="true">
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-2.5">
+                <span className="text-5xl mb-2 opacity-60" aria-hidden="true">
                     🛒
                 </span>
-                <h2>No lists yet</h2>
-                <p>Create your first shared shopping list!</p>
+                <h2 className="text-xl text-text-strong font-bold">
+                    No lists yet
+                </h2>
+                <p className="text-sm text-text-muted mb-4">
+                    Create your first shared shopping list!
+                </p>
                 <button
                     type="button"
-                    className="create-btn-primary"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
                     onClick={openModal}
                 >
                     Create a List
@@ -120,7 +123,7 @@ const Dashboard = () => {
         );
     } else if (selectedList) {
         mainContent = (
-            <div className="selected-list-view">
+            <div className="max-w-[860px] mx-auto w-full">
                 <ListDetail
                     listIdOverride={selectedList.id}
                     listTitle={selectedList.name}
@@ -132,93 +135,102 @@ const Dashboard = () => {
         );
     } else {
         mainContent = (
-            <div className="lists-grid">
+            <div className="flex flex-wrap gap-5">
                 {lists.map((list) => (
-                    <div key={list.id} className="list-card-shell">
-                        <div
-                            className="list-card"
+                    <div
+                        key={list.id}
+                        className="relative flex-1 min-w-[300px] max-w-[400px] group"
+                    >
+                        <button
+                            type="button"
+                            className="w-full text-left relative bg-surface border border-border rounded-xl p-[22px_22px_18px] cursor-pointer transition-all duration-200 ease-out hover:border-accent-border hover:shadow-md hover:shadow-accent-glow/20 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 flex flex-col gap-[18px] outline-none"
                             onClick={() => handleCardClick(list.id)}
-                            onKeyUp={(e) =>
-                                e.key === "Enter" && handleCardClick(list.id)
-                            }
-                            tabIndex={0}
-                            role="button"
                             aria-label={`Deschide lista ${list.name}`}
                         >
-                            <div className="card-header">
-                                <div className="card-title-group">
-                                    <p className="card-kicker">
+                            <div className="flex justify-between items-start gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-bold tracking-widest uppercase text-accent mb-1.5 opacity-80">
                                         Listă partajată
                                     </p>
-                                    <h3>{list.name}</h3>
+                                    <h3 className="text-lg font-bold text-text-strong leading-tight break-words pr-8">
+                                        {list.name}
+                                    </h3>
                                 </div>
-                                <div className="card-actions">
-                                    <span className="updated-pill">
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className="px-2.5 py-1 rounded-full bg-bg-muted text-text-muted text-[11px] font-semibold border border-border whitespace-nowrap">
                                         {formatDate(list.updatedAt)}
                                     </span>
-                                    <button
-                                        type="button"
-                                        className="delete-btn"
-                                        onClick={(e) =>
-                                            handleDeleteList(
-                                                e,
-                                                list.id,
-                                                list.name,
-                                            )
-                                        }
-                                        title="Șterge lista"
-                                        aria-label="Șterge lista"
-                                    >
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            width="16"
-                                            height="16"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            fill="none"
-                                            aria-hidden="true"
-                                        >
-                                            <polyline points="3,6 5,6 21,6" />
-                                            <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2" />
-                                        </svg>
-                                    </button>
                                 </div>
                             </div>
 
-                            <div className="card-body">
-                                <div className="list-stats">
-                                    <span className="stat stat-pill">
+                            <div className="flex flex-col gap-3.5">
+                                <div className="flex flex-wrap gap-1.5">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
                                         {getItemsCount(list.items)}
                                     </span>
-                                    <span className="stat stat-pill">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
                                         {list.ownerName || "Tu"}
                                     </span>
                                 </div>
 
-                                <div className="items-preview">
+                                <div className="flex flex-col gap-1.5">
                                     {list.items.slice(0, 3).map((item) => (
                                         <div
                                             key={item.id}
-                                            className={`item-preview ${item.checked ? "checked" : ""}`}
+                                            className={`flex items-center gap-2.5 p-[8px_12px] rounded-md bg-bg-subtle border border-border text-sm text-text transition-colors duration-200 ease-out ${item.checked ? "opacity-55" : ""}`}
                                         >
                                             <span
-                                                className="checkbox-icon"
+                                                className={`w-[18px] h-[18px] border-2 border-border-strong rounded-[5px] shrink-0 flex items-center justify-center transition-all ${item.checked ? "bg-success border-success" : "bg-surface"}`}
                                                 aria-hidden="true"
-                                            />
-                                            <span className="item-name">
+                                            >
+                                                {item.checked && (
+                                                    <span className="w-[9px] h-[5px] border-l-2 border-b-2 border-white -rotate-45 -translate-y-px" />
+                                                )}
+                                            </span>
+                                            <span
+                                                className={`flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${item.checked ? "line-through" : ""}`}
+                                            >
                                                 {item.name}
                                             </span>
                                         </div>
                                     ))}
                                     {list.items.length > 3 && (
-                                        <div className="more-items">
+                                        <div className="text-[12px] text-text-muted px-3 font-italic">
                                             +{list.items.length - 3} produse în
                                             plus
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        </div>
+                        </button>
+
+                        {/* Delete Button (Separate from card button to avoid nesting) */}
+                        <button
+                            type="button"
+                            className="absolute top-5 right-5 flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 z-10"
+                            onClick={(e) =>
+                                handleDeleteList(e, list.id, list.name)
+                            }
+                            title="Șterge lista"
+                            aria-label="Șterge lista"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                fill="none"
+                                role="img"
+                                aria-labelledby={`delete-title-${list.id}`}
+                            >
+                                <title id={`delete-title-${list.id}`}>
+                                    Șterge
+                                </title>
+                                <polyline points="3,6 5,6 21,6" />
+                                <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2" />
+                            </svg>
+                        </button>
                     </div>
                 ))}
             </div>
@@ -226,15 +238,16 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="dashboard">
+        <div className="flex flex-col bg-bg">
             {/* Header */}
-            <header className="dashboard-header">
+            <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-[60px] z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
                 {selectedList ? (
                     <>
                         <button
                             type="button"
-                            className="back-to-lists-btn"
+                            className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
                             onClick={clearSelectedList}
+                            aria-label="Înapoi la liste"
                         >
                             <svg
                                 viewBox="0 0 24 24"
@@ -243,18 +256,20 @@ const Dashboard = () => {
                                 stroke="currentColor"
                                 strokeWidth="2"
                                 fill="none"
-                                aria-hidden="true"
+                                role="img"
+                                aria-labelledby="back-title"
                             >
+                                <title id="back-title">Înapoi</title>
                                 <path d="M15 18l-6-6 6-6" />
                             </svg>
                         </button>
-                        <h1 className="list-header-title">
+                        <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
                             {selectedList.name}
                         </h1>
-                        <div className="toolbar-actions">
+                        <div className="flex items-center gap-2 shrink-0 max-[600px]:w-full max-[600px]:justify-between">
                             <button
                                 type="button"
-                                className="toolbar-find-stores-btn"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 border-1.5 border-border-strong rounded-md bg-bg-muted text-text-strong text-sm font-semibold transition-all duration-200 ease-out hover:bg-surface hover:border-border-strong shrink-0"
                                 onClick={() => setShowStoresModal(true)}
                             >
                                 <svg
@@ -264,8 +279,12 @@ const Dashboard = () => {
                                     stroke="currentColor"
                                     strokeWidth="2"
                                     fill="none"
-                                    aria-hidden="true"
+                                    role="img"
+                                    aria-labelledby="find-stores-title"
                                 >
+                                    <title id="find-stores-title">
+                                        Caută magazine
+                                    </title>
                                     <circle cx="11" cy="11" r="8" />
                                     <line
                                         x1="21"
@@ -278,7 +297,7 @@ const Dashboard = () => {
                             </button>
                             <button
                                 type="button"
-                                className="toolbar-navigate-btn"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-text-strong text-bg text-sm font-semibold transition-all duration-200 ease-out hover:opacity-85 hover:-translate-y-px shrink-0 active:translate-y-0"
                             >
                                 <svg
                                     viewBox="0 0 24 24"
@@ -287,8 +306,10 @@ const Dashboard = () => {
                                     stroke="currentColor"
                                     strokeWidth="2"
                                     fill="none"
-                                    aria-hidden="true"
+                                    role="img"
+                                    aria-labelledby="navigate-title"
                                 >
+                                    <title id="navigate-title">Navigare</title>
                                     <line x1="22" y1="2" x2="11" y2="13" />
                                     <polygon points="22 2 15 22 11 13 2 9 22 2" />
                                 </svg>
@@ -298,15 +319,17 @@ const Dashboard = () => {
                     </>
                 ) : (
                     <>
-                        <div className="header-content">
-                            <h1>My Lists</h1>
-                            <p className="subtitle">
+                        <div className="flex flex-col">
+                            <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
+                                My Lists
+                            </h1>
+                            <p className="text-[13px] text-text-muted mt-0.5">
                                 {`${lists.length} ${lists.length === 1 ? "list" : "lists"}`}
                             </p>
                         </div>
                         <button
                             type="button"
-                            className="create-btn"
+                            className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:w-full max-[600px]:justify-center"
                             onClick={openModal}
                         >
                             <svg
@@ -316,8 +339,10 @@ const Dashboard = () => {
                                 stroke="currentColor"
                                 strokeWidth="2"
                                 fill="none"
-                                aria-hidden="true"
+                                role="img"
+                                aria-labelledby="new-list-title"
                             >
+                                <title id="new-list-title">Listă nouă</title>
                                 <line x1="12" y1="5" x2="12" y2="19" />
                                 <line x1="5" y1="12" x2="19" y2="12" />
                             </svg>
@@ -328,7 +353,9 @@ const Dashboard = () => {
             </header>
 
             {/* Content */}
-            <main className="dashboard-content">{mainContent}</main>
+            <main className="flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4">
+                {mainContent}
+            </main>
 
             {/* Create List Modal */}
             {isModalOpen && <CreateListModal onClose={closeModal} />}

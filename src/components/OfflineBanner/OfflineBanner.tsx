@@ -1,6 +1,5 @@
 import type React from "react";
 import { useStore } from "../../context/useStore";
-import "./OfflineBanner.css";
 
 interface OfflineBannerProps {
     hasNavbar?: boolean;
@@ -18,11 +17,11 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
 
     if (!isOnline) {
         return (
-            <div className={`offline-banner ${hasNavbar ? "with-navbar" : ""}`}>
-                <span className="offline-icon">⚠️</span>
-                <span className="offline-text">
-                    Working Offline (No Internet)
-                </span>
+            <div
+                className={`fixed left-0 right-0 z-100 flex items-center justify-center gap-2 py-2 px-4 bg-danger text-white text-sm font-bold shadow-lg animate-in slide-in-from-top duration-300 ${hasNavbar ? "top-[60px]" : "top-0"}`}
+            >
+                <span className="text-base">⚠️</span>
+                <span>Working Offline (No Internet)</span>
             </div>
         );
     }
@@ -30,10 +29,10 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
     if (!isServerConnected) {
         return (
             <div
-                className={`offline-banner server-disconnected ${hasNavbar ? "with-navbar" : ""}`}
+                className={`fixed left-0 right-0 z-100 flex items-center justify-center gap-2 py-2 px-4 bg-warning text-white text-sm font-bold shadow-lg animate-in slide-in-from-top duration-300 ${hasNavbar ? "top-[60px]" : "top-0"}`}
             >
-                {/*<span className="offline-icon">🔌</span>*/}
-                <span className="offline-text">Server Connection Lost</span>
+                <span className="text-base">🔌</span>
+                <span>Server Connection Lost</span>
             </div>
         );
     }

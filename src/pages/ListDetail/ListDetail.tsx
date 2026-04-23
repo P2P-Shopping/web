@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Modal } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import { Modal } from "../../components";
-import "./ListDetail.css";
 
 interface Item {
     id: string;
@@ -70,7 +69,7 @@ const MOCK_STORES = [
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
-    listTitle,
+    listTitle: _listTitle,
     showAiImport = true,
     showStoresModal = false,
     onCloseStoresModal,
@@ -96,55 +95,72 @@ const ListDetail = ({
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
 
-    const getBaseUrl = () =>
-        import.meta.env.VITE_API_URL || "http://localhost:8081";
+    const getBaseUrl = useCallback(
+        () => import.meta.env.VITE_API_URL || "http://localhost:8081",
+        [],
+    );
 
-    const getAuthHeaders = (withContentType = false): HeadersInit => {
-        const token = localStorage.getItem("token");
-        return {
-            ...(withContentType ? { "Content-Type": "application/json" } : {}),
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        };
-    };
+    const getAuthHeaders = useCallback(
+        (withContentType = false): HeadersInit => {
+            const token = localStorage.getItem("token");
+            return {
+                ...(withContentType
+                    ? { "Content-Type": "application/json" }
+                    : {}),
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            };
+        },
+        [],
+    );
 
-    const syncListItemsInStore = (
-        nextItems: Item[],
-        targetListId = effectiveListId,
-    ) => {
-        if (!targetListId || targetListId === "default") return;
-        updateList(targetListId, { items: nextItems });
-    };
+    const syncListItemsInStore = useCallback(
+        (nextItems: Item[], targetListId = effectiveListId) => {
+            if (!targetListId || targetListId === "default") return;
+            updateList(targetListId, { items: nextItems });
+        },
+        [effectiveListId, updateList],
+    );
 
-    const fetchListData = useCallback(async (targetListId = effectiveListId) => {
-        if (!targetListId || targetListId === "default") {
-            setItems([]);
-            setIsLoading(false);
-            return;
-        }
-        try {
-            const response = await fetch(`${getBaseUrl()}/api/lists`, { headers: getAuthHeaders() });
-            if (!response.ok) throw new Error("Failed to fetch lists");
-            const allLists = (await response.json()) as ApiShoppingList[];
-            const currentList = allLists.find((list) => list.id === targetListId);
-            if (!currentList) { setItems([]); return; }
-            const mappedItems = (currentList.items ?? []).map((item) => ({
-                id: item.id,
-                name: item.name,
-                checked: Boolean(item.isChecked),
-                brand: item.brand,
-                price: item.price,
-                quantity: item.quantity,
-                category: item.category,
-                isRecurrent: item.isRecurrent,
-            }));
-            setItems(mappedItems);
-            syncListItemsInStore(mappedItems, targetListId);
-        } catch {
-            setError("Nu s-a putut sincroniza lista.");
-        } finally {
-            setIsLoading(false);
-        }
-    }, [effectiveListId, updateList]);
+    const fetchListData = useCallback(
+        async (targetListId = effectiveListId) => {
+            if (!targetListId || targetListId === "default") {
+                setItems([]);
+                setIsLoading(false);
+                return;
+            }
+            try {
+                const response = await fetch(`${getBaseUrl()}/api/lists`, {
+                    headers: getAuthHeaders(),
+                });
+                if (!response.ok) throw new Error("Failed to fetch lists");
+                const allLists = (await response.json()) as ApiShoppingList[];
+                const currentList = allLists.find(
+                    (list) => list.id === targetListId,
+                );
+                if (!currentList) {
+                    setItems([]);
+                    return;
+                }
+                const mappedItems = (currentList.items ?? []).map((item) => ({
+                    id: item.id,
+                    name: item.name,
+                    checked: Boolean(item.isChecked),
+                    brand: item.brand,
+                    price: item.price,
+                    quantity: item.quantity,
+                    category: item.category,
+                    isRecurrent: item.isRecurrent,
+                }));
+                setItems(mappedItems);
+                syncListItemsInStore(mappedItems, targetListId);
+            } catch {
+                setError("Nu s-a putut sincroniza lista.");
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [effectiveListId, getAuthHeaders, getBaseUrl, syncListItemsInStore],
+    );
 
     useEffect(() => {
         setIsLoading(true);
@@ -240,7 +256,7 @@ const ListDetail = ({
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
         setShowExpandedDetails(false);
-        
+
         // Reset detail fields
         setDetailName("");
         setDetailQuantity("");
@@ -367,29 +383,38 @@ const ListDetail = ({
     return (
         <div
             className={
-                isEmbedded ? "list-detail-sidebar open" : "full-page-wrapper"
+                isEmbedded
+                    ? "w-full"
+                    : "flex justify-center items-start min-h-[calc(100svh-60px)] p-[28px_20px] bg-bg"
             }
         >
-            <div className="centered-list-card">
-                {error && <div className="error-msg">{error}</div>}
+            <div className="w-full max-w-[860px] mx-auto flex flex-col gap-4 box-border max-[600px]:pb-[100px]">
+                {error && (
+                    <div className="bg-danger-subtle text-danger border border-danger-border p-[10px_14px] rounded-md text-[13px] font-medium">
+                        {error}
+                    </div>
+                )}
 
                 {isNewListPage ? (
-                    <>
-                        <h3 className="list-detail-title">AI List Generator</h3>
-                        <p className="list-detail-helper">
+                    <div className="flex flex-col gap-2">
+                        <h3 className="text-lg font-bold text-text-strong text-center mb-2">
+                            AI List Generator
+                        </h3>
+                        <p className="text-sm text-text-muted text-center leading-relaxed mb-4">
                             Paste a recipe or ingredient list and a new shopping
                             list will be created automatically.
                         </p>
-                        <div className="ai-import-section">
+                        <div className="bg-accent-subtle border border-accent-border p-[18px] rounded-lg flex flex-col gap-3">
                             <textarea
                                 rows={5}
                                 value={recipeText}
                                 onChange={(e) => setRecipeText(e.target.value)}
                                 placeholder="Paste your recipe here (e.g. 2 eggs, milk...)"
+                                className="w-full bg-surface border-1.5 border-border text-text-strong p-[12px_14px] rounded-md resize-none text-sm leading-relaxed min-h-[120px] outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)]"
                             />
                             <button
                                 onClick={handleAiImport}
-                                className="ai-btn"
+                                className="w-full p-3 rounded-md border-none bg-accent text-text-on-accent text-sm font-bold cursor-pointer transition-all duration-200 ease-out hover:bg-accent-hover hover:-translate-y-px disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
                                 disabled={isAiLoading}
                                 type="button"
                             >
@@ -398,13 +423,13 @@ const ListDetail = ({
                                     : "Generate List"}
                             </button>
                         </div>
-                    </>
+                    </div>
                 ) : (
                     <>
                         {/* ── Inline add bar (Desktop) ── */}
                         <form
                             onSubmit={handleInlineAdd}
-                            className="add-item-bar desktop-only"
+                            className="flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm max-[600px]:hidden"
                         >
                             <input
                                 ref={addInputRef}
@@ -412,16 +437,19 @@ const ListDetail = ({
                                 value={newItemName}
                                 onChange={(e) => setNewItemName(e.target.value)}
                                 placeholder="Add item (e.g., Milk, Bread)..."
-                                className="add-item-input"
+                                className="flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1"
                             />
                             <button
                                 type="button"
-                                className="details-btn"
+                                className="inline-flex items-center px-3.5 py-1.5 border-1.5 border-border-strong rounded-md bg-transparent text-text-strong text-[13px] font-semibold cursor-pointer transition-all duration-200 hover:bg-bg-muted shrink-0 whitespace-nowrap"
                                 onClick={openDetailsModal}
                             >
                                 Details
                             </button>
-                            <button type="submit" className="add-btn">
+                            <button
+                                type="submit"
+                                className="inline-flex items-center gap-1.5 px-4 py-1.5 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all duration-200 hover:opacity-85 hover:-translate-y-px active:translate-y-0 shrink-0 whitespace-nowrap"
+                            >
                                 <svg
                                     viewBox="0 0 24 24"
                                     width="16"
@@ -429,8 +457,10 @@ const ListDetail = ({
                                     stroke="currentColor"
                                     strokeWidth="2.5"
                                     fill="none"
-                                    aria-hidden="true"
+                                    role="img"
+                                    aria-labelledby="add-icon-desktop"
                                 >
+                                    <title id="add-icon-desktop">Adaugă</title>
                                     <line x1="12" y1="5" x2="12" y2="19" />
                                     <line x1="5" y1="12" x2="19" y2="12" />
                                 </svg>
@@ -439,18 +469,20 @@ const ListDetail = ({
                         </form>
 
                         {/* ── Items list ── */}
-                        <div className="items-card">
+                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden">
                             {isLoading ? (
-                                <div className="ld-loading-container">
-                                    <div className="loading-spinner" />
+                                <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
+                                    <div className="w-8 h-8 border-3 border-border border-t-accent rounded-full animate-spin" />
                                     <p>Se încarcă produsele...</p>
                                 </div>
                             ) : (
-                                <ShoppingListItems
-                                    items={items}
-                                    onCheck={handleCheck}
-                                    onDelete={handleDelete}
-                                />
+                                <div className="divide-y divide-border/50">
+                                    <ShoppingListItems
+                                        items={items}
+                                        onCheck={handleCheck}
+                                        onDelete={handleDelete}
+                                    />
+                                </div>
                             )}
                         </div>
                     </>
@@ -458,12 +490,23 @@ const ListDetail = ({
             </div>
 
             {/* Mobile FAB */}
-            <button 
-                className="mobile-fab" 
+            <button
+                type="button"
+                className="hidden max-[600px]:flex fixed bottom-6 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
                 onClick={() => setShowMobileAddModal(true)}
                 aria-label="Add Item"
             >
-                <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" strokeWidth="3" fill="none">
+                <svg
+                    viewBox="0 0 24 24"
+                    width="28"
+                    height="28"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    fill="none"
+                    role="img"
+                    aria-labelledby="add-icon-mobile"
+                >
+                    <title id="add-icon-mobile">Adaugă Produs</title>
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
@@ -477,14 +520,35 @@ const ListDetail = ({
                 initialFocusSelector="#mobile-item-name"
                 footer={
                     <>
-                        <button type="button" className="cancel-btn" onClick={closeMobileAddModal}>Anulează</button>
-                        <button type="submit" form="mobile-add-form" className="submit-btn">Adaugă</button>
+                        <button
+                            type="button"
+                            className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
+                            onClick={closeMobileAddModal}
+                        >
+                            Anulează
+                        </button>
+                        <button
+                            type="submit"
+                            form="mobile-add-form"
+                            className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
+                        >
+                            Adaugă
+                        </button>
                     </>
                 }
             >
-                <form id="mobile-add-form" onSubmit={handleDetailsSubmit} className="mobile-add-form">
-                    <div className="ld-field">
-                        <label htmlFor="mobile-item-name">Nume Produs</label>
+                <form
+                    id="mobile-add-form"
+                    onSubmit={handleDetailsSubmit}
+                    className="flex flex-col gap-5"
+                >
+                    <div className="flex flex-col gap-2">
+                        <label
+                            htmlFor="mobile-item-name"
+                            className="text-[13px] font-semibold text-text-strong"
+                        >
+                            Nume Produs
+                        </label>
                         <input
                             id="mobile-item-name"
                             type="text"
@@ -492,59 +556,98 @@ const ListDetail = ({
                             onChange={(e) => setDetailName(e.target.value)}
                             placeholder="ex: Lapte"
                             required
+                            className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
                         />
                     </div>
 
-                    <button 
-                        type="button" 
-                        className="mobile-details-toggle"
-                        onClick={() => setShowExpandedDetails(!showExpandedDetails)}
+                    <button
+                        type="button"
+                        className="flex items-center justify-between w-full p-[12px_14px] bg-bg-muted border border-border rounded-md text-text-strong text-sm font-semibold cursor-pointer transition-all hover:bg-border/50"
+                        onClick={() =>
+                            setShowExpandedDetails(!showExpandedDetails)
+                        }
                     >
-                        {showExpandedDetails ? "Mai puține detalii" : "Adaugă detalii (cantitate, preț...)"}
-                        <svg 
-                            viewBox="0 0 24 24" 
-                            width="16" 
-                            height="16" 
-                            stroke="currentColor" 
-                            strokeWidth="2" 
+                        {showExpandedDetails
+                            ? "Mai puține detalii"
+                            : "Adaugă detalii (cantitate, preț...)"}
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            stroke="currentColor"
+                            strokeWidth="2"
                             fill="none"
-                            style={{ transform: showExpandedDetails ? "rotate(180deg)" : "none" }}
+                            className="transition-transform duration-200"
+                            style={{
+                                transform: showExpandedDetails
+                                    ? "rotate(180deg)"
+                                    : "none",
+                            }}
+                            role="img"
+                            aria-labelledby="expand-details-icon"
                         >
+                            <title id="expand-details-icon">
+                                {showExpandedDetails ? "Restrânge" : "Extinde"}
+                            </title>
                             <path d="M6 9l6 6 6-6" />
                         </svg>
                     </button>
 
                     {showExpandedDetails && (
-                        <div className="mobile-expanded-fields">
-                            <div className="ld-field">
-                                <label htmlFor="m-qty">Cantitate</label>
+                        <div className="flex flex-col gap-4 p-4 bg-bg-subtle rounded-xl border border-border border-dashed animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex flex-col gap-1.5">
+                                <label
+                                    htmlFor="m-qty"
+                                    className="text-xs font-semibold text-text-muted"
+                                >
+                                    Cantitate
+                                </label>
                                 <input
                                     id="m-qty"
                                     type="text"
                                     value={detailQuantity}
-                                    onChange={(e) => setDetailQuantity(e.target.value)}
+                                    onChange={(e) =>
+                                        setDetailQuantity(e.target.value)
+                                    }
                                     placeholder="ex: 2 buc"
+                                    className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
                                 />
                             </div>
-                            <div className="ld-field">
-                                <label htmlFor="m-brand">Brand</label>
+                            <div className="flex flex-col gap-1.5">
+                                <label
+                                    htmlFor="m-brand"
+                                    className="text-xs font-semibold text-text-muted"
+                                >
+                                    Brand
+                                </label>
                                 <input
                                     id="m-brand"
                                     type="text"
                                     value={detailBrand}
-                                    onChange={(e) => setDetailBrand(e.target.value)}
+                                    onChange={(e) =>
+                                        setDetailBrand(e.target.value)
+                                    }
                                     placeholder="ex: Zuzu"
+                                    className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
                                 />
                             </div>
-                            <div className="ld-field">
-                                <label htmlFor="m-price">Preț</label>
+                            <div className="flex flex-col gap-1.5">
+                                <label
+                                    htmlFor="m-price"
+                                    className="text-xs font-semibold text-text-muted"
+                                >
+                                    Preț
+                                </label>
                                 <input
                                     id="m-price"
                                     type="number"
                                     step="0.01"
                                     value={detailPrice}
-                                    onChange={(e) => setDetailPrice(e.target.value)}
+                                    onChange={(e) =>
+                                        setDetailPrice(e.target.value)
+                                    }
                                     placeholder="0.00"
+                                    className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
                                 />
                             </div>
                         </div>
@@ -563,7 +666,7 @@ const ListDetail = ({
                     <>
                         <button
                             type="button"
-                            className="ld-cancel-btn"
+                            className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
                             onClick={closeDetailsModal}
                         >
                             Cancel
@@ -571,7 +674,7 @@ const ListDetail = ({
                         <button
                             type="submit"
                             form="ld-details-form"
-                            className="ld-submit-btn"
+                            className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
                         >
                             Add Item
                         </button>
@@ -581,10 +684,15 @@ const ListDetail = ({
                 <form
                     id="ld-details-form"
                     onSubmit={handleDetailsSubmit}
-                    className="ld-modal-body-form"
+                    className="flex flex-col gap-4"
                 >
-                    <div className="ld-field">
-                        <label htmlFor="ld-item-name">Item Name</label>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="ld-item-name"
+                            className="text-[13px] font-semibold text-text-strong"
+                        >
+                            Item Name
+                        </label>
                         <input
                             id="ld-item-name"
                             type="text"
@@ -592,38 +700,61 @@ const ListDetail = ({
                             onChange={(e) => setDetailName(e.target.value)}
                             placeholder="e.g., Milk"
                             required
+                            className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
                         />
                     </div>
-                    <div className="ld-field">
-                        <label htmlFor="ld-quantity">Quantity</label>
-                        <input
-                            id="ld-quantity"
-                            type="text"
-                            value={detailQuantity}
-                            onChange={(e) => setDetailQuantity(e.target.value)}
-                            placeholder="e.g., 2"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="ld-quantity"
+                                className="text-[13px] font-semibold text-text-strong"
+                            >
+                                Quantity
+                            </label>
+                            <input
+                                id="ld-quantity"
+                                type="text"
+                                value={detailQuantity}
+                                onChange={(e) =>
+                                    setDetailQuantity(e.target.value)
+                                }
+                                placeholder="e.g., 2"
+                                className="w-full px-3.5 py-2.5 bg-bg-muted border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor="ld-price"
+                                className="text-[13px] font-semibold text-text-strong"
+                            >
+                                Price (Optional)
+                            </label>
+                            <input
+                                id="ld-price"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={detailPrice}
+                                onChange={(e) => setDetailPrice(e.target.value)}
+                                placeholder="e.g., 4.99"
+                                className="w-full px-3.5 py-2.5 bg-bg-muted border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all"
+                            />
+                        </div>
                     </div>
-                    <div className="ld-field">
-                        <label htmlFor="ld-brand">Brand (Optional)</label>
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="ld-brand"
+                            className="text-[13px] font-semibold text-text-strong"
+                        >
+                            Brand (Optional)
+                        </label>
                         <input
                             id="ld-brand"
                             type="text"
                             value={detailBrand}
                             onChange={(e) => setDetailBrand(e.target.value)}
                             placeholder="e.g., Organic Valley"
-                        />
-                    </div>
-                    <div className="ld-field">
-                        <label htmlFor="ld-price">Price (Optional)</label>
-                        <input
-                            id="ld-price"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={detailPrice}
-                            onChange={(e) => setDetailPrice(e.target.value)}
-                            placeholder="e.g., 4.99"
+                            className="w-full px-3.5 py-2.5 bg-bg-muted border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all"
                         />
                     </div>
                 </form>
@@ -637,25 +768,31 @@ const ListDetail = ({
                 subtitle="Based on your shopping list and crowd-sourced data"
                 maxWidth="500px"
             >
-                <div className="ld-stores-list">
+                <div className="flex flex-col gap-2.5 p-[0_4px_12px]">
                     {MOCK_STORES.map((store) => (
-                        <div key={store.id} className="ld-store-item">
-                            <div className="ld-store-info">
-                                <div className="ld-store-name-row">
-                                    <span className="ld-store-name">
+                        <div
+                            key={store.id}
+                            className="flex items-center justify-between gap-3 bg-bg-subtle border border-border rounded-xl p-[14px_16px] transition-all hover:border-border-strong group"
+                        >
+                            <div className="flex flex-col gap-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[15px] font-bold text-text-strong">
                                         {store.name}
                                     </span>
                                     {store.bestMatch && (
-                                        <span className="ld-best-match-badge">
+                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-text-strong text-bg text-[10px] font-extrabold uppercase tracking-tight">
                                             Best Match
                                         </span>
                                     )}
                                 </div>
-                                <span className="ld-store-address">
+                                <span className="text-xs text-text-muted break-words">
                                     {store.address}
                                 </span>
                             </div>
-                            <button type="button" className="ld-go-btn">
+                            <button
+                                type="button"
+                                className="inline-flex items-center gap-1.5 px-4 py-2 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all hover:opacity-80 hover:-translate-y-px active:translate-y-0 shrink-0"
+                            >
                                 <svg
                                     viewBox="0 0 24 24"
                                     width="15"
@@ -663,8 +800,12 @@ const ListDetail = ({
                                     stroke="currentColor"
                                     strokeWidth="2"
                                     fill="none"
-                                    aria-hidden="true"
+                                    role="img"
+                                    aria-labelledby={`go-store-${store.id}`}
                                 >
+                                    <title id={`go-store-${store.id}`}>
+                                        Navighează la magazin
+                                    </title>
                                     <line x1="22" y1="2" x2="11" y2="13" />
                                     <polygon points="22 2 15 22 11 13 2 9 22 2" />
                                 </svg>

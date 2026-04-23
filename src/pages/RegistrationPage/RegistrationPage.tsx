@@ -2,7 +2,6 @@ import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerRequest } from "../../services/authService";
-import "../LoginPage/LoginPage.css";
 
 interface RegistrationPageProps {
     onAuthSuccess?: (authResult: unknown) => void;
@@ -58,34 +57,48 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
     };
 
     return (
-        <div className="auth-card">
-            <div className="auth-logo">
-                <span className="auth-logo-icon">🛒</span>
-                <span className="auth-logo-name">P2P Shopping</span>
+        <div className="flex flex-col w-full max-w-[440px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
+            <div className="flex items-center justify-center gap-3 mb-8">
+                <span className="text-3xl" aria-hidden="true">
+                    🛒
+                </span>
+                <span className="text-2xl font-black text-text-strong tracking-tighter">
+                    P2P Shopping
+                </span>
             </div>
 
-            <h1 className="auth-heading">Create account</h1>
-            <p className="auth-subtitle">
+            <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
+                Create account
+            </h1>
+            <p className="text-[15px] text-text-muted mb-8">
                 Join to start managing your shopping lists
             </p>
 
-            <div className="auth-tabs">
+            <div className="flex p-1 bg-bg-muted rounded-lg mb-8">
                 <button
                     type="button"
-                    className="tab-btn"
+                    className="flex-1 py-2 text-sm font-semibold text-text-muted hover:text-text-strong rounded-md transition-all"
                     onClick={() => navigate("/login")}
                 >
                     Login
                 </button>
-                <button type="button" className="tab-btn active">
+                <button
+                    type="button"
+                    className="flex-1 py-2 text-sm font-bold bg-surface text-text-strong rounded-md shadow-sm transition-all"
+                >
                     Register
                 </button>
             </div>
 
-            <form onSubmit={handleRegister}>
-                <div className="auth-row">
-                    <div className="form-group">
-                        <label htmlFor="firstName">First Name</label>
+            <form onSubmit={handleRegister} className="flex flex-col gap-4">
+                <div className="flex gap-4">
+                    <div className="flex flex-col gap-1.5 flex-1">
+                        <label
+                            htmlFor="firstName"
+                            className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                        >
+                            First Name
+                        </label>
                         <input
                             id="firstName"
                             type="text"
@@ -93,10 +106,16 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
                             value={formData.firstName}
                             onChange={handleChange}
                             required
+                            className="w-full px-4 py-2.5 bg-bg-subtle border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent transition-all"
                         />
                     </div>
-                    <div className="form-group">
-                        <label htmlFor="lastName">Last Name</label>
+                    <div className="flex flex-col gap-1.5 flex-1">
+                        <label
+                            htmlFor="lastName"
+                            className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                        >
+                            Last Name
+                        </label>
                         <input
                             id="lastName"
                             type="text"
@@ -104,12 +123,18 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
                             value={formData.lastName}
                             onChange={handleChange}
                             required
+                            className="w-full px-4 py-2.5 bg-bg-subtle border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent transition-all"
                         />
                     </div>
                 </div>
 
-                <div className="form-group">
-                    <label htmlFor="email">Email</label>
+                <div className="flex flex-col gap-1.5">
+                    <label
+                        htmlFor="email"
+                        className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                    >
+                        Email
+                    </label>
                     <input
                         id="email"
                         type="email"
@@ -117,11 +142,17 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
                         value={formData.email}
                         onChange={handleChange}
                         required
+                        className="w-full px-4 py-2.5 bg-bg-subtle border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent transition-all"
                     />
                 </div>
 
-                <div className="form-group">
-                    <label htmlFor="password">Password</label>
+                <div className="flex flex-col gap-1.5">
+                    <label
+                        htmlFor="password"
+                        className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                    >
+                        Password
+                    </label>
                     <input
                         id="password"
                         type="password"
@@ -129,11 +160,17 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
                         value={formData.password}
                         onChange={handleChange}
                         required
+                        className="w-full px-4 py-2.5 bg-bg-subtle border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent transition-all"
                     />
                 </div>
 
-                <div className="form-group">
-                    <label htmlFor="confirmPassword">Confirm Password</label>
+                <div className="flex flex-col gap-1.5">
+                    <label
+                        htmlFor="confirmPassword"
+                        className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                    >
+                        Confirm Password
+                    </label>
                     <input
                         id="confirmPassword"
                         type="password"
@@ -141,14 +178,19 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
                         value={formData.confirmPassword}
                         onChange={handleChange}
                         required
+                        className="w-full px-4 py-2.5 bg-bg-subtle border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent transition-all"
                     />
                 </div>
 
-                {error && <p className="error-msg">{error}</p>}
+                {error && (
+                    <p className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium">
+                        {error}
+                    </p>
+                )}
 
                 <button
                     type="submit"
-                    className="submit-btn"
+                    className="w-full py-3.5 mt-2 bg-accent text-text-on-accent border-none rounded-xl text-base font-bold shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={isSubmitting}
                 >
                     {isSubmitting ? "Creating account…" : "Create Account"}

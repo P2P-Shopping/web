@@ -1,28 +1,39 @@
 import { useThemeStore } from "../../store/useThemeStore";
-import "./ThemeSwitcher.css";
 
 export default function ThemeSwitcher() {
     const { theme, toggleTheme } = useThemeStore();
 
     return (
         <button
-            className="theme-switcher"
+            type="button"
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-bg-muted text-text-strong transition-all duration-300 hover:bg-border active:scale-90 group relative overflow-hidden"
             onClick={toggleTheme}
             aria-label={`Current theme: ${theme}. Click to switch.`}
             title={`Current theme: ${theme}. Click to switch.`}
         >
-            <div className="theme-switcher-inner">
-                <div className={`theme-icon theme-icon--${theme}`}>
-                    {/* Sun Icon */}
+            <div
+                className={`relative flex flex-col transition-transform duration-500 ease-spring ${
+                    theme === "light"
+                        ? "translate-y-[33.33%]"
+                        : theme === "dark"
+                          ? "translate-y-[-33.33%]"
+                          : "translate-y-0"
+                }`}
+            >
+                {/* Sun Icon */}
+                <div className="flex items-center justify-center w-9 h-9">
                     <svg
-                        className="sun-icon"
+                        className="w-5 h-5 text-warning"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        role="img"
+                        aria-labelledby="sun-title"
                     >
+                        <title id="sun-title">Light Mode</title>
                         <circle cx="12" cy="12" r="5" />
                         <line x1="12" y1="1" x2="12" y2="3" />
                         <line x1="12" y1="21" x2="12" y2="23" />
@@ -33,30 +44,22 @@ export default function ThemeSwitcher() {
                         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
                         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                     </svg>
+                </div>
 
-                    {/* Moon Icon */}
+                {/* System/Monitor Icon */}
+                <div className="flex items-center justify-center w-9 h-9">
                     <svg
-                        className="moon-icon"
+                        className="w-5 h-5 text-accent"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        role="img"
+                        aria-labelledby="system-title"
                     >
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                    </svg>
-
-                    {/* System/Monitor Icon */}
-                    <svg
-                        className="system-icon"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    >
+                        <title id="system-title">System Mode</title>
                         <rect
                             x="2"
                             y="3"
@@ -67,6 +70,24 @@ export default function ThemeSwitcher() {
                         />
                         <line x1="8" y1="21" x2="16" y2="21" />
                         <line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                </div>
+
+                {/* Moon Icon */}
+                <div className="flex items-center justify-center w-9 h-9">
+                    <svg
+                        className="w-5 h-5 text-accent"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        role="img"
+                        aria-labelledby="moon-title"
+                    >
+                        <title id="moon-title">Dark Mode</title>
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                     </svg>
                 </div>
             </div>

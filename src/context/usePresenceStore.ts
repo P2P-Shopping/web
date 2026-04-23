@@ -95,9 +95,9 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     clearAllTimeouts: () => {
         const currentTyping = get().typingUsers;
-        Object.values(currentTyping).forEach((id) =>
-            globalThis.clearTimeout(id),
-        );
+        Object.values(currentTyping).forEach((id) => {
+            globalThis.clearTimeout(id);
+        });
         set({ typingUsers: {} });
     },
 }));

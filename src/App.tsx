@@ -17,8 +17,6 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
 
-import "./App.css";
-
 function App() {
     useNetworkState();
     const location = useLocation();
@@ -105,21 +103,26 @@ function App() {
     const showNavbar = token && !isAuthPage;
 
     return (
-        <div className="app-container">
+        <div className="min-h-svh flex flex-col bg-bg transition-colors duration-300">
             {showNavbar && <Navbar />}
             <OfflineBanner hasNavbar={!!showNavbar} />
+
             {toastMessage && (
-                <div className="toast" role="status" aria-live="polite">
+                <div
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-500 px-6 py-3 bg-text-strong text-bg rounded-full shadow-2xl text-sm font-bold animate-in fade-in slide-in-from-bottom-4 duration-300"
+                    role="status"
+                    aria-live="polite"
+                >
                     {toastMessage}
                 </div>
             )}
 
-            <main className="content">
+            <main className="flex-1 flex flex-col">
                 <Routes>
                     <Route
                         path="/login"
                         element={
-                            <div className="auth-container">
+                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-[calc(100svh-60px)]">
                                 <LoginPage />
                             </div>
                         }
@@ -127,7 +130,7 @@ function App() {
                     <Route
                         path="/register"
                         element={
-                            <div className="auth-container">
+                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-[calc(100svh-60px)]">
                                 <RegistrationPage
                                     onAuthSuccess={handleAuthSuccess}
                                 />
@@ -143,7 +146,14 @@ function App() {
                         path="/"
                         element={<Navigate to="/login" replace />}
                     />
-                    <Route path="*" element={<div>Page not found</div>} />
+                    <Route
+                        path="*"
+                        element={
+                            <div className="flex-1 flex items-center justify-center text-text-muted">
+                                Page not found
+                            </div>
+                        }
+                    />
                 </Routes>
             </main>
         </div>
