@@ -55,8 +55,9 @@
     font-weight: 500;
     color: var(--text);
     text-decoration: none;
-    transition: color var(--duration) var(--ease-out),
-                background var(--duration) var(--ease-out);
+    transition:
+        color var(--duration) var(--ease-out),
+        background var(--duration) var(--ease-out);
     white-space: nowrap;
 }
 
@@ -76,18 +77,34 @@
     color: var(--accent-hover);
 }
 
+.navbar-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+}
+
 /* Mobile */
 @media (max-width: 700px) {
-    .navbar-inner { padding: 0 16px; }
+    .navbar-inner {
+        padding: 0 16px;
+    }
 
-    .navbar-brand-name { display: none; }
+    .navbar-brand-name {
+        display: none;
+    }
 
     .navbar-nav {
         gap: 0;
         overflow-x: auto;
         scrollbar-width: none;
     }
-    .navbar-nav::-webkit-scrollbar { display: none; }
+    .navbar-nav::-webkit-scrollbar {
+        display: none;
+    }
 
-    .nav-link { font-size: 13px; padding: 6px 10px; }
+    .nav-link {
+        font-size: 13px;
+        padding: 6px 10px;
+    }
 }

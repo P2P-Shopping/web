@@ -14,21 +14,21 @@ export interface PresenceEvent {
  * Interface defining the Zustand store state and actions for managing connected user presence.
  */
 interface PresenceState {
-    /** 
+    /**
      * Collection of actively connected users.
      */
     activeUsers: Set<string>;
-    /** 
+    /**
      * Map linking a typing username to their active javascript timeout ID.
      */
     typingUsers: Record<string, number>;
-    
+
     /**
      * Processes an incoming presence event and updates state.
      * @param event The presence event object containing username and eventType.
      */
     handlePresenceEvent: (event: PresenceEvent) => void;
-    
+
     /**
      * Called during unmount to ensure 100% memory leak cleanup.
      * Clears any lingering typing timeouts.
@@ -53,12 +53,11 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 newSet.add(username);
                 return { activeUsers: newSet };
             });
-        } 
-        else if (eventType === "LEAVE") {
+        } else if (eventType === "LEAVE") {
             set((state) => {
                 const newSet = new Set(state.activeUsers);
                 newSet.delete(username);
-                
+
                 const newTyping = { ...state.typingUsers };
                 if (newTyping[username]) {
                     globalThis.clearTimeout(newTyping[username]);
@@ -66,13 +65,12 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 }
                 return { activeUsers: newSet, typingUsers: newTyping };
             });
-        } 
-        else if (eventType === "TYPING") {
+        } else if (eventType === "TYPING") {
             const currentTyping = get().typingUsers;
             if (currentTyping[username]) {
                 globalThis.clearTimeout(currentTyping[username]);
             }
-            
+
             const timeoutId = globalThis.setTimeout(() => {
                 set((innerState) => {
                     const updatedTyping = { ...innerState.typingUsers };
@@ -84,9 +82,12 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
             set((state) => {
                 const newSet = new Set(state.activeUsers);
                 newSet.add(username);
-                return { 
-                    activeUsers: newSet, 
-                    typingUsers: { ...state.typingUsers, [username]: timeoutId } 
+                return {
+                    activeUsers: newSet,
+                    typingUsers: {
+                        ...state.typingUsers,
+                        [username]: timeoutId,
+                    },
                 };
             });
         }
@@ -94,7 +95,9 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     clearAllTimeouts: () => {
         const currentTyping = get().typingUsers;
-        Object.values(currentTyping).forEach((id) => globalThis.clearTimeout(id));
+        Object.values(currentTyping).forEach((id) =>
+            globalThis.clearTimeout(id),
+        );
         set({ typingUsers: {} });
     },
 }));

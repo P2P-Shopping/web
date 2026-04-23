@@ -82,4 +82,3 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
 };
 
 export default ShoppingListItems;
-

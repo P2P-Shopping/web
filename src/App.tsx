@@ -15,6 +15,7 @@ import {
 } from "./pages";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
+import { useThemeStore } from "./store/useThemeStore";
 
 import "./App.css";
 
@@ -22,9 +23,19 @@ function App() {
     useNetworkState();
     const location = useLocation();
     const setServerConnected = useStore((state) => state.setServerConnected);
+    const { theme } = useThemeStore();
 
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        const root = document.documentElement;
+        if (theme === "system") {
+            root.removeAttribute("data-theme");
+        } else {
+            root.setAttribute("data-theme", theme);
+        }
+    }, [theme]);
 
     const clearToastTimeout = useCallback(() => {
         if (!toastTimeoutRef.current) return;
@@ -89,7 +100,8 @@ function App() {
 
     // Determine if Navbar should be shown
     const token = localStorage.getItem("token");
-    const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+    const isAuthPage =
+        location.pathname === "/login" || location.pathname === "/register";
     const showNavbar = token && !isAuthPage;
 
     return (

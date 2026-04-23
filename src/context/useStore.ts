@@ -76,7 +76,7 @@ export const useStore = create<AppState>((set, get) => ({
     toggleItemOptimistic: (itemId, newChecked) =>
         set((state) => ({
             items: state.items.map((i) =>
-                i.id === itemId ? { ...i, checked: newChecked } : i
+                i.id === itemId ? { ...i, checked: newChecked } : i,
             ),
         })),
     rollbackItemState: (itemId) => {
@@ -86,7 +86,9 @@ export const useStore = create<AppState>((set, get) => ({
                 const newBackupItems = { ...state.backupItems };
                 delete newBackupItems[itemId];
                 return {
-                    items: state.items.map((i) => (i.id === itemId ? { ...backup } : i)),
+                    items: state.items.map((i) =>
+                        i.id === itemId ? { ...backup } : i,
+                    ),
                     backupItems: newBackupItems,
                 };
             });

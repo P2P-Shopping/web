@@ -29,11 +29,19 @@ const LoginPage = () => {
             </div>
 
             <h1 className="auth-heading">Welcome back</h1>
-            <p className="auth-subtitle">Sign in to manage your shopping lists</p>
+            <p className="auth-subtitle">
+                Sign in to manage your shopping lists
+            </p>
 
             <div className="auth-tabs">
-                <button type="button" className="tab-btn active">Login</button>
-                <button type="button" className="tab-btn" onClick={() => navigate("/register")}>
+                <button type="button" className="tab-btn active">
+                    Login
+                </button>
+                <button
+                    type="button"
+                    className="tab-btn"
+                    onClick={() => navigate("/register")}
+                >
                     Register
                 </button>
             </div>
@@ -64,7 +72,9 @@ const LoginPage = () => {
 
                 {error && <p className="error-msg">{error}</p>}
 
-                <button type="submit" className="submit-btn">Sign In</button>
+                <button type="submit" className="submit-btn">
+                    Sign In
+                </button>
             </form>
         </div>
     );

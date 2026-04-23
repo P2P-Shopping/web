@@ -47,13 +47,18 @@ const PresenceBar: React.FC = () => {
                         <div key={username} className="presence-user">
                             <div
                                 className="avatar-circle"
-                                style={{ backgroundColor: stringToColor(username) }}
+                                style={{
+                                    backgroundColor: stringToColor(username),
+                                }}
                                 title={username}
                             >
                                 {initial}
                             </div>
                             {isTyping && (
-                                <div className="typing-indicator" title={`${username} is typing...`}>
+                                <div
+                                    className="typing-indicator"
+                                    title={`${username} is typing...`}
+                                >
                                     <span>.</span>
                                     <span>.</span>
                                     <span>.</span>

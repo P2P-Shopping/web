@@ -1,8 +1,14 @@
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+    type MouseEvent,
+    type ReactNode,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
 import { useSearchParams } from "react-router-dom";
-import ListDetail from "../ListDetail/ListDetail";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item } from "../../types";
+import ListDetail from "../ListDetail/ListDetail";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
 import "./Dashboard.css";
@@ -13,6 +19,7 @@ const Dashboard = () => {
         id: string;
         name: string;
     } | null>(null);
+    const [showStoresModal, setShowStoresModal] = useState(false);
     const {
         lists,
         isLoading,
@@ -97,7 +104,9 @@ const Dashboard = () => {
     } else if (lists.length === 0) {
         mainContent = (
             <div className="empty-state">
-                <span className="empty-state-icon" aria-hidden="true">🛒</span>
+                <span className="empty-state-icon" aria-hidden="true">
+                    🛒
+                </span>
                 <h2>No lists yet</h2>
                 <p>Create your first shared shopping list!</p>
                 <button
@@ -112,34 +121,12 @@ const Dashboard = () => {
     } else if (selectedList) {
         mainContent = (
             <div className="selected-list-view">
-                <div className="selected-list-toolbar">
-                    <button
-                        type="button"
-                        className="back-to-lists-btn"
-                        onClick={clearSelectedList}
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="18"
-                            height="18"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="none"
-                            aria-hidden="true"
-                        >
-                            <path d="M15 18l-6-6 6-6" />
-                        </svg>
-                        <span>All Lists</span>
-                    </button>
-                    <div className="selected-list-breadcrumb">
-                        <span className="selected-list-label">Opened List</span>
-                        <strong>{selectedList.name}</strong>
-                    </div>
-                </div>
                 <ListDetail
                     listIdOverride={selectedList.id}
                     listTitle={selectedList.name}
                     showAiImport={false}
+                    showStoresModal={showStoresModal}
+                    onCloseStoresModal={() => setShowStoresModal(false)}
                 />
             </div>
         );
@@ -200,8 +187,12 @@ const Dashboard = () => {
 
                             <div className="card-body">
                                 <div className="list-stats">
-                                    <span className="stat stat-pill">{getItemsCount(list.items)}</span>
-                                    <span className="stat stat-pill">{list.ownerName || "Tu"}</span>
+                                    <span className="stat stat-pill">
+                                        {getItemsCount(list.items)}
+                                    </span>
+                                    <span className="stat stat-pill">
+                                        {list.ownerName || "Tu"}
+                                    </span>
                                 </div>
 
                                 <div className="items-preview">
@@ -210,7 +201,10 @@ const Dashboard = () => {
                                             key={item.id}
                                             className={`item-preview ${item.checked ? "checked" : ""}`}
                                         >
-                                            <span className="checkbox-icon" aria-hidden="true" />
+                                            <span
+                                                className="checkbox-icon"
+                                                aria-hidden="true"
+                                            />
                                             <span className="item-name">
                                                 {item.name}
                                             </span>
@@ -235,34 +229,101 @@ const Dashboard = () => {
         <div className="dashboard">
             {/* Header */}
             <header className="dashboard-header">
-                <div className="header-content">
-                    <h1>My Lists</h1>
-                    <p className="subtitle">
-                        {selectedList
-                            ? selectedList.name
-                            : `${lists.length} ${lists.length === 1 ? "list" : "lists"}`}
-                    </p>
-                </div>
-                {!selectedList && (
-                    <button
-                        type="button"
-                        className="create-btn"
-                        onClick={openModal}
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="20"
-                            height="20"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="none"
-                            aria-hidden="true"
+                {selectedList ? (
+                    <>
+                        <button
+                            type="button"
+                            className="back-to-lists-btn"
+                            onClick={clearSelectedList}
                         >
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        New List
-                    </button>
+                            <svg
+                                viewBox="0 0 24 24"
+                                width="20"
+                                height="20"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+                                <path d="M15 18l-6-6 6-6" />
+                            </svg>
+                        </button>
+                        <h1 className="list-header-title">
+                            {selectedList.name}
+                        </h1>
+                        <div className="toolbar-actions">
+                            <button
+                                type="button"
+                                className="toolbar-find-stores-btn"
+                                onClick={() => setShowStoresModal(true)}
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    width="18"
+                                    height="18"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    fill="none"
+                                    aria-hidden="true"
+                                >
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line
+                                        x1="21"
+                                        y1="21"
+                                        x2="16.65"
+                                        y2="16.65"
+                                    />
+                                </svg>
+                                <span>Find Stores</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="toolbar-navigate-btn"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    width="18"
+                                    height="18"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    fill="none"
+                                    aria-hidden="true"
+                                >
+                                    <line x1="22" y1="2" x2="11" y2="13" />
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                </svg>
+                                <span>Navigate</span>
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="header-content">
+                            <h1>My Lists</h1>
+                            <p className="subtitle">
+                                {`${lists.length} ${lists.length === 1 ? "list" : "lists"}`}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            className="create-btn"
+                            onClick={openModal}
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                width="20"
+                                height="20"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            New List
+                        </button>
+                    </>
                 )}
             </header>
 

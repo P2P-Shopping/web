@@ -10,7 +10,9 @@ interface OfflineBannerProps {
  * Component that displays a global visual warning when the device loses its internet connection
  * or when the backend server is unreachable.
  */
-export const OfflineBanner: React.FC<OfflineBannerProps> = ({ hasNavbar = false }) => {
+export const OfflineBanner: React.FC<OfflineBannerProps> = ({
+    hasNavbar = false,
+}) => {
     const isOnline = useStore((state) => state.isOnline);
     const isServerConnected = useStore((state) => state.isServerConnected);
 
@@ -18,14 +20,18 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({ hasNavbar = false 
         return (
             <div className={`offline-banner ${hasNavbar ? "with-navbar" : ""}`}>
                 <span className="offline-icon">⚠️</span>
-                <span className="offline-text">Working Offline (No Internet)</span>
+                <span className="offline-text">
+                    Working Offline (No Internet)
+                </span>
             </div>
         );
     }
 
     if (!isServerConnected) {
         return (
-            <div className={`offline-banner server-disconnected ${hasNavbar ? "with-navbar" : ""}`}>
+            <div
+                className={`offline-banner server-disconnected ${hasNavbar ? "with-navbar" : ""}`}
+            >
                 {/*<span className="offline-icon">🔌</span>*/}
                 <span className="offline-text">Server Connection Lost</span>
             </div>

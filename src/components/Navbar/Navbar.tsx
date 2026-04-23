@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { ThemeSwitcher } from "..";
 import "./Navbar.css";
 
 const NAV_LINKS = [
@@ -29,6 +30,9 @@ export default function Navbar() {
                             {label}
                         </Link>
                     ))}
+                    <div className="navbar-actions">
+                        <ThemeSwitcher />
+                    </div>
                 </nav>
             </div>
         </header>

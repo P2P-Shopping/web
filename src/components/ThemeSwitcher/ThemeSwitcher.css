@@ -1,0 +1,93 @@
+.theme-switcher {
+    background: var(--bg-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--text-muted);
+    transition: all var(--duration) var(--ease-out);
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-switcher:hover {
+    background: var(--bg-subtle);
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.theme-switcher:active {
+    transform: translateY(0);
+}
+
+.theme-switcher-inner {
+    position: relative;
+    width: 20px;
+    height: 20px;
+}
+
+.theme-icon {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.5s var(--ease-spring);
+}
+
+.sun-icon,
+.moon-icon,
+.system-icon {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transition:
+        opacity 0.3s var(--ease-out),
+        transform 0.5s var(--ease-spring);
+}
+
+/* Light theme state */
+.theme-icon--light .sun-icon {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+}
+
+.theme-icon--light .moon-icon,
+.theme-icon--light .system-icon {
+    opacity: 0;
+    transform: rotate(90deg) scale(0);
+}
+
+/* Dark theme state */
+.theme-icon--dark .moon-icon {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+}
+
+.theme-icon--dark .sun-icon,
+.theme-icon--dark .system-icon {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0);
+}
+
+/* System theme state */
+.theme-icon--system .system-icon {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+}
+
+.theme-icon--system .sun-icon,
+.theme-icon--system .moon-icon {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0);
+}
+
+/* For system theme, we show based on media query if no explicit theme is set */
+/* However, our store handles the logic to always return "light" or "dark" once toggled */
+/* If the store is still at "system", we could use CSS to decide, but the JS store is more reliable here */

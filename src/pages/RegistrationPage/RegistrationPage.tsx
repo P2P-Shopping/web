@@ -36,7 +36,9 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
         }
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
         if (!passwordRegex.test(formData.password)) {
-            setError("Password must be 8+ chars with uppercase, lowercase, and a number.");
+            setError(
+                "Password must be 8+ chars with uppercase, lowercase, and a number.",
+            );
             return;
         }
 
@@ -46,7 +48,10 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
             if (onAuthSuccess) onAuthSuccess(response);
             navigate("/login");
         } catch (err: any) {
-            setError(err.response?.data?.message ?? "Registration failed. Please try again.");
+            setError(
+                err.response?.data?.message ??
+                    "Registration failed. Please try again.",
+            );
         } finally {
             setIsSubmitting(false);
         }
@@ -60,13 +65,21 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
             </div>
 
             <h1 className="auth-heading">Create account</h1>
-            <p className="auth-subtitle">Join to start managing your shopping lists</p>
+            <p className="auth-subtitle">
+                Join to start managing your shopping lists
+            </p>
 
             <div className="auth-tabs">
-                <button type="button" className="tab-btn" onClick={() => navigate("/login")}>
+                <button
+                    type="button"
+                    className="tab-btn"
+                    onClick={() => navigate("/login")}
+                >
                     Login
                 </button>
-                <button type="button" className="tab-btn active">Register</button>
+                <button type="button" className="tab-btn active">
+                    Register
+                </button>
             </div>
 
             <form onSubmit={handleRegister}>
@@ -133,7 +146,11 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
 
                 {error && <p className="error-msg">{error}</p>}
 
-                <button type="submit" className="submit-btn" disabled={isSubmitting}>
+                <button
+                    type="submit"
+                    className="submit-btn"
+                    disabled={isSubmitting}
+                >
                     {isSubmitting ? "Creating account…" : "Create Account"}
                 </button>
             </form>

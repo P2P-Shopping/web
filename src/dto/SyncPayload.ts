@@ -1,4 +1,9 @@
-export type ActionType = "UPDATE_ITEM" | "DELETE_ITEM" | "USER_PRESENCE" | "REJECT" | "ERROR";
+export type ActionType =
+    | "UPDATE_ITEM"
+    | "DELETE_ITEM"
+    | "USER_PRESENCE"
+    | "REJECT"
+    | "ERROR";
 
 export abstract class SyncPayload {
     actionType: ActionType;

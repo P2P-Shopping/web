@@ -1,5 +1,4 @@
-import { useEffect, useRef } from "react";
-import "./CreateListModal.css";
+import { Modal } from "../../components";
 
 interface ConfirmDeleteModalProps {
     listId: string;
@@ -14,75 +13,14 @@ const ConfirmDeleteModal = ({
     onCancel,
     onConfirm,
 }: ConfirmDeleteModalProps) => {
-    const dialogRef = useRef<HTMLDialogElement | null>(null);
-    const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
-
-    useEffect(() => {
-        dialogRef.current?.showModal();
-        const rafId = window.requestAnimationFrame(() => {
-            cancelButtonRef.current?.focus();
-        });
-
-        return () => {
-            window.cancelAnimationFrame(rafId);
-            dialogRef.current?.close();
-        };
-    }, []);
-
     return (
-        <dialog
-            ref={dialogRef}
-            className="modal-backdrop"
-            aria-labelledby="confirm-delete-title"
-            onCancel={(e) => {
-                e.preventDefault();
-                onCancel();
-            }}
-            onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                    e.preventDefault();
-                    onCancel();
-                }
-            }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                    onCancel();
-                }
-            }}
-        >
-            <div className="modal-content">
-                <div className="modal-header">
-                    <h2 id="confirm-delete-title">Confirmă ștergerea</h2>
+        <Modal
+            isOpen={true}
+            onClose={onCancel}
+            title="Confirmă ștergerea"
+            footer={
+                <>
                     <button
-                        type="button"
-                        className="close-btn"
-                        onClick={onCancel}
-                        aria-label="Închide"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="24"
-                            height="24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="none"
-                            aria-hidden="true"
-                        >
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="modal-body">
-                    <p>
-                        Ștergi lista <strong>{listName}</strong>?
-                    </p>
-                </div>
-
-                <div className="modal-footer">
-                    <button
-                        ref={cancelButtonRef}
                         type="button"
                         className="cancel-btn"
                         onClick={onCancel}
@@ -96,9 +34,14 @@ const ConfirmDeleteModal = ({
                     >
                         Șterge
                     </button>
-                </div>
-            </div>
-        </dialog>
+                </>
+            }
+        >
+            <p style={{ margin: 0 }}>
+                Ștergi lista <strong>{listName}</strong>? Această acțiune nu
+                poate fi anulată.
+            </p>
+        </Modal>
     );
 };
 

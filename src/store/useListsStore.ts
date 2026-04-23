@@ -102,7 +102,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
             const data = (await response.json()) as ApiShoppingList[];
             set({
-                lists: Array.isArray(data) ? data.map(normalizeListFromApi) : [],
+                lists: Array.isArray(data)
+                    ? data.map(normalizeListFromApi)
+                    : [],
                 isLoading: false,
             });
         } catch (error) {
@@ -199,17 +201,22 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
     addItem: async (listId: string, item: Omit<Item, "id">) => {
         try {
-            const response = await fetch(`${getBaseUrl()}/api/lists/${listId}/items`, {
-                method: "POST",
-                headers: getAuthHeaders(true),
-                body: JSON.stringify(buildItemRequest(item)),
-            });
+            const response = await fetch(
+                `${getBaseUrl()}/api/lists/${listId}/items`,
+                {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify(buildItemRequest(item)),
+                },
+            );
 
             if (!response.ok) {
                 throw new Error(`Failed to add item (${response.status})`);
             }
 
-            const createdItem = normalizeItem((await response.json()) as ApiItem);
+            const createdItem = normalizeItem(
+                (await response.json()) as ApiItem,
+            );
             set((state) => ({
                 lists: state.lists.map((list) =>
                     list.id === listId
@@ -221,7 +228,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
         } catch (error) {
             set({
                 error:
-                    error instanceof Error ? error.message : "Failed to add item",
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to add item",
             });
             return false;
         }
@@ -236,17 +245,24 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
         const nextChecked = !item.checked;
         try {
-            const response = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "PUT",
-                headers: getAuthHeaders(true),
-                body: JSON.stringify(buildItemRequest({ ...item, checked: nextChecked })),
-            });
+            const response = await fetch(
+                `${getBaseUrl()}/api/items/${itemId}`,
+                {
+                    method: "PUT",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify(
+                        buildItemRequest({ ...item, checked: nextChecked }),
+                    ),
+                },
+            );
 
             if (!response.ok) {
                 throw new Error(`Failed to update item (${response.status})`);
             }
 
-            const updatedItem = normalizeItem((await response.json()) as ApiItem);
+            const updatedItem = normalizeItem(
+                (await response.json()) as ApiItem,
+            );
             set((state) => ({
                 lists: state.lists.map((entry) =>
                     entry.id === listId
@@ -273,10 +289,13 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
     deleteItem: async (listId: string, itemId: string) => {
         try {
-            const response = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "DELETE",
-                headers: getAuthHeaders(),
-            });
+            const response = await fetch(
+                `${getBaseUrl()}/api/items/${itemId}`,
+                {
+                    method: "DELETE",
+                    headers: getAuthHeaders(),
+                },
+            );
 
             if (!response.ok) {
                 throw new Error(`Failed to delete item (${response.status})`);
