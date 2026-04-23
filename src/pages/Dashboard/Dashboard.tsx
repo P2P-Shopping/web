@@ -1,4 +1,4 @@
-import { ChevronLeft, Plus, Search, Send, Trash2 } from "lucide-react";
+import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import {
     type MouseEvent,
     type ReactNode,
@@ -6,7 +6,7 @@ import {
     useMemo,
     useState,
 } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
@@ -16,13 +16,11 @@ import CreateListModal from "./CreateListModal";
 const PREVIEW_LIMIT = 3;
 
 const Dashboard = () => {
-    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [deleteTarget, setDeleteTarget] = useState<{
         id: string;
         name: string;
     } | null>(null);
-    const [showStoresModal, setShowStoresModal] = useState(false);
     const {
         lists,
         isLoading,
@@ -84,7 +82,6 @@ const Dashboard = () => {
 
     const clearSelectedList = () => {
         setSearchParams({});
-        setShowStoresModal(false);
     };
 
     // Calculate items count
@@ -133,8 +130,6 @@ const Dashboard = () => {
                 <ListDetail
                     listIdOverride={selectedList.id}
                     listTitle={selectedList.name}
-                    showStoresModal={showStoresModal}
-                    onCloseStoresModal={() => setShowStoresModal(false)}
                 />
             </div>
         );
@@ -245,26 +240,7 @@ const Dashboard = () => {
                         <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
                             {selectedList.name}
                         </h1>
-                        <div className="flex items-center gap-2 shrink-0 max-[600px]:w-full max-[600px]:justify-between">
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-2 border-1.5 border-border-strong rounded-md bg-bg-muted text-text-strong text-sm font-semibold transition-all duration-200 ease-out hover:bg-surface hover:border-border-strong shrink-0"
-                                onClick={() => setShowStoresModal(true)}
-                            >
-                                <Search size={18} />
-                                <span>Find Stores</span>
-                            </button>
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-text-strong text-bg text-sm font-semibold transition-all duration-200 ease-out hover:opacity-85 hover:-translate-y-px shrink-0 active:translate-y-0"
-                                onClick={() =>
-                                    navigate(`/nav/${selectedList.id}`)
-                                }
-                            >
-                                <Send size={18} />
-                                <span>Navigate</span>
-                            </button>
-                        </div>
+                        <div className="flex items-center gap-2 shrink-0 max-[600px]:w-full max-[600px]:justify-between" />
                     </>
                 ) : (
                     <>

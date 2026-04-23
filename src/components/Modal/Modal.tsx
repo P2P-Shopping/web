@@ -133,7 +133,7 @@ export default function Modal({
                 </div>
 
                 {footer && (
-                    <div className="flex items-center justify-end gap-3 p-6 pt-2 bg-bg-subtle/50 rounded-b-xl border-t border-border/50">
+                    <div className="flex items-center justify-end gap-3 p-6 bg-bg-subtle/50 rounded-b-xl border-t border-border/50">
                         {footer}
                     </div>
                 )}

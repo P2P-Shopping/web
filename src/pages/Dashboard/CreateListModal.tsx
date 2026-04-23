@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type SubmitEvent, useState } from "react";
 import { Modal } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -16,7 +16,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
         onClose();
     };
 
-    const handleSubmit = async (e: FormEvent) => {
+    const handleSubmit = async (e: SubmitEvent) => {
         e.preventDefault();
         const trimmedName = listName.trim();
         if (!trimmedName) return;
@@ -42,7 +42,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
             title="Create New List"
             initialFocusSelector="#list-name"
             footer={
-                <>
+                <div className="grid grid-cols-2 gap-3 w-full">
                     <button
                         type="button"
                         className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border disabled:opacity-50"
@@ -67,7 +67,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                             "Create List"
                         )}
                     </button>
-                </>
+                </div>
             }
         >
             <form

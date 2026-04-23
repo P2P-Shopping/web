@@ -19,7 +19,7 @@ const ConfirmDeleteModal = ({
             onClose={onCancel}
             title="Confirm deletion"
             footer={
-                <>
+                <div className="grid grid-cols-2 gap-3 w-full">
                     <button
                         type="button"
                         className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
@@ -34,7 +34,7 @@ const ConfirmDeleteModal = ({
                     >
                         Delete
                     </button>
-                </>
+                </div>
             }
         >
             <p className="m-0 text-text leading-relaxed">

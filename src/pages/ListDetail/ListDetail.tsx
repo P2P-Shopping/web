@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, Send } from "lucide-react";
+import { ChevronDown, Plus, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Modal } from "../../components";
@@ -37,40 +37,12 @@ interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
     listTitle?: string;
-    showStoresModal?: boolean;
-    onCloseStoresModal?: () => void;
 }
-
-const MOCK_STORES = [
-    {
-        id: "1",
-        name: "SuperMart Downtown",
-        address: "123 Main St, New York, NY 10001",
-        bestMatch: true,
-        isMock: true,
-    },
-    {
-        id: "2",
-        name: "FreshMart Uptown",
-        address: "456 Broadway, New York, NY 10012",
-        bestMatch: false,
-        isMock: true,
-    },
-    {
-        id: "3",
-        name: "QuickShop Mall",
-        address: "789 Park Ave, New York, NY 10016",
-        bestMatch: false,
-        isMock: true,
-    },
-];
 
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
     listTitle: _listTitle,
-    showStoresModal = false,
-    onCloseStoresModal,
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -187,7 +159,6 @@ const ListDetail = ({
     };
 
     const closeDetailsModal = () => setShowDetailsModal(false);
-    const closeStoresModal = () => onCloseStoresModal?.();
 
     const commitItem = (
         name: string,
@@ -452,10 +423,12 @@ const ListDetail = ({
                             />
                             <button
                                 type="button"
-                                className="text-[11px] font-bold text-text-muted hover:text-accent transition-colors uppercase tracking-wider px-2"
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
                                 onClick={_openDetailsModal}
+                                title="Add item details"
+                                aria-label="Add item details"
                             >
-                                Details
+                                <Settings size={18} />
                             </button>
                             <button
                                 type="submit"
@@ -504,7 +477,7 @@ const ListDetail = ({
                 title="Add Item"
                 initialFocusSelector="#mobile-item-name"
                 footer={
-                    <>
+                    <div className="grid grid-cols-2 gap-3 w-full">
                         <button
                             type="button"
                             className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
@@ -519,7 +492,7 @@ const ListDetail = ({
                         >
                             Add
                         </button>
-                    </>
+                    </div>
                 }
             >
                 <form
@@ -636,7 +609,7 @@ const ListDetail = ({
                 subtitle="Add optional details like quantity, brand, and price"
                 initialFocusSelector="#ld-item-name"
                 footer={
-                    <>
+                    <div className="grid grid-cols-2 gap-3 w-full">
                         <button
                             type="button"
                             className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
@@ -651,7 +624,7 @@ const ListDetail = ({
                         >
                             Add Item
                         </button>
-                    </>
+                    </div>
                 }
             >
                 <form
@@ -731,55 +704,6 @@ const ListDetail = ({
                         />
                     </div>
                 </form>
-            </Modal>
-
-            {/* ── Suggested Stores modal ── */}
-            <Modal
-                isOpen={showStoresModal}
-                onClose={closeStoresModal}
-                title="Suggested Stores"
-                subtitle="Based on your shopping list and crowd-sourced data"
-                maxWidth="500px"
-            >
-                <div className="flex flex-col gap-2.5 p-[0_4px_12px]">
-                    {MOCK_STORES.filter(
-                        (store) => !(store.isMock && import.meta.env.PROD),
-                    ).map((store) => (
-                        <div
-                            key={store.id}
-                            className="flex items-center justify-between gap-3 bg-bg-subtle border border-border rounded-xl p-[14px_16px] transition-all hover:border-border-strong group"
-                        >
-                            <div className="flex flex-col gap-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[15px] font-bold text-text-strong">
-                                        {store.name}
-                                    </span>
-                                    {store.bestMatch && (
-                                        <span className="inline-flex px-2 py-0.5 rounded-full bg-text-strong text-bg text-[10px] font-extrabold uppercase tracking-tight">
-                                            Best Match
-                                        </span>
-                                    )}
-                                </div>
-                                <span className="text-xs text-text-muted break-words">
-                                    {store.address}
-                                </span>
-                            </div>
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all hover:opacity-80 hover:-translate-y-px active:translate-y-0 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed disabled:translate-y-0"
-                                disabled={store.isMock}
-                                title={
-                                    store.isMock
-                                        ? "Navigation unavailable for mock stores"
-                                        : undefined
-                                }
-                            >
-                                <Send size={15} />
-                                {store.isMock ? "Go (Mock)" : "Go"}
-                            </button>
-                        </div>
-                    ))}
-                </div>
             </Modal>
         </div>
     );
