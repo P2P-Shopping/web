@@ -680,6 +680,15 @@ const StoreMap: React.FC = () => {
     const { id: listId } = useParams<{ id: string }>();
     const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
+    // Prevent browser scrolling when map is active
+    useEffect(() => {
+        const originalStyle = window.getComputedStyle(document.body).overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = originalStyle;
+        };
+    }, []);
+
     const {
         isDragging,
         hasLocationLock,
@@ -703,129 +712,141 @@ const StoreMap: React.FC = () => {
     }
 
     return (
-        <div
-            className={`relative flex-1 h-[calc(100svh-60px)] overflow-hidden bg-bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-        >
-            {isRouting && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-text-strong text-bg rounded-full text-xs font-bold shadow-lg animate-pulse">
-                    Calculating route...
-                </div>
-            )}
+        <div className="flex flex-col h-full overflow-hidden bg-bg-muted">
+            <div
+                className={`relative flex-1 overflow-hidden ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+            >
+                {isRouting && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-text-strong text-bg rounded-full text-xs font-bold shadow-lg animate-pulse">
+                        Calculating route...
+                    </div>
+                )}
 
-            <canvas
-                ref={canvasRef}
-                className="w-full h-full block bg-bg-muted touch-none"
-                {...handlers}
-            />
+                <canvas
+                    ref={canvasRef}
+                    className="w-full h-full block bg-bg-muted touch-none"
+                    {...handlers}
+                />
 
-            {gpsError && (
+                {gpsError && (
+                    <div
+                        className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
+                        role="status"
+                    >
+                        {gpsError}
+                    </div>
+                )}
+
+                {/* Sidebar Overlay (Mobile) */}
+                {isSidebarExpanded && (
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-30 min-[1000px]:hidden animate-fade-in"
+                        onClick={() => setIsSidebarExpanded(false)}
+                        onKeyDown={(e) =>
+                            e.key === "Escape" && setIsSidebarExpanded(false)
+                        }
+                        aria-label="Close list drawer"
+                    />
+                )}
+
+                {/* Responsive Sidebar */}
                 <div
-                    className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
-                    role="status"
+                    aria-hidden={!isSidebarExpanded}
+                    {...(!isSidebarExpanded ? { inert: true } : {})}
+                    className={`
+                        absolute z-30 transition-all duration-500 ease-spring
+                        /* Desktop: Right-side Drawer */
+                        min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 
+                        min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border
+                        ${
+                            isSidebarExpanded
+                                ? "min-[1000px]:translate-x-0"
+                                : "min-[1000px]:translate-x-full"
+                        }
+                        
+                        /* Mobile: Bottom Sheet */
+                        max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 
+                        max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh]
+                        ${
+                            isSidebarExpanded
+                                ? "max-[1000px]:translate-y-0"
+                                : "max-[1000px]:translate-y-full"
+                        }
+                        
+                        bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
+                    `}
                 >
-                    {gpsError}
-                </div>
-            )}
+                    {/* Drag Handle for Mobile */}
+                    <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
-            <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-3">
-                <button
-                    type="button"
-                    className="w-14 h-14 flex items-center justify-center bg-accent text-text-on-accent rounded-full shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        recenterCamera();
-                    }}
-                    title="Recenter Map"
-                >
-                    <LocateFixed size={24} />
-                </button>
-
-                <div className="flex flex-col bg-surface border border-border rounded-[28px] shadow-xl overflow-hidden shadow-[0_4px_12px_var(--color-accent-glow)] transition-all">
-                    <button
-                        type="button"
-                        className="w-14 h-14 flex items-center justify-center text-text-strong hover:bg-bg-muted transition-colors border-b border-border active:bg-border"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            zoomIn();
-                        }}
-                        title="Zoom In"
-                    >
-                        <ZoomIn size={22} />
-                    </button>
-                    <button
-                        type="button"
-                        className="w-14 h-14 flex items-center justify-center text-text-strong hover:bg-bg-muted transition-colors active:bg-border"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            zoomOut();
-                        }}
-                        title="Zoom Out"
-                    >
-                        <ZoomOut size={22} />
-                    </button>
+                    <div className="flex-1 overflow-y-auto px-1">
+                        <ListDetail isEmbedded={true} />
+                    </div>
                 </div>
             </div>
 
-            {/* Floating Toggle Button (Mobile & Desktop) */}
-            <button
-                type="button"
-                className={`absolute bottom-6 right-6 z-40 w-14 h-14 flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 ${
-                    isSidebarExpanded
-                        ? "rotate-90 bg-accent text-text-on-accent"
-                        : "bg-text-strong text-bg"
-                }`}
-                onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-                aria-label={isSidebarExpanded ? "Close List" : "Show List"}
-            >
-                {isSidebarExpanded ? <X size={24} /> : <List size={24} />}
-            </button>
+            {/* Map Control Bar - Separated from map view */}
+            <div className="relative z-40 bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
+                <div className="flex items-center gap-4">
+                    <button
+                        type="button"
+                        className="w-12 h-12 flex items-center justify-center bg-accent text-text-on-accent rounded-full shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            recenterCamera();
+                        }}
+                        title="Recenter Map"
+                    >
+                        <LocateFixed size={20} />
+                    </button>
 
-            {/* Sidebar Overlay (Mobile) */}
-            {isSidebarExpanded && (
+                    <div className="flex items-center bg-bg-muted border border-border rounded-2xl p-1">
+                        <button
+                            type="button"
+                            className="w-10 h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                zoomIn();
+                            }}
+                            title="Zoom In"
+                        >
+                            <ZoomIn size={18} />
+                        </button>
+                        <div className="w-px h-6 bg-border mx-1" />
+                        <button
+                            type="button"
+                            className="w-10 h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                zoomOut();
+                            }}
+                            title="Zoom Out"
+                        >
+                            <ZoomOut size={18} />
+                        </button>
+                    </div>
+                </div>
+
                 <button
                     type="button"
-                    className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-30 min-[1000px]:hidden animate-fade-in"
-                    onClick={() => setIsSidebarExpanded(false)}
-                    onKeyDown={(e) =>
-                        e.key === "Escape" && setIsSidebarExpanded(false)
-                    }
-                    aria-label="Close list drawer"
-                ></button>
-            )}
-
-            {/* Responsive Sidebar */}
-            <div
-                aria-hidden={!isSidebarExpanded}
-                {...(!isSidebarExpanded ? { inert: true } : {})}
-                className={`
-                    absolute z-30 transition-all duration-500 ease-spring
-                    /* Desktop: Right-side Drawer */
-                    min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 
-                    min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border
-                    ${
+                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 ${
                         isSidebarExpanded
-                            ? "min-[1000px]:translate-x-0"
-                            : "min-[1000px]:translate-x-full"
-                    }
-                    
-                    /* Mobile: Bottom Sheet */
-                    max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 
-                    max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh]
-                    ${
-                        isSidebarExpanded
-                            ? "max-[1000px]:translate-y-0"
-                            : "max-[1000px]:translate-y-full"
-                    }
-                    
-                    bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
-                `}
-            >
-                {/* Drag Handle for Mobile */}
-                <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
-
-                <div className="flex-1 overflow-y-auto px-1">
-                    <ListDetail isEmbedded={true} />
-                </div>
+                            ? "bg-accent text-text-on-accent"
+                            : "bg-text-strong text-bg"
+                    }`}
+                    onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                    aria-label={isSidebarExpanded ? "Close List" : "Show List"}
+                >
+                    {isSidebarExpanded ? (
+                        <X size={20} className="rotate-90" />
+                    ) : (
+                        <List size={20} />
+                    )}
+                    <span className="hidden sm:inline">
+                        {isSidebarExpanded ? "Close List" : "View List"}
+                    </span>
+                </button>
             </div>
         </div>
     );
