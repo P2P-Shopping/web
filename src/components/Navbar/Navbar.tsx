@@ -65,7 +65,7 @@ export default function Navbar() {
                         <div
                             className={`p-2 rounded-xl transition-all duration-300 ${
                                 pathname.startsWith(to)
-                                    ? "bg-accent-subtle scale-110 shadow-[0_0_20px_var(--color-accent-glow)]"
+                                    ? "bg-accent-subtle"
                                     : "group-hover:bg-bg-muted"
                             }`}
                         >
@@ -74,12 +74,7 @@ export default function Navbar() {
                                 strokeWidth={pathname.startsWith(to) ? 2.5 : 2}
                             />
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">
-                            {label}
-                        </span>
-                        {pathname.startsWith(to) && (
-                            <div className="absolute -top-1 w-1 h-1 bg-accent rounded-full animate-in fade-in zoom-in duration-300" />
-                        )}
+                        <span className="text-[10px] font-bold">{label}</span>
                     </Link>
                 ))}
 
@@ -96,7 +91,7 @@ export default function Navbar() {
                     <div
                         className={`p-2 rounded-xl transition-all duration-300 ${
                             isMoreOpen
-                                ? "bg-accent-subtle scale-110"
+                                ? "bg-accent-subtle"
                                 : "group-hover:bg-bg-muted"
                         }`}
                     >
@@ -106,9 +101,7 @@ export default function Navbar() {
                             <MoreHorizontal size={22} />
                         )}
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                        More
-                    </span>
+                    <span className="text-[10px] font-bold">More</span>
                 </button>
 
                 {/* More Menu Content */}
@@ -134,7 +127,7 @@ export default function Navbar() {
                             ))}
                             <div className="h-px bg-border my-1" />
                             <div className="px-4 py-2 flex items-center justify-between">
-                                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                <span className="text-xs font-bold text-text-muted">
                                     Theme
                                 </span>
                                 <ThemeSwitcher />
