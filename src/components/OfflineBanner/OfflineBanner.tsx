@@ -10,7 +10,7 @@ export const OfflineBanner: React.FC = () => {
     const isOnline = useStore((state) => state.isOnline);
     const isServerConnected = useStore((state) => state.isServerConnected);
 
-    // If we have a top navbar/header, we might want to offset this, 
+    // If we have a top navbar/header, we might want to offset this,
     // but usually global banners stay at the very top (top-0).
     // For now, we'll just fix the prop error.
 

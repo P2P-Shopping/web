@@ -33,8 +33,6 @@ interface ApiShoppingList {
     items?: ApiListItem[];
 }
 
-
-
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
@@ -333,10 +331,6 @@ const ListDetail = ({
         });
     };
 
-
-
-
-
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
 
@@ -413,7 +407,10 @@ const ListDetail = ({
                                         className="flex items-center justify-between p-4 bg-surface border border-border rounded-xl hover:border-accent hover:shadow-md transition-all text-left"
                                     >
                                         <div className="flex flex-col gap-0.5 min-w-0">
-                                            <span className="font-bold text-text-strong truncate" title={list.name}>
+                                            <span
+                                                className="font-bold text-text-strong truncate"
+                                                title={list.name}
+                                            >
                                                 {list.name}
                                             </span>
                                             <span className="text-xs text-text-muted">
@@ -760,10 +757,16 @@ const ListDetail = ({
                                 type="button"
                                 className="inline-flex items-center gap-1.5 px-4 py-2 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all hover:opacity-80 hover:-translate-y-px active:translate-y-0 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed disabled:translate-y-0"
                                 disabled={store.isMock && import.meta.env.PROD}
-                                title={store.isMock && import.meta.env.PROD ? "Navigation unavailable for mock stores" : undefined}
+                                title={
+                                    store.isMock && import.meta.env.PROD
+                                        ? "Navigation unavailable for mock stores"
+                                        : undefined
+                                }
                             >
                                 <Send size={15} />
-                                {store.isMock && import.meta.env.DEV ? "Go (Mock)" : "Go"}
+                                {store.isMock && import.meta.env.DEV
+                                    ? "Go (Mock)"
+                                    : "Go"}
                             </button>
                         </div>
                     ))}

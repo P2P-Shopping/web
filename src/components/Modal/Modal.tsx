@@ -79,12 +79,19 @@ export default function Modal({
         onClose();
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDialogElement>) => {
+        if (e.key === "Escape") {
+            onClose();
+        }
+    };
+
     return (
         <dialog
             ref={dialogRef}
             className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-[4px] border-none p-0 outline-none open:animate-in open:fade-in duration-200"
             onCancel={handleCancel}
             onClick={handleBackdropClick}
+            onKeyDown={handleKeyDown}
             aria-labelledby={title ? modalTitleId : undefined}
             aria-describedby={subtitle ? modalSubtitleId : undefined}
         >

@@ -35,6 +35,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                     key={item.id}
                     className={`flex items-center justify-between p-4 bg-bg-subtle border border-border rounded-xl transition-all duration-200 hover:bg-surface hover:shadow-md group ${item.checked ? "opacity-60" : ""}`}
                 >
+                    {/* biome-ignore lint/a11y/useSemanticElements: custom checkbox button */}
                     <button
                         type="button"
                         className="flex items-center gap-4 cursor-pointer flex-1 min-w-0 border-none bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-4 rounded-sm"

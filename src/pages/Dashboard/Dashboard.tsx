@@ -155,7 +155,10 @@ const Dashboard = () => {
                             >
                                 <div className="flex justify-between items-start gap-3">
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="text-lg font-bold text-text-strong leading-tight truncate" title={list.name}>
+                                        <h3
+                                            className="text-lg font-bold text-text-strong leading-tight truncate"
+                                            title={list.name}
+                                        >
                                             {list.name}
                                         </h3>
                                     </div>
@@ -206,18 +209,18 @@ const Dashboard = () => {
                                 </div>
                             </button>
 
-                        {/* Delete Button (Separate from card button to avoid nesting) */}
-                        <button
-                            type="button"
-                            className="absolute top-5 right-5 flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 z-10"
-                            onClick={(e) =>
-                                handleDeleteList(e, list.id, list.name)
-                            }
-                            title="Delete list"
-                            aria-label="Delete list"
-                        >
-                            <Trash2 size={16} />
-                        </button>
+                            {/* Delete Button (Separate from card button to avoid nesting) */}
+                            <button
+                                type="button"
+                                className="absolute top-5 right-5 flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 z-10"
+                                onClick={(e) =>
+                                    handleDeleteList(e, list.id, list.name)
+                                }
+                                title="Delete list"
+                                aria-label="Delete list"
+                            >
+                                <Trash2 size={16} />
+                            </button>
                         </div>
                     );
                 })}
@@ -254,7 +257,9 @@ const Dashboard = () => {
                             <button
                                 type="button"
                                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-text-strong text-bg text-sm font-semibold transition-all duration-200 ease-out hover:opacity-85 hover:-translate-y-px shrink-0 active:translate-y-0"
-                                onClick={() => navigate(`/nav/${selectedList.id}`)}
+                                onClick={() =>
+                                    navigate(`/nav/${selectedList.id}`)
+                                }
                             >
                                 <Send size={18} />
                                 <span>Navigate</span>

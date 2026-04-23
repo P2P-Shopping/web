@@ -40,6 +40,7 @@ export default function Navbar() {
     }, []);
 
     // Close more menu on navigation
+    // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is used as a trigger to close the menu
     useEffect(() => {
         setIsMoreOpen(false);
     }, [pathname]);
