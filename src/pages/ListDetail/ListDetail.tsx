@@ -195,6 +195,7 @@ const ListDetail = ({
         brand?: string,
         price?: number,
     ) => {
+        if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
         const newItem: Item = {
             id: crypto.randomUUID(),
@@ -292,27 +293,31 @@ const ListDetail = ({
                 isRecurrent: currentItem.isRecurrent ?? false,
                 timestamp: Date.now(),
             }),
-        }).catch(() => {
-            setError("Failed to update the product.");
-            const rolledBack = items.map((item) =>
-                item.id === itemId
-                    ? { ...item, checked: currentItem.checked }
-                    : item,
-            );
-            setItems(rolledBack);
-            syncListItemsInStore(rolledBack);
-        });
-        if (effectiveListId && stompClient.connected) {
-            stompClient.publish({
-                destination: "/app/sync",
-                body: JSON.stringify({
-                    eventType: "ITEM_TOGGLED",
-                    listId: effectiveListId,
-                    itemId,
-                    checked: newChecked,
-                }),
+        })
+            .then((res) => {
+                if (!res.ok) throw new Error("Failed to update item");
+                if (effectiveListId && stompClient.connected) {
+                    stompClient.publish({
+                        destination: "/app/sync",
+                        body: JSON.stringify({
+                            eventType: "ITEM_TOGGLED",
+                            listId: effectiveListId,
+                            itemId,
+                            checked: newChecked,
+                        }),
+                    });
+                }
+            })
+            .catch(() => {
+                setError("Failed to update the product.");
+                const rolledBack = items.map((item) =>
+                    item.id === itemId
+                        ? { ...item, checked: currentItem.checked }
+                        : item,
+                );
+                setItems(rolledBack);
+                syncListItemsInStore(rolledBack);
             });
-        }
     };
 
     const handleDelete = (itemId: string) => {
@@ -324,11 +329,15 @@ const ListDetail = ({
         void fetch(`${getBaseUrl()}/api/items/${itemId}`, {
             method: "DELETE",
             headers: getAuthHeaders(),
-        }).catch(() => {
-            setError("Failed to delete the product.");
-            setItems(previousItems);
-            syncListItemsInStore(previousItems);
-        });
+        })
+            .then((res) => {
+                if (!res.ok) throw new Error("Failed to delete item");
+            })
+            .catch(() => {
+                setError("Failed to delete the product.");
+                setItems(previousItems);
+                syncListItemsInStore(previousItems);
+            });
     };
 
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
@@ -733,7 +742,9 @@ const ListDetail = ({
                 maxWidth="500px"
             >
                 <div className="flex flex-col gap-2.5 p-[0_4px_12px]">
-                    {MOCK_STORES.map((store) => (
+                    {MOCK_STORES.filter(
+                        (store) => !(store.isMock && import.meta.env.PROD),
+                    ).map((store) => (
                         <div
                             key={store.id}
                             className="flex items-center justify-between gap-3 bg-bg-subtle border border-border rounded-xl p-[14px_16px] transition-all hover:border-border-strong group"
@@ -756,17 +767,15 @@ const ListDetail = ({
                             <button
                                 type="button"
                                 className="inline-flex items-center gap-1.5 px-4 py-2 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all hover:opacity-80 hover:-translate-y-px active:translate-y-0 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed disabled:translate-y-0"
-                                disabled={store.isMock && import.meta.env.PROD}
+                                disabled={store.isMock}
                                 title={
-                                    store.isMock && import.meta.env.PROD
+                                    store.isMock
                                         ? "Navigation unavailable for mock stores"
                                         : undefined
                                 }
                             >
                                 <Send size={15} />
-                                {store.isMock && import.meta.env.DEV
-                                    ? "Go (Mock)"
-                                    : "Go"}
+                                {store.isMock ? "Go (Mock)" : "Go"}
                             </button>
                         </div>
                     ))}

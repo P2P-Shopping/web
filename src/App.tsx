@@ -17,6 +17,14 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+    const token = localStorage.getItem("token");
+    if (!token) {
+        return <Navigate to="/login" replace />;
+    }
+    return children;
+}
+
 function App() {
     useNetworkState();
     const location = useLocation();
@@ -78,7 +86,11 @@ function App() {
             console.error("Broker error:", frame.headers.message);
             setServerConnected(false);
             setToastMessage("Connection lost. Retrying...");
-            setTimeout(() => setToastMessage(null), 3000);
+            clearToastTimeout();
+            toastTimeoutRef.current = setTimeout(() => {
+                setToastMessage(null);
+                toastTimeoutRef.current = null;
+            }, 3000);
         };
 
         stompClient.onWebSocketClose = () => {
@@ -98,7 +110,7 @@ function App() {
             stompClient.onStompError = () => {};
             stompClient.deactivate();
         };
-    }, [handlePongMessage, setServerConnected]);
+    }, [handlePongMessage, setServerConnected, clearToastTimeout]);
 
     const handleAuthSuccess = (result: unknown) => {
         console.info("Authentication successful", result);
@@ -155,11 +167,46 @@ function App() {
                             )
                         }
                     />
-                    <Route path="/map" element={<MapPage />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/nav/:id?" element={<StoreMap />} />
-                    <Route path="/route" element={<RoutePage />} />
-                    <Route path="/list/:id" element={<ListDetail />} />
+                    <Route
+                        path="/map"
+                        element={
+                            <ProtectedRoute>
+                                <MapPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/dashboard"
+                        element={
+                            <ProtectedRoute>
+                                <Dashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/nav/:id?"
+                        element={
+                            <ProtectedRoute>
+                                <StoreMap />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/route"
+                        element={
+                            <ProtectedRoute>
+                                <RoutePage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/list/:id"
+                        element={
+                            <ProtectedRoute>
+                                <ListDetail />
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route
                         path="/"
                         element={

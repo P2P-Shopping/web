@@ -216,8 +216,8 @@ const Dashboard = () => {
                                 onClick={(e) =>
                                     handleDeleteList(e, list.id, list.name)
                                 }
-                                title="Delete list"
-                                aria-label="Delete list"
+                                title={`Delete ${list.name}`}
+                                aria-label={`Delete list ${list.name}`}
                             >
                                 <Trash2 size={16} />
                             </button>

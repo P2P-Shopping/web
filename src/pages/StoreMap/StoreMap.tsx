@@ -418,7 +418,7 @@ const useMapEngine = (
                     ctx.fill();
 
                     ctx.fillStyle = "white";
-                    ctx.font = `bold ${12 / camera.current.zoom}px Outfit, sans-serif`;
+                    ctx.font = `bold ${12 / camera.current.zoom}px Inter, sans-serif`;
                     ctx.fillText(
                         product.name,
                         x + 12 / camera.current.zoom,
@@ -644,7 +644,6 @@ const useMapEngine = (
     const recenterCamera = () => {
         if (!originGps.current) return;
 
-        camera.current.zoom = 1; // Reset zoom as requested
         const userPos = getRelativePixels(
             currentRenderedGps.current,
             originGps.current,
@@ -790,6 +789,7 @@ const StoreMap: React.FC = () => {
                     onKeyDown={(e) =>
                         e.key === "Escape" && setIsSidebarExpanded(false)
                     }
+                    aria-label="Close list drawer"
                 ></button>
             )}
 

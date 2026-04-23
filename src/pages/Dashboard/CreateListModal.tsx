@@ -11,28 +11,34 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { addList } = useListsStore();
 
+    const handleClose = () => {
+        if (isSubmitting) return;
+        onClose();
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         const trimmedName = listName.trim();
         if (!trimmedName) return;
 
         setIsSubmitting(true);
+        let success = false;
         try {
-            const success = await addList(trimmedName);
-            if (success) {
-                onClose();
-            }
+            success = await addList(trimmedName);
         } catch (error) {
             console.error("Failed to create list:", error);
         } finally {
             setIsSubmitting(false);
+            if (success) {
+                onClose();
+            }
         }
     };
 
     return (
         <Modal
             isOpen={true}
-            onClose={onClose}
+            onClose={handleClose}
             title="Create New List"
             initialFocusSelector="#list-name"
             footer={
@@ -40,7 +46,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                     <button
                         type="button"
                         className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border disabled:opacity-50"
-                        onClick={onClose}
+                        onClick={handleClose}
                         disabled={isSubmitting}
                     >
                         Cancel
@@ -50,6 +56,10 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                         form="create-list-form"
                         className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={!listName.trim() || isSubmitting}
+                        aria-busy={isSubmitting}
+                        aria-label={
+                            isSubmitting ? "Creating list..." : undefined
+                        }
                     >
                         {isSubmitting ? (
                             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
