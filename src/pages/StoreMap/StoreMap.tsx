@@ -1,16 +1,13 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import "./StoreMap.css";
+import { useParams } from "react-router-dom";
 import ListDetail from "../ListDetail/ListDetail";
+
+import "./StoreMap.css";
 
 interface Coordinate {
     lat: number;
     lng: number;
-}
-
-interface Product extends Coordinate {
-    id: number;
-    name: string;
 }
 
 interface Point {
@@ -51,6 +48,8 @@ const MAP_CONFIG = {
     PAN_PADDING: 96,
 };
 
+const USER_GPS_DEFAULT = { lat: 47.151726, lng: 27.587914 };
+
 const getRelativePixels = (
     target: Coordinate,
     reference: Coordinate,
@@ -67,31 +66,31 @@ const getRelativePixels = (
     return { x, y };
 };
 
-const generateLocalProducts = (centerGps: Coordinate): Product[] => {
+const generateLocalProducts = (centerGps: Coordinate): RoutePoint[] => {
     const latOffset = 0.00015;
     const lngOffset = 0.00015;
 
     return [
         {
-            id: 1,
+            itemId: "1",
             lat: centerGps.lat + latOffset,
             lng: centerGps.lng + lngOffset,
             name: "Milk",
         },
         {
-            id: 2,
+            itemId: "2",
             lat: centerGps.lat - latOffset,
             lng: centerGps.lng - lngOffset,
             name: "Bread",
         },
         {
-            id: 3,
+            itemId: "3",
             lat: centerGps.lat + latOffset * 1.5,
             lng: centerGps.lng - lngOffset * 0.5,
             name: "Apples",
         },
         {
-            id: 4,
+            itemId: "4",
             lat: centerGps.lat - latOffset * 0.8,
             lng: centerGps.lng + lngOffset * 1.2,
             name: "Coffee",
@@ -101,11 +100,11 @@ const generateLocalProducts = (centerGps: Coordinate): Product[] => {
 
 const calculateNearestNeighborRoute = (
     startPoint: Point,
-    products: Product[],
+    products: RoutePoint[],
     anchor: Coordinate,
-): Product[] => {
+): RoutePoint[] => {
     const unvisited = [...products];
-    const orderedRoute: Product[] = [];
+    const orderedRoute: RoutePoint[] = [];
     let currentPoint = { ...startPoint };
 
     while (unvisited.length > 0) {
@@ -173,15 +172,26 @@ const getCameraConstraints = (
     };
 };
 
-const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
+interface RoutePoint {
+    itemId: string;
+    name: string;
+    lat: number;
+    lng: number;
+}
+
+const useMapEngine = (
+    canvasRef: React.RefObject<HTMLCanvasElement | null>,
+    listId: string | undefined,
+) => {
     const [isDragging, setIsDragging] = useState(false);
     const [hasLocationLock, setHasLocationLock] = useState(false);
     const [gpsError, setGpsError] = useState<string | null>(null);
+    const [isRouting, setIsRouting] = useState(false);
 
     const originGps = useRef<Coordinate | null>(null);
     const targetGps = useRef<Coordinate>({ lat: 0, lng: 0 });
     const currentRenderedGps = useRef<Coordinate>({ lat: 0, lng: 0 });
-    const localProducts = useRef<Product[]>([]);
+    const routePoints = useRef<RoutePoint[]>([]);
     const isFirstLocationUpdate = useRef(true);
     const camera = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
     const lastPanPoint = useRef<Point | null>(null);
@@ -212,11 +222,15 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         };
 
         const userPos = getRelativePixels(currentRenderedGps.current, anchor);
-        const productPoints = localProducts.current.map((product) =>
-            getRelativePixels(product, anchor),
-        );
+        const pointsToBound = [userPos];
+        if (routePoints.current.length > 0) {
+            for (const p of routePoints.current) {
+                pointsToBound.push(getRelativePixels(p, anchor));
+            }
+        }
+
         const constraints = getCameraConstraints(
-            [userPos, ...productPoints],
+            pointsToBound,
             viewport,
             nextZoom,
             MAP_CONFIG.PAN_PADDING,
@@ -231,6 +245,68 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         camera.current.x = clamp(nextX, constraints.minX, constraints.maxX);
         camera.current.y = clamp(nextY, constraints.minY, constraints.maxY);
     };
+
+    useEffect(() => {
+        const controller = new AbortController();
+        const fetchRoute = async () => {
+            if (!listId || listId === "default") {
+                if (originGps.current) {
+                    routePoints.current = generateLocalProducts(
+                        originGps.current,
+                    );
+                }
+                return;
+            }
+            setIsRouting(true);
+            try {
+                const baseUrl =
+                    import.meta.env.VITE_API_URL || "http://localhost:8081";
+                const response = await fetch(
+                    `${baseUrl}/api/routing/calculate`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        signal: controller.signal,
+                        body: JSON.stringify({
+                            listId: listId,
+                            userLat:
+                                targetGps.current.lat || USER_GPS_DEFAULT.lat,
+                            userLng:
+                                targetGps.current.lng || USER_GPS_DEFAULT.lng,
+                        }),
+                    },
+                );
+
+                if (controller.signal.aborted) return;
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.route) {
+                        const productsOnly: RoutePoint[] = data.route.filter(
+                            (p: RoutePoint) => p.itemId !== "user_loc",
+                        );
+                        routePoints.current = productsOnly;
+                    }
+                }
+            } catch (error) {
+                if (controller.signal.aborted) return;
+                console.error(error);
+                if (originGps.current) {
+                    routePoints.current = generateLocalProducts(
+                        originGps.current,
+                    );
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setIsRouting(false);
+                }
+            }
+        };
+        if (hasLocationLock) {
+            fetchRoute();
+        }
+        return () => controller.abort();
+    }, [listId, hasLocationLock]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
@@ -309,10 +385,10 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     anchor,
                 );
 
-                if (localProducts.current.length > 0) {
+                if (routePoints.current.length > 0) {
                     const orderedRoute = calculateNearestNeighborRoute(
                         userPos,
-                        localProducts.current,
+                        routePoints.current,
                         anchor,
                     );
 
@@ -332,12 +408,20 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     ctx.setLineDash([]);
                 }
 
-                localProducts.current.forEach((product) => {
+                routePoints.current.forEach((product) => {
                     const { x, y } = getRelativePixels(product, anchor);
                     ctx.beginPath();
                     ctx.arc(x, y, 8 / camera.current.zoom, 0, Math.PI * 2);
                     ctx.fillStyle = theme.product;
                     ctx.fill();
+
+                    ctx.fillStyle = "white";
+                    ctx.font = `${12 / camera.current.zoom}px Arial`;
+                    ctx.fillText(
+                        product.name,
+                        x + 12 / camera.current.zoom,
+                        y + 4 / camera.current.zoom,
+                    );
                 });
 
                 ctx.beginPath();
@@ -373,6 +457,12 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     useEffect(() => {
         if (!("geolocation" in navigator)) {
             setGpsError("Geolocation is not supported by your browser.");
+            // Fallback for development if needed
+            const newCoords = USER_GPS_DEFAULT;
+            originGps.current = { ...newCoords };
+            targetGps.current = { ...newCoords };
+            currentRenderedGps.current = { ...newCoords };
+            setHasLocationLock(true);
             return;
         }
 
@@ -383,7 +473,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
                 if (isFirstLocationUpdate.current) {
                     originGps.current = { ...newCoords };
-                    localProducts.current = generateLocalProducts(newCoords);
                     targetGps.current = { ...newCoords };
                     currentRenderedGps.current = { ...newCoords };
 
@@ -411,8 +500,14 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     setGpsError("Unable to acquire GPS signal.");
                 }
 
-                if (error.code === error.PERMISSION_DENIED) {
-                    setHasLocationLock(false);
+                if (isFirstLocationUpdate.current) {
+                    // Fallback for testing
+                    const newCoords = USER_GPS_DEFAULT;
+                    originGps.current = { ...newCoords };
+                    targetGps.current = { ...newCoords };
+                    currentRenderedGps.current = { ...newCoords };
+                    setHasLocationLock(true);
+                    isFirstLocationUpdate.current = false;
                 }
             },
             {
@@ -521,8 +616,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         } else {
             lastPanPoint.current = null;
             setIsDragging(false);
+            gestureState.current.initialPinchWorld = null;
         }
-        gestureState.current.initialPinchWorld = null;
     };
 
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -558,6 +653,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         isDragging,
         hasLocationLock,
         gpsError,
+        isRouting,
         recenterCamera,
         handlers: {
             onTouchStart: handleTouchStart,
@@ -574,8 +670,15 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
 const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { isDragging, hasLocationLock, gpsError, handlers, recenterCamera } =
-        useMapEngine(canvasRef);
+    const { id: listId } = useParams<{ id: string }>();
+    const {
+        isDragging,
+        hasLocationLock,
+        gpsError,
+        isRouting,
+        handlers,
+        recenterCamera,
+    } = useMapEngine(canvasRef, listId);
 
     if (!hasLocationLock) {
         return (
@@ -587,9 +690,12 @@ const StoreMap: React.FC = () => {
 
     return (
         <div className={`mapContainer ${isDragging ? "dragging" : ""}`}>
+            {isRouting && (
+                <div className="routing-loader">Calculating route...</div>
+            )}
             <canvas ref={canvasRef} className="map-canvas" {...handlers} />
 
-            {gpsError && hasLocationLock && (
+            {gpsError && (
                 <div className="map-status-banner" role="status">
                     {gpsError}
                 </div>

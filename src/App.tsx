@@ -16,7 +16,6 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 
 import "./App.css";
-
 function App() {
     useNetworkState();
 

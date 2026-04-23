@@ -1,432 +1,256 @@
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
-import { PresenceBar } from "../../components";
-import { usePresenceStore } from "../../context/usePresenceStore";
-import { useStore } from "../../context/useStore";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import stompClient from "../../services/socketService";
-import type { Item } from "../../types";
-import { uuid } from "../../utils/uuid";
+import { useListsStore } from "../../store/useListsStore";
 import "./ListDetail.css";
+
+interface Item {
+    id: string;
+    name: string;
+    checked: boolean;
+    brand?: string;
+    quantity?: string;
+    price?: number;
+    category?: string;
+    isRecurrent?: boolean;
+}
+
+interface ApiListItem {
+    id: string;
+    name: string;
+    isChecked?: boolean;
+    brand?: string;
+    quantity?: string;
+    price?: number;
+    category?: string;
+    isRecurrent?: boolean;
+}
+
+interface ApiShoppingList {
+    id: string;
+    items?: ApiListItem[];
+}
+
+interface CreatedListResponse {
+    id: string;
+}
 
 interface ListDetailProps {
     isEmbedded?: boolean;
+    listIdOverride?: string;
+    listTitle?: string;
+    showAiImport?: boolean;
 }
 
-const DEMO_ITEMS: Item[] = [
-    { id: "1", name: "Lapte de ovăz", checked: false },
-    { id: "2", name: "Pâine integrală", checked: false },
-    { id: "3", name: "Roșii cherry", checked: false },
-    { id: "4", name: "Detergent de rufe", checked: false },
-];
-
-const RECEIPT_TIMEOUT_MS = 5000;
-
-interface StompLikeClient {
-    connected: boolean;
-    onConnect: (() => void) | undefined;
-    onWebSocketError?: ((evt: unknown) => void) | undefined;
-    onStompError?: ((frame: unknown) => void) | undefined;
-    subscribe: typeof stompClient.subscribe;
-    publish: typeof stompClient.publish;
-}
-
-const removeScriptBlocks = (input: string): string => {
-    const lowerInput = input.toLowerCase();
-    const closingTag = "</script>";
-    let cursor = 0;
-    let output = "";
-
-    while (cursor < input.length) {
-        const start = lowerInput.indexOf("<script", cursor);
-        if (start === -1) {
-            output += input.slice(cursor);
-            break;
-        }
-
-        const tagEnd = input.indexOf(">", start + 7);
-        if (tagEnd === -1) {
-            output += input.slice(cursor);
-            break;
-        }
-
-        const closeStart = lowerInput.indexOf(closingTag, tagEnd + 1);
-        if (closeStart === -1) {
-            output += input.slice(cursor);
-            break;
-        }
-
-        output += input.slice(cursor, start);
-        cursor = closeStart + closingTag.length;
-    }
-
-    return output;
-};
-
-const sanitizeString = (input: unknown): string =>
-    removeScriptBlocks(String(input ?? "")).replace(/[<>&]/g, (c) =>
-        c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;",
-    );
-
-const sanitizeItemsForStorage = (items: Item[]): Item[] =>
-    items.map((item) => ({
-        id: String(item.id),
-        name: sanitizeString(item.name),
-        checked: Boolean(item.checked),
-    }));
-
-const readItems = (id: string | undefined): Item[] => {
-    if (!id) return [];
-
-    const saved = localStorage.getItem(`list-${id}`);
-    if (!saved) return [];
-
-    try {
-        const parsed = JSON.parse(saved);
-        if (!Array.isArray(parsed)) return [];
-
-        return parsed.map((item) => ({
-            id: String(item.id ?? uuid()),
-            name: sanitizeString(item.name ?? ""),
-            checked: Boolean(item.checked),
-        }));
-    } catch {
-        return [];
-    }
-};
-
-const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
+const ListDetail = ({
+    isEmbedded = false,
+    listIdOverride,
+    listTitle,
+    showAiImport = true,
+}: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
-    const location = useLocation();
-    const isNavView = location.pathname.includes("/nav") || isEmbedded;
+    const navigate = useNavigate();
+    const effectiveListId = listIdOverride ?? id;
+    const isNewListPage = effectiveListId === "default" && showAiImport;
+    const { updateList } = useListsStore();
 
-    const items = useStore((state) => state.items);
-    const setItems = useStore((state) => state.setItems);
-    const backupItemState = useStore((state) => state.backupItemState);
-    const rollbackItemState = useStore((state) => state.rollbackItemState);
-    const conflictItems = useStore((state) => state.conflictItems);
-    const setItemConflict = useStore((state) => state.setItemConflict);
-    const isOnline = useStore((state) => state.isOnline);
-    const handlePresenceEvent = usePresenceStore(
-        (state) => state.handlePresenceEvent,
-    );
-    const clearAllTimeouts = usePresenceStore(
-        (state) => state.clearAllTimeouts,
-    );
-
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
-    const [permissionStatus, setPermissionStatus] =
-        useState<PermissionState | null>(null);
-    const [showBanner, setShowBanner] = useState(true);
-    const [myUsername] = useState(() => {
-        const stored = localStorage.getItem("p2p_username");
-        const randomNum =
-            globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 1000;
-        return stored || `User_${randomNum}`;
-    });
+    const [brand, setBrand] = useState("");
+    const [quantity, setQuantity] = useState("");
+    const [category, setCategory] = useState("");
+    const [isRecurrent, setIsRecurrent] = useState(false);
+    const [recipeText, setRecipeText] = useState("");
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const pendingRollbacksRef = useRef(
-        new Map<string, { timeoutId: number; rollback: () => void }>(),
-    );
-    const conflictTimeoutsRef = useRef<Record<string, number>>({});
-    const handlersWrappedRef = useRef(false);
-    const lastTypingEmitRef = useRef(0);
+    const getBaseUrl = () => import.meta.env.VITE_API_URL || "http://localhost:8081";
 
-    const clearConflictTimeout = useCallback((itemId: string) => {
-        const timeoutId = conflictTimeoutsRef.current[itemId];
-        if (!timeoutId) return;
-        clearTimeout(timeoutId);
-        delete conflictTimeoutsRef.current[itemId];
-    }, []);
-
-    const flagConflict = useCallback(
-        (itemId: string) => {
-            setItemConflict(itemId, true);
-            clearConflictTimeout(itemId);
-            conflictTimeoutsRef.current[itemId] = globalThis.setTimeout(() => {
-                setItemConflict(itemId, false);
-                delete conflictTimeoutsRef.current[itemId];
-            }, 3000);
-        },
-        [clearConflictTimeout, setItemConflict],
-    );
-
-    const handleRejection = useCallback(
-        (itemId: string) => {
-            if (!itemId) return;
-            rollbackItemState(itemId);
-            flagConflict(itemId);
-        },
-        [flagConflict, rollbackItemState],
-    );
-
-    useEffect(() => {
-        if (handlersWrappedRef.current) return;
-        handlersWrappedRef.current = true;
-
-        const client = stompClient as StompLikeClient;
-        const prevOnWS = client.onWebSocketError;
-        const prevOnStomp = client.onStompError;
-
-        const rollbackAllPending = () => {
-            for (const [
-                pendingId,
-                entry,
-            ] of pendingRollbacksRef.current.entries()) {
-                clearTimeout(entry.timeoutId);
-                try {
-                    entry.rollback();
-                } finally {
-                    pendingRollbacksRef.current.delete(pendingId);
-                }
-            }
+    const getAuthHeaders = (withContentType = false): HeadersInit => {
+        const token = localStorage.getItem("token");
+        return {
+            ...(withContentType ? { "Content-Type": "application/json" } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
-
-        client.onWebSocketError = (evt: unknown) => {
-            try {
-                prevOnWS?.(evt);
-            } catch (error) {
-                console.error(
-                    "Error in previous onWebSocketError handler:",
-                    error,
-                );
-            }
-            rollbackAllPending();
-        };
-
-        client.onStompError = (frame: unknown) => {
-            try {
-                prevOnStomp?.(frame);
-            } catch (error) {
-                console.error("Error in previous onStompError handler:", error);
-            }
-            rollbackAllPending();
-        };
-
-        return () => {
-            client.onWebSocketError = prevOnWS;
-            client.onStompError = prevOnStomp;
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!id) return;
-
-        if (isEmbedded || id === "default") {
-            setItems(DEMO_ITEMS);
-            return;
-        }
-
-        setItems(readItems(id));
-    }, [id, isEmbedded, setItems]);
-
-    useEffect(() => {
-        if (!id) return;
-        localStorage.setItem(
-            `list-${id}`,
-            JSON.stringify(sanitizeItemsForStorage(items)),
-        );
-    }, [items, id]);
-
-    useEffect(() => {
-        let isMounted = true;
-        let permResult: PermissionStatus | null = null;
-
-        const handler = () => {
-            if (isMounted && permResult) setPermissionStatus(permResult.state);
-        };
-
-        if (navigator.permissions) {
-            navigator.permissions
-                .query({ name: "geolocation" as PermissionName })
-                .then((result) => {
-                    if (!isMounted) return;
-                    permResult = result;
-                    setPermissionStatus(result.state);
-                    result.addEventListener("change", handler);
-                })
-                .catch(() => {
-                    // Ignore permission API failures.
-                });
-        }
-
-        return () => {
-            isMounted = false;
-            permResult?.removeEventListener("change", handler);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!id) return;
-
-        let rejectSub: { unsubscribe: () => void } | undefined;
-        let presenceSub: { unsubscribe: () => void } | undefined;
-        let updateSub: { unsubscribe: () => void } | undefined;
-
-        const connectAndSubscribe = () => {
-            if (!stompClient.connected) return;
-
-            rejectSub = stompClient.subscribe(
-                `/topic/list/${id}/errors`,
-                (message) => {
-                    try {
-                        const payload = JSON.parse(message.body);
-                        if (payload.itemId) handleRejection(payload.itemId);
-                    } catch (error) {
-                        console.error("Error parsing reject payload", error);
-                    }
-                },
-            );
-
-            updateSub = stompClient.subscribe(
-                `/topic/list/${id}`,
-                (message) => {
-                    try {
-                        const payload = JSON.parse(message.body);
-                        if (payload.status === "Rejection" && payload.itemId) {
-                            handleRejection(payload.itemId);
-                            return;
-                        }
-
-                        if (
-                            payload.itemId &&
-                            (payload.action === "UPDATE_ITEM" ||
-                                payload.actionType === "UPDATE_ITEM")
-                        ) {
-                            const newChecked = payload.checked;
-                            if (typeof newChecked === "boolean") {
-                                setItems((prevItems) =>
-                                    prevItems.map((item) =>
-                                        item.id === payload.itemId
-                                            ? { ...item, checked: newChecked }
-                                            : item,
-                                    ),
-                                );
-                            }
-                        }
-                    } catch (error) {
-                        console.error("Error parsing update payload", error);
-                    }
-                },
-            );
-
-            presenceSub = stompClient.subscribe(
-                `/topic/list/${id}/presence`,
-                (message) => {
-                    try {
-                        const payload = JSON.parse(message.body);
-                        handlePresenceEvent({
-                            username: payload.username,
-                            eventType: payload.eventType,
-                            listId: id,
-                        });
-                    } catch (error) {
-                        console.error("Error parsing presence payload", error);
-                    }
-                },
-            );
-
-            stompClient.publish({
-                destination: `/app/list/${id}/presence`,
-                body: JSON.stringify({
-                    eventType: "JOIN",
-                    username: myUsername,
-                    listId: id,
-                }),
-            });
-            handlePresenceEvent({
-                eventType: "JOIN",
-                username: myUsername,
-                listId: id,
-            });
-        };
-
-        if (stompClient.connected) {
-            connectAndSubscribe();
-        } else {
-            stompClient.onConnect = () => connectAndSubscribe();
-        }
-
-        return () => {
-            if (stompClient.connected) {
-                stompClient.publish({
-                    destination: `/app/list/${id}/presence`,
-                    body: JSON.stringify({
-                        eventType: "LEAVE",
-                        username: myUsername,
-                        listId: id,
-                    }),
-                });
-            }
-
-            rejectSub?.unsubscribe();
-            presenceSub?.unsubscribe();
-            updateSub?.unsubscribe();
-
-            Object.values(conflictTimeoutsRef.current).forEach((timeoutId) => {
-                clearTimeout(timeoutId);
-            });
-            conflictTimeoutsRef.current = {};
-            clearAllTimeouts();
-        };
-    }, [
-        id,
-        handlePresenceEvent,
-        myUsername,
-        clearAllTimeouts,
-        setItems,
-        handleRejection,
-    ]);
-
-    const handleTyping = () => {
-        const now = Date.now();
-        if (
-            now - lastTypingEmitRef.current <= 500 ||
-            !stompClient.connected ||
-            !id ||
-            !isOnline
-        ) {
-            return;
-        }
-
-        lastTypingEmitRef.current = now;
-        stompClient.publish({
-            destination: `/app/list/${id}/presence`,
-            body: JSON.stringify({
-                eventType: "TYPING",
-                username: myUsername,
-                listId: id,
-            }),
-        });
-        handlePresenceEvent({
-            eventType: "TYPING",
-            username: myUsername,
-            listId: id,
-        });
     };
 
-    const addItem = (e: React.FormEvent) => {
-        e.preventDefault();
+    const syncListItemsInStore = (nextItems: Item[], targetListId = effectiveListId) => {
+        if (!targetListId || targetListId === "default") {
+            return;
+        }
+        updateList(targetListId, { items: nextItems });
+    };
 
-        const trimmedName = newItemName.trim();
-        if (!trimmedName) return;
+    const fetchListData = async (targetListId = effectiveListId) => {
+        if (!targetListId || targetListId === "default") {
+            setItems([]);
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(`${getBaseUrl()}/api/lists`, {
+                headers: getAuthHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to fetch lists");
+            }
+
+            const allLists = (await response.json()) as ApiShoppingList[];
+            const currentList = allLists.find((list) => list.id === targetListId);
+
+            if (!currentList) {
+                setItems([]);
+                return;
+            }
+
+            const mappedItems = (currentList.items ?? []).map((item) => ({
+                id: item.id,
+                name: item.name,
+                checked: Boolean(item.isChecked),
+                brand: item.brand,
+                price: item.price,
+                quantity: item.quantity,
+                category: item.category,
+                isRecurrent: item.isRecurrent,
+            }));
+
+            setItems(mappedItems);
+            syncListItemsInStore(mappedItems, targetListId);
+        } catch {
+            setError("Nu s-a putut sincroniza lista.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setIsLoading(true);
+        void fetchListData();
+    }, [effectiveListId]);
+
+    const createListFromPlaceholder = async (): Promise<string> => {
+        const response = await fetch(`${getBaseUrl()}/api/lists`, {
+            method: "POST",
+            headers: getAuthHeaders(true),
+            body: JSON.stringify({
+                title: `AI Generated ${new Date().toISOString().slice(0, 10)}`,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to create list");
+        }
+
+        const createdList = (await response.json()) as CreatedListResponse;
+        return createdList.id;
+    };
+
+    const handleAiImport = async () => {
+        if (!recipeText.trim() || !id) {
+            return;
+        }
+
+        setIsAiLoading(true);
+        setError(null);
+
+        try {
+            const targetListId =
+                effectiveListId === "default"
+                    ? await createListFromPlaceholder()
+                    : effectiveListId;
+
+            const response = await fetch(`${getBaseUrl()}/api/ai/recipe-to-list`, {
+                method: "POST",
+                headers: getAuthHeaders(true),
+                body: JSON.stringify({
+                    text: recipeText,
+                    listId: targetListId,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error("AI Service error");
+            }
+
+            setRecipeText("");
+
+            if (effectiveListId === "default") {
+                navigate(`/dashboard?list=${targetListId}`);
+                return;
+            }
+
+            await fetchListData(targetListId);
+        } catch {
+            setError("Eroare la procesarea AI. Verifică backend-ul.");
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
+
+    const addItem = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (newItemName.trim() === "") {
+            return;
+        }
 
         const newItem: Item = {
-            id: uuid(),
-            name: trimmedName,
+            id: crypto.randomUUID(),
+            name: newItemName.trim(),
             checked: false,
+            brand: brand || undefined,
+            quantity: quantity || undefined,
+            category,
+            isRecurrent,
         };
 
-        setItems((prevItems) => [...prevItems, newItem]);
+        const optimisticItems = [...items, newItem];
+        setItems(optimisticItems);
+        syncListItemsInStore(optimisticItems);
         setNewItemName("");
+        setBrand("");
+        setQuantity("");
+        setCategory("Altele");
+        setIsRecurrent(false);
 
-        if (id && stompClient.connected) {
+        void fetch(`${getBaseUrl()}/api/lists/${effectiveListId}/items`, {
+            method: "POST",
+            headers: getAuthHeaders(true),
+            body: JSON.stringify({
+                name: newItem.name,
+                isChecked: newItem.checked,
+                brand: newItem.brand ?? null,
+                quantity: newItem.quantity ?? null,
+                price: newItem.price ?? null,
+                category: newItem.category ?? null,
+                isRecurrent: newItem.isRecurrent ?? false,
+                timestamp: Date.now(),
+            }),
+        })
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to add item");
+                }
+                await fetchListData(effectiveListId);
+            })
+            .catch(() => {
+                setError("Nu s-a putut adăuga produsul.");
+                const rolledBackItems = optimisticItems.filter(
+                    (item) => item.id !== newItem.id,
+                );
+                setItems(rolledBackItems);
+                syncListItemsInStore(rolledBackItems);
+            });
+
+        if (effectiveListId && stompClient.connected) {
             stompClient.publish({
                 destination: "/app/sync",
                 body: JSON.stringify({
                     eventType: "ITEM_ADDED",
-                    listId: id,
+                    listId: effectiveListId,
                     item: newItem,
                 }),
             });
@@ -434,191 +258,178 @@ const ListDetail: React.FC<ListDetailProps> = ({ isEmbedded = false }) => {
     };
 
     const handleCheck = (itemId: string) => {
-        const currentItem = items.find((it) => it.id === itemId);
-        if (!currentItem) return;
-
-        const newChecked = !currentItem.checked;
-        backupItemState({ ...currentItem });
-        setItems((prevItems) =>
-            prevItems.map((item) =>
-                item.id === itemId ? { ...item, checked: newChecked } : item,
-            ),
-        );
-
-        if (!id) return;
-
-        if (!stompClient.connected || !isOnline) {
-            handleRejection(itemId);
+        const currentItem = items.find((item) => item.id === itemId);
+        if (!currentItem) {
             return;
         }
 
-        const receiptId = `rcpt-${uuid()}`;
-        const timeoutId = globalThis.setTimeout(() => {
-            const entry = pendingRollbacksRef.current.get(receiptId);
-            if (!entry) return;
-            pendingRollbacksRef.current.delete(receiptId);
-            entry.rollback();
-        }, RECEIPT_TIMEOUT_MS);
+        const newChecked = !currentItem.checked;
+        const nextItems = items.map((item) =>
+            item.id === itemId ? { ...item, checked: newChecked } : item,
+        );
 
-        pendingRollbacksRef.current.set(receiptId, {
-            timeoutId,
-            rollback: () => {
-                handleRejection(itemId);
-                console.error(
-                    "Optimistic UI failed, state reverted for item:",
-                    itemId,
-                );
-            },
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        void fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+            method: "PUT",
+            headers: getAuthHeaders(true),
+            body: JSON.stringify({
+                name: currentItem.name,
+                isChecked: newChecked,
+                brand: currentItem.brand ?? null,
+                quantity: currentItem.quantity ?? null,
+                price: currentItem.price ?? null,
+                category: currentItem.category ?? null,
+                isRecurrent: currentItem.isRecurrent ?? false,
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {
+            setError("Nu s-a putut actualiza produsul.");
+            const rolledBackItems = items.map((item) =>
+                item.id === itemId
+                    ? { ...item, checked: currentItem.checked }
+                    : item,
+            );
+            setItems(rolledBackItems);
+            syncListItemsInStore(rolledBackItems);
         });
 
-        try {
+        if (effectiveListId && stompClient.connected) {
             stompClient.publish({
                 destination: "/app/sync",
                 body: JSON.stringify({
                     eventType: "ITEM_TOGGLED",
-                    listId: id,
+                    listId: effectiveListId,
                     itemId,
                     checked: newChecked,
                 }),
-                headers: { receipt: receiptId },
             });
-        } catch (error) {
-            const entry = pendingRollbacksRef.current.get(receiptId);
-            if (entry) {
-                clearTimeout(entry.timeoutId);
-                pendingRollbacksRef.current.delete(receiptId);
-                entry.rollback();
-            }
-            console.error("Optimistic UI failed, state reverted:", error);
         }
     };
 
-    const listContent = (
-        <>
-            <div className="sidebar-header">
-                <h3>Shopping List</h3>
-                {isNavView && (
-                    <button
-                        type="button"
-                        className="close-sidebar-btn"
-                        aria-label="Close shopping list"
-                        onClick={() => setIsSidebarOpen(false)}
-                    >
-                        <svg
-                            aria-hidden="true"
-                            viewBox="0 0 24 24"
-                            width="20"
-                            height="20"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <title>Close shopping list</title>
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                    </button>
-                )}
-            </div>
+    const handleDelete = (itemId: string) => {
+        const previousItems = items;
+        const nextItems = previousItems.filter((item) => item.id !== itemId);
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
 
-            <form onSubmit={addItem} className="add-item-form-sidebar">
-                <input
-                    type="text"
-                    value={newItemName}
-                    onChange={(e) => {
-                        setNewItemName(e.target.value);
-                        handleTyping();
-                    }}
-                    placeholder="Add item..."
-                    className="sidebar-input"
-                />
-                <button type="submit" className="sidebar-add-btn">
-                    Add
-                </button>
-            </form>
-
-            <ul className="shopping-list">
-                {items.map((item) => {
-                    const isConflicting = conflictItems[item.id] === true;
-
-                    return (
-                        <li
-                            key={item.id}
-                            className={`shopping-item ${item.checked ? "item-completed" : ""} ${isConflicting ? "item-conflict" : ""}`}
-                        >
-                            <label className="item-label">
-                                <input
-                                    type="checkbox"
-                                    checked={item.checked}
-                                    onChange={() => handleCheck(item.id)}
-                                    className="item-checkbox"
-                                />
-                                <span className="item-text">
-                                    {item.name}
-                                    {isConflicting && (
-                                        <span className="warning-icon">⚠️</span>
-                                    )}
-                                </span>
-                            </label>
-                        </li>
-                    );
-                })}
-            </ul>
-
-            {items.length === 0 && (
-                <p className="empty-msg">Your list is empty!</p>
-            )}
-        </>
-    );
+        void fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(),
+        }).catch(() => {
+            setError("Nu s-a putut șterge produsul.");
+            setItems(previousItems);
+            syncListItemsInStore(previousItems);
+        });
+    };
 
     return (
-        <div
-            className={isNavView ? "nav-sidebar-wrapper" : "full-page-wrapper"}
-        >
-            {showBanner && permissionStatus === "denied" && (
-                <div className="location-warning-banner">
-                    <span>
-                        Location access is disabled. Some features may be
-                        limited.
-                    </span>
-                    <button
-                        type="button"
-                        className="close-banner-btn"
-                        onClick={() => setShowBanner(false)}
-                    >
-                        ✕
-                    </button>
-                </div>
-            )}
+        <div className={isEmbedded ? "list-detail-sidebar open" : "full-page-wrapper"}>
+            <div className="centered-list-card">
+                <h3
+                    style={{
+                        textAlign: "center",
+                        color: "#2e1a5e",
+                        marginBottom: "20px",
+                    }}
+                >
+                    {isNewListPage ? "AI List Generator" : listTitle || "Shopping List"}
+                </h3>
 
-            <PresenceBar />
+                {error && <div className="error-msg">{error}</div>}
 
-            {isNavView ? (
-                <>
-                    {!isSidebarOpen && (
-                        <div className="open-list-container">
+                {isNewListPage ? (
+                    <>
+                        <p className="list-detail-helper">
+                            Paste a recipe or ingredient list and a new shopping list will be created automatically.
+                        </p>
+                        <div className="ai-import-section">
+                            <textarea
+                                rows={5}
+                                value={recipeText}
+                                onChange={(e) => setRecipeText(e.target.value)}
+                                placeholder="Paste your recipe here (e.g. 2 eggs, milk...)"
+                            />
                             <button
+                                onClick={handleAiImport}
+                                className="ai-btn"
+                                disabled={isAiLoading}
                                 type="button"
-                                className="open-list-btn-modern"
-                                onClick={() => setIsSidebarOpen(true)}
                             >
-                                <span className="cart-icon">🛒</span> Open List
+                                {isAiLoading ? "Processing..." : "Generate List"}
                             </button>
                         </div>
-                    )}
-                    <div
-                        className={`list-detail-sidebar ${isSidebarOpen ? "open" : ""}`}
-                    >
-                        {listContent}
-                    </div>
-                </>
-            ) : (
-                <div className="centered-list-card">{listContent}</div>
-            )}
+                    </>
+                ) : (
+                    <>
+                        <form onSubmit={addItem} className="add-item-form-sidebar">
+                            <input
+                                type="text"
+                                value={newItemName}
+                                onChange={(e) => setNewItemName(e.target.value)}
+                                placeholder="Item Name*"
+                                className="sidebar-input"
+                                required
+                            />
+                            <div className="row-inputs">
+                                <input
+                                    type="text"
+                                    value={brand}
+                                    onChange={(e) => setBrand(e.target.value)}
+                                    placeholder="Brand"
+                                    className="sidebar-input"
+                                />
+                                <input
+                                    type="text"
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(e.target.value)}
+                                    placeholder="Qty"
+                                    className="sidebar-input"
+                                />
+                            </div>
+                            <select
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="sidebar-input"
+                            >
+                                <option value="Altele">Category...</option>
+                                <option value="Lactate">Lactate</option>
+                                <option value="Legume">Legume</option>
+                                <option value="Carne">Carne</option>
+                                <option value="Băuturi">Băuturi</option>
+                                <option value="Dulciuri">Dulciuri</option>
+                            </select>
+                            <label className="recurrence-label">
+                                <input
+                                    type="checkbox"
+                                    checked={isRecurrent}
+                                    onChange={(e) => setIsRecurrent(e.target.checked)}
+                                />
+                                Add to frequent items
+                            </label>
+                            <button type="submit" className="sidebar-add-btn">
+                                Add to List
+                            </button>
+                        </form>
+
+                        {isLoading ? (
+                            <p style={{ textAlign: "center", marginTop: "20px" }}>
+                                Loading list...
+                            </p>
+                        ) : (
+                            <ShoppingListItems
+                                items={items}
+                                onCheck={handleCheck}
+                                onDelete={handleDelete}
+                            />
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 };
 
 export default ListDetail;
+

@@ -13,9 +13,12 @@ interface Item {
 interface Props {
     items: Item[];
     onCheck: (id: string) => void;
+    onDelete?: (id: string) => void;
 }
 
-const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
+const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
+
+const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
     if (items.length === 0) {
         return <p className="empty-msg">Your list is empty!</p>;
     }
@@ -36,10 +39,8 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
                         />
                         <div>
                             <span
+                                className="item-name-text"
                                 style={{
-                                    fontSize: "16px",
-                                    fontWeight: "bold",
-                                    color: "#2e1a5e",
                                     textDecoration: item.checked
                                         ? "line-through"
                                         : "none",
@@ -48,27 +49,32 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
                             >
                                 {item.name}
                             </span>
-                            <div style={{ fontSize: "12px", color: "#444" }}>
+                            <div className="item-meta-text">
                                 {item.brand && <span>{item.brand}</span>}
                                 {item.quantity && (
                                     <span> • {item.quantity}</span>
                                 )}
                                 {item.price != null && (
-                                    <span> • {item.price.toFixed(2)} RON</span>
+                                    <span> • {formatPrice(item.price)}</span>
                                 )}
                                 {item.category && (
-                                    <span
-                                        style={{
-                                            fontStyle: "italic",
-                                            color: "#6c4ab3",
-                                        }}
-                                    >
+                                    <span className="item-category-text">
                                         {` [${item.category}]`}
                                     </span>
                                 )}
                             </div>
                         </div>
                     </label>
+                    {onDelete && (
+                        <button
+                            type="button"
+                            className="item-inline-remove"
+                            onClick={() => onDelete(item.id)}
+                            aria-label="Remove item"
+                        >
+                            ×
+                        </button>
+                    )}
                 </li>
             ))}
         </ul>
@@ -76,3 +82,4 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck }) => {
 };
 
 export default ShoppingListItems;
+
