@@ -220,9 +220,13 @@ function App() {
                     <Route
                         path="*"
                         element={
-                            <div className="flex-1 flex items-center justify-center text-text-muted">
-                                Page not found
-                            </div>
+                            token ? (
+                                <div className="flex-1 flex items-center justify-center text-text-muted">
+                                    Page not found
+                                </div>
+                            ) : (
+                                <Navigate to="/login" replace />
+                            )
                         }
                     />
                 </Routes>
