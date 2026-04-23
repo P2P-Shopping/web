@@ -141,74 +141,70 @@ const Dashboard = () => {
     } else {
         mainContent = (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
-                {lists.map((list) => (
-                    <div key={list.id} className="relative group">
-                        <button
-                            type="button"
-                            className="w-full h-full text-left relative bg-surface border border-border rounded-xl p-[22px_22px_18px] cursor-pointer transition-all duration-200 ease-out hover:border-accent-border hover:shadow-md hover:shadow-accent-glow/20 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 flex flex-col gap-[18px] outline-none"
-                            onClick={() => handleCardClick(list.id)}
-                            aria-label={`Deschide lista ${list.name}`}
-                        >
-                            <div className="flex justify-between items-start gap-3">
-                                <div className="flex-1 min-w-0 pr-12">
-                                    <h3 className="text-lg font-bold text-text-strong leading-tight break-words">
-                                        {list.name}
-                                    </h3>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 pr-12">
-                                    <span className="px-2.5 py-1 rounded-full bg-bg-muted text-text-muted text-[11px] font-semibold border border-border whitespace-nowrap">
-                                        {formatDate(list.updatedAt)}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col gap-3.5 mt-auto">
-                                <div className="flex flex-wrap gap-1.5">
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
-                                        {getItemsCount(list.items)}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
-                                        {list.ownerName || "Tu"}
-                                    </span>
+                {lists.map((list) => {
+                    const uncheckedItems = list.items.filter(
+                        (item) => !item.checked,
+                    );
+                    return (
+                        <div key={list.id} className="relative group">
+                            <button
+                                type="button"
+                                className="w-full h-full text-left relative bg-surface border border-border rounded-xl p-[22px_22px_18px] cursor-pointer transition-all duration-200 ease-out hover:border-accent-border hover:shadow-md hover:shadow-accent-glow/20 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 flex flex-col gap-[18px] outline-none"
+                                onClick={() => handleCardClick(list.id)}
+                                aria-label={`Deschide lista ${list.name}`}
+                            >
+                                <div className="flex justify-between items-start gap-3">
+                                    <div className="flex-1 min-w-0 pr-12">
+                                        <h3 className="text-lg font-bold text-text-strong leading-tight break-words">
+                                            {list.name}
+                                        </h3>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0 pr-12">
+                                        <span className="px-2.5 py-1 rounded-full bg-bg-muted text-text-muted text-[11px] font-semibold border border-border whitespace-nowrap">
+                                            {formatDate(list.updatedAt)}
+                                        </span>
+                                    </div>
                                 </div>
 
-                                <div className="flex flex-col gap-1.5">
-                                    {list.items
-                                        .slice(0, PREVIEW_LIMIT)
-                                        .map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className={`flex items-center gap-2.5 p-[8px_12px] rounded-md bg-bg-subtle border border-border text-sm text-text transition-colors duration-200 ease-out ${item.checked ? "opacity-55" : ""}`}
-                                            >
-                                                <span
-                                                    className={`w-[18px] h-[18px] border-2 border-border-strong rounded-[5px] shrink-0 flex items-center justify-center transition-all ${item.checked ? "bg-success border-success" : "bg-surface"}`}
-                                                    aria-hidden="true"
+                                <div className="flex flex-col gap-3.5 mt-auto">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
+                                            {getItemsCount(list.items)}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
+                                            {list.ownerName || "Tu"}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5">
+                                        {uncheckedItems
+                                            .slice(0, PREVIEW_LIMIT)
+                                            .map((item) => (
+                                                <div
+                                                    key={item.id}
+                                                    className="flex items-center gap-2.5 p-[8px_12px] rounded-md bg-bg-subtle border border-border text-sm text-text transition-colors duration-200 ease-out"
                                                 >
-                                                    {item.checked && (
-                                                        <Check
-                                                            size={12}
-                                                            strokeWidth={4}
-                                                            className="text-white"
-                                                        />
-                                                    )}
-                                                </span>
-                                                <span
-                                                    className={`flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${item.checked ? "line-through" : ""}`}
-                                                >
-                                                    {item.name}
-                                                </span>
+                                                    <span
+                                                        className="w-[18px] h-[18px] border-2 border-border-strong rounded-[5px] shrink-0 flex items-center justify-center transition-all bg-surface"
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                        {item.name}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        {uncheckedItems.length >
+                                            PREVIEW_LIMIT && (
+                                            <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[11px] font-bold text-text-muted transition-all hover:bg-border/40">
+                                                ...and another{" "}
+                                                {uncheckedItems.length -
+                                                    PREVIEW_LIMIT}{" "}
+                                                unchecked items
                                             </div>
-                                        ))}
-                                    {list.items.length > PREVIEW_LIMIT && (
-                                        <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[11px] font-bold text-text-muted transition-all hover:bg-border/40">
-                                            ...and another{" "}
-                                            {list.items.length - PREVIEW_LIMIT}{" "}
-                                            items
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </button>
+                            </button>
 
                         {/* Delete Button (Separate from card button to avoid nesting) */}
                         <button
@@ -222,8 +218,9 @@ const Dashboard = () => {
                         >
                             <Trash2 size={16} />
                         </button>
-                    </div>
-                ))}
+                        </div>
+                    );
+                })}
             </div>
         );
     }
