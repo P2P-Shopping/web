@@ -154,8 +154,8 @@ const Dashboard = () => {
                                 aria-label={`Open list ${list.name}`}
                             >
                                 <div className="flex justify-between items-start gap-3">
-                                    <div className="flex-1 min-w-0 pr-12">
-                                        <h3 className="text-lg font-bold text-text-strong leading-tight break-words">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-lg font-bold text-text-strong leading-tight truncate" title={list.name}>
                                             {list.name}
                                         </h3>
                                     </div>

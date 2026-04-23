@@ -38,11 +38,11 @@ const ConfirmDeleteModal = ({
             }
         >
             <p className="m-0 text-text leading-relaxed">
-                Are you sure you want to delete the list{" "}
-                <strong className="text-text-strong font-bold">
-                    {listName}
+                Are you sure you want to delete the list:
+                <strong className="text-text-strong font-bold block my-2 line-clamp-3 break-words" title={listName}>
+                    {listName}?
                 </strong>
-                ? This action cannot be undone.
+                This action cannot be undone.
             </p>
         </Modal>
     );

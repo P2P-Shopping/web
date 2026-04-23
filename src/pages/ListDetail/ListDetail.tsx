@@ -412,8 +412,8 @@ const ListDetail = ({
                                         }
                                         className="flex items-center justify-between p-4 bg-surface border border-border rounded-xl hover:border-accent hover:shadow-md transition-all text-left"
                                     >
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="font-bold text-text-strong">
+                                        <div className="flex flex-col gap-0.5 min-w-0">
+                                            <span className="font-bold text-text-strong truncate" title={list.name}>
                                                 {list.name}
                                             </span>
                                             <span className="text-xs text-text-muted">
