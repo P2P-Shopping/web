@@ -1,37 +1,39 @@
-/* Styled for a seamless UI integration, keeping consistent clean aesthetic */
 .offline-banner {
     position: sticky;
     top: 0;
     left: 0;
     right: 0;
-    background-color: #fca5a5; /* nice soft red/orange tone */
-    color: #7f1d1d; /* darker tone for contrast */
+    background: var(--warning-subtle);
+    color: var(--warning);
+    border-bottom: 1px solid hsl(38, 80%, 80%);
     text-align: center;
-    padding: 10px 16px;
+    padding: 9px 16px;
+    font-size: 13px;
     font-weight: 600;
-    font-size: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    animation: slideDown 0.3s ease-out forwards;
+    gap: 8px;
+    z-index: 190;
+    animation: slide-down 0.25s var(--ease-out);
+    transition: top var(--duration) var(--ease-out);
 }
 
-.offline-icon {
-    margin-right: 8px;
-    font-size: 16px;
+.offline-banner.with-navbar {
+    top: 60px;
 }
 
-.offline-text {
-    letter-spacing: 0.5px;
+.offline-banner.server-disconnected {
+    background: var(--danger-subtle);
+    color: var(--danger);
+    border-bottom-color: var(--danger-border);
 }
 
-@keyframes slideDown {
-    0% {
-        transform: translateY(-100%);
+@media (prefers-color-scheme: dark) {
+    .offline-banner {
+        border-bottom-color: hsl(38, 50%, 30%);
     }
-    100% {
-        transform: translateY(0);
+    .offline-banner.server-disconnected {
+        border-bottom-color: var(--danger-border);
     }
 }

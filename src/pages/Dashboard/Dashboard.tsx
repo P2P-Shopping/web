@@ -80,10 +80,10 @@ const Dashboard = () => {
     const getItemsCount = (items: Item[]) => {
         const checked = items.filter((item) => item.checked).length;
         if (items.length === 0) {
-            return "Fără produse";
+            return "No items";
         }
 
-        return `${checked}/${items.length} produse`;
+        return `${checked}/${items.length} items`;
     };
 
     let mainContent: ReactNode;
@@ -97,14 +97,15 @@ const Dashboard = () => {
     } else if (lists.length === 0) {
         mainContent = (
             <div className="empty-state">
-                <h2>Nu ai nicio listă</h2>
-                <p>Crează prima ta listă de cumpărături!</p>
+                <span className="empty-state-icon" aria-hidden="true">🛒</span>
+                <h2>No lists yet</h2>
+                <p>Create your first shared shopping list!</p>
                 <button
                     type="button"
                     className="create-btn-primary"
                     onClick={openModal}
                 >
-                    Creează Listă
+                    Create a List
                 </button>
             </div>
         );
@@ -239,7 +240,7 @@ const Dashboard = () => {
                     <p className="subtitle">
                         {selectedList
                             ? selectedList.name
-                            : `${lists.length} ${lists.length === 1 ? "listă" : "liste"}`}
+                            : `${lists.length} ${lists.length === 1 ? "list" : "lists"}`}
                     </p>
                 </div>
                 {!selectedList && (
@@ -260,7 +261,7 @@ const Dashboard = () => {
                             <line x1="12" y1="5" x2="12" y2="19" />
                             <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
-                        Listă Nouă
+                        New List
                     </button>
                 )}
             </header>

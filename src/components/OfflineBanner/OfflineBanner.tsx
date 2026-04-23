@@ -2,23 +2,35 @@ import type React from "react";
 import { useStore } from "../../context/useStore";
 import "./OfflineBanner.css";
 
-/**
- * Component that displays a global visual warning when the device loses its internet connection.
- * It reads the isOnline state governed by the 'useNetworkState' hook, preventing STOMP errors.
- * Renders absolutely nothing if the connection is perfectly fine.
- */
-export const OfflineBanner: React.FC = () => {
-    // Read the online presence directly from the global Zustand store
-    const isOnline = useStore((state) => state.isOnline);
+interface OfflineBannerProps {
+    hasNavbar?: boolean;
+}
 
-    if (isOnline) {
-        return null;
+/**
+ * Component that displays a global visual warning when the device loses its internet connection
+ * or when the backend server is unreachable.
+ */
+export const OfflineBanner: React.FC<OfflineBannerProps> = ({ hasNavbar = false }) => {
+    const isOnline = useStore((state) => state.isOnline);
+    const isServerConnected = useStore((state) => state.isServerConnected);
+
+    if (!isOnline) {
+        return (
+            <div className={`offline-banner ${hasNavbar ? "with-navbar" : ""}`}>
+                <span className="offline-icon">⚠️</span>
+                <span className="offline-text">Working Offline (No Internet)</span>
+            </div>
+        );
     }
 
-    return (
-        <div className="offline-banner">
-            <span className="offline-icon">⚠️</span>
-            <span className="offline-text">Working Offline</span>
-        </div>
-    );
+    if (!isServerConnected) {
+        return (
+            <div className={`offline-banner server-disconnected ${hasNavbar ? "with-navbar" : ""}`}>
+                {/*<span className="offline-icon">🔌</span>*/}
+                <span className="offline-text">Server Connection Lost</span>
+            </div>
+        );
+    }
+
+    return null;
 };

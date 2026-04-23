@@ -1,75 +1,93 @@
-/* Header Styles */
-.main-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 5%;
-    background-color: var(--indigo-dark);
-    border-bottom: 1px solid var(--border-color);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    position: relative;
-    z-index: 100;
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
-.logo-section {
+.navbar-inner {
     display: flex;
     align-items: center;
-    gap: 12px;
-}
-
-.logo-section h1 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    margin: 0;
-    color: var(--navbar-text);
-}
-.cart-icon {
-    font-size: 1.5rem;
-}
-.team-tag {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-/* Navigation Menu */
-nav {
-    display: flex;
-    gap: 24px;
-    margin-right: 2rem;
-}
-nav a {
-    text-decoration: none;
-    color: var(--navbar-text);
-    font-weight: 600;
-    font-size: 0.95rem;
-    transition: color 0.2s ease;
-    position: relative;
-}
-nav a:hover {
-    color: var(--accent-blue);
-}
-nav a::after {
-    content: "";
-    position: absolute;
-    width: 0;
-    height: 2px;
-    bottom: -4px;
-    left: 0;
-    background-color: var(--accent-blue);
-    transition: width 0.2s ease;
-}
-nav a:hover::after {
+    gap: 8px;
+    padding: 0 24px;
+    height: 60px;
     width: 100%;
 }
 
-/* Ping Button (Matches Nav Links) */
-.ping-button {
-    background: transparent;
-    border: none;
-    padding: 0;
-    font: inherit;
+/* Brand */
+.navbar-brand {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 10px;
+    text-decoration: none;
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.navbar-brand-icon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.navbar-brand-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-strong);
+    letter-spacing: -0.3px;
+}
+
+/* Nav links */
+.navbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+}
+
+.nav-link {
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+    transition: color var(--duration) var(--ease-out),
+                background var(--duration) var(--ease-out);
+    white-space: nowrap;
+}
+
+.nav-link:hover {
+    color: var(--text-strong);
+    background: var(--bg-muted);
+}
+
+.nav-link--active {
+    color: var(--accent);
+    background: var(--accent-subtle);
+    font-weight: 600;
+}
+
+.nav-link--active:hover {
+    background: var(--accent-muted);
+    color: var(--accent-hover);
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+    .navbar-inner { padding: 0 16px; }
+
+    .navbar-brand-name { display: none; }
+
+    .navbar-nav {
+        gap: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .navbar-nav::-webkit-scrollbar { display: none; }
+
+    .nav-link { font-size: 13px; padding: 6px 10px; }
 }

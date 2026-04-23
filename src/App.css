@@ -1,51 +1,41 @@
-/* src/App.css */
-:root {
-    --indigo-dark: #090820;
-    --purple-dark: #22153d;
-    --purple-medium: #25103e;
-    --lavender: #bca7d6;
-    --blue-neon: #00d4ff;
-    --red-neon: #ff3366;
-    --green-neon: #4aff9c8c;
-    --purple-other: #4a148c;
-
-    --navbar-color: var(--indigo-dark);
-    --navbar-text: white;
-
-    --tab-bg: white;
-    --tab-color: var(--purple-medium);
-    --tab-text: var(--text-secondary);
-
-    --bg-color: var(--purple-dark);
-    --card-bg: var(--lavender);
-    --bg-surface: #ffffff;
-    --bg-card: #ffffff;
-
-    --text-main: var(--purple-dark);
-    --text-secondary: white;
-    --text-primary: #1a1a1a;
-    --text-muted: #666666;
-    --text-main-outline: white;
-    --text-secondary-outline: var(--purple-dark);
-
-    --accent-blue: var(--lavender);
-
-    --border-color: #eaeaea;
-    --border-subtle: #f0f0f0;
-    --border-secondary-color: black;
-
-    --shadow:
-        0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-body {
-    margin: 0;
-    font-family:
-        Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-main);
-}
-
+/* App.css — layout wrappers only, no design tokens here */
 .app-container {
-    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Auth layout wrapper used in App.tsx routes */
+.auth-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background: var(--bg);
+}
+
+/* Toast notification */
+.toast {
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: var(--text-on-accent);
+    padding: 10px 20px;
+    border-radius: var(--radius-full);
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 9999;
+    box-shadow: var(--shadow-lg);
+    animation: slide-down 0.25s var(--ease-out);
+    white-space: nowrap;
+    pointer-events: none;
 }

@@ -148,12 +148,12 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                             type="text"
                             value={listName}
                             onChange={(e) => setListName(e.target.value)}
-                            placeholder="Ex: Cumpărături săptămâna asta"
+                            placeholder="Dă un nume descriptiv pentru lista ta"
                             maxLength={100}
                         />
-                        <p className="helper-text">
+                        {/* <p className="helper-text">
                             Dă un nume descriptiv pentru lista ta
-                        </p>
+                        </p> */}
                     </div>
 
                     <div className="modal-footer">

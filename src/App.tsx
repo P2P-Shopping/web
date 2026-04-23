@@ -1,7 +1,8 @@
 import type { StompSubscription } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Navbar, OfflineBanner } from "./components";
+import { useStore } from "./context/useStore";
 import { useNetworkState } from "./hooks/useNetworkState";
 import {
     Dashboard,
@@ -16,10 +17,12 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 
 import "./App.css";
+
 function App() {
     useNetworkState();
+    const location = useLocation();
+    const setServerConnected = useStore((state) => state.setServerConnected);
 
-    const [isConnected, setIsConnected] = useState<boolean>(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -50,7 +53,7 @@ function App() {
         let subscription: StompSubscription | null = null;
 
         stompClient.onConnect = () => {
-            setIsConnected(true);
+            setServerConnected(true);
 
             if (subscription) {
                 subscription.unsubscribe();
@@ -63,7 +66,7 @@ function App() {
         };
 
         stompClient.onWebSocketClose = () => {
-            setIsConnected(false);
+            setServerConnected(false);
         };
 
         stompClient.activate();
@@ -78,50 +81,26 @@ function App() {
             stompClient.onWebSocketClose = () => {};
             stompClient.deactivate();
         };
-    }, [handlePongMessage]);
+    }, [handlePongMessage, setServerConnected]);
 
     const handleAuthSuccess = (result: unknown) => {
         console.info("Authentication successful", result);
     };
 
-    const handlePingPress = () => {
-        if (isConnected) {
-            stompClient.publish({
-                destination: "/app/ping",
-                body: "Ping from React Navigation!",
-            });
-        } else {
-            alert("Cannot ping. Server is disconnected.");
-        }
-    };
+    // Determine if Navbar should be shown
+    const token = localStorage.getItem("token");
+    const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+    const showNavbar = token && !isAuthPage;
 
     return (
         <div className="app-container">
-            <OfflineBanner />
+            {showNavbar && <Navbar />}
+            <OfflineBanner hasNavbar={!!showNavbar} />
             {toastMessage && (
-                <div
-                    style={{
-                        position: "fixed",
-                        top: "80px",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        background: "var(--accent, #aa3bff)",
-                        color: "#fff",
-                        padding: "10px 20px",
-                        borderRadius: "8px",
-                        zIndex: 1000,
-                        boxShadow: "var(--shadow)",
-                        fontWeight: "bold",
-                    }}
-                >
+                <div className="toast" role="status" aria-live="polite">
                     {toastMessage}
                 </div>
             )}
-
-            <Navbar
-                isConnected={isConnected}
-                handlePingPress={handlePingPress}
-            />
 
             <main className="content">
                 <Routes>

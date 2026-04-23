@@ -1,53 +1,35 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import "./Navbar.css";
 
-interface NavbarProps {
-    isConnected: boolean;
-    handlePingPress: () => void;
-}
+const NAV_LINKS = [
+    { to: "/dashboard", label: "My Lists" },
+    { to: "/list/default", label: "AI Import" },
+    { to: "/route", label: "Route" },
+    { to: "/nav", label: "Store Map" },
+    { to: "/map", label: "Map" },
+];
 
-export default function Navbar({ isConnected, handlePingPress }: NavbarProps) {
+export default function Navbar() {
+    const { pathname } = useLocation();
+
     return (
-        <header className="main-header">
-            <nav className="nav-menu">
-                <Link to="/login" className="nav-link">
-                    Login
-                </Link>
-                <Link to="/register" className="nav-link">
-                    Register
-                </Link>
-                <Link to="/map" className="nav-link">
-                    Map
-                </Link>
-                <Link to="/dashboard" className="nav-link">
-                    My Lists
-                </Link>
-                <Link to="/route" className="nav-link">
-                    Route
-                </Link>
-                <Link to="/nav" className="nav-link">
-                    Store Map
-                </Link>
-                <Link to="/list/default" className="nav-link">
-                    AI
+        <header className="navbar">
+            <div className="navbar-inner">
+                <Link to="/dashboard" className="navbar-brand">
+                    <span className="navbar-brand-name">P2P Shopping</span>
                 </Link>
 
-                <button
-                    type="button"
-                    className="nav-link ping-button"
-                    onClick={handlePingPress}
-                    disabled={!isConnected}
-                    style={{
-                        color: isConnected ? "inherit" : "gray",
-                        cursor: isConnected ? "pointer" : "not-allowed",
-                    }}
-                >
-                    {isConnected ? "Ping Server" : "Disconnected"}
-                </button>
-            </nav>
-            <div className="logo-section">
-                <span className="cart-icon">🛒</span>
-                <h1>P2P Shopping</h1>
+                <nav className="navbar-nav" aria-label="Main navigation">
+                    {NAV_LINKS.map(({ to, label }) => (
+                        <Link
+                            key={to}
+                            to={to}
+                            className={`nav-link ${pathname.startsWith(to) ? "nav-link--active" : ""}`}
+                        >
+                            {label}
+                        </Link>
+                    ))}
+                </nav>
             </div>
         </header>
     );

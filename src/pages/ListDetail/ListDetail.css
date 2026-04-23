@@ -1,216 +1,292 @@
+/* ─── Full-page wrapper (standalone route) ─── */
 .full-page-wrapper {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    min-height: calc(100vh - 80px);
-    padding: 20px;
+    min-height: calc(100svh - 60px);
+    padding: 28px 20px;
+    background: var(--bg);
 }
 
+/* ─── Sidebar mode (embedded in Dashboard) ─── */
 .list-detail-sidebar {
-    width: min(100%, 420px);
-    margin-left: auto;
-    padding: 20px;
+    width: 100%;
 }
 
-/* Container Card */
+/* ─── Container card ─── */
 .centered-list-card {
-    background-color: #b8a9d1;
-    border-radius: 24px;
-    padding: 25px;
-    width: 95%;
-    max-width: 450px;
-    margin: 20px auto;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.2);
-    font-family: 'Inter', sans-serif;
-    /* REPARARE LĂȚIME: Toate elementele vor respecta padding-ul */
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 28px;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-md);
     box-sizing: border-box;
 }
 
-/* Asigurăm că toate elementele de tip input/textarea respectă marginile */
-.centered-list-card * {
-    box-sizing: border-box;
-}
+.centered-list-card * { box-sizing: border-box; }
 
-/* Eroarea roșie - O facem mai discretă și aliniată */
-.error-msg {
-    background: #ff5252;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    font-size: 13px;
+/* ─── Title ─── */
+.list-detail-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-strong);
     text-align: center;
-    width: 100%;
+    margin-bottom: 22px;
 }
 
+/* ─── Error ─── */
+.error-msg {
+    background: var(--danger-subtle);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 16px;
+}
+
+/* ─── Helper text ─── */
 .list-detail-helper {
-    margin: 0 0 16px;
-    color: #2e1a5e;
     font-size: 14px;
+    color: var(--text-muted);
     line-height: 1.5;
+    margin: 0 0 16px;
 }
 
-/* Secțiunea AI */
+/* ─── AI import section ─── */
 .ai-import-section {
-    background: linear-gradient(145deg, #2e1a5e, #4a307d);
-    padding: 15px;
-    border-radius: 16px;
-    margin-bottom: 25px;
-    border: 2px solid #7c4dff;
-    width: 100%;
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
+    padding: 18px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .ai-import-section textarea {
-    width: 100%; /* Acum va sta cuminte în interior datorită box-sizing */
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid #6c4ab3;
-    color: white;
-    padding: 12px;
-    border-radius: 10px;
-    margin-bottom: 10px;
+    width: 100%;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    color: var(--text-strong);
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
     resize: none;
     font-size: 14px;
-    display: block;
+    line-height: 1.5;
+    min-height: 120px;
+}
+
+.ai-import-section textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    outline: none;
 }
 
 .ai-btn {
     width: 100%;
-    background-color: #f4eaff;
-    color: #2e1a5e;
     padding: 12px;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     border: none;
-    font-weight: bold;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
+    transition: all var(--duration) var(--ease-out);
+}
+
+.ai-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
 }
 
 .ai-btn:disabled,
 .sidebar-add-btn:disabled {
-    opacity: 0.7;
+    opacity: 0.55;
     cursor: not-allowed;
+    transform: none;
 }
 
-/* Formular Manual */
+/* ─── Add item form ─── */
 .add-item-form-sidebar {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    width: 100%;
+    gap: 10px;
+    margin-bottom: 22px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
 }
 
 .sidebar-input {
-    width: 100%; /* Aliniere perfectă cu restul */
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(0,0,0,0.1);
-    background: white;
+    width: 100%;
+    padding: 10px 13px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+    background: var(--bg-muted);
     font-size: 14px;
-    color: #2e1a5e;
+    color: var(--text-strong);
+    transition: border-color var(--duration) var(--ease-out),
+                box-shadow    var(--duration) var(--ease-out);
+}
+
+.sidebar-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    background: var(--surface);
+    outline: none;
 }
 
 .row-inputs {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
-    width: 100%;
 }
 
-/* Facem input-urile din rând să fie egale și să nu iasă în afară */
-.row-inputs .sidebar-input {
-    flex: 1;
-    min-width: 0; 
+select.sidebar-input {
+    cursor: pointer;
+}
+
+.recurrence-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.recurrence-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 .sidebar-add-btn {
     width: 100%;
-    background-color: #2e1a5e;
-    color: white;
-    padding: 14px;
-    border-radius: 10px;
+    padding: 12px;
+    border-radius: var(--radius-md);
     border: none;
-    font-weight: bold;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
-    margin-top: 5px;
+    transition: all var(--duration) var(--ease-out);
+    box-shadow: 0 2px 8px var(--accent-glow);
 }
 
+.sidebar-add-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.sidebar-add-btn:active:not(:disabled) { transform: translateY(0); }
+
+/* ─── Shopping list ─── */
 .shopping-list {
     list-style: none;
     padding: 0;
-    margin: 20px 0 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .shopping-item {
-    background: white;
-    border-radius: 14px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 12px 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: center;
+    gap: 10px;
+    transition: background var(--duration) var(--ease-out),
+                border-color var(--duration) var(--ease-out);
+}
+
+.shopping-item:hover {
+    background: var(--surface);
+    border-color: var(--border-strong);
 }
 
 .shopping-item.item-completed {
-    opacity: 0.75;
+    opacity: 0.6;
 }
 
 .item-label {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     cursor: pointer;
     flex: 1;
+    min-width: 0;
 }
 
 .item-checkbox {
     width: 18px;
     height: 18px;
-    margin-top: 2px;
-    accent-color: #2e1a5e;
+    accent-color: var(--accent);
     cursor: pointer;
     flex-shrink: 0;
+    border-radius: 4px;
+}
+
+.item-name-text {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.item-meta-text {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.item-category-text {
+    color: var(--accent);
+    font-style: italic;
 }
 
 .item-inline-remove {
     border: none;
     background: transparent;
-    color: #7a6f8f;
-    font-size: 18px;
-    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 20px;
     line-height: 1;
     cursor: pointer;
-    padding: 0 2px;
-    margin-top: 1px;
-    opacity: 0.7;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    transition: color var(--duration) var(--ease-out),
+                background var(--duration) var(--ease-out);
+    flex-shrink: 0;
 }
 
 .item-inline-remove:hover {
-    color: #d14343;
-    opacity: 1;
-}
-
-.item-name-text {
-    display: block;
-    font-size: 16px;
-    font-weight: 700;
-    color: #2e1a5e;
-}
-
-.item-meta-text {
-    margin-top: 2px;
-    font-size: 12px;
-    color: #444;
-}
-
-.item-category-text {
-    font-style: italic;
-    color: #6c4ab3;
+    color: var(--danger);
+    background: var(--danger-subtle);
 }
 
 .empty-msg {
     text-align: center;
-    margin-top: 20px;
-    color: #2e1a5e;
-    font-weight: 600;
+    padding: 28px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
 }

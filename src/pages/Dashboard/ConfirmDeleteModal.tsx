@@ -91,7 +91,7 @@ const ConfirmDeleteModal = ({
                     </button>
                     <button
                         type="button"
-                        className="submit-btn"
+                        className="submit-btn danger"
                         onClick={() => onConfirm(listId)}
                     >
                         Șterge

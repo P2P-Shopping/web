@@ -30,6 +30,8 @@ interface AppState {
     conflictItems: Record<string, boolean>;
     /** Tracks whether the application is currently online (has network connectivity) */
     isOnline: boolean;
+    /** Tracks whether the application is connected to the backend server */
+    isServerConnected: boolean;
     /** Updates user location */
     setUserLocation: (loc: Coordinate) => void;
     /** Sets the map route */
@@ -38,6 +40,8 @@ interface AppState {
     setStatus: (status: string) => void;
     /** Sets the online status of the application */
     setOnlineStatus: (status: boolean) => void;
+    /** Sets the server connection status */
+    setServerConnected: (status: boolean) => void;
     /** Sets the full list of items */
     setItems: (items: Item[]) => void;
     /** Creates a backup of the item before an optimistic update */
@@ -58,10 +62,12 @@ export const useStore = create<AppState>((set, get) => ({
     backupItems: {},
     conflictItems: {},
     isOnline: navigator.onLine,
+    isServerConnected: false,
     setUserLocation: (loc) => set({ userLocation: loc }),
     setRoute: (route) => set({ route }),
     setStatus: (status) => set({ status }),
     setOnlineStatus: (status) => set({ isOnline: status }),
+    setServerConnected: (status) => set({ isServerConnected: status }),
     setItems: (items) => set({ items }),
     backupItemState: (item) =>
         set((state) => ({

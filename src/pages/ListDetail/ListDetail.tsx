@@ -327,13 +327,7 @@ const ListDetail = ({
     return (
         <div className={isEmbedded ? "list-detail-sidebar open" : "full-page-wrapper"}>
             <div className="centered-list-card">
-                <h3
-                    style={{
-                        textAlign: "center",
-                        color: "#2e1a5e",
-                        marginBottom: "20px",
-                    }}
-                >
+                <h3 className="list-detail-title">
                     {isNewListPage ? "AI List Generator" : listTitle || "Shopping List"}
                 </h3>
 
@@ -414,9 +408,7 @@ const ListDetail = ({
                         </form>
 
                         {isLoading ? (
-                            <p style={{ textAlign: "center", marginTop: "20px" }}>
-                                Loading list...
-                            </p>
+                            <p className="empty-msg">Loading list…</p>
                         ) : (
                             <ShoppingListItems
                                 items={items}
