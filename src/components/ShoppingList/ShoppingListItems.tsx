@@ -37,8 +37,16 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                 >
                     <button
                         type="button"
-                        className="flex items-center gap-4 cursor-pointer flex-1 min-w-0 border-none bg-transparent p-0 text-left"
+                        className="flex items-center gap-4 cursor-pointer flex-1 min-w-0 border-none bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-4 rounded-sm"
                         onClick={() => onCheck(item.id)}
+                        onKeyDown={(e) => {
+                            if (e.key === " " || e.key === "Enter") {
+                                e.preventDefault();
+                                onCheck(item.id);
+                            }
+                        }}
+                        role="checkbox"
+                        aria-checked={item.checked}
                         aria-label={`${item.checked ? "Uncheck" : "Check"} ${item.name}`}
                     >
                         <div
@@ -84,12 +92,12 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                     {onDelete && (
                         <button
                             type="button"
-                            className="flex items-center justify-center w-8 h-8 rounded-lg text-text-muted opacity-0 group-hover:opacity-100 transition-all hover:bg-danger-subtle hover:text-danger shrink-0"
+                            className="flex items-center justify-center w-8 h-8 rounded-lg text-text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-danger-subtle hover:text-danger shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-danger"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onDelete(item.id);
                             }}
-                            aria-label="Remove item"
+                            aria-label={`Remove ${item.name}`}
                         >
                             <Trash2 size={18} />
                         </button>

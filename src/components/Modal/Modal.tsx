@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 
 interface ModalProps {
     isOpen: boolean;
@@ -25,6 +25,8 @@ export default function Modal({
 }: ModalProps) {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
+    const modalTitleId = useId();
+    const modalSubtitleId = useId();
 
     useEffect(() => {
         const dialog = dialogRef.current;
@@ -83,11 +85,8 @@ export default function Modal({
             className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-[4px] border-none p-0 outline-none open:animate-in open:fade-in duration-200"
             onCancel={handleCancel}
             onClick={handleBackdropClick}
-            onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                    onClose();
-                }
-            }}
+            aria-labelledby={title ? modalTitleId : undefined}
+            aria-describedby={subtitle ? modalSubtitleId : undefined}
         >
             <div
                 className="bg-surface border border-border rounded-xl shadow-xl flex flex-col w-full mx-4 animate-in zoom-in-95 fade-in duration-200"
@@ -96,12 +95,18 @@ export default function Modal({
                 <div className="flex items-start justify-between p-6 pb-2">
                     <div className="flex flex-col gap-1">
                         {title && (
-                            <h2 className="text-xl font-bold text-text-strong tracking-tight">
+                            <h2
+                                id={modalTitleId}
+                                className="text-xl font-bold text-text-strong tracking-tight"
+                            >
                                 {title}
                             </h2>
                         )}
                         {subtitle && (
-                            <p className="text-sm text-text-muted leading-relaxed">
+                            <p
+                                id={modalSubtitleId}
+                                className="text-sm text-text-muted leading-relaxed"
+                            >
                                 {subtitle}
                             </p>
                         )}

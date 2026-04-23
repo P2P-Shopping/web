@@ -74,6 +74,13 @@ function App() {
             );
         };
 
+        stompClient.onStompError = (frame) => {
+            console.error("Broker error:", frame.headers.message);
+            setServerConnected(false);
+            setToastMessage("Connection lost. Retrying...");
+            setTimeout(() => setToastMessage(null), 3000);
+        };
+
         stompClient.onWebSocketClose = () => {
             setServerConnected(false);
         };
@@ -88,6 +95,7 @@ function App() {
             }
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
+            stompClient.onStompError = () => {};
             stompClient.deactivate();
         };
     }, [handlePongMessage, setServerConnected]);
@@ -105,7 +113,7 @@ function App() {
     return (
         <div className="min-h-svh flex flex-col bg-bg transition-colors duration-300">
             {showNavbar && <Navbar />}
-            <OfflineBanner hasNavbar={!!showNavbar} />
+            <OfflineBanner />
 
             {toastMessage && (
                 <div
@@ -124,19 +132,27 @@ function App() {
                     <Route
                         path="/login"
                         element={
-                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
-                                <LoginPage />
-                            </div>
+                            token ? (
+                                <Navigate to="/dashboard" replace />
+                            ) : (
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
+                                    <LoginPage />
+                                </div>
+                            )
                         }
                     />
                     <Route
                         path="/register"
                         element={
-                            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
-                                <RegistrationPage
-                                    onAuthSuccess={handleAuthSuccess}
-                                />
-                            </div>
+                            token ? (
+                                <Navigate to="/dashboard" replace />
+                            ) : (
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
+                                    <RegistrationPage
+                                        onAuthSuccess={handleAuthSuccess}
+                                    />
+                                </div>
+                            )
                         }
                     />
                     <Route path="/map" element={<MapPage />} />
@@ -146,7 +162,13 @@ function App() {
                     <Route path="/list/:id" element={<ListDetail />} />
                     <Route
                         path="/"
-                        element={<Navigate to="/login" replace />}
+                        element={
+                            token ? (
+                                <Navigate to="/dashboard" replace />
+                            ) : (
+                                <Navigate to="/login" replace />
+                            )
+                        }
                     />
                     <Route
                         path="*"

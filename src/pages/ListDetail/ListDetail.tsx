@@ -33,9 +33,7 @@ interface ApiShoppingList {
     items?: ApiListItem[];
 }
 
-interface CreatedListResponse {
-    id: string;
-}
+
 
 interface ListDetailProps {
     isEmbedded?: boolean;
@@ -51,18 +49,21 @@ const MOCK_STORES = [
         name: "SuperMart Downtown",
         address: "123 Main St, New York, NY 10001",
         bestMatch: true,
+        isMock: true,
     },
     {
         id: "2",
         name: "FreshMart Uptown",
         address: "456 Broadway, New York, NY 10012",
         bestMatch: false,
+        isMock: true,
     },
     {
         id: "3",
         name: "QuickShop Mall",
         address: "789 Park Ave, New York, NY 10016",
         bestMatch: false,
+        isMock: true,
     },
 ];
 
@@ -80,8 +81,7 @@ const ListDetail = ({
 
     const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
-    const [recipeText, setRecipeText] = useState("");
-    const [_isAiLoading, setIsAiLoading] = useState(false);
+    const [_isAiLoading, _setIsAiLoading] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -152,12 +152,12 @@ const ListDetail = ({
                 setItems(mappedItems);
                 syncListItemsInStore(mappedItems, targetListId);
             } catch {
-                setError("Nu s-a putut sincroniza lista.");
+                setError("Failed to sync the list.");
             } finally {
                 setIsLoading(false);
             }
         },
-        [effectiveListId, getAuthHeaders, getBaseUrl, syncListItemsInStore],
+        [getBaseUrl, getAuthHeaders, syncListItemsInStore, effectiveListId],
     );
 
     useEffect(() => {
@@ -228,26 +228,27 @@ const ListDetail = ({
             .then(async (res) => {
                 if (!res.ok) throw new Error("Failed to add item");
                 await fetchListData(effectiveListId);
+
+                // Publish after confirmation
+                if (stompClient.connected) {
+                    stompClient.publish({
+                        destination: "/app/sync",
+                        body: JSON.stringify({
+                            eventType: "ITEM_ADDED",
+                            listId: effectiveListId,
+                            item: newItem,
+                        }),
+                    });
+                }
             })
             .catch(() => {
-                setError("Nu s-a putut adăuga produsul.");
+                setError("Failed to add the product.");
                 const rolledBack = optimisticItems.filter(
                     (i) => i.id !== newItem.id,
                 );
                 setItems(rolledBack);
                 syncListItemsInStore(rolledBack);
             });
-
-        if (effectiveListId && stompClient.connected) {
-            stompClient.publish({
-                destination: "/app/sync",
-                body: JSON.stringify({
-                    eventType: "ITEM_ADDED",
-                    listId: effectiveListId,
-                    item: newItem,
-                }),
-            });
-        }
     };
 
     const handleInlineAdd = (e: React.FormEvent) => {
@@ -271,6 +272,7 @@ const ListDetail = ({
     };
 
     const handleCheck = (itemId: string) => {
+        if (!effectiveListId || effectiveListId === "default") return;
         const currentItem = items.find((item) => item.id === itemId);
         if (!currentItem) return;
         const newChecked = !currentItem.checked;
@@ -293,7 +295,7 @@ const ListDetail = ({
                 timestamp: Date.now(),
             }),
         }).catch(() => {
-            setError("Nu s-a putut actualiza produsul.");
+            setError("Failed to update the product.");
             const rolledBack = items.map((item) =>
                 item.id === itemId
                     ? { ...item, checked: currentItem.checked }
@@ -316,6 +318,7 @@ const ListDetail = ({
     };
 
     const handleDelete = (itemId: string) => {
+        if (!effectiveListId || effectiveListId === "default") return;
         const previousItems = items;
         const nextItems = previousItems.filter((item) => item.id !== itemId);
         setItems(nextItems);
@@ -324,58 +327,15 @@ const ListDetail = ({
             method: "DELETE",
             headers: getAuthHeaders(),
         }).catch(() => {
-            setError("Nu s-a putut șterge produsul.");
+            setError("Failed to delete the product.");
             setItems(previousItems);
             syncListItemsInStore(previousItems);
         });
     };
 
-    const createListFromPlaceholder = async (): Promise<string> => {
-        const response = await fetch(`${getBaseUrl()}/api/lists`, {
-            method: "POST",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify({
-                title: `AI Generated ${new Date().toISOString().slice(0, 10)}`,
-            }),
-        });
-        if (!response.ok) throw new Error("Failed to create list");
-        const createdList = (await response.json()) as CreatedListResponse;
-        return createdList.id;
-    };
 
-    const _handleAiImport = async () => {
-        if (!recipeText.trim() || !effectiveListId) return;
-        setIsAiLoading(true);
-        setError(null);
-        try {
-            const targetListId =
-                effectiveListId === "default"
-                    ? await createListFromPlaceholder()
-                    : effectiveListId;
-            const response = await fetch(
-                `${getBaseUrl()}/api/ai/recipe-to-list`,
-                {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        text: recipeText,
-                        listId: targetListId,
-                    }),
-                },
-            );
-            if (!response.ok) throw new Error("AI Service error");
-            setRecipeText("");
-            if (effectiveListId === "default") {
-                navigate(`/dashboard?list=${targetListId}`);
-                return;
-            }
-            await fetchListData(targetListId);
-        } catch {
-            setError("Eroare la procesarea AI. Verifică backend-ul.");
-        } finally {
-            setIsAiLoading(false);
-        }
-    };
+
+
 
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
@@ -485,6 +445,13 @@ const ListDetail = ({
                                 className="flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1"
                             />
                             <button
+                                type="button"
+                                className="text-[11px] font-bold text-text-muted hover:text-accent transition-colors uppercase tracking-wider px-2"
+                                onClick={_openDetailsModal}
+                            >
+                                Details
+                            </button>
+                            <button
                                 type="submit"
                                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg hover:opacity-90 transition-all shrink-0"
                                 aria-label="Add"
@@ -528,7 +495,7 @@ const ListDetail = ({
             <Modal
                 isOpen={showMobileAddModal}
                 onClose={closeMobileAddModal}
-                title="Adaugă Produs"
+                title="Add Item"
                 initialFocusSelector="#mobile-item-name"
                 footer={
                     <>
@@ -537,14 +504,14 @@ const ListDetail = ({
                             className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
                             onClick={closeMobileAddModal}
                         >
-                            Anulează
+                            Cancel
                         </button>
                         <button
                             type="submit"
                             form="mobile-add-form"
                             className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
                         >
-                            Adaugă
+                            Add
                         </button>
                     </>
                 }
@@ -559,14 +526,14 @@ const ListDetail = ({
                             htmlFor="mobile-item-name"
                             className="text-[13px] font-semibold text-text-strong"
                         >
-                            Nume Produs
+                            Item Name
                         </label>
                         <input
                             id="mobile-item-name"
                             type="text"
                             value={detailName}
                             onChange={(e) => setDetailName(e.target.value)}
-                            placeholder="ex: Lapte"
+                            placeholder="e.g. Milk"
                             required
                             className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
                         />
@@ -580,8 +547,8 @@ const ListDetail = ({
                         }
                     >
                         {showExpandedDetails
-                            ? "Mai puține detalii"
-                            : "Adaugă detalii (cantitate, preț...)"}
+                            ? "Fewer details"
+                            : "Add details (qty, price...)"}
                         <ChevronDown
                             size={16}
                             className="transition-transform duration-200"
@@ -600,7 +567,7 @@ const ListDetail = ({
                                     htmlFor="m-qty"
                                     className="text-xs font-semibold text-text-muted"
                                 >
-                                    Cantitate
+                                    Quantity
                                 </label>
                                 <input
                                     id="m-qty"
@@ -609,7 +576,7 @@ const ListDetail = ({
                                     onChange={(e) =>
                                         setDetailQuantity(e.target.value)
                                     }
-                                    placeholder="ex: 2 buc"
+                                    placeholder="e.g. 2 pcs"
                                     className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
                                 />
                             </div>
@@ -627,7 +594,7 @@ const ListDetail = ({
                                     onChange={(e) =>
                                         setDetailBrand(e.target.value)
                                     }
-                                    placeholder="ex: Zuzu"
+                                    placeholder="e.g. Zuzu"
                                     className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
                                 />
                             </div>
@@ -636,7 +603,7 @@ const ListDetail = ({
                                     htmlFor="m-price"
                                     className="text-xs font-semibold text-text-muted"
                                 >
-                                    Preț
+                                    Price
                                 </label>
                                 <input
                                     id="m-price"
@@ -791,10 +758,12 @@ const ListDetail = ({
                             </div>
                             <button
                                 type="button"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all hover:opacity-80 hover:-translate-y-px active:translate-y-0 shrink-0"
+                                className="inline-flex items-center gap-1.5 px-4 py-2 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all hover:opacity-80 hover:-translate-y-px active:translate-y-0 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed disabled:translate-y-0"
+                                disabled={store.isMock && import.meta.env.PROD}
+                                title={store.isMock && import.meta.env.PROD ? "Navigation unavailable for mock stores" : undefined}
                             >
                                 <Send size={15} />
-                                Go
+                                {store.isMock && import.meta.env.DEV ? "Go (Mock)" : "Go"}
                             </button>
                         </div>
                     ))}

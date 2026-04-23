@@ -15,10 +15,10 @@ export default function ThemeSwitcher() {
             <div
                 className={`relative flex flex-col transition-transform duration-500 ease-spring ${
                     theme === "light"
-                        ? "translate-y-[33.33%]"
-                        : theme === "dark"
+                        ? "translate-y-0"
+                        : theme === "system"
                           ? "translate-y-[-33.33%]"
-                          : "translate-y-0"
+                          : "translate-y-[-66.66%]"
                 }`}
             >
                 {/* Sun Icon */}

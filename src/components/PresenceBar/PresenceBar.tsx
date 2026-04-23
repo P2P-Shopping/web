@@ -59,13 +59,25 @@ const PresenceBar: React.FC = () => {
                                     className="absolute -bottom-1 -right-1 flex gap-0.5 px-1.5 py-0.5 bg-bg-muted border border-border rounded-full text-[10px] text-accent font-bold shadow-sm animate-bounce"
                                     title={`${username} is typing...`}
                                 >
-                                    <span className="animate-[pulse_1s_infinite]">
+                                    <span className="sr-only" role="status">
+                                        {username} is typing...
+                                    </span>
+                                    <span
+                                        className="animate-[pulse_1s_infinite]"
+                                        aria-hidden="true"
+                                    >
                                         .
                                     </span>
-                                    <span className="animate-[pulse_1s_infinite_200ms]">
+                                    <span
+                                        className="animate-[pulse_1s_infinite_200ms]"
+                                        aria-hidden="true"
+                                    >
                                         .
                                     </span>
-                                    <span className="animate-[pulse_1s_infinite_400ms]">
+                                    <span
+                                        className="animate-[pulse_1s_infinite_400ms]"
+                                        aria-hidden="true"
+                                    >
                                         .
                                     </span>
                                 </div>

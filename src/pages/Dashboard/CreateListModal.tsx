@@ -33,7 +33,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
         <Modal
             isOpen={true}
             onClose={onClose}
-            title="Creare Listă Nouă"
+            title="Create New List"
             initialFocusSelector="#list-name"
             footer={
                 <>
@@ -43,7 +43,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                         onClick={onClose}
                         disabled={isSubmitting}
                     >
-                        Anulează
+                        Cancel
                     </button>
                     <button
                         type="submit"
@@ -54,7 +54,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                         {isSubmitting ? (
                             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         ) : (
-                            "Crează Lista"
+                            "Create List"
                         )}
                     </button>
                 </>
@@ -70,14 +70,14 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                         htmlFor="list-name"
                         className="text-[13px] font-semibold text-text-strong"
                     >
-                        Numele listei
+                        List name
                     </label>
                     <input
                         id="list-name"
                         type="text"
                         value={listName}
                         onChange={(e) => setListName(e.target.value)}
-                        placeholder="Dă un nume descriptiv"
+                        placeholder="Give it a descriptive name"
                         maxLength={100}
                         className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong transition-all focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] outline-none"
                     />

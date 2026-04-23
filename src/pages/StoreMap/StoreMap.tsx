@@ -795,6 +795,8 @@ const StoreMap: React.FC = () => {
 
             {/* Responsive Sidebar */}
             <div
+                aria-hidden={!isSidebarExpanded}
+                {...(!isSidebarExpanded ? { inert: true } : {})}
                 className={`
                     absolute z-30 transition-all duration-500 ease-spring
                     /* Desktop: Right-side Drawer */

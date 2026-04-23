@@ -92,7 +92,10 @@ const LoginPage = () => {
                 </div>
 
                 {error && (
-                    <p className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium animate-in shake-in duration-300">
+                    <p
+                        role="alert"
+                        className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium animate-in shake-in duration-300"
+                    >
                         {error}
                     </p>
                 )}

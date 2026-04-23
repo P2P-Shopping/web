@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ThemeSwitcher } from "..";
+import ThemeSwitcher from "../ThemeSwitcher/ThemeSwitcher";
 
 const NAV_LINKS = [
     { to: "/dashboard", label: "My Lists", icon: LayoutDashboard },
@@ -42,7 +42,7 @@ export default function Navbar() {
     // Close more menu on navigation
     useEffect(() => {
         setIsMoreOpen(false);
-    }, []);
+    }, [pathname]);
 
     // Split links into priority (visible) and extra (in more menu)
     // On mobile we might want fewer visible items. Let's show 4 + More.

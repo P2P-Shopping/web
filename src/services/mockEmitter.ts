@@ -23,7 +23,9 @@ export const startMockEmitter = () => {
             lat: currentLat,
             lng: currentLng,
         });
-        console.log("GPS Update:", currentLat, currentLng);
+        if (import.meta.env.DEV) {
+            console.log("GPS Update:", currentLat, currentLng);
+        }
     }, 1000);
 };
 

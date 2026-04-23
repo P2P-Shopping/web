@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, Plus, Search, Send, Trash2 } from "lucide-react";
+import { ChevronLeft, Plus, Search, Send, Trash2 } from "lucide-react";
 import {
     type MouseEvent,
     type ReactNode,
@@ -6,7 +6,7 @@ import {
     useMemo,
     useState,
 } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
@@ -16,6 +16,7 @@ import CreateListModal from "./CreateListModal";
 const PREVIEW_LIMIT = 3;
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [deleteTarget, setDeleteTarget] = useState<{
         id: string;
@@ -51,7 +52,7 @@ const Dashboard = () => {
     // Format date nicely
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString("ro-RO", {
+        return date.toLocaleDateString("en-US", {
             day: "numeric",
             month: "short",
             hour: "2-digit",
@@ -101,7 +102,7 @@ const Dashboard = () => {
         mainContent = (
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-text-muted text-sm">
                 <div className="w-9 h-9 border-3 border-border border-t-accent rounded-full animate-spin" />
-                <p>Se încarcă listele...</p>
+                <p>Loading lists...</p>
             </div>
         );
     } else if (lists.length === 0) {
@@ -118,7 +119,7 @@ const Dashboard = () => {
                 </p>
                 <button
                     type="button"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
                     onClick={openModal}
                 >
                     <Plus size={20} />
@@ -132,7 +133,6 @@ const Dashboard = () => {
                 <ListDetail
                     listIdOverride={selectedList.id}
                     listTitle={selectedList.name}
-                    showAiImport={false}
                     showStoresModal={showStoresModal}
                     onCloseStoresModal={() => setShowStoresModal(false)}
                 />
@@ -151,7 +151,7 @@ const Dashboard = () => {
                                 type="button"
                                 className="w-full h-full text-left relative bg-surface border border-border rounded-xl p-[22px_22px_18px] cursor-pointer transition-all duration-200 ease-out hover:border-accent-border hover:shadow-md hover:shadow-accent-glow/20 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 flex flex-col gap-[18px] outline-none"
                                 onClick={() => handleCardClick(list.id)}
-                                aria-label={`Deschide lista ${list.name}`}
+                                aria-label={`Open list ${list.name}`}
                             >
                                 <div className="flex justify-between items-start gap-3">
                                     <div className="flex-1 min-w-0 pr-12">
@@ -172,7 +172,7 @@ const Dashboard = () => {
                                             {getItemsCount(list.items)}
                                         </span>
                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
-                                            {list.ownerName || "Tu"}
+                                            {list.ownerName || "You"}
                                         </span>
                                     </div>
 
@@ -213,8 +213,8 @@ const Dashboard = () => {
                             onClick={(e) =>
                                 handleDeleteList(e, list.id, list.name)
                             }
-                            title="Șterge lista"
-                            aria-label="Șterge lista"
+                            title="Delete list"
+                            aria-label="Delete list"
                         >
                             <Trash2 size={16} />
                         </button>
@@ -235,7 +235,7 @@ const Dashboard = () => {
                             type="button"
                             className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
                             onClick={clearSelectedList}
-                            aria-label="Înapoi la liste"
+                            aria-label="Back to lists"
                         >
                             <ChevronLeft size={20} />
                         </button>
@@ -254,6 +254,7 @@ const Dashboard = () => {
                             <button
                                 type="button"
                                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-text-strong text-bg text-sm font-semibold transition-all duration-200 ease-out hover:opacity-85 hover:-translate-y-px shrink-0 active:translate-y-0"
+                                onClick={() => navigate(`/nav/${selectedList.id}`)}
                             >
                                 <Send size={18} />
                                 <span>Navigate</span>
