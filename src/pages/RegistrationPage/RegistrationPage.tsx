@@ -46,6 +46,7 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
             const response = await registerRequest(formData);
             if (onAuthSuccess) onAuthSuccess(response);
             navigate("/login");
+            // biome-ignore lint/suspicious/noExplicitAny: API error response format
         } catch (err: any) {
             setError(
                 err.response?.data?.message ??

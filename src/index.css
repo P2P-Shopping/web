@@ -42,12 +42,13 @@
     --radius-xl: 20px;
     --radius-full: 9999px;
 
-    /* Transition */
+    /* Transitions & Animations */
     --ease-out: cubic-bezier(0.2, 1, 0.3, 1);
     --ease-spring: cubic-bezier(0.3, 1.5, 0.6, 1);
     --animate-spin: spin 0.8s linear infinite;
+    --animate-fade-in: fade-in 0.3s var(--ease-out);
+    --animate-slide-in-bottom: slide-in-bottom 0.5s var(--ease-spring);
 
-    /* Z-Index */
     --z-10: 10;
     --z-20: 20;
     --z-30: 30;
@@ -256,5 +257,23 @@
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slide-in-bottom {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
     }
 }

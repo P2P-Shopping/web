@@ -41,7 +41,6 @@ interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
     listTitle?: string;
-    showAiImport?: boolean;
     showStoresModal?: boolean;
     onCloseStoresModal?: () => void;
 }
@@ -71,20 +70,18 @@ const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
     listTitle: _listTitle,
-    showAiImport = true,
     showStoresModal = false,
     onCloseStoresModal,
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
-    const isNewListPage = effectiveListId === "default" && showAiImport;
     const { updateList } = useListsStore();
 
     const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
     const [recipeText, setRecipeText] = useState("");
-    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [_isAiLoading, setIsAiLoading] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -183,7 +180,7 @@ const ListDetail = ({
         setShowExpandedDetails(false);
     }, [effectiveListId]);
 
-    const openDetailsModal = () => {
+    const _openDetailsModal = () => {
         setDetailName(newItemName);
         setDetailQuantity("");
         setDetailBrand("");
@@ -346,7 +343,7 @@ const ListDetail = ({
         return createdList.id;
     };
 
-    const handleAiImport = async () => {
+    const _handleAiImport = async () => {
         if (!recipeText.trim() || !effectiveListId) return;
         setIsAiLoading(true);
         setError(null);
@@ -389,90 +386,122 @@ const ListDetail = ({
         setNewItemName("");
     };
 
+    const { lists, fetchLists } = useListsStore();
+
+    // Fetch lists if embedded to allow selection
+    useEffect(() => {
+        if (isEmbedded && lists.length === 0) {
+            void fetchLists();
+        }
+    }, [isEmbedded, lists.length, fetchLists]);
+
+    const handleListSelect = (listId: string) => {
+        navigate(`/nav/${listId}`);
+    };
+
     return (
         <div
             className={
                 isEmbedded
-                    ? "w-full"
+                    ? "w-full flex flex-col h-full bg-surface/50"
                     : "flex justify-center items-start min-h-[calc(100svh-60px)] p-[28px_20px] bg-bg"
             }
         >
-            <div className="w-full max-w-[860px] mx-auto flex flex-col gap-4 box-border max-[600px]:pb-[100px]">
+            <div
+                className={`w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`}
+            >
+                {isEmbedded && (
+                    <header className="flex items-center justify-between mb-2">
+                        <h2 className="text-xl font-black text-text-strong tracking-tighter uppercase italic">
+                            {effectiveListId === "default"
+                                ? "Select a List"
+                                : "Shopping List"}
+                        </h2>
+                        {effectiveListId !== "default" && (
+                            <button
+                                type="button"
+                                onClick={() => handleListSelect("default")}
+                                className="text-[10px] font-bold text-accent hover:underline uppercase"
+                            >
+                                Switch List
+                            </button>
+                        )}
+                    </header>
+                )}
+
                 {error && (
                     <div className="bg-danger-subtle text-danger border border-danger-border p-[10px_14px] rounded-md text-[13px] font-medium">
                         {error}
                     </div>
                 )}
 
-                {isNewListPage ? (
-                    <div className="flex flex-col gap-2">
-                        <h3 className="text-lg font-bold text-text-strong text-center mb-2">
-                            AI List Generator
-                        </h3>
-                        <p className="text-sm text-text-muted text-center leading-relaxed mb-4">
-                            Paste a recipe or ingredient list and a new shopping
-                            list will be created automatically.
-                        </p>
-                        <div className="bg-accent-subtle border border-accent-border p-[18px] rounded-lg flex flex-col gap-3">
-                            <textarea
-                                rows={5}
-                                value={recipeText}
-                                onChange={(e) => setRecipeText(e.target.value)}
-                                placeholder="Paste your recipe here (e.g. 2 eggs, milk...)"
-                                className="w-full bg-surface border-1.5 border-border text-text-strong p-[12px_14px] rounded-md resize-none text-sm leading-relaxed min-h-[120px] outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)]"
-                            />
-                            <button
-                                onClick={handleAiImport}
-                                className="w-full p-3 rounded-md border-none bg-accent text-text-on-accent text-sm font-bold cursor-pointer transition-all duration-200 ease-out hover:bg-accent-hover hover:-translate-y-px disabled:opacity-55 disabled:cursor-not-allowed disabled:transform-none"
-                                disabled={isAiLoading}
-                                type="button"
-                            >
-                                {isAiLoading
-                                    ? "Processing..."
-                                    : "Generate List"}
-                            </button>
-                        </div>
+                {effectiveListId === "default" && isEmbedded ? (
+                    <div className="flex flex-col gap-3">
+                        {lists.length === 0 && !isLoading ? (
+                            <p className="text-center py-10 text-text-muted italic text-sm">
+                                No lists found. Create one in the dashboard!
+                            </p>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                {lists.map((list) => (
+                                    <button
+                                        type="button"
+                                        key={list.id}
+                                        onClick={() =>
+                                            handleListSelect(list.id)
+                                        }
+                                        className="flex items-center justify-between p-4 bg-surface border border-border rounded-xl hover:border-accent hover:shadow-md transition-all text-left"
+                                    >
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="font-bold text-text-strong">
+                                                {list.name}
+                                            </span>
+                                            <span className="text-xs text-text-muted">
+                                                {list.items.length} items
+                                            </span>
+                                        </div>
+                                        <ChevronDown
+                                            size={18}
+                                            className="-rotate-90 text-text-muted"
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <>
-                        {/* ── Inline add bar (Desktop) ── */}
+                        {/* ── Inline add bar (Desktop & Embedded) ── */}
                         <form
                             onSubmit={handleInlineAdd}
-                            className="flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm max-[600px]:hidden"
+                            className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${!isEmbedded ? "max-[600px]:hidden" : ""}`}
                         >
                             <input
                                 ref={addInputRef}
                                 type="text"
                                 value={newItemName}
                                 onChange={(e) => setNewItemName(e.target.value)}
-                                placeholder="Add item (e.g., Milk, Bread)..."
+                                placeholder="Add item..."
                                 className="flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1"
                             />
                             <button
-                                type="button"
-                                className="inline-flex items-center px-3.5 py-1.5 border-1.5 border-border-strong rounded-md bg-transparent text-text-strong text-[13px] font-semibold cursor-pointer transition-all duration-200 hover:bg-bg-muted shrink-0 whitespace-nowrap"
-                                onClick={openDetailsModal}
-                            >
-                                Details
-                            </button>
-                            <button
                                 type="submit"
-                                className="inline-flex items-center gap-1.5 px-4 py-1.5 border-none rounded-md bg-text-strong text-bg text-[13px] font-bold cursor-pointer transition-all duration-200 hover:opacity-85 hover:-translate-y-px active:translate-y-0 shrink-0 whitespace-nowrap"
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg hover:opacity-90 transition-all shrink-0"
+                                aria-label="Add"
                             >
-                                <Plus size={16} strokeWidth={2.5} />
-                                Add
+                                <Plus size={18} strokeWidth={3} />
                             </button>
                         </form>
 
                         {/* ── Items list ── */}
-                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden">
+                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
                             {isLoading ? (
                                 <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
                                     <div className="w-8 h-8 border-3 border-border border-t-accent rounded-full animate-spin" />
-                                    <p>Se încarcă produsele...</p>
+                                    <p>Loading...</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/50">
+                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4">
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={handleCheck}

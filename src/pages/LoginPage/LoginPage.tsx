@@ -15,6 +15,7 @@ const LoginPage = () => {
         try {
             await loginRequest(email, password);
             navigate("/dashboard");
+            // biome-ignore lint/suspicious/noExplicitAny: API error response format
         } catch (err: any) {
             setError(err.message ?? "Login failed. Please try again.");
         }

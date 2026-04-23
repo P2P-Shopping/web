@@ -45,7 +45,11 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                             className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all shrink-0 ${item.checked ? "bg-success border-success" : "bg-surface border-border-strong group-hover:border-accent"}`}
                         >
                             {item.checked && (
-                                <Check size={14} strokeWidth={4} className="text-white" />
+                                <Check
+                                    size={14}
+                                    strokeWidth={4}
+                                    className="text-white"
+                                />
                             )}
                         </div>
                         <div className="flex flex-col min-w-0">

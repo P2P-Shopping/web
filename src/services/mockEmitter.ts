@@ -1,6 +1,6 @@
 import { useStore } from "../context/useStore";
 
-let intervalId: any = null;
+let intervalId: ReturnType<typeof setInterval> | null = null;
 
 export const startMockEmitter = () => {
     if (intervalId) return;

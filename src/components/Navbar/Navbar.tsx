@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { 
-    LayoutDashboard, 
-    Sparkles, 
-    Route as RouteIcon, 
-    MapPinned, 
-    Map, 
+import {
+    LayoutDashboard,
+    Map as MapIcon,
+    MapPinned,
     MoreHorizontal,
-    X
+    Route as RouteIcon,
+    Sparkles,
+    X,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { ThemeSwitcher } from "..";
 
 const NAV_LINKS = [
@@ -16,7 +16,7 @@ const NAV_LINKS = [
     { to: "/list/default", label: "AI Import", icon: Sparkles },
     { to: "/route", label: "Route", icon: RouteIcon },
     { to: "/nav", label: "Store Map", icon: MapPinned },
-    { to: "/map", label: "Map", icon: Map },
+    { to: "/map", label: "Map", icon: MapIcon },
 ];
 
 export default function Navbar() {
@@ -27,18 +27,22 @@ export default function Navbar() {
     // Close more menu when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+            if (
+                moreMenuRef.current &&
+                !moreMenuRef.current.contains(event.target as Node)
+            ) {
                 setIsMoreOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     // Close more menu on navigation
     useEffect(() => {
         setIsMoreOpen(false);
-    }, [pathname]);
+    }, []);
 
     // Split links into priority (visible) and extra (in more menu)
     // On mobile we might want fewer visible items. Let's show 4 + More.
@@ -58,12 +62,17 @@ export default function Navbar() {
                                 : "text-text-muted hover:text-text-strong"
                         }`}
                     >
-                        <div className={`p-2 rounded-xl transition-all duration-300 ${
-                            pathname.startsWith(to) 
-                                ? "bg-accent-subtle scale-110 shadow-[0_0_20px_var(--color-accent-glow)]" 
-                                : "group-hover:bg-bg-muted"
-                        }`}>
-                            <Icon size={22} strokeWidth={pathname.startsWith(to) ? 2.5 : 2} />
+                        <div
+                            className={`p-2 rounded-xl transition-all duration-300 ${
+                                pathname.startsWith(to)
+                                    ? "bg-accent-subtle scale-110 shadow-[0_0_20px_var(--color-accent-glow)]"
+                                    : "group-hover:bg-bg-muted"
+                            }`}
+                        >
+                            <Icon
+                                size={22}
+                                strokeWidth={pathname.startsWith(to) ? 2.5 : 2}
+                            />
                         </div>
                         <span className="text-[10px] font-bold uppercase tracking-wider">
                             {label}
@@ -79,13 +88,23 @@ export default function Navbar() {
                     type="button"
                     onClick={() => setIsMoreOpen(!isMoreOpen)}
                     className={`flex flex-col items-center gap-1 group py-1 px-3 transition-all duration-300 ${
-                        isMoreOpen ? "text-accent" : "text-text-muted hover:text-text-strong"
+                        isMoreOpen
+                            ? "text-accent"
+                            : "text-text-muted hover:text-text-strong"
                     }`}
                 >
-                    <div className={`p-2 rounded-xl transition-all duration-300 ${
-                        isMoreOpen ? "bg-accent-subtle scale-110" : "group-hover:bg-bg-muted"
-                    }`}>
-                        {isMoreOpen ? <X size={22} /> : <MoreHorizontal size={22} />}
+                    <div
+                        className={`p-2 rounded-xl transition-all duration-300 ${
+                            isMoreOpen
+                                ? "bg-accent-subtle scale-110"
+                                : "group-hover:bg-bg-muted"
+                        }`}
+                    >
+                        {isMoreOpen ? (
+                            <X size={22} />
+                        ) : (
+                            <MoreHorizontal size={22} />
+                        )}
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider">
                         More
@@ -94,7 +113,7 @@ export default function Navbar() {
 
                 {/* More Menu Content */}
                 {isMoreOpen && (
-                    <div 
+                    <div
                         ref={moreMenuRef}
                         className="absolute bottom-[84px] right-4 bg-surface border border-border rounded-2xl p-2 shadow-2xl min-w-[180px] animate-in slide-in-from-bottom-4 fade-in duration-300"
                     >
@@ -115,7 +134,9 @@ export default function Navbar() {
                             ))}
                             <div className="h-px bg-border my-1" />
                             <div className="px-4 py-2 flex items-center justify-between">
-                                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Theme</span>
+                                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                    Theme
+                                </span>
                                 <ThemeSwitcher />
                             </div>
                         </div>

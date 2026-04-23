@@ -117,7 +117,9 @@ function App() {
                 </div>
             )}
 
-            <main className={`flex-1 flex flex-col ${showNavbar ? "pb-[72px]" : ""}`}>
+            <main
+                className={`flex-1 flex flex-col ${showNavbar ? "pb-[72px]" : ""}`}
+            >
                 <Routes>
                     <Route
                         path="/login"

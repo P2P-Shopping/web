@@ -1,3 +1,4 @@
+import { List, LocateFixed, X, ZoomIn, ZoomOut } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -622,9 +623,28 @@ const useMapEngine = (
         lastPanPoint.current = null;
     };
 
+    const zoomIn = () => {
+        const nextZoom = Math.min(
+            camera.current.zoom * 1.5,
+            MAP_CONFIG.MAX_ZOOM,
+        );
+        camera.current.zoom = nextZoom;
+        recenterCamera();
+    };
+
+    const zoomOut = () => {
+        const nextZoom = Math.max(
+            camera.current.zoom / 1.5,
+            MAP_CONFIG.MIN_ZOOM,
+        );
+        camera.current.zoom = nextZoom;
+        recenterCamera();
+    };
+
     const recenterCamera = () => {
         if (!originGps.current) return;
 
+        camera.current.zoom = 1; // Reset zoom as requested
         const userPos = getRelativePixels(
             currentRenderedGps.current,
             originGps.current,
@@ -641,6 +661,8 @@ const useMapEngine = (
         gpsError,
         isRouting,
         recenterCamera,
+        zoomIn,
+        zoomOut,
         handlers: {
             onTouchStart: handleTouchStart,
             onTouchMove: handleTouchMove,
@@ -657,6 +679,8 @@ const useMapEngine = (
 const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { id: listId } = useParams<{ id: string }>();
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+
     const {
         isDragging,
         hasLocationLock,
@@ -664,6 +688,8 @@ const StoreMap: React.FC = () => {
         isRouting,
         handlers,
         recenterCamera,
+        zoomIn,
+        zoomOut,
     } = useMapEngine(canvasRef, listId);
 
     if (!hasLocationLock) {
@@ -689,7 +715,7 @@ const StoreMap: React.FC = () => {
 
             <canvas
                 ref={canvasRef}
-                className="w-full h-full block bg-bg-muted"
+                className="w-full h-full block bg-bg-muted touch-none"
                 {...handlers}
             />
 
@@ -702,19 +728,102 @@ const StoreMap: React.FC = () => {
                 </div>
             )}
 
+            <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-3">
+                <button
+                    type="button"
+                    className="w-14 h-14 flex items-center justify-center bg-accent text-text-on-accent rounded-full shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        recenterCamera();
+                    }}
+                    title="Recenter Map"
+                >
+                    <LocateFixed size={24} />
+                </button>
+
+                <div className="flex flex-col bg-surface border border-border rounded-[28px] shadow-xl overflow-hidden shadow-[0_4px_12px_var(--color-accent-glow)] transition-all">
+                    <button
+                        type="button"
+                        className="w-14 h-14 flex items-center justify-center text-text-strong hover:bg-bg-muted transition-colors border-b border-border active:bg-border"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            zoomIn();
+                        }}
+                        title="Zoom In"
+                    >
+                        <ZoomIn size={22} />
+                    </button>
+                    <button
+                        type="button"
+                        className="w-14 h-14 flex items-center justify-center text-text-strong hover:bg-bg-muted transition-colors active:bg-border"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            zoomOut();
+                        }}
+                        title="Zoom Out"
+                    >
+                        <ZoomOut size={22} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Floating Toggle Button (Mobile & Desktop) */}
             <button
                 type="button"
-                className="absolute bottom-6 left-6 z-20 px-6 py-3 bg-accent text-text-on-accent rounded-full text-xs font-black tracking-widest shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    recenterCamera();
-                }}
+                className={`absolute bottom-6 right-6 z-40 w-14 h-14 flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 ${
+                    isSidebarExpanded
+                        ? "rotate-90 bg-accent text-text-on-accent"
+                        : "bg-text-strong text-bg"
+                }`}
+                onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                aria-label={isSidebarExpanded ? "Close List" : "Show List"}
             >
-                RECENTER
+                {isSidebarExpanded ? <X size={24} /> : <List size={24} />}
             </button>
 
-            <div className="absolute top-0 right-0 bottom-0 w-[400px] bg-surface/90 backdrop-blur-md border-l border-border shadow-2xl z-10 overflow-y-auto max-[1000px]:hidden">
-                <ListDetail isEmbedded={true} />
+            {/* Sidebar Overlay (Mobile) */}
+            {isSidebarExpanded && (
+                <button
+                    type="button"
+                    className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-30 min-[1000px]:hidden animate-fade-in"
+                    onClick={() => setIsSidebarExpanded(false)}
+                    onKeyDown={(e) =>
+                        e.key === "Escape" && setIsSidebarExpanded(false)
+                    }
+                ></button>
+            )}
+
+            {/* Responsive Sidebar */}
+            <div
+                className={`
+                    absolute z-30 transition-all duration-500 ease-spring
+                    /* Desktop: Right-side Drawer */
+                    min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 
+                    min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border
+                    ${
+                        isSidebarExpanded
+                            ? "min-[1000px]:translate-x-0"
+                            : "min-[1000px]:translate-x-full"
+                    }
+                    
+                    /* Mobile: Bottom Sheet */
+                    max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 
+                    max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh]
+                    ${
+                        isSidebarExpanded
+                            ? "max-[1000px]:translate-y-0"
+                            : "max-[1000px]:translate-y-full"
+                    }
+                    
+                    bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
+                `}
+            >
+                {/* Drag Handle for Mobile */}
+                <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
+
+                <div className="flex-1 overflow-y-auto px-1">
+                    <ListDetail isEmbedded={true} />
+                </div>
             </div>
         </div>
     );

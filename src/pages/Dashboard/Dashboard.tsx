@@ -1,11 +1,4 @@
-import {
-    Check,
-    ChevronLeft,
-    Plus,
-    Search,
-    Send,
-    Trash2,
-} from "lucide-react";
+import { Check, ChevronLeft, Plus, Search, Send, Trash2 } from "lucide-react";
 import {
     type MouseEvent,
     type ReactNode,
@@ -192,7 +185,11 @@ const Dashboard = () => {
                                                     aria-hidden="true"
                                                 >
                                                     {item.checked && (
-                                                        <Check size={12} strokeWidth={4} className="text-white" />
+                                                        <Check
+                                                            size={12}
+                                                            strokeWidth={4}
+                                                            className="text-white"
+                                                        />
                                                     )}
                                                 </span>
                                                 <span
