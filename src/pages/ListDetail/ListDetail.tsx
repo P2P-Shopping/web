@@ -174,6 +174,14 @@ const ListDetail = ({
         }
     }, [showDetailsModal, newItemName]);
 
+    // Reset local modal states when list changes
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Reset on ID change
+    useEffect(() => {
+        setShowDetailsModal(false);
+        setShowMobileAddModal(false);
+        setShowExpandedDetails(false);
+    }, [effectiveListId]);
+
     const openDetailsModal = () => {
         setDetailName(newItemName);
         setDetailQuantity("");
