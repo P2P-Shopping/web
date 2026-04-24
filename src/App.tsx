@@ -140,11 +140,6 @@ function App() {
         };
     }, [handlePongMessage, setServerConnected, clearToastTimeout]);
 
-    const handleAuthSuccess = (result: { email: string } | null) => {
-        console.info("Authentication successful", result);
-        setAuth(result);
-    };
-
     // Determine if Navbar should be shown
     const isAuthPage =
         location.pathname === "/login" || location.pathname === "/register";
@@ -184,9 +179,7 @@ function App() {
                                 <Navigate to="/dashboard" replace />
                             ) : (
                                 <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
-                                    <RegistrationPage
-                                        onAuthSuccess={handleAuthSuccess}
-                                    />
+                                    <RegistrationPage />
                                 </div>
                             )
                         }

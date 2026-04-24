@@ -104,7 +104,13 @@ const ListDetail = ({
                     headers: getAuthHeaders(),
                     credentials: "include",
                 });
-                if (!response.ok) throw new Error("Failed to fetch lists");
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        useStore.getState().setAuth(null);
+                        throw new Error("Session expired.");
+                    }
+                    throw new Error("Failed to fetch lists");
+                }
                 const allLists = (await response.json()) as ApiShoppingList[];
                 const currentList = allLists.find(
                     (list) => list.id === targetListId,
@@ -287,7 +293,13 @@ const ListDetail = ({
                 },
             );
 
-            if (!res.ok) throw new Error("Failed to add item");
+            if (!res.ok) {
+                if (res.status === 401) {
+                    useStore.getState().setAuth(null);
+                    throw new Error("Session expired.");
+                }
+                throw new Error("Failed to add item");
+            }
             await fetchListData(effectiveListId);
 
             // Publish after confirmation
@@ -359,7 +371,13 @@ const ListDetail = ({
                 credentials: "include",
             });
 
-            if (!res.ok) throw new Error("Failed to update item");
+            if (!res.ok) {
+                if (res.status === 401) {
+                    useStore.getState().setAuth(null);
+                    throw new Error("Session expired.");
+                }
+                throw new Error("Failed to update item");
+            }
             if (effectiveListId && stompClient.connected) {
                 stompClient.publish({
                     destination: "/app/sync",
@@ -399,7 +417,13 @@ const ListDetail = ({
                 credentials: "include",
             });
 
-            if (!res.ok) throw new Error("Failed to delete item");
+            if (!res.ok) {
+                if (res.status === 401) {
+                    useStore.getState().setAuth(null);
+                    throw new Error("Session expired.");
+                }
+                throw new Error("Failed to delete item");
+            }
         } catch {
             setError("Failed to delete the product.");
             setItems((prev) => {

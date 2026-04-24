@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useStore } from "../context/useStore";
 import type { Item, ShoppingList } from "../types";
 
 interface ApiItem {
@@ -96,6 +97,10 @@ export const useListsStore = create<ListsState>((set, get) => ({
             });
 
             if (!response.ok) {
+                if (response.status === 401) {
+                    useStore.getState().setAuth(null);
+                    throw new Error("Session expired. Please log in again.");
+                }
                 throw new Error(`Failed to fetch lists (${response.status})`);
             }
 

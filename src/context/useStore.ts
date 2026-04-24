@@ -107,5 +107,8 @@ export const useStore = create<AppState>((set, get) => ({
             conflictItems: { ...state.conflictItems, [itemId]: hasConflict },
         })),
     setAuth: (user: { email: string } | null) =>
-        set({ user, isAuthenticated: !!user }),
+        set({
+            user: user && "email" in user ? user : null,
+            isAuthenticated: !!(user && "email" in user),
+        }),
 }));

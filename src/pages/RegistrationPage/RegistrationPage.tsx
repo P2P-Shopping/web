@@ -3,11 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerRequest } from "../../services/authService";
 
-interface RegistrationPageProps {
-    onAuthSuccess?: (authResult: any) => void;
-}
-
-const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
+const RegistrationPage = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         firstName: "",
@@ -43,8 +39,7 @@ const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
 
         setIsSubmitting(true);
         try {
-            const response = await registerRequest(formData);
-            if (onAuthSuccess) onAuthSuccess(response);
+            await registerRequest(formData);
             navigate("/login");
             // biome-ignore lint/suspicious/noExplicitAny: API error response format
         } catch (err: any) {
