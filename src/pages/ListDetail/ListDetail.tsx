@@ -134,7 +134,7 @@ const ListDetail = ({
 
     useEffect(() => {
         setIsLoading(true);
-        void fetchListData();
+        fetchListData();
     }, [fetchListData]);
 
     // Sync detail name when modal opens
@@ -331,7 +331,7 @@ const ListDetail = ({
 
     const handleDetailsSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const price = detailPrice ? parseFloat(detailPrice) : undefined;
+        const price = detailPrice ? Number.parseFloat(detailPrice) : undefined;
         commitItem(detailName, detailQuantity, detailBrand, price);
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
@@ -428,7 +428,7 @@ const ListDetail = ({
     // Fetch lists if embedded to allow selection
     useEffect(() => {
         if (isEmbedded && lists.length === 0) {
-            void fetchLists();
+            fetchLists();
         }
     }, [isEmbedded, lists.length, fetchLists]);
 
@@ -519,7 +519,7 @@ const ListDetail = ({
                         {/* ── Inline add bar (Desktop & Embedded) ── */}
                         <form
                             onSubmit={handleInlineAdd}
-                            className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${!isEmbedded ? "max-[600px]:hidden" : ""}`}
+                            className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${isEmbedded ? "" : "max-[600px]:hidden"}`}
                         >
                             <input
                                 ref={addInputRef}

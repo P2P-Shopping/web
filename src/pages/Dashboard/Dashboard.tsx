@@ -188,54 +188,64 @@ const Dashboard = () => {
                                     </div>
 
                                     <div className="flex flex-col gap-1.5">
-                                        {list.items.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-8 rounded-xl border-2 border-dashed border-border/40 text-text-muted/60 gap-1.5">
-                                                <Plus size={20} />
-                                                <span className="text-[11px] font-bold uppercase tracking-wider">
-                                                    Empty List
-                                                </span>
-                                            </div>
-                                        ) : uncheckedItems.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-8 rounded-xl bg-success-subtle/10 border border-success-border/20 text-success gap-2 animate-in fade-in zoom-in-95 duration-500">
-                                                <div className="w-9 h-9 rounded-full bg-success/10 flex items-center justify-center">
-                                                    <Check
-                                                        size={20}
-                                                        className="text-success"
-                                                    />
-                                                </div>
-                                                <span className="text-[11px] font-extrabold uppercase tracking-widest">
-                                                    All items checked
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                {uncheckedItems
-                                                    .slice(0, PREVIEW_LIMIT)
-                                                    .map((item) => (
-                                                        <div
-                                                            key={item.id}
-                                                            className="flex items-center gap-2.5 p-[8px_12px] rounded-md bg-bg-subtle border border-border text-sm text-text transition-colors duration-200 ease-out"
-                                                        >
-                                                            <span
-                                                                className="w-[18px] h-[18px] border-2 border-border-strong rounded-[5px] shrink-0 flex items-center justify-center transition-all bg-surface"
-                                                                aria-hidden="true"
-                                                            />
-                                                            <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                                                                {item.name}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                {uncheckedItems.length >
-                                                    PREVIEW_LIMIT && (
-                                                    <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[11px] font-bold text-text-muted transition-all hover:bg-border/40">
-                                                        ...and another{" "}
-                                                        {uncheckedItems.length -
-                                                            PREVIEW_LIMIT}{" "}
-                                                        unchecked items
+                                        {(() => {
+                                            if (list.items.length === 0) {
+                                                return (
+                                                    <div className="flex flex-col items-center justify-center py-8 rounded-xl border-2 border-dashed border-border/40 text-text-muted/60 gap-1.5">
+                                                        <Plus size={20} />
+                                                        <span className="text-[11px] font-bold uppercase tracking-wider">
+                                                            Empty List
+                                                        </span>
                                                     </div>
-                                                )}
-                                            </>
-                                        )}
+                                                );
+                                            }
+
+                                            if (uncheckedItems.length === 0) {
+                                                return (
+                                                    <div className="flex flex-col items-center justify-center py-8 rounded-xl bg-success-subtle/10 border border-success-border/20 text-success gap-2 animate-in fade-in zoom-in-95 duration-500">
+                                                        <div className="w-9 h-9 rounded-full bg-success/10 flex items-center justify-center">
+                                                            <Check
+                                                                size={20}
+                                                                className="text-success"
+                                                            />
+                                                        </div>
+                                                        <span className="text-[11px] font-extrabold uppercase tracking-widest">
+                                                            All items checked
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <>
+                                                    {uncheckedItems
+                                                        .slice(0, PREVIEW_LIMIT)
+                                                        .map((item) => (
+                                                            <div
+                                                                key={item.id}
+                                                                className="flex items-center gap-2.5 p-[8px_12px] rounded-md bg-bg-subtle border border-border text-sm text-text transition-colors duration-200 ease-out"
+                                                            >
+                                                                <span
+                                                                    className="w-[18px] h-[18px] border-2 border-border-strong rounded-[5px] shrink-0 flex items-center justify-center transition-all bg-surface"
+                                                                    aria-hidden="true"
+                                                                />
+                                                                <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                                    {item.name}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    {uncheckedItems.length >
+                                                        PREVIEW_LIMIT && (
+                                                        <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[11px] font-bold text-text-muted transition-all hover:bg-border/40">
+                                                            ...and another{" "}
+                                                            {uncheckedItems.length -
+                                                                PREVIEW_LIMIT}{" "}
+                                                            unchecked items
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </button>

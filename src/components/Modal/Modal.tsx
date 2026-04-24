@@ -22,7 +22,7 @@ export default function Modal({
     footer,
     maxWidth = "440px",
     initialFocusSelector,
-}: ModalProps) {
+}: Readonly<ModalProps>) {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
     const modalTitleId = useId();
@@ -33,11 +33,7 @@ export default function Modal({
         if (isOpen) {
             previousFocusRef.current = document.activeElement as HTMLElement;
             if (dialog && !dialog.open) {
-                try {
-                    dialog.showModal();
-                } catch (_err) {
-                    // Ignore errors if already open
-                }
+                dialog.showModal();
             }
 
             if (initialFocusSelector) {
@@ -48,22 +44,14 @@ export default function Modal({
             }
         } else {
             if (dialog?.open) {
-                try {
-                    dialog.close();
-                } catch (_err) {
-                    // Ignore errors if already closed
-                }
+                dialog.close();
             }
             previousFocusRef.current?.focus();
         }
 
         return () => {
             if (dialog?.open) {
-                try {
-                    dialog.close();
-                } catch (_err) {
-                    // ignore
-                }
+                dialog.close();
             }
         };
     }, [isOpen, initialFocusSelector]);

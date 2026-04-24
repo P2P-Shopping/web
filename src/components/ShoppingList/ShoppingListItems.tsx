@@ -35,21 +35,13 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                     key={item.id}
                     className={`flex items-center justify-between p-4 bg-bg-subtle border border-border rounded-xl transition-all duration-200 hover:bg-surface hover:shadow-md group ${item.checked ? "opacity-60" : ""}`}
                 >
-                    {/* biome-ignore lint/a11y/useSemanticElements: custom checkbox button */}
-                    <button
-                        type="button"
-                        className="flex items-center gap-4 cursor-pointer flex-1 min-w-0 border-none bg-transparent p-0 text-left focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-4 rounded-sm"
-                        onClick={() => onCheck(item.id)}
-                        onKeyDown={(e) => {
-                            if (e.key === " " || e.key === "Enter") {
-                                e.preventDefault();
-                                onCheck(item.id);
-                            }
-                        }}
-                        role="checkbox"
-                        aria-checked={item.checked}
-                        aria-label={`${item.checked ? "Uncheck" : "Check"} ${item.name}`}
-                    >
+                    <label className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={item.checked}
+                            onChange={() => onCheck(item.id)}
+                        />
                         <div
                             className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all shrink-0 ${item.checked ? "bg-success border-success" : "bg-surface border-border-strong group-hover:border-accent"}`}
                         >
@@ -61,7 +53,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                                 />
                             )}
                         </div>
-                        <div className="flex flex-col min-w-0">
+                        <div className="flex flex-col min-w-0 flex-1">
                             <span
                                 className={`text-base font-medium text-text-strong break-words transition-all ${item.checked ? "line-through opacity-60" : ""}`}
                             >
@@ -89,7 +81,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                                 )}
                             </div>
                         </div>
-                    </button>
+                    </label>
                     {onDelete && (
                         <button
                             type="button"

@@ -17,7 +17,7 @@ import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     const token = localStorage.getItem("token");
     if (!token) {
         return <Navigate to="/login" replace />;
@@ -37,9 +37,9 @@ function App() {
     useEffect(() => {
         const root = document.documentElement;
         if (theme === "system") {
-            root.removeAttribute("data-theme");
+            delete root.dataset.theme;
         } else {
-            root.setAttribute("data-theme", theme);
+            root.dataset.theme = theme;
         }
     }, [theme]);
 
@@ -128,13 +128,12 @@ function App() {
 
             <main className="flex-1 flex flex-col overflow-y-auto min-h-0 relative">
                 {toastMessage && (
-                    <div
+                    <output
                         className="fixed bottom-24 left-1/2 -translate-x-1/2 z-500 px-6 py-3 bg-text-strong text-bg rounded-full shadow-2xl text-sm font-bold animate-in fade-in slide-in-from-bottom-4 duration-300"
-                        role="status"
                         aria-live="polite"
                     >
                         {toastMessage}
-                    </div>
+                    </output>
                 )}
 
                 <Routes>

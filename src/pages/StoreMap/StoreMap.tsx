@@ -682,7 +682,9 @@ const StoreMap: React.FC = () => {
 
     // Prevent browser scrolling when map is active
     useEffect(() => {
-        const originalStyle = window.getComputedStyle(document.body).overflow;
+        const originalStyle = globalThis.getComputedStyle(
+            document.body,
+        ).overflow;
         document.body.style.overflow = "hidden";
         return () => {
             document.body.style.overflow = originalStyle;

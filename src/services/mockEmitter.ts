@@ -12,7 +12,7 @@ export const startMockEmitter = () => {
     intervalId = setInterval(() => {
         // Secure pseudo-random location mock update
         const randArray = new Uint32Array(2);
-        window.crypto.getRandomValues(randArray);
+        globalThis.crypto.getRandomValues(randArray);
         const randLat = randArray[0] / 4294967295;
         const randLng = randArray[1] / 4294967295;
 
