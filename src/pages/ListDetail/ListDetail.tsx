@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Modal, PresenceBar } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
+import { useStore } from "../../context/useStore";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -40,29 +41,7 @@ interface ListDetailProps {
     listTitle?: string;
 }
 
-const getUsernameFromToken = (token: string | null): string => {
-    if (!token) return "Anonymous";
-    try {
-        const base64Url = token.split(".")[1];
-        if (!base64Url) return "Anonymous";
-        const base64 = base64Url.replaceAll("-", "+").replaceAll("_", "/");
-        const jsonPayload = decodeURIComponent(
-            globalThis
-                .atob(base64)
-                .split("")
-                .map(
-                    (c) =>
-                        `%${c.codePointAt(0)?.toString(16).padStart(2, "0")}`,
-                )
-                .join(""),
-        );
-        const payload = JSON.parse(jsonPayload);
-        return payload.sub || payload.name || "Anonymous";
-    } catch (e) {
-        console.error("Failed to decode JWT token:", e);
-        return "Anonymous";
-    }
-};
+// getUsernameFromToken is no longer needed as we use the user state from the store
 
 const ListDetail = ({
     isEmbedded = false,
@@ -74,6 +53,7 @@ const ListDetail = ({
     const effectiveListId = listIdOverride ?? id;
     const { updateList } = useListsStore();
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
+    const user = useStore((state) => state.user);
 
     const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
@@ -95,12 +75,10 @@ const ListDetail = ({
 
     const getAuthHeaders = useCallback(
         (withContentType = false): HeadersInit => {
-            const token = localStorage.getItem("token");
             return {
                 ...(withContentType
                     ? { "Content-Type": "application/json" }
                     : {}),
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
             };
         },
         [],
@@ -124,6 +102,7 @@ const ListDetail = ({
             try {
                 const response = await fetch(`${getBaseUrl()}/api/lists`, {
                     headers: getAuthHeaders(),
+                    credentials: "include",
                 });
                 if (!response.ok) throw new Error("Failed to fetch lists");
                 const allLists = (await response.json()) as ApiShoppingList[];
@@ -181,7 +160,7 @@ const ListDetail = ({
             return;
         }
 
-        const username = getUsernameFromToken(localStorage.getItem("token"));
+        const username = user?.email || "Anonymous";
 
         const subscription = stompClient.subscribe(
             `/topic/presence/${effectiveListId}`,
@@ -221,7 +200,7 @@ const ListDetail = ({
             subscription.unsubscribe();
             clearPresence();
         };
-    }, [effectiveListId, handlePresenceEvent, clearPresence]);
+    }, [effectiveListId, handlePresenceEvent, clearPresence, user?.email]);
 
     // Typing Logic
     const lastTypingSentRef = useRef<number>(0);
@@ -236,9 +215,7 @@ const ListDetail = ({
 
         const now = Date.now();
         if (now - lastTypingSentRef.current > 1500) {
-            const username = getUsernameFromToken(
-                localStorage.getItem("token"),
-            );
+            const username = user?.email || "Anonymous";
 
             const typingEvent = {
                 eventType: "TYPING" as const,
@@ -252,7 +229,7 @@ const ListDetail = ({
             handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, handlePresenceEvent]);
+    }, [effectiveListId, handlePresenceEvent, user?.email]);
 
     const handleNewItemNameChange = (name: string) => {
         setNewItemName(name);
@@ -306,6 +283,7 @@ const ListDetail = ({
                         isRecurrent: false,
                         timestamp: Date.now(),
                     }),
+                    credentials: "include",
                 },
             );
 
@@ -378,6 +356,7 @@ const ListDetail = ({
                     isRecurrent: currentItem.isRecurrent ?? false,
                     timestamp: Date.now(),
                 }),
+                credentials: "include",
             });
 
             if (!res.ok) throw new Error("Failed to update item");
@@ -417,6 +396,7 @@ const ListDetail = ({
             const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
                 method: "DELETE",
                 headers: getAuthHeaders(),
+                credentials: "include",
             });
 
             if (!res.ok) throw new Error("Failed to delete item");

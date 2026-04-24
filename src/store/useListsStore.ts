@@ -43,10 +43,8 @@ const getBaseUrl = () =>
     "http://localhost:8081";
 
 const getAuthHeaders = (withContentType = false): HeadersInit => {
-    const token = localStorage.getItem("token");
     return {
         ...(withContentType ? { "Content-Type": "application/json" } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 };
 
@@ -94,6 +92,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
         try {
             const response = await fetch(`${getBaseUrl()}/api/lists`, {
                 headers: getAuthHeaders(),
+                credentials: "include",
             });
 
             if (!response.ok) {
@@ -130,6 +129,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 method: "POST",
                 headers: getAuthHeaders(true),
                 body: JSON.stringify({ title: trimmedName }),
+                credentials: "include",
             });
 
             if (!response.ok) {
@@ -171,6 +171,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
             const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
                 method: "DELETE",
                 headers: getAuthHeaders(),
+                credentials: "include",
             });
 
             if (!response.ok) {
@@ -207,6 +208,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     method: "POST",
                     headers: getAuthHeaders(true),
                     body: JSON.stringify(buildItemRequest(item)),
+                    credentials: "include",
                 },
             );
 
@@ -253,6 +255,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     body: JSON.stringify(
                         buildItemRequest({ ...item, checked: nextChecked }),
                     ),
+                    credentials: "include",
                 },
             );
 
@@ -294,6 +297,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 {
                     method: "DELETE",
                     headers: getAuthHeaders(),
+                    credentials: "include",
                 },
             );
 

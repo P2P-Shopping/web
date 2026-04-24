@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useStore } from "../../context/useStore";
 import { loginRequest } from "../../services/authService";
 
 const LoginPage = () => {
@@ -9,6 +10,7 @@ const LoginPage = () => {
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
+    const setAuth = useStore((state) => state.setAuth);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -16,7 +18,8 @@ const LoginPage = () => {
         setError("");
         setIsSubmitting(true);
         try {
-            await loginRequest(email, password);
+            const result = await loginRequest(email, password);
+            setAuth(result);
             navigate("/dashboard");
         } catch (err: unknown) {
             const message =

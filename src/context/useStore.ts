@@ -32,6 +32,10 @@ interface AppState {
     isOnline: boolean;
     /** Tracks whether the application is connected to the backend server */
     isServerConnected: boolean;
+    /** Current authenticated user info */
+    user: { email: string } | null;
+    /** Whether the user is authenticated */
+    isAuthenticated: boolean;
     /** Updates user location */
     setUserLocation: (loc: Coordinate) => void;
     /** Sets the map route */
@@ -52,6 +56,8 @@ interface AppState {
     rollbackItemState: (itemId: string) => void;
     /** Flags an item as experiencing a sync conflict */
     setItemConflict: (itemId: string, hasConflict: boolean) => void;
+    /** Updates authentication state */
+    setAuth: (user: { email: string } | null) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -63,6 +69,8 @@ export const useStore = create<AppState>((set, get) => ({
     conflictItems: {},
     isOnline: navigator.onLine,
     isServerConnected: false,
+    user: null,
+    isAuthenticated: false,
     setUserLocation: (loc) => set({ userLocation: loc }),
     setRoute: (route) => set({ route }),
     setStatus: (status) => set({ status }),
@@ -98,4 +106,6 @@ export const useStore = create<AppState>((set, get) => ({
         set((state) => ({
             conflictItems: { ...state.conflictItems, [itemId]: hasConflict },
         })),
+    setAuth: (user: { email: string } | null) =>
+        set({ user, isAuthenticated: !!user }),
 }));

@@ -13,13 +13,36 @@ import {
     RoutePage,
     StoreMap,
 } from "./pages";
+import { checkAuthRequest } from "./services/authService";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
 
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
+    const [isLoading, setIsLoading] = useState(true);
+    const setAuth = useStore((state) => state.setAuth);
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            checkAuthRequest().then((user) => {
+                setAuth(user);
+                setIsLoading(false);
+            });
+        } else {
+            setIsLoading(false);
+        }
+    }, [isAuthenticated, setAuth]);
+
+    if (isLoading) {
+        return (
+            <div className="flex-1 flex items-center justify-center">
+                Loading session...
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
     }
     return children;
@@ -29,6 +52,8 @@ function App() {
     useNetworkState();
     const location = useLocation();
     const setServerConnected = useStore((state) => state.setServerConnected);
+    const setAuth = useStore((state) => state.setAuth);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
     const { theme } = useThemeStore();
 
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -62,9 +87,12 @@ function App() {
     );
 
     useEffect(() => {
+        checkAuthRequest().then((user) => {
+            setAuth(user);
+        });
         startMockEmitter();
         return () => stopMockEmitter();
-    }, []);
+    }, [setAuth]);
 
     useEffect(() => {
         let subscription: StompSubscription | null = null;
@@ -112,15 +140,15 @@ function App() {
         };
     }, [handlePongMessage, setServerConnected, clearToastTimeout]);
 
-    const handleAuthSuccess = (result: unknown) => {
+    const handleAuthSuccess = (result: { email: string } | null) => {
         console.info("Authentication successful", result);
+        setAuth(result);
     };
 
     // Determine if Navbar should be shown
-    const token = localStorage.getItem("token");
     const isAuthPage =
         location.pathname === "/login" || location.pathname === "/register";
-    const showNavbar = token && !isAuthPage;
+    const showNavbar = isAuthenticated && !isAuthPage;
 
     return (
         <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">
@@ -140,7 +168,7 @@ function App() {
                     <Route
                         path="/login"
                         element={
-                            token ? (
+                            isAuthenticated ? (
                                 <Navigate to="/dashboard" replace />
                             ) : (
                                 <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
@@ -152,7 +180,7 @@ function App() {
                     <Route
                         path="/register"
                         element={
-                            token ? (
+                            isAuthenticated ? (
                                 <Navigate to="/dashboard" replace />
                             ) : (
                                 <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
@@ -206,7 +234,7 @@ function App() {
                     <Route
                         path="/"
                         element={
-                            token ? (
+                            isAuthenticated ? (
                                 <Navigate to="/dashboard" replace />
                             ) : (
                                 <Navigate to="/login" replace />
@@ -216,7 +244,7 @@ function App() {
                     <Route
                         path="*"
                         element={
-                            token ? (
+                            isAuthenticated ? (
                                 <div className="flex-1 flex items-center justify-center text-text-muted">
                                     Page not found
                                 </div>
