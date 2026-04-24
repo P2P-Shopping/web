@@ -74,21 +74,19 @@ export default function Modal({
     return (
         <dialog
             ref={dialogRef}
-            className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-[4px] border-none p-0 outline-none open:animate-in open:fade-in duration-200"
+            className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-xs border-none p-0 outline-none open:animate-in open:fade-in duration-200"
             onCancel={handleCancel}
-            onClick={(e) => {
-                if (e.target === dialogRef.current) {
-                    onClose();
-                }
-            }}
-            onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                    onClose();
-                }
-            }}
             aria-labelledby={title ? modalTitleId : undefined}
             aria-describedby={subtitle ? modalSubtitleId : undefined}
         >
+            {/* Backdrop click handler - interactive element */}
+            <button
+                type="button"
+                className="fixed inset-0 w-full h-full bg-transparent border-none cursor-default p-0 outline-none"
+                onClick={onClose}
+                aria-hidden="true"
+                tabIndex={-1}
+            />
             <div
                 className="relative z-10 bg-surface border border-border rounded-xl shadow-xl flex flex-col w-full mx-4 animate-in zoom-in-95 fade-in duration-200"
                 style={{ maxWidth }}

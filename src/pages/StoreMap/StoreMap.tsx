@@ -216,8 +216,8 @@ const useMapEngine = (
 
         const rect = canvas.getBoundingClientRect();
         const viewport = {
-            width: Math.max(1, Math.round(rect.width || window.innerWidth)),
-            height: Math.max(1, Math.round(rect.height || window.innerHeight)),
+            width: Math.max(1, Math.round(rect.width || globalThis.innerWidth)),
+            height: Math.max(1, Math.round(rect.height || globalThis.innerHeight)),
         };
 
         const userPos = getRelativePixels(currentRenderedGps.current, anchor);
@@ -343,13 +343,13 @@ const useMapEngine = (
                 const rect = canvas.parentElement?.getBoundingClientRect();
                 const targetW = Math.max(
                     1,
-                    Math.round(rect?.width || window.innerWidth),
+                    Math.round(rect?.width || globalThis.innerWidth),
                 );
                 const targetH = Math.max(
                     1,
-                    Math.round(rect?.height || window.innerHeight),
+                    Math.round(rect?.height || globalThis.innerHeight),
                 );
-                const dpr = window.devicePixelRatio || 1;
+                const dpr = globalThis.devicePixelRatio || 1;
                 const backingW = Math.max(1, Math.round(targetW * dpr));
                 const backingH = Math.max(1, Math.round(targetH * dpr));
 

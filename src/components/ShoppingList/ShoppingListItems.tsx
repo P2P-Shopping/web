@@ -55,7 +55,7 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                         </div>
                         <div className="flex flex-col min-w-0 flex-1">
                             <span
-                                className={`text-base font-medium text-text-strong break-words transition-all ${item.checked ? "line-through opacity-60" : ""}`}
+                                className={`text-base font-medium text-text-strong wrap-break-word transition-all ${item.checked ? "line-through opacity-60" : ""}`}
                             >
                                 {item.name}
                             </span>

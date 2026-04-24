@@ -260,6 +260,32 @@ const ListDetail = ({
         setShowDetailsModal(true);
     };
 
+    const rollbackItem = useCallback(
+        (itemId: string) => {
+            setItems((prev) => {
+                const next = prev.filter((i) => i.id !== itemId);
+                syncListItemsInStore(next);
+                return next;
+            });
+        },
+        [syncListItemsInStore],
+    );
+
+    const revertItemChecked = useCallback(
+        (itemId: string, originalChecked: boolean) => {
+            setItems((prev) => {
+                const next = prev.map((item) =>
+                    item.id === itemId
+                        ? { ...item, checked: originalChecked }
+                        : item,
+                );
+                syncListItemsInStore(next);
+                return next;
+            });
+        },
+        [syncListItemsInStore],
+    );
+
     const closeDetailsModal = () => setShowDetailsModal(false);
 
     const commitItem = async (
@@ -338,11 +364,7 @@ const ListDetail = ({
             }
         } catch {
             setError("Failed to add the product.");
-            setItems((prev) => {
-                const next = prev.filter((i) => i.id !== newItem.id);
-                syncListItemsInStore(next);
-                return next;
-            });
+            rollbackItem(newItem.id);
         }
     };
 
@@ -414,15 +436,7 @@ const ListDetail = ({
             }
         } catch {
             setError("Failed to update the product.");
-            setItems((prev) => {
-                const next = prev.map((item) =>
-                    item.id === itemId
-                        ? { ...item, checked: currentItem.checked }
-                        : item,
-                );
-                syncListItemsInStore(next);
-                return next;
-            });
+            revertItemChecked(itemId, currentItem.checked);
         }
     };
 
@@ -449,7 +463,7 @@ const ListDetail = ({
             }
         } catch {
             setError("Failed to delete the product.");
-            void fetchListData(effectiveListId);
+            fetchListData(effectiveListId);
         }
     };
 

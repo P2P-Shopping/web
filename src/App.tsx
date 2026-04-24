@@ -36,6 +36,25 @@ function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     return children;
 }
 
+function GuestRoute({ children }: Readonly<{ children: React.ReactNode }>) {
+    const authChecked = useStore((state) => state.authChecked);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
+
+    if (!authChecked) {
+        return (
+            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted">
+                Loading session...
+            </div>
+        );
+    }
+
+    if (isAuthenticated) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+}
+
 function App() {
     useNetworkState();
     const location = useLocation();
@@ -147,46 +166,33 @@ function App() {
 
             <main className="flex-1 flex flex-col overflow-y-auto min-h-0 relative">
                 {toastMessage && (
-                    <div
-                        role="status"
+                    <output
                         className="fixed bottom-24 left-1/2 -translate-x-1/2 z-500 px-6 py-3 bg-text-strong text-bg rounded-full shadow-2xl text-sm font-bold animate-in fade-in slide-in-from-bottom-4 duration-300"
                         aria-live="polite"
                     >
                         {toastMessage}
-                    </div>
+                    </output>
                 )}
 
                 <Routes>
                     <Route
                         path="/login"
                         element={
-                            !authChecked ? (
-                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted">
-                                    Loading session...
-                                </div>
-                            ) : isAuthenticated ? (
-                                <Navigate to="/dashboard" replace />
-                            ) : (
+                            <GuestRoute>
                                 <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
                                     <LoginPage />
                                 </div>
-                            )
+                            </GuestRoute>
                         }
                     />
                     <Route
                         path="/register"
                         element={
-                            !authChecked ? (
-                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted">
-                                    Loading session...
-                                </div>
-                            ) : isAuthenticated ? (
-                                <Navigate to="/dashboard" replace />
-                            ) : (
+                            <GuestRoute>
                                 <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
                                     <RegistrationPage />
                                 </div>
-                            )
+                            </GuestRoute>
                         }
                     />
                     <Route
@@ -242,14 +248,16 @@ function App() {
                     <Route
                         path="*"
                         element={
-                            !authChecked ? (
-                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted" />
-                            ) : isAuthenticated ? (
-                                <div className="flex-1 flex items-center justify-center text-text-muted">
-                                    Page not found
-                                </div>
+                            authChecked ? (
+                                isAuthenticated ? (
+                                    <div className="flex-1 flex items-center justify-center text-text-muted">
+                                        Page not found
+                                    </div>
+                                ) : (
+                                    <Navigate to="/login" replace />
+                                )
                             ) : (
-                                <Navigate to="/login" replace />
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted" />
                             )
                         }
                     />
