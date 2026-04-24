@@ -411,6 +411,239 @@ const useListPresence = (effectiveListId: string | undefined) => {
     return { sendTypingEvent };
 };
 
+const ListSelectionView = ({
+    lists,
+    isLoading,
+    onSelect,
+}: {
+    lists: { id: string; name: string; items: Item[] }[];
+    isLoading: boolean;
+    onSelect: (id: string) => void;
+}) => {
+    if (lists.length === 0 && !isLoading) {
+        return (
+            <p className="text-center py-10 text-text-muted italic text-sm">
+                No lists found. Create one in the dashboard!
+            </p>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-2">
+            {lists.map((list) => (
+                <button
+                    type="button"
+                    key={list.id}
+                    onClick={() => onSelect(list.id)}
+                    className="flex items-center justify-between p-4 bg-surface border border-border rounded-xl hover:border-accent hover:shadow-md transition-all text-left"
+                >
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                        <span
+                            className="font-bold text-text-strong truncate"
+                            title={list.name}
+                        >
+                            {list.name}
+                        </span>
+                        <span className="text-xs text-text-muted">
+                            {list.items.length} items
+                        </span>
+                    </div>
+                    <ChevronDown
+                        size={18}
+                        className="-rotate-90 text-text-muted"
+                    />
+                </button>
+            ))}
+        </div>
+    );
+};
+
+interface AddItemModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (e: React.FormEvent) => void;
+    title: string;
+    subtitle?: string;
+    idPrefix: string;
+    itemName: string;
+    setItemName: (val: string) => void;
+    quantity: string;
+    setQuantity: (val: string) => void;
+    brand: string;
+    setBrand: (val: string) => void;
+    price: string;
+    setPrice: (val: string) => void;
+    onTyping?: () => void;
+    isMobile?: boolean;
+    showExpanded?: boolean;
+    setShowExpanded?: (val: boolean) => void;
+}
+
+const AddItemDetailsModal = ({
+    isOpen,
+    onClose,
+    onSubmit,
+    title,
+    subtitle,
+    idPrefix,
+    itemName,
+    setItemName,
+    quantity,
+    setQuantity,
+    brand,
+    setBrand,
+    price,
+    setPrice,
+    onTyping,
+    isMobile = false,
+    showExpanded = true,
+    setShowExpanded,
+}: AddItemModalProps) => {
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={title}
+            subtitle={subtitle}
+            initialFocusSelector={`#${idPrefix}-item-name`}
+            footer={
+                <div className="grid grid-cols-2 gap-3 w-full">
+                    <button
+                        type="button"
+                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
+                        onClick={onClose}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        form={`${idPrefix}-details-form`}
+                        className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
+                    >
+                        {isMobile ? "Add" : "Add Item"}
+                    </button>
+                </div>
+            }
+        >
+            <form
+                id={`${idPrefix}-details-form`}
+                onSubmit={onSubmit}
+                className="flex flex-col gap-4"
+            >
+                <div className="flex flex-col gap-1.5">
+                    <label
+                        htmlFor={`${idPrefix}-item-name`}
+                        className="text-[13px] font-semibold text-text-strong"
+                    >
+                        Item Name
+                    </label>
+                    <input
+                        id={`${idPrefix}-item-name`}
+                        type="text"
+                        value={itemName}
+                        onChange={(e) => {
+                            setItemName(e.target.value);
+                            onTyping?.();
+                        }}
+                        placeholder={isMobile ? "e.g. Milk" : "e.g., Milk"}
+                        required
+                        className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
+                    />
+                </div>
+
+                {isMobile && setShowExpanded && (
+                    <button
+                        type="button"
+                        className="flex items-center justify-between w-full p-[12px_14px] bg-bg-muted border border-border rounded-md text-text-strong text-sm font-semibold cursor-pointer transition-all hover:bg-border/50"
+                        onClick={() => setShowExpanded(!showExpanded)}
+                    >
+                        {showExpanded
+                            ? "Fewer details"
+                            : "Add details (qty, price...)"}
+                        <ChevronDown
+                            size={16}
+                            className="transition-transform duration-200"
+                            style={{
+                                transform: showExpanded
+                                    ? "rotate(180deg)"
+                                    : "none",
+                            }}
+                        />
+                    </button>
+                )}
+
+                {showExpanded && (
+                    <div
+                        className={
+                            isMobile
+                                ? "flex flex-col gap-4 p-4 bg-bg-subtle rounded-xl border border-border border-dashed animate-in slide-in-from-top-2 duration-200"
+                                : "grid grid-cols-2 gap-4"
+                        }
+                    >
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor={`${idPrefix}-quantity`}
+                                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+                            >
+                                Quantity
+                            </label>
+                            <input
+                                id={`${idPrefix}-quantity`}
+                                type="text"
+                                value={quantity}
+                                onChange={(e) => setQuantity(e.target.value)}
+                                placeholder={
+                                    isMobile ? "e.g. 2 pcs" : "e.g., 2"
+                                }
+                                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label
+                                htmlFor={`${idPrefix}-price`}
+                                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+                            >
+                                Price {isMobile ? "" : "(Optional)"}
+                            </label>
+                            <input
+                                id={`${idPrefix}-price`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                placeholder={isMobile ? "0.00" : "e.g., 4.99"}
+                                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+                            />
+                        </div>
+                        <div
+                            className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}
+                        >
+                            <label
+                                htmlFor={`${idPrefix}-brand`}
+                                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+                            >
+                                Brand {isMobile ? "" : "(Optional)"}
+                            </label>
+                            <input
+                                id={`${idPrefix}-brand`}
+                                type="text"
+                                value={brand}
+                                onChange={(e) => setBrand(e.target.value)}
+                                placeholder={
+                                    isMobile
+                                        ? "e.g. Zuzu"
+                                        : "e.g., Organic Valley"
+                                }
+                                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+                            />
+                        </div>
+                    </div>
+                )}
+            </form>
+        </Modal>
+    );
+};
+
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
@@ -419,27 +652,22 @@ const ListDetail = ({
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
 
-    // Logic hooks
     const { items, isLoading, error, addItem, toggleItem, deleteItem } =
         useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
 
-    // Local UI State
     const [newItemName, setNewItemName] = useState("");
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
 
-    // Detail form state
     const [detailName, setDetailName] = useState("");
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
-    const prevShowDetailsModalRef = useRef(showDetailsModal);
-
     const { lists, fetchLists } = useListsStore();
 
     useEffect(() => {
@@ -448,16 +676,6 @@ const ListDetail = ({
         }
     }, [isEmbedded, lists.length, fetchLists]);
 
-    // Sync detail name when modal opens
-    // biome-ignore lint/correctness/useExhaustiveDependencies: Only sync on open transition
-    useEffect(() => {
-        if (showDetailsModal && !prevShowDetailsModalRef.current) {
-            setDetailName(newItemName);
-        }
-        prevShowDetailsModalRef.current = showDetailsModal;
-    }, [showDetailsModal]);
-
-    // Reset local modal states when list changes
     // biome-ignore lint/correctness/useExhaustiveDependencies: reset on change
     useEffect(() => {
         setShowDetailsModal(false);
@@ -472,6 +690,7 @@ const ListDetail = ({
 
     const handleInlineAdd = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!newItemName.trim()) return;
         addItem(newItemName);
         setNewItemName("");
     };
@@ -500,10 +719,6 @@ const ListDetail = ({
         setNewItemName("");
     };
 
-    const handleListSelect = (listId: string) => {
-        navigate(`/nav/${listId}`);
-    };
-
     const isReadOnly = error === "Failed to sync the list.";
 
     return (
@@ -527,7 +742,7 @@ const ListDetail = ({
                         {effectiveListId !== "default" && (
                             <button
                                 type="button"
-                                onClick={() => handleListSelect("default")}
+                                onClick={() => navigate("/nav/default")}
                                 className="text-[10px] font-bold text-accent hover:underline uppercase"
                             >
                                 Switch List
@@ -553,42 +768,11 @@ const ListDetail = ({
                 )}
 
                 {effectiveListId === "default" && isEmbedded ? (
-                    <div className="flex flex-col gap-3">
-                        {lists.length === 0 && !isLoading ? (
-                            <p className="text-center py-10 text-text-muted italic text-sm">
-                                No lists found. Create one in the dashboard!
-                            </p>
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                {lists.map((list) => (
-                                    <button
-                                        type="button"
-                                        key={list.id}
-                                        onClick={() =>
-                                            handleListSelect(list.id)
-                                        }
-                                        className="flex items-center justify-between p-4 bg-surface border border-border rounded-xl hover:border-accent hover:shadow-md transition-all text-left"
-                                    >
-                                        <div className="flex flex-col gap-0.5 min-w-0">
-                                            <span
-                                                className="font-bold text-text-strong truncate"
-                                                title={list.name}
-                                            >
-                                                {list.name}
-                                            </span>
-                                            <span className="text-xs text-text-muted">
-                                                {list.items.length} items
-                                            </span>
-                                        </div>
-                                        <ChevronDown
-                                            size={18}
-                                            className="-rotate-90 text-text-muted"
-                                        />
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <ListSelectionView
+                        lists={lists}
+                        isLoading={isLoading}
+                        onSelect={(listId) => navigate(`/nav/${listId}`)}
+                    />
                 ) : (
                     <>
                         <div className="flex flex-col gap-1.5">
@@ -660,260 +844,57 @@ const ListDetail = ({
                 <button
                     type="button"
                     className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
-                    onClick={() => setShowMobileAddModal(true)}
+                    onClick={() => {
+                        setDetailName(newItemName);
+                        setShowMobileAddModal(true);
+                    }}
                     aria-label="Add Item"
                 >
                     <Plus size={28} strokeWidth={3} />
                 </button>
             )}
 
-            <Modal
+            <AddItemDetailsModal
                 isOpen={showMobileAddModal}
                 onClose={() => {
                     setShowMobileAddModal(false);
                     setShowExpandedDetails(false);
                     setNewItemName("");
                 }}
+                onSubmit={handleDetailsSubmit}
                 title="Add Item"
-                initialFocusSelector="#mobile-item-name"
-                footer={
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                        <button
-                            type="button"
-                            className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
-                            onClick={() => {
-                                setShowMobileAddModal(false);
-                                setShowExpandedDetails(false);
-                                setNewItemName("");
-                            }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="mobile-add-form"
-                            className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
-                        >
-                            Add
-                        </button>
-                    </div>
-                }
-            >
-                <form
-                    id="mobile-add-form"
-                    onSubmit={handleDetailsSubmit}
-                    className="flex flex-col gap-5"
-                >
-                    <div className="flex flex-col gap-2">
-                        <label
-                            htmlFor="mobile-item-name"
-                            className="text-[13px] font-semibold text-text-strong"
-                        >
-                            Item Name
-                        </label>
-                        <input
-                            id="mobile-item-name"
-                            type="text"
-                            value={detailName}
-                            onChange={(e) => {
-                                setDetailName(e.target.value);
-                                sendTypingEvent();
-                            }}
-                            placeholder="e.g. Milk"
-                            required
-                            className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
-                        />
-                    </div>
+                idPrefix="mobile"
+                itemName={detailName}
+                setItemName={setDetailName}
+                quantity={detailQuantity}
+                setQuantity={setDetailQuantity}
+                brand={detailBrand}
+                setBrand={setDetailBrand}
+                price={detailPrice}
+                setPrice={setDetailPrice}
+                onTyping={sendTypingEvent}
+                isMobile={true}
+                showExpanded={showExpandedDetails}
+                setShowExpanded={setShowExpandedDetails}
+            />
 
-                    <button
-                        type="button"
-                        className="flex items-center justify-between w-full p-[12px_14px] bg-bg-muted border border-border rounded-md text-text-strong text-sm font-semibold cursor-pointer transition-all hover:bg-border/50"
-                        onClick={() =>
-                            setShowExpandedDetails(!showExpandedDetails)
-                        }
-                    >
-                        {showExpandedDetails
-                            ? "Fewer details"
-                            : "Add details (qty, price...)"}
-                        <ChevronDown
-                            size={16}
-                            className="transition-transform duration-200"
-                            style={{
-                                transform: showExpandedDetails
-                                    ? "rotate(180deg)"
-                                    : "none",
-                            }}
-                        />
-                    </button>
-
-                    {showExpandedDetails && (
-                        <div className="flex flex-col gap-4 p-4 bg-bg-subtle rounded-xl border border-border border-dashed animate-in slide-in-from-top-2 duration-200">
-                            <div className="flex flex-col gap-1.5">
-                                <label
-                                    htmlFor="m-qty"
-                                    className="text-xs font-semibold text-text-muted"
-                                >
-                                    Quantity
-                                </label>
-                                <input
-                                    id="m-qty"
-                                    type="text"
-                                    value={detailQuantity}
-                                    onChange={(e) =>
-                                        setDetailQuantity(e.target.value)
-                                    }
-                                    placeholder="e.g. 2 pcs"
-                                    className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
-                                />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <label
-                                    htmlFor="m-brand"
-                                    className="text-xs font-semibold text-text-muted"
-                                >
-                                    Brand
-                                </label>
-                                <input
-                                    id="m-brand"
-                                    type="text"
-                                    value={detailBrand}
-                                    onChange={(e) =>
-                                        setDetailBrand(e.target.value)
-                                    }
-                                    placeholder="e.g. Zuzu"
-                                    className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
-                                />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <label
-                                    htmlFor="m-price"
-                                    className="text-xs font-semibold text-text-muted"
-                                >
-                                    Price
-                                </label>
-                                <input
-                                    id="m-price"
-                                    type="number"
-                                    step="0.01"
-                                    value={detailPrice}
-                                    onChange={(e) =>
-                                        setDetailPrice(e.target.value)
-                                    }
-                                    placeholder="0.00"
-                                    className="w-full px-3 py-2 bg-surface border border-border rounded-md text-sm outline-none focus:border-accent transition-all"
-                                />
-                            </div>
-                        </div>
-                    )}
-                </form>
-            </Modal>
-
-            <Modal
+            <AddItemDetailsModal
                 isOpen={showDetailsModal}
                 onClose={() => setShowDetailsModal(false)}
+                onSubmit={handleDetailsSubmit}
                 title="Add Item Details"
                 subtitle="Add optional details like quantity, brand, and price"
-                initialFocusSelector="#ld-item-name"
-                footer={
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                        <button
-                            type="button"
-                            className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
-                            onClick={() => setShowDetailsModal(false)}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            form="ld-details-form"
-                            className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
-                        >
-                            Add Item
-                        </button>
-                    </div>
-                }
-            >
-                <form
-                    id="ld-details-form"
-                    onSubmit={handleDetailsSubmit}
-                    className="flex flex-col gap-4"
-                >
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="ld-item-name"
-                            className="text-[13px] font-semibold text-text-strong"
-                        >
-                            Item Name
-                        </label>
-                        <input
-                            id="ld-item-name"
-                            type="text"
-                            value={detailName}
-                            onChange={(e) => {
-                                setDetailName(e.target.value);
-                                sendTypingEvent();
-                            }}
-                            placeholder="e.g., Milk"
-                            required
-                            className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                            <label
-                                htmlFor="ld-quantity"
-                                className="text-[13px] font-semibold text-text-strong"
-                            >
-                                Quantity
-                            </label>
-                            <input
-                                id="ld-quantity"
-                                type="text"
-                                value={detailQuantity}
-                                onChange={(e) =>
-                                    setDetailQuantity(e.target.value)
-                                }
-                                placeholder="e.g., 2"
-                                className="w-full px-3.5 py-2.5 bg-bg-muted border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label
-                                htmlFor="ld-price"
-                                className="text-[13px] font-semibold text-text-strong"
-                            >
-                                Price (Optional)
-                            </label>
-                            <input
-                                id="ld-price"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={detailPrice}
-                                onChange={(e) => setDetailPrice(e.target.value)}
-                                placeholder="e.g., 4.99"
-                                className="w-full px-3.5 py-2.5 bg-bg-muted border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="ld-brand"
-                            className="text-[13px] font-semibold text-text-strong"
-                        >
-                            Brand (Optional)
-                        </label>
-                        <input
-                            id="ld-brand"
-                            type="text"
-                            value={detailBrand}
-                            onChange={(e) => setDetailBrand(e.target.value)}
-                            placeholder="e.g., Organic Valley"
-                            className="w-full px-3.5 py-2.5 bg-bg-muted border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all"
-                        />
-                    </div>
-                </form>
-            </Modal>
+                idPrefix="ld"
+                itemName={detailName}
+                setItemName={setDetailName}
+                quantity={detailQuantity}
+                setQuantity={setDetailQuantity}
+                brand={detailBrand}
+                setBrand={setDetailBrand}
+                price={detailPrice}
+                setPrice={setDetailPrice}
+                onTyping={sendTypingEvent}
+            />
         </div>
     );
 };
