@@ -36,6 +36,7 @@ interface ListsState {
     openModal: () => void;
     closeModal: () => void;
     getListById: (id: string) => ShoppingList | undefined;
+    clearLists: () => void;
 }
 
 const getBaseUrl = () =>
@@ -338,4 +339,5 @@ export const useListsStore = create<ListsState>((set, get) => ({
     closeModal: () => set({ isModalOpen: false }),
 
     getListById: (id: string) => get().lists.find((list) => list.id === id),
+    clearLists: () => set({ lists: [], currentList: null, error: null }),
 }));

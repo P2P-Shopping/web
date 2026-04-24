@@ -37,8 +37,15 @@ export const checkAuthRequest = async () => {
 };
 
 export const logoutRequest = async () => {
-    // Note: To properly logout with HttpOnly cookies,
-    // the server should have a logout endpoint that clears the cookie.
-    // For now, we just clear the state on the frontend.
-    // If a logout endpoint is needed, it should be added to the backend.
+    try {
+        await axios.post(
+            `${API_URL}/api/auth/logout`,
+            {},
+            {
+                withCredentials: true,
+            },
+        );
+    } catch (error) {
+        console.error("Logout request failed:", error);
+    }
 };

@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useStore } from "../../context/useStore";
+import { logoutRequest } from "../../services/authService";
+import { useListsStore } from "../../store/useListsStore";
 import ThemeSwitcher from "../ThemeSwitcher/ThemeSwitcher";
 
 const NAV_LINKS = [
@@ -21,6 +24,15 @@ export default function Navbar() {
     const { pathname } = useLocation();
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const moreMenuRef = useRef<HTMLDivElement>(null);
+    const setAuth = useStore((state) => state.setAuth);
+    const clearLists = useListsStore((state) => state.clearLists);
+    const user = useStore((state) => state.user);
+
+    const handleLogout = async () => {
+        await logoutRequest();
+        setAuth(null);
+        clearLists();
+    };
 
     // Close more menu when clicking outside
     useEffect(() => {
@@ -131,6 +143,25 @@ export default function Navbar() {
                                 </span>
                                 <ThemeSwitcher />
                             </div>
+                            <div className="h-px bg-border my-1" />
+                            {user && (
+                                <div className="px-4 py-2 flex flex-col">
+                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                        Account
+                                    </span>
+                                    <span className="text-xs font-semibold text-text-strong truncate">
+                                        {user.email}
+                                    </span>
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-danger hover:bg-danger-subtle/50 transition-all text-left font-bold text-sm"
+                            >
+                                <X size={20} />
+                                Logout
+                            </button>
                         </div>
                     </div>
                 )}
