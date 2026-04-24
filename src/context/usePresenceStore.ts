@@ -30,10 +30,10 @@ interface PresenceState {
     handlePresenceEvent: (event: PresenceEvent) => void;
 
     /**
-     * Called during unmount to ensure 100% memory leak cleanup.
-     * Clears any lingering typing timeouts.
+     * Called during unmount or list change to ensure 100% memory leak cleanup.
+     * Clears any lingering typing timeouts and resets active users.
      */
-    clearAllTimeouts: () => void;
+    clearPresence: () => void;
 }
 
 /**
@@ -93,11 +93,11 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         }
     },
 
-    clearAllTimeouts: () => {
+    clearPresence: () => {
         const currentTyping = get().typingUsers;
         Object.values(currentTyping).forEach((id) => {
             globalThis.clearTimeout(id);
         });
-        set({ typingUsers: {} });
+        set({ activeUsers: new Set(), typingUsers: {} });
     },
 }));

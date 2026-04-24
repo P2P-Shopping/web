@@ -1,8 +1,9 @@
 import { ChevronDown, Plus, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Modal } from "../../components";
+import { Modal, PresenceBar } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
+import { usePresenceStore } from "../../context/usePresenceStore";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -48,6 +49,7 @@ const ListDetail = ({
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
     const { updateList } = useListsStore();
+    const { handlePresenceEvent, clearPresence } = usePresenceStore();
 
     const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
@@ -149,6 +151,101 @@ const ListDetail = ({
         setShowMobileAddModal(false);
         setShowExpandedDetails(false);
     }, [effectiveListId]);
+
+    // WebSocket Presence Logic
+    useEffect(() => {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !stompClient.connected
+        ) {
+            return;
+        }
+
+        const token = localStorage.getItem("token");
+        let username = "Anonymous";
+        try {
+            if (token) {
+                const payload = JSON.parse(atob(token.split(".")[1]));
+                username = payload.sub || payload.name || "Anonymous";
+            }
+        } catch (e) {
+            console.error("Failed to decode token for presence", e);
+        }
+
+        const subscription = stompClient.subscribe(
+            `/topic/presence/${effectiveListId}`,
+            (message) => {
+                const event = JSON.parse(message.body);
+                handlePresenceEvent(event);
+            },
+        );
+
+        // Join
+        stompClient.publish({
+            destination: `/app/presence/${effectiveListId}`,
+            body: JSON.stringify({
+                eventType: "JOIN",
+                username,
+                listId: effectiveListId,
+            }),
+        });
+
+        return () => {
+            // Leave
+            if (stompClient.connected) {
+                stompClient.publish({
+                    destination: `/app/presence/${effectiveListId}`,
+                    body: JSON.stringify({
+                        eventType: "LEAVE",
+                        username,
+                        listId: effectiveListId,
+                    }),
+                });
+            }
+            subscription.unsubscribe();
+            clearPresence();
+        };
+    }, [effectiveListId, handlePresenceEvent, clearPresence]);
+
+    // Typing Logic
+    const _typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    );
+    const lastTypingSentRef = useRef<number>(0);
+
+    const handleNewItemNameChange = (name: string) => {
+        setNewItemName(name);
+
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !stompClient.connected
+        )
+            return;
+
+        const now = Date.now();
+        if (now - lastTypingSentRef.current > 1500) {
+            const token = localStorage.getItem("token");
+            let username = "Anonymous";
+            try {
+                if (token) {
+                    const payload = JSON.parse(atob(token.split(".")[1]));
+                    username = payload.sub || payload.name || "Anonymous";
+                }
+            } catch {}
+
+            stompClient.publish({
+                destination: `/app/presence/${effectiveListId}`,
+                body: JSON.stringify({
+                    eventType: "TYPING",
+                    username,
+                    listId: effectiveListId,
+                }),
+            });
+            lastTypingSentRef.current = now;
+        }
+    };
 
     const _openDetailsModal = () => {
         setDetailName(newItemName);
@@ -338,7 +435,7 @@ const ListDetail = ({
             className={
                 isEmbedded
                     ? "w-full flex flex-col h-full bg-surface/50"
-                    : "flex justify-center items-start min-h-[calc(100svh-60px)] p-[28px_20px] bg-bg"
+                    : "flex justify-center items-start p-[28px_20px] bg-bg"
             }
         >
             <div
@@ -408,6 +505,11 @@ const ListDetail = ({
                     </div>
                 ) : (
                     <>
+                        {/* ── Typing Indicator ── */}
+                        <div className="mb-2 min-h-[28px]">
+                            <PresenceBar variant="typing" />
+                        </div>
+
                         {/* ── Inline add bar (Desktop & Embedded) ── */}
                         <form
                             onSubmit={handleInlineAdd}
@@ -417,7 +519,9 @@ const ListDetail = ({
                                 ref={addInputRef}
                                 type="text"
                                 value={newItemName}
-                                onChange={(e) => setNewItemName(e.target.value)}
+                                onChange={(e) =>
+                                    handleNewItemNameChange(e.target.value)
+                                }
                                 placeholder="Add item..."
                                 className="flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1"
                             />

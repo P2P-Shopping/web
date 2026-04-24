@@ -4,7 +4,6 @@ import {
     MapPinned,
     MoreHorizontal,
     Route as RouteIcon,
-    Sparkles,
     X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -13,7 +12,6 @@ import ThemeSwitcher from "../ThemeSwitcher/ThemeSwitcher";
 
 const NAV_LINKS = [
     { to: "/dashboard", label: "My Lists", icon: LayoutDashboard },
-    { to: "/list/default", label: "AI Import", icon: Sparkles },
     { to: "/route", label: "Route", icon: RouteIcon },
     { to: "/nav", label: "Store Map", icon: MapPinned },
     { to: "/map", label: "Map", icon: MapIcon },

@@ -1,4 +1,4 @@
-import { ChevronLeft, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, Plus, Sparkles, Trash2 } from "lucide-react";
 import {
     type MouseEvent,
     type ReactNode,
@@ -7,9 +7,11 @@ import {
     useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
+import { PresenceBar } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
+import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
 
@@ -21,6 +23,8 @@ const Dashboard = () => {
         id: string;
         name: string;
     } | null>(null);
+    const [showAiImport, setShowAiImport] = useState(false);
+
     const {
         lists,
         isLoading,
@@ -41,6 +45,15 @@ const Dashboard = () => {
         () => lists.find((list) => list.id === selectedListId) ?? null,
         [lists, selectedListId],
     );
+
+    // Handle AI Import Param
+    useEffect(() => {
+        if (searchParams.get("import") === "ai") {
+            setShowAiImport(true);
+            // Clear the param after opening to avoid re-opening on refresh if desired,
+            // or keep it for deep linking.
+        }
+    }, [searchParams]);
 
     // Handle Card Click
     const handleCardClick = (listId: string) => {
@@ -240,7 +253,9 @@ const Dashboard = () => {
                         <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
                             {selectedList.name}
                         </h1>
-                        <div className="flex items-center gap-2 shrink-0 max-[600px]:w-full max-[600px]:justify-between" />
+                        <div className="flex items-center gap-4 shrink-0 max-[600px]:w-full max-[600px]:justify-between">
+                            <PresenceBar variant="avatars" />
+                        </div>
                     </>
                 ) : (
                     <>
@@ -252,14 +267,24 @@ const Dashboard = () => {
                                 {`${lists.length} ${lists.length === 1 ? "list" : "lists"}`}
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:w-full max-[600px]:justify-center"
-                            onClick={openModal}
-                        >
-                            <Plus size={20} />
-                            New List
-                        </button>
+                        <div className="flex items-center gap-3 max-[600px]:w-full">
+                            <button
+                                type="button"
+                                className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
+                                onClick={() => setShowAiImport(true)}
+                            >
+                                <Sparkles size={18} className="text-accent" />
+                                AI Import
+                            </button>
+                            <button
+                                type="button"
+                                className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:flex-1 max-[600px]:justify-center"
+                                onClick={openModal}
+                            >
+                                <Plus size={20} />
+                                New List
+                            </button>
+                        </div>
                     </>
                 )}
             </header>
@@ -277,6 +302,14 @@ const Dashboard = () => {
                     listName={deleteTarget.name}
                     onCancel={cancelDeleteList}
                     onConfirm={confirmDeleteList}
+                />
+            )}
+            {showAiImport && (
+                <AiImportModal
+                    onClose={() => {
+                        setShowAiImport(false);
+                        setSearchParams({});
+                    }}
                 />
             )}
         </div>
