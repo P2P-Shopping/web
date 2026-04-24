@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useStore } from "../context/useStore";
 
 const API_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -31,8 +32,7 @@ export const checkAuthRequest = async () => {
         if (axios.isAxiosError(error) && error.response?.status === 401) {
             return null;
         }
-        console.error("Check auth failed:", error);
-        return null;
+        throw error;
     }
 };
 
@@ -45,7 +45,10 @@ export const logoutRequest = async () => {
                 withCredentials: true,
             },
         );
+        useStore.getState().setAuth(null);
     } catch (error) {
         console.error("Logout request failed:", error);
+        useStore.getState().setAuth(null);
+        throw error;
     }
 };

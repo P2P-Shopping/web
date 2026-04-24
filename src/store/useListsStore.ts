@@ -173,6 +173,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     },
 
     deleteList: async (id: string) => {
+        set({ isLoading: true, error: null });
         try {
             const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
                 method: "DELETE",
@@ -189,6 +190,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 currentList:
                     state.currentList?.id === id ? null : state.currentList,
                 error: null,
+                isLoading: false,
             }));
             return true;
         } catch (error) {
@@ -197,6 +199,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     error instanceof Error
                         ? error.message
                         : "Failed to delete list",
+                isLoading: false,
             });
             return false;
         }

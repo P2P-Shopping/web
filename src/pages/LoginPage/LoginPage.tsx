@@ -22,10 +22,12 @@ const LoginPage = () => {
             setAuth(result);
             navigate("/dashboard");
         } catch (err: unknown) {
-            const message =
-                err instanceof Error
-                    ? err.message
-                    : String(err) || "Login failed. Please try again.";
+            let message = "Login failed. Please try again.";
+            if (err instanceof Error) {
+                message = err.message;
+            } else if (typeof err === "string" && err.trim().length > 0) {
+                message = err;
+            }
             setError(message);
         } finally {
             setIsSubmitting(false);

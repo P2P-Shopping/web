@@ -630,6 +630,7 @@ const useMapEngine = (
         camera.current.zoom = nextZoom;
         camera.current.x *= zoomRatio;
         camera.current.y *= zoomRatio;
+        clampCameraPosition(camera.current.x, camera.current.y, nextZoom);
     };
 
     const zoomOut = () => {
@@ -639,6 +640,7 @@ const useMapEngine = (
         camera.current.zoom = nextZoom;
         camera.current.x *= zoomRatio;
         camera.current.y *= zoomRatio;
+        clampCameraPosition(camera.current.x, camera.current.y, nextZoom);
     };
 
     const recenterCamera = () => {
@@ -680,14 +682,15 @@ const StoreMap: React.FC = () => {
     const { id: listId } = useParams<{ id: string }>();
     const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
-    // Prevent browser scrolling when map is active
     useEffect(() => {
-        const originalStyle = globalThis.getComputedStyle(
-            document.body,
-        ).overflow;
+        const originalInlineStyle = document.body.getAttribute("style");
         document.body.style.overflow = "hidden";
         return () => {
-            document.body.style.overflow = originalStyle;
+            if (originalInlineStyle === null) {
+                document.body.removeAttribute("style");
+            } else {
+                document.body.setAttribute("style", originalInlineStyle);
+            }
         };
     }, []);
 
@@ -731,9 +734,13 @@ const StoreMap: React.FC = () => {
                 />
 
                 {gpsError && (
-                    <output className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg">
+                    <div
+                        role="alert"
+                        aria-live="assertive"
+                        className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
+                    >
                         {gpsError}
-                    </output>
+                    </div>
                 )}
 
                 {/* Sidebar Overlay (Mobile) */}

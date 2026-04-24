@@ -166,7 +166,7 @@ const ListDetail = ({
             return;
         }
 
-        const username = user?.email || "Anonymous";
+        const username = user?.firstName || user?.userId || "Anonymous";
 
         const subscription = stompClient.subscribe(
             `/topic/presence/${effectiveListId}`,
@@ -206,7 +206,13 @@ const ListDetail = ({
             subscription.unsubscribe();
             clearPresence();
         };
-    }, [effectiveListId, handlePresenceEvent, clearPresence, user?.email]);
+    }, [
+        effectiveListId,
+        handlePresenceEvent,
+        clearPresence,
+        user?.firstName,
+        user?.userId,
+    ]);
 
     // Typing Logic
     const lastTypingSentRef = useRef<number>(0);
@@ -221,7 +227,7 @@ const ListDetail = ({
 
         const now = Date.now();
         if (now - lastTypingSentRef.current > 1500) {
-            const username = user?.email || "Anonymous";
+            const username = user?.firstName || user?.userId || "Anonymous";
 
             const typingEvent = {
                 eventType: "TYPING" as const,
@@ -235,7 +241,7 @@ const ListDetail = ({
             handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, handlePresenceEvent, user?.email]);
+    }, [effectiveListId, handlePresenceEvent, user?.firstName, user?.userId]);
 
     const handleNewItemNameChange = (name: string) => {
         setNewItemName(name);
@@ -426,15 +432,7 @@ const ListDetail = ({
             }
         } catch {
             setError("Failed to delete the product.");
-            setItems((prev) => {
-                if (prev.some((i) => i.id === itemId)) return prev;
-                const itemToRestore = previousItems.find(
-                    (i) => i.id === itemId,
-                );
-                const next = itemToRestore ? [...prev, itemToRestore] : prev;
-                syncListItemsInStore(next);
-                return next;
-            });
+            void fetchListData(effectiveListId);
         }
     };
 

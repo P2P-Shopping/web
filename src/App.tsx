@@ -19,22 +19,23 @@ import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
 
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
+    const authChecked = useStore((state) => state.authChecked);
     const isAuthenticated = useStore((state) => state.isAuthenticated);
-    const [isLoading, setIsLoading] = useState(true);
     const setAuth = useStore((state) => state.setAuth);
 
     useEffect(() => {
-        if (isAuthenticated) {
-            setIsLoading(false);
-        } else {
-            checkAuthRequest().then((user) => {
-                setAuth(user);
-                setIsLoading(false);
-            });
+        if (!authChecked) {
+            checkAuthRequest()
+                .then((user) => {
+                    setAuth(user);
+                })
+                .catch(() => {
+                    setAuth(null);
+                });
         }
-    }, [isAuthenticated, setAuth]);
+    }, [authChecked, setAuth]);
 
-    if (isLoading) {
+    if (!authChecked) {
         return (
             <div className="flex-1 flex items-center justify-center">
                 Loading session...
@@ -86,13 +87,21 @@ function App() {
         [clearToastTimeout],
     );
 
+    const authChecked = useStore((state) => state.authChecked);
+
     useEffect(() => {
-        checkAuthRequest().then((user) => {
-            setAuth(user);
-        });
+        if (!authChecked) {
+            checkAuthRequest()
+                .then((user) => {
+                    setAuth(user);
+                })
+                .catch(() => {
+                    setAuth(null);
+                });
+        }
         startMockEmitter();
         return () => stopMockEmitter();
-    }, [setAuth]);
+    }, [setAuth, authChecked]);
 
     useEffect(() => {
         let subscription: StompSubscription | null = null;

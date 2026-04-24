@@ -3,6 +3,7 @@ import { Modal } from "../../components";
 interface ConfirmDeleteModalProps {
     listId: string;
     listName: string;
+    isDeleting: boolean;
     onCancel: () => void;
     onConfirm: (listId: string) => void;
 }
@@ -10,6 +11,7 @@ interface ConfirmDeleteModalProps {
 const ConfirmDeleteModal = ({
     listId,
     listName,
+    isDeleting,
     onCancel,
     onConfirm,
 }: ConfirmDeleteModalProps) => {
@@ -24,15 +26,18 @@ const ConfirmDeleteModal = ({
                         type="button"
                         className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
                         onClick={onCancel}
+                        disabled={isDeleting}
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        className="inline-flex items-center justify-center px-6 py-2.5 bg-danger text-white border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
+                        className="inline-flex items-center justify-center px-6 py-2.5 bg-danger text-white border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => onConfirm(listId)}
+                        disabled={isDeleting}
+                        aria-busy={isDeleting}
                     >
-                        Delete
+                        {isDeleting ? "Deleting..." : "Delete"}
                     </button>
                 </div>
             }

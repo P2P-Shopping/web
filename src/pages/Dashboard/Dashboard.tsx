@@ -329,6 +329,7 @@ const Dashboard = () => {
                 <ConfirmDeleteModal
                     listId={deleteTarget.id}
                     listName={deleteTarget.name}
+                    isDeleting={isLoading}
                     onCancel={cancelDeleteList}
                     onConfirm={confirmDeleteList}
                 />
@@ -337,7 +338,9 @@ const Dashboard = () => {
                 <AiImportModal
                     onClose={() => {
                         setShowAiImport(false);
-                        setSearchParams({});
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete("import");
+                        setSearchParams(newParams);
                     }}
                 />
             )}
