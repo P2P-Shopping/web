@@ -217,7 +217,10 @@ const useMapEngine = (
         const rect = canvas.getBoundingClientRect();
         const viewport = {
             width: Math.max(1, Math.round(rect.width || globalThis.innerWidth)),
-            height: Math.max(1, Math.round(rect.height || globalThis.innerHeight)),
+            height: Math.max(
+                1,
+                Math.round(rect.height || globalThis.innerHeight),
+            ),
         };
 
         const userPos = getRelativePixels(currentRenderedGps.current, anchor);
