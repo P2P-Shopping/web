@@ -707,7 +707,7 @@ const StoreMap: React.FC = () => {
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4 bg-bg">
                 <div className="w-12 h-12 border-4 border-border border-t-accent rounded-full animate-spin" />
                 <h2 className="text-xl font-bold text-text-strong tracking-tight">
-                    {gpsError ? gpsError : "Acquiring GPS Signal... 🛰️"}
+                    {gpsError || "Acquiring GPS Signal... 🛰️"}
                 </h2>
             </div>
         );
@@ -731,12 +731,9 @@ const StoreMap: React.FC = () => {
                 />
 
                 {gpsError && (
-                    <div
-                        className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
-                        role="status"
-                    >
+                    <output className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg">
                         {gpsError}
-                    </div>
+                    </output>
                 )}
 
                 {/* Sidebar Overlay (Mobile) */}
@@ -755,7 +752,7 @@ const StoreMap: React.FC = () => {
                 {/* Responsive Sidebar */}
                 <div
                     aria-hidden={!isSidebarExpanded}
-                    inert={!isSidebarExpanded ? true : undefined}
+                    inert={isSidebarExpanded ? undefined : true}
                     className={`
                         absolute z-30 transition-all duration-500 ease-spring
                         /* Desktop: Right-side Drawer */
@@ -776,7 +773,7 @@ const StoreMap: React.FC = () => {
                                 : "max-[1000px]:translate-y-full"
                         }
                         
-                        ${!isSidebarExpanded ? "pointer-events-none" : ""}
+                        ${isSidebarExpanded ? "" : "pointer-events-none"}
                         bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
                     `}
                 >

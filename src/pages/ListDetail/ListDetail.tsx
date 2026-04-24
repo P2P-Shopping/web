@@ -45,14 +45,14 @@ const getUsernameFromToken = (token: string | null): string => {
     try {
         const base64Url = token.split(".")[1];
         if (!base64Url) return "Anonymous";
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const base64 = base64Url.replaceAll("-", "+").replaceAll("_", "/");
         const jsonPayload = decodeURIComponent(
-            window
+            globalThis
                 .atob(base64)
                 .split("")
                 .map(
                     (c) =>
-                        `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`,
+                        `%${c.codePointAt(0)?.toString(16).padStart(2, "0")}`,
                 )
                 .join(""),
         );
@@ -270,7 +270,7 @@ const ListDetail = ({
 
     const closeDetailsModal = () => setShowDetailsModal(false);
 
-    const commitItem = (
+    const commitItem = async (
         name: string,
         quantity?: string,
         brand?: string,
@@ -291,41 +291,47 @@ const ListDetail = ({
         syncListItemsInStore(optimisticItems);
         setNewItemName("");
 
-        void fetch(`${getBaseUrl()}/api/lists/${effectiveListId}/items`, {
-            method: "POST",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify({
-                name: newItem.name,
-                isChecked: false,
-                brand: newItem.brand ?? null,
-                quantity: newItem.quantity ?? null,
-                price: newItem.price ?? null,
-                category: null,
-                isRecurrent: false,
-                timestamp: Date.now(),
-            }),
-        })
-            .then(async (res) => {
-                if (!res.ok) throw new Error("Failed to add item");
-                await fetchListData(effectiveListId);
+        try {
+            const res = await fetch(
+                `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
+                {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({
+                        name: newItem.name,
+                        isChecked: false,
+                        brand: newItem.brand ?? null,
+                        quantity: newItem.quantity ?? null,
+                        price: newItem.price ?? null,
+                        category: null,
+                        isRecurrent: false,
+                        timestamp: Date.now(),
+                    }),
+                },
+            );
 
-                // Publish after confirmation
-                if (stompClient.connected) {
-                    stompClient.publish({
-                        destination: "/app/sync",
-                        body: JSON.stringify({
-                            eventType: "ITEM_ADDED",
-                            listId: effectiveListId,
-                            item: newItem,
-                        }),
-                    });
-                }
-            })
-            .catch(() => {
-                setError("Failed to add the product.");
-                setItems((prev) => prev.filter((i) => i.id !== newItem.id));
-                syncListItemsInStore(items.filter((i) => i.id !== newItem.id));
+            if (!res.ok) throw new Error("Failed to add item");
+            await fetchListData(effectiveListId);
+
+            // Publish after confirmation
+            if (stompClient.connected) {
+                stompClient.publish({
+                    destination: "/app/sync",
+                    body: JSON.stringify({
+                        eventType: "ITEM_ADDED",
+                        listId: effectiveListId,
+                        item: newItem,
+                    }),
+                });
+            }
+        } catch {
+            setError("Failed to add the product.");
+            setItems((prev) => {
+                const next = prev.filter((i) => i.id !== newItem.id);
+                syncListItemsInStore(next);
+                return next;
             });
+        }
     };
 
     const handleInlineAdd = (e: React.FormEvent) => {
@@ -348,7 +354,7 @@ const ListDetail = ({
         setDetailPrice("");
     };
 
-    const handleCheck = (itemId: string) => {
+    const handleCheck = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const currentItem = items.find((item) => item.id === itemId);
         if (!currentItem) return;
@@ -358,69 +364,75 @@ const ListDetail = ({
         );
         setItems(nextItems);
         syncListItemsInStore(nextItems);
-        void fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-            method: "PUT",
-            headers: getAuthHeaders(true),
-            body: JSON.stringify({
-                name: currentItem.name,
-                isChecked: newChecked,
-                brand: currentItem.brand ?? null,
-                quantity: currentItem.quantity ?? null,
-                price: currentItem.price ?? null,
-                category: currentItem.category ?? null,
-                isRecurrent: currentItem.isRecurrent ?? false,
-                timestamp: Date.now(),
-            }),
-        })
-            .then((res) => {
-                if (!res.ok) throw new Error("Failed to update item");
-                if (effectiveListId && stompClient.connected) {
-                    stompClient.publish({
-                        destination: "/app/sync",
-                        body: JSON.stringify({
-                            eventType: "ITEM_TOGGLED",
-                            listId: effectiveListId,
-                            itemId,
-                            checked: newChecked,
-                        }),
-                    });
-                }
-            })
-            .catch(() => {
-                setError("Failed to update the product.");
-                setItems((prev) =>
-                    prev.map((item) =>
-                        item.id === itemId
-                            ? { ...item, checked: currentItem.checked }
-                            : item,
-                    ),
-                );
+
+        try {
+            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+                method: "PUT",
+                headers: getAuthHeaders(true),
+                body: JSON.stringify({
+                    name: currentItem.name,
+                    isChecked: newChecked,
+                    brand: currentItem.brand ?? null,
+                    quantity: currentItem.quantity ?? null,
+                    price: currentItem.price ?? null,
+                    category: currentItem.category ?? null,
+                    isRecurrent: currentItem.isRecurrent ?? false,
+                    timestamp: Date.now(),
+                }),
             });
+
+            if (!res.ok) throw new Error("Failed to update item");
+            if (effectiveListId && stompClient.connected) {
+                stompClient.publish({
+                    destination: "/app/sync",
+                    body: JSON.stringify({
+                        eventType: "ITEM_TOGGLED",
+                        listId: effectiveListId,
+                        itemId,
+                        checked: newChecked,
+                    }),
+                });
+            }
+        } catch {
+            setError("Failed to update the product.");
+            setItems((prev) => {
+                const next = prev.map((item) =>
+                    item.id === itemId
+                        ? { ...item, checked: currentItem.checked }
+                        : item,
+                );
+                syncListItemsInStore(next);
+                return next;
+            });
+        }
     };
 
-    const handleDelete = (itemId: string) => {
+    const handleDelete = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const previousItems = items;
         const nextItems = previousItems.filter((item) => item.id !== itemId);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
-        void fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-            method: "DELETE",
-            headers: getAuthHeaders(),
-        })
-            .then((res) => {
-                if (!res.ok) throw new Error("Failed to delete item");
-            })
-            .catch(() => {
-                setError("Failed to delete the product.");
-                setItems((prev) => {
-                    if (prev.find((i) => i.id === itemId)) return prev;
-                    const itemToRestore = previousItems.find(
-                        (i) => i.id === itemId,
-                    );
-                    return itemToRestore ? [...prev, itemToRestore] : prev;
-                });
+
+        try {
+            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+                method: "DELETE",
+                headers: getAuthHeaders(),
             });
+
+            if (!res.ok) throw new Error("Failed to delete item");
+        } catch {
+            setError("Failed to delete the product.");
+            setItems((prev) => {
+                if (prev.some((i) => i.id === itemId)) return prev;
+                const itemToRestore = previousItems.find(
+                    (i) => i.id === itemId,
+                );
+                const next = itemToRestore ? [...prev, itemToRestore] : prev;
+                syncListItemsInStore(next);
+                return next;
+            });
+        }
     };
 
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
