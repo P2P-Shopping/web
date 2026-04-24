@@ -27,8 +27,11 @@ export const checkAuthRequest = async () => {
             withCredentials: true,
         });
         return response.data;
-    } catch (_error) {
-        // If 401, we are not logged in
+    } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+            return null;
+        }
+        console.error("Check auth failed:", error);
         return null;
     }
 };

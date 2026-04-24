@@ -24,13 +24,13 @@ function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     const setAuth = useStore((state) => state.setAuth);
 
     useEffect(() => {
-        if (!isAuthenticated) {
+        if (isAuthenticated) {
+            setIsLoading(false);
+        } else {
             checkAuthRequest().then((user) => {
                 setAuth(user);
                 setIsLoading(false);
             });
-        } else {
-            setIsLoading(false);
         }
     }, [isAuthenticated, setAuth]);
 

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { registerRequest } from "../../services/authService";
 
 interface RegistrationPageProps {
-    onAuthSuccess?: (authResult: unknown) => void;
+    onAuthSuccess?: (authResult: any) => void;
 }
 
 const RegistrationPage = ({ onAuthSuccess }: RegistrationPageProps) => {
