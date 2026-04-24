@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import stompClient from "../services/socketService";
+import axios from "axios";
 
 interface Item {
   id: string; // Added unique ID
@@ -46,6 +47,28 @@ const ListDetail: React.FC = () => {
   const [newItemName, setNewItemName] = useState("");
   const [permissionStatus, setPermissionStatus] = useState<PermissionState | null>(null);
   const [showBanner, setShowBanner] = useState(true);
+
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareEmail, setShareEmail] = useState("");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  const handleShare = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shareEmail.trim()) return;
+    
+    try {
+      await axios.post(`/api/lists/${id}/share`, { email: shareEmail });
+      setToast({ message: "Invitation sent successfully!", type: "success" });
+      setShareEmail("");
+      setIsSharing(false);
+    } catch (err) {
+      setToast({ message: "Failed to send invitation.", type: "error" });
+    }
+    
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
 
   // Sync items when ID changes
   useEffect(() => {
@@ -127,6 +150,34 @@ const ListDetail: React.FC = () => {
           <button className="close-banner-btn" onClick={() => setShowBanner(false)}>
             ✕
           </button>
+        </div>
+      )}
+
+      <div className="header-actions">
+        <button onClick={() => setIsSharing(!isSharing)} className="share-btn">
+          {isSharing ? "Cancel Share" : "Share List"}
+        </button>
+      </div>
+
+      {isSharing && (
+        <form onSubmit={handleShare} className="share-form">
+          <input
+            type="email"
+            value={shareEmail}
+            onChange={(e) => setShareEmail(e.target.value)}
+            placeholder="Collaborator's email"
+            className="share-input"
+            required
+          />
+          <button type="submit" className="share-submit-btn">
+            Send Invite
+          </button>
+        </form>
+      )}
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.message}
         </div>
       )}
 

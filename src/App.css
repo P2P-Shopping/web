@@ -140,3 +140,21 @@ nav a:hover::after { width: 100%; }
 .item-text { font-size: 18px; color: #111c2f; }
 .item-completed .item-text { text-decoration: line-through; color: #a0aec0; }
 .empty-msg { text-align: center; color: #888; margin-top: 20px; }
+
+/* Share UI */
+.header-actions { display: flex; justify-content: flex-end; margin-bottom: 15px; }
+.share-btn { padding: 8px 16px; background: var(--accent-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+.share-btn:hover { background: #2563eb; }
+.share-form { display: flex; gap: 10px; margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.share-input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 14px; }
+.share-submit-btn { padding: 10px 15px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.cancel-btn { padding: 10px 15px; background: #e2e8f0; color: #4a5568; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 8px; color: white; font-weight: 600; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); animation: slideUp 0.3s ease-out; }
+.toast-success { background-color: #10b981; }
+.toast-error { background-color: #ef4444; }
+
+@keyframes slideUp {
+  from { bottom: -50px; opacity: 0; }
+  to { bottom: 20px; opacity: 1; }
+}
