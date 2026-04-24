@@ -77,7 +77,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                     delete updatedTyping[username];
                     return { typingUsers: updatedTyping };
                 });
-            }, 2000);
+            }, 4000);
 
             set((state) => {
                 const newSet = new Set(state.activeUsers);

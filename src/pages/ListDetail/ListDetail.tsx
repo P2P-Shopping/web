@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, Settings } from "lucide-react";
+import { AlertCircle, ChevronDown, Plus, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Modal, PresenceBar } from "../../components";
@@ -54,6 +54,7 @@ const ListDetail = ({
     const { updateList } = useListsStore();
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
     const user = useStore((state) => state.user);
+    const isServerConnected = useStore((state) => state.isServerConnected);
 
     const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
@@ -166,7 +167,11 @@ const ListDetail = ({
 
     // WebSocket Presence Logic
     useEffect(() => {
-        if (!effectiveListId || effectiveListId === "default") {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !isServerConnected
+        ) {
             return;
         }
 
@@ -207,7 +212,7 @@ const ListDetail = ({
                     }),
                 });
             }
-            subscription.unsubscribe();
+            subscription?.unsubscribe();
             clearPresence();
         };
     }, [
@@ -216,6 +221,7 @@ const ListDetail = ({
         clearPresence,
         user?.firstName,
         user?.userId,
+        isServerConnected,
     ]);
 
     // Typing Logic
@@ -494,7 +500,7 @@ const ListDetail = ({
             className={
                 isEmbedded
                     ? "w-full flex flex-col h-full bg-surface/50"
-                    : "flex justify-center items-start p-[28px_20px] bg-bg"
+                    : "flex justify-center items-start p-20px bg-bg"
             }
         >
             <div
@@ -520,8 +526,18 @@ const ListDetail = ({
                 )}
 
                 {error && (
-                    <div className="bg-danger-subtle text-danger border border-danger-border p-[10px_14px] rounded-md text-[13px] font-medium">
-                        {error}
+                    <div
+                        className={`bg-danger-subtle text-danger border border-danger-border p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300 ${isEmbedded ? "mb-2" : "-mt-2 mb-2"}`}
+                    >
+                        <AlertCircle size={20} className="shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold leading-none mb-1">
+                                System Error
+                            </p>
+                            <p className="text-[13px] opacity-90 leading-tight">
+                                {error}
+                            </p>
+                        </div>
                     </div>
                 )}
 
@@ -564,43 +580,62 @@ const ListDetail = ({
                     </div>
                 ) : (
                     <>
-                        {/* ── Typing Indicator ── */}
-                        <div className="mb-2 min-h-[28px]">
-                            <PresenceBar variant="typing" />
-                        </div>
-
                         {/* ── Inline add bar (Desktop & Embedded) ── */}
-                        <form
-                            onSubmit={handleInlineAdd}
-                            className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${isEmbedded ? "" : "max-[600px]:hidden"}`}
-                        >
-                            <input
-                                ref={addInputRef}
-                                type="text"
-                                value={newItemName}
-                                onChange={(e) =>
-                                    handleNewItemNameChange(e.target.value)
-                                }
-                                placeholder="Add item..."
-                                className="flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1"
-                            />
-                            <button
-                                type="button"
-                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
-                                onClick={openDetailsModal}
-                                title="Add item details"
-                                aria-label="Add item details"
+                        <div className="flex flex-col gap-1.5">
+                            <form
+                                onSubmit={handleInlineAdd}
+                                className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${isEmbedded ? "" : "max-[600px]:hidden"}`}
                             >
-                                <Settings size={18} />
-                            </button>
-                            <button
-                                type="submit"
-                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg hover:opacity-90 transition-all shrink-0"
-                                aria-label="Add"
-                            >
-                                <Plus size={18} strokeWidth={3} />
-                            </button>
-                        </form>
+                                <input
+                                    ref={addInputRef}
+                                    type="text"
+                                    value={newItemName}
+                                    onChange={(e) =>
+                                        handleNewItemNameChange(e.target.value)
+                                    }
+                                    placeholder={
+                                        error === "Failed to sync the list."
+                                            ? "List is read-only (sync failed)"
+                                            : "Add item..."
+                                    }
+                                    disabled={
+                                        error === "Failed to sync the list."
+                                    }
+                                    className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${error === "Failed to sync the list." ? "cursor-not-allowed opacity-50" : ""}`}
+                                />
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
+                                    disabled={
+                                        error === "Failed to sync the list."
+                                    }
+                                    onClick={openDetailsModal}
+                                    title={
+                                        error === "Failed to sync the list."
+                                            ? "Sync failed"
+                                            : "Add item details"
+                                    }
+                                    aria-label="Add item details"
+                                >
+                                    <Settings size={18} />
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={
+                                        error === "Failed to sync the list."
+                                    }
+                                    className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 ${error === "Failed to sync the list." ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}`}
+                                    aria-label="Add"
+                                >
+                                    <Plus size={18} strokeWidth={3} />
+                                </button>
+                            </form>
+
+                            {/* ── Typing Indicator (Discord-style) ── */}
+                            <div className="min-h-[20px] px-2 flex items-center">
+                                <PresenceBar variant="typing" />
+                            </div>
+                        </div>
 
                         {/* ── Items list ── */}
                         <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
@@ -615,6 +650,9 @@ const ListDetail = ({
                                         items={items}
                                         onCheck={handleCheck}
                                         onDelete={handleDelete}
+                                        disabled={
+                                            error === "Failed to sync the list."
+                                        }
                                     />
                                 </div>
                             )}
@@ -624,14 +662,16 @@ const ListDetail = ({
             </div>
 
             {/* Mobile FAB */}
-            <button
-                type="button"
-                className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
-                onClick={() => setShowMobileAddModal(true)}
-                aria-label="Add Item"
-            >
-                <Plus size={28} strokeWidth={3} />
-            </button>
+            {error !== "Failed to sync the list." && (
+                <button
+                    type="button"
+                    className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
+                    onClick={() => setShowMobileAddModal(true)}
+                    aria-label="Add Item"
+                >
+                    <Plus size={28} strokeWidth={3} />
+                </button>
+            )}
 
             {/* ── Mobile Add Item Modal ── */}
             <Modal

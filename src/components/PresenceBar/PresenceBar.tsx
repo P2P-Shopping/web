@@ -86,16 +86,16 @@ const PresenceBar: React.FC<PresenceBarProps> = ({ variant = "avatars" }) => {
         if (typingArray.length === 0) return null;
 
         return (
-            <div className="flex items-center gap-2 px-3 py-1 bg-accent-subtle/50 border border-accent-border/30 rounded-full w-fit animate-in slide-in-from-bottom-2 fade-in duration-300">
-                <div className="flex gap-1">
-                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce" />
-                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-delay:0.4s]" />
+            <div className="flex items-center gap-1.5 px-1 py-0.5 animate-in slide-in-from-bottom-1 fade-in duration-200 h-5">
+                <div className="flex gap-0.5 items-center">
+                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s]" />
+                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.15s]" />
+                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.3s]" />
                 </div>
-                <span className="text-[11px] font-semibold text-accent italic">
+                <span className="text-[12px] font-bold text-text-muted tracking-tight leading-none">
                     {typingArray.length === 1
                         ? `${typingArray[0]} is typing...`
-                        : "Multiple people typing..."}
+                        : "Several people are typing..."}
                 </span>
             </div>
         );

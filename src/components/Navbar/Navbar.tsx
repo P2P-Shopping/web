@@ -1,6 +1,5 @@
 import {
     LayoutDashboard,
-    Map as MapIcon,
     MapPinned,
     MoreHorizontal,
     Route as RouteIcon,
@@ -17,17 +16,18 @@ const NAV_LINKS = [
     { to: "/dashboard", label: "My Lists", icon: LayoutDashboard },
     { to: "/route", label: "Route", icon: RouteIcon },
     { to: "/nav", label: "Store Map", icon: MapPinned },
-    { to: "/map", label: "Map", icon: MapIcon },
 ];
-
-const PRIORITY_LINK_COUNT = 4;
 
 export default function Navbar() {
     const { pathname } = useLocation();
     const [isMoreOpen, setIsMoreOpen] = useState(false);
+    const [windowWidth, setWindowWidth] = useState(globalThis.innerWidth);
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const clearLists = useListsStore((state) => state.clearLists);
     const user = useStore((state) => state.user);
+
+    // Dynamic priority count based on width
+    const priorityCount = windowWidth < 400 ? 2 : 3;
 
     const handleLogout = async () => {
         try {
@@ -36,6 +36,13 @@ export default function Navbar() {
             clearLists();
         }
     };
+
+    // Update width on resize
+    useEffect(() => {
+        const handleResize = () => setWindowWidth(globalThis.innerWidth);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     // Close more menu when clicking outside
     useEffect(() => {
@@ -59,9 +66,8 @@ export default function Navbar() {
     }, [pathname]);
 
     // Split links into priority (visible) and extra (in more menu)
-    // PRIORITY_LINK_COUNT determines how many items stay in the main bar
-    const priorityLinks = NAV_LINKS.slice(0, PRIORITY_LINK_COUNT);
-    const extraLinks = NAV_LINKS.slice(PRIORITY_LINK_COUNT);
+    const priorityLinks = NAV_LINKS.slice(0, priorityCount);
+    const extraLinks = NAV_LINKS.slice(priorityCount);
 
     return (
         <nav className="relative bg-surface/80 backdrop-blur-xl border-t border-border h-[72px] pb-safe flex items-center shadow-[0_-8px_30px_rgba(0,0,0,0.04)] z-50">
@@ -92,33 +98,31 @@ export default function Navbar() {
                     </Link>
                 ))}
 
-                {/* More Menu Toggle */}
-                {extraLinks.length > 0 && (
-                    <button
-                        type="button"
-                        onClick={() => setIsMoreOpen(!isMoreOpen)}
-                        className={`flex flex-col items-center gap-1 group py-1 px-3 transition-all duration-300 ${
+                {/* More Menu Toggle - Always visible as it contains theme/logout */}
+                <button
+                    type="button"
+                    onClick={() => setIsMoreOpen(!isMoreOpen)}
+                    className={`flex flex-col items-center gap-1 group py-1 px-3 transition-all duration-300 ${
+                        isMoreOpen
+                            ? "text-accent"
+                            : "text-text-muted hover:text-text-strong"
+                    }`}
+                >
+                    <div
+                        className={`p-2 rounded-xl transition-all duration-300 ${
                             isMoreOpen
-                                ? "text-accent"
-                                : "text-text-muted hover:text-text-strong"
+                                ? "bg-accent-subtle"
+                                : "group-hover:bg-bg-muted"
                         }`}
                     >
-                        <div
-                            className={`p-2 rounded-xl transition-all duration-300 ${
-                                isMoreOpen
-                                    ? "bg-accent-subtle"
-                                    : "group-hover:bg-bg-muted"
-                            }`}
-                        >
-                            {isMoreOpen ? (
-                                <X size={22} />
-                            ) : (
-                                <MoreHorizontal size={22} />
-                            )}
-                        </div>
-                        <span className="text-[10px] font-bold">More</span>
-                    </button>
-                )}
+                        {isMoreOpen ? (
+                            <X size={22} />
+                        ) : (
+                            <MoreHorizontal size={22} />
+                        )}
+                    </div>
+                    <span className="text-[10px] font-bold">More</span>
+                </button>
 
                 {/* More Menu Content */}
                 {isMoreOpen && (

@@ -15,11 +15,17 @@ interface Props {
     items: Item[];
     onCheck: (id: string) => void;
     onDelete?: (id: string) => void;
+    disabled?: boolean;
 }
 
 const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
 
-const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
+const ShoppingListItems: React.FC<Props> = ({
+    items,
+    onCheck,
+    onDelete,
+    disabled = false,
+}) => {
     if (items.length === 0) {
         return (
             <p className="text-center py-12 text-text-muted italic">
@@ -35,12 +41,15 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                     key={item.id}
                     className={`flex items-center justify-between p-4 bg-bg-subtle border border-border rounded-xl transition-all duration-200 hover:bg-surface hover:shadow-md group ${item.checked ? "opacity-60" : ""}`}
                 >
-                    <label className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer">
+                    <label
+                        className={`flex items-center gap-4 flex-1 min-w-0 ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+                    >
                         <input
                             type="checkbox"
                             className="sr-only"
                             checked={item.checked}
-                            onChange={() => onCheck(item.id)}
+                            onChange={() => !disabled && onCheck(item.id)}
+                            disabled={disabled}
                         />
                         <div
                             className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all shrink-0 ${item.checked ? "bg-success border-success" : "bg-surface border-border-strong group-hover:border-accent"}`}
@@ -119,9 +128,11 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                             type="button"
                             className="flex items-center justify-center w-8 h-8 rounded-lg text-text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-danger-subtle hover:text-danger shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-danger"
                             onClick={(e) => {
+                                if (disabled) return;
                                 e.stopPropagation();
                                 onDelete(item.id);
                             }}
+                            disabled={disabled}
                             aria-label={`Remove ${item.name}`}
                         >
                             <Trash2 size={18} />

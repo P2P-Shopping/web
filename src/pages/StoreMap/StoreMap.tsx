@@ -1,7 +1,15 @@
-import { List, LocateFixed, X, ZoomIn, ZoomOut } from "lucide-react";
+import {
+    List,
+    LocateFixed,
+    Navigation,
+    X,
+    ZoomIn,
+    ZoomOut,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import Modal from "../../components/Modal/Modal";
 import ListDetail from "../ListDetail/ListDetail";
 
 interface Coordinate {
@@ -664,6 +672,7 @@ const useMapEngine = (
         hasLocationLock,
         gpsError,
         isRouting,
+        currentGps: currentRenderedGps.current,
         recenterCamera,
         zoomIn,
         zoomOut,
@@ -684,6 +693,7 @@ const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { id: listId } = useParams<{ id: string }>();
     const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+    const [isCoordsModalOpen, setIsCoordsModalOpen] = useState(false);
 
     useEffect(() => {
         const originalInlineStyle = document.body.getAttribute("style");
@@ -715,6 +725,7 @@ const StoreMap: React.FC = () => {
         hasLocationLock,
         gpsError,
         isRouting,
+        currentGps,
         handlers,
         recenterCamera,
         zoomIn,
@@ -821,6 +832,18 @@ const StoreMap: React.FC = () => {
                         <LocateFixed size={20} />
                     </button>
 
+                    <button
+                        type="button"
+                        className="w-12 h-12 flex items-center justify-center bg-bg-muted text-text-strong border border-border rounded-full shadow-sm transition-all hover:bg-surface hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsCoordsModalOpen(true);
+                        }}
+                        title="Live Coordinates"
+                    >
+                        <Navigation size={20} />
+                    </button>
+
                     <div className="flex items-center bg-bg-muted border border-border rounded-2xl p-1">
                         <button
                             type="button"
@@ -868,6 +891,53 @@ const StoreMap: React.FC = () => {
                     </span>
                 </button>
             </div>
+
+            <Modal
+                isOpen={isCoordsModalOpen}
+                onClose={() => setIsCoordsModalOpen(false)}
+                title="Live Store Coordinates"
+            >
+                <div className="flex flex-col gap-6 p-2">
+                    <div className="flex items-center gap-4 bg-bg-muted p-4 rounded-2xl border border-border">
+                        <div className="p-3 bg-accent/10 rounded-xl text-accent">
+                            <Navigation size={24} />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                Current Location
+                            </p>
+                            <p className="text-sm font-mono font-bold text-text-strong">
+                                {currentGps.lat.toFixed(6)},{" "}
+                                {currentGps.lng.toFixed(6)}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-text-muted">Latitude</span>
+                            <span className="font-mono font-bold text-text-strong">
+                                {currentGps.lat}
+                            </span>
+                        </div>
+                        <div className="h-px bg-border" />
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-text-muted">Longitude</span>
+                            <span className="font-mono font-bold text-text-strong">
+                                {currentGps.lng}
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="w-full py-4 bg-text-strong text-bg rounded-2xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        onClick={() => setIsCoordsModalOpen(false)}
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 };
