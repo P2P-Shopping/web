@@ -23,17 +23,18 @@ const Dashboard = () => {
         id: string;
         name: string;
     } | null>(null);
-    const [showAiImport, setShowAiImport] = useState(false);
-
     const {
         lists,
         isLoading,
         isModalOpen,
+        deletingListId,
         fetchLists,
         deleteList,
         openModal,
         closeModal,
     } = useListsStore();
+
+    const showAiImport = searchParams.get("import") === "ai";
 
     // Fetch lists on mount
     useEffect(() => {
@@ -45,11 +46,6 @@ const Dashboard = () => {
         () => lists.find((list) => list.id === selectedListId) ?? null,
         [lists, selectedListId],
     );
-
-    // Handle AI Import Param
-    useEffect(() => {
-        setShowAiImport(searchParams.get("import") === "ai");
-    }, [searchParams]);
 
     // Handle Card Click
     const handleCardClick = (listId: string) => {
@@ -300,7 +296,13 @@ const Dashboard = () => {
                             <button
                                 type="button"
                                 className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
-                                onClick={() => setShowAiImport(true)}
+                                onClick={() =>
+                                    setSearchParams((prev) => {
+                                        const next = new URLSearchParams(prev);
+                                        next.set("import", "ai");
+                                        return next;
+                                    })
+                                }
                             >
                                 <Sparkles size={18} className="text-accent" />
                                 AI Import
@@ -329,7 +331,7 @@ const Dashboard = () => {
                 <ConfirmDeleteModal
                     listId={deleteTarget.id}
                     listName={deleteTarget.name}
-                    isDeleting={isLoading}
+                    isDeleting={deletingListId === deleteTarget.id}
                     onCancel={cancelDeleteList}
                     onConfirm={confirmDeleteList}
                 />
@@ -337,10 +339,11 @@ const Dashboard = () => {
             {showAiImport && (
                 <AiImportModal
                     onClose={() => {
-                        setShowAiImport(false);
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.delete("import");
-                        setSearchParams(newParams);
+                        setSearchParams((prev) => {
+                            const next = new URLSearchParams(prev);
+                            next.delete("import");
+                            return next;
+                        });
                     }}
                 />
             )}

@@ -25,6 +25,7 @@ export default function Modal({
 }: Readonly<ModalProps>) {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
+    const wasPreviouslyOpenRef = useRef(isOpen);
     const modalTitleId = useId();
     const modalSubtitleId = useId();
 
@@ -42,7 +43,7 @@ export default function Modal({
                 ) as HTMLElement;
                 elementToFocus?.focus();
             }
-        } else {
+        } else if (wasPreviouslyOpenRef.current) {
             if (dialog?.open) {
                 dialog.close();
             }
@@ -55,6 +56,8 @@ export default function Modal({
                 document.body.focus();
             }
         }
+
+        wasPreviouslyOpenRef.current = isOpen;
 
         return () => {
             if (dialog?.open && !isOpen) {

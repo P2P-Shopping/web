@@ -694,6 +694,19 @@ const StoreMap: React.FC = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (!isSidebarExpanded) return;
+
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setIsSidebarExpanded(false);
+            }
+        };
+
+        document.addEventListener("keydown", handleEscape);
+        return () => document.removeEventListener("keydown", handleEscape);
+    }, [isSidebarExpanded]);
+
     const {
         isDragging,
         hasLocationLock,
@@ -749,9 +762,6 @@ const StoreMap: React.FC = () => {
                         type="button"
                         className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-30 min-[1000px]:hidden animate-fade-in"
                         onClick={() => setIsSidebarExpanded(false)}
-                        onKeyDown={(e) =>
-                            e.key === "Escape" && setIsSidebarExpanded(false)
-                        }
                         aria-label="Close list drawer"
                     />
                 )}

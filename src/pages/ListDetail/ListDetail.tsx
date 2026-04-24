@@ -67,6 +67,7 @@ const ListDetail = ({
     const [detailPrice, setDetailPrice] = useState("");
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
+    const prevShowDetailsModalRef = useRef(showDetailsModal);
 
     const getBaseUrl = useCallback(
         () => import.meta.env.VITE_API_URL || "http://localhost:8081",
@@ -100,21 +101,21 @@ const ListDetail = ({
                 return;
             }
             try {
-                const response = await fetch(`${getBaseUrl()}/api/lists`, {
-                    headers: getAuthHeaders(),
-                    credentials: "include",
-                });
+                const response = await fetch(
+                    `${getBaseUrl()}/api/lists/${targetListId}`,
+                    {
+                        headers: getAuthHeaders(),
+                        credentials: "include",
+                    },
+                );
                 if (!response.ok) {
                     if (response.status === 401) {
                         useStore.getState().setAuth(null);
                         throw new Error("Session expired.");
                     }
-                    throw new Error("Failed to fetch lists");
+                    throw new Error("Failed to fetch list");
                 }
-                const allLists = (await response.json()) as ApiShoppingList[];
-                const currentList = allLists.find(
-                    (list) => list.id === targetListId,
-                );
+                const currentList = (await response.json()) as ApiShoppingList;
                 if (!currentList) {
                     setItems([]);
                     return;
@@ -131,7 +132,8 @@ const ListDetail = ({
                 }));
                 setItems(mappedItems);
                 syncListItemsInStore(mappedItems, targetListId);
-            } catch {
+            } catch (error) {
+                console.error("fetchListData error:", error);
                 setError("Failed to sync the list.");
             } finally {
                 setIsLoading(false);
@@ -146,11 +148,13 @@ const ListDetail = ({
     }, [fetchListData]);
 
     // Sync detail name when modal opens
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Only sync on open transition
     useEffect(() => {
-        if (showDetailsModal) {
+        if (showDetailsModal && !prevShowDetailsModalRef.current) {
             setDetailName(newItemName);
         }
-    }, [showDetailsModal, newItemName]);
+        prevShowDetailsModalRef.current = showDetailsModal;
+    }, [showDetailsModal]); // Removed newItemName from deps to prevent clobbering
 
     // Reset local modal states when list changes
     // biome-ignore lint/correctness/useExhaustiveDependencies: Reset on ID change
@@ -248,7 +252,7 @@ const ListDetail = ({
         sendTypingEvent();
     };
 
-    const _openDetailsModal = () => {
+    const openDetailsModal = () => {
         setDetailName(newItemName);
         setDetailQuantity("");
         setDetailBrand("");
@@ -306,16 +310,29 @@ const ListDetail = ({
                 }
                 throw new Error("Failed to add item");
             }
+
+            const createdApiItem = (await res.json()) as ApiListItem;
+            const createdItem: Item = {
+                id: createdApiItem.id,
+                name: createdApiItem.name,
+                checked: Boolean(createdApiItem.isChecked),
+                brand: createdApiItem.brand,
+                price: createdApiItem.price,
+                quantity: createdApiItem.quantity,
+                category: createdApiItem.category,
+                isRecurrent: createdApiItem.isRecurrent,
+            };
+
             await fetchListData(effectiveListId);
 
-            // Publish after confirmation
+            // Publish after confirmation with server data
             if (stompClient.connected) {
                 stompClient.publish({
                     destination: "/app/sync",
                     body: JSON.stringify({
                         eventType: "ITEM_ADDED",
                         listId: effectiveListId,
-                        item: newItem,
+                        item: createdItem,
                     }),
                 });
             }
@@ -556,7 +573,7 @@ const ListDetail = ({
                             <button
                                 type="button"
                                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
-                                onClick={_openDetailsModal}
+                                onClick={openDetailsModal}
                                 title="Add item details"
                                 aria-label="Add item details"
                             >

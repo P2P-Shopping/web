@@ -179,7 +179,10 @@ const RegistrationPage = () => {
                 </div>
 
                 {error && (
-                    <p className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium">
+                    <p
+                        role="alert"
+                        className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium"
+                    >
                         {error}
                     </p>
                 )}

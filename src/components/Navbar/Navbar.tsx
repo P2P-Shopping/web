@@ -20,18 +20,21 @@ const NAV_LINKS = [
     { to: "/map", label: "Map", icon: MapIcon },
 ];
 
+const PRIORITY_LINK_COUNT = 4;
+
 export default function Navbar() {
     const { pathname } = useLocation();
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const moreMenuRef = useRef<HTMLDivElement>(null);
-    const setAuth = useStore((state) => state.setAuth);
     const clearLists = useListsStore((state) => state.clearLists);
     const user = useStore((state) => state.user);
 
     const handleLogout = async () => {
-        await logoutRequest();
-        setAuth(null);
-        clearLists();
+        try {
+            await logoutRequest();
+        } finally {
+            clearLists();
+        }
     };
 
     // Close more menu when clicking outside
@@ -56,9 +59,9 @@ export default function Navbar() {
     }, [pathname]);
 
     // Split links into priority (visible) and extra (in more menu)
-    // On mobile we might want fewer visible items. Let's show 4 + More.
-    const priorityLinks = NAV_LINKS.slice(0, 4);
-    const extraLinks = NAV_LINKS.slice(4);
+    // PRIORITY_LINK_COUNT determines how many items stay in the main bar
+    const priorityLinks = NAV_LINKS.slice(0, PRIORITY_LINK_COUNT);
+    const extraLinks = NAV_LINKS.slice(PRIORITY_LINK_COUNT);
 
     return (
         <nav className="relative bg-surface/80 backdrop-blur-xl border-t border-border h-[72px] pb-safe flex items-center shadow-[0_-8px_30px_rgba(0,0,0,0.04)] z-50">
@@ -90,30 +93,32 @@ export default function Navbar() {
                 ))}
 
                 {/* More Menu Toggle */}
-                <button
-                    type="button"
-                    onClick={() => setIsMoreOpen(!isMoreOpen)}
-                    className={`flex flex-col items-center gap-1 group py-1 px-3 transition-all duration-300 ${
-                        isMoreOpen
-                            ? "text-accent"
-                            : "text-text-muted hover:text-text-strong"
-                    }`}
-                >
-                    <div
-                        className={`p-2 rounded-xl transition-all duration-300 ${
+                {extraLinks.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => setIsMoreOpen(!isMoreOpen)}
+                        className={`flex flex-col items-center gap-1 group py-1 px-3 transition-all duration-300 ${
                             isMoreOpen
-                                ? "bg-accent-subtle"
-                                : "group-hover:bg-bg-muted"
+                                ? "text-accent"
+                                : "text-text-muted hover:text-text-strong"
                         }`}
                     >
-                        {isMoreOpen ? (
-                            <X size={22} />
-                        ) : (
-                            <MoreHorizontal size={22} />
-                        )}
-                    </div>
-                    <span className="text-[10px] font-bold">More</span>
-                </button>
+                        <div
+                            className={`p-2 rounded-xl transition-all duration-300 ${
+                                isMoreOpen
+                                    ? "bg-accent-subtle"
+                                    : "group-hover:bg-bg-muted"
+                            }`}
+                        >
+                            {isMoreOpen ? (
+                                <X size={22} />
+                            ) : (
+                                <MoreHorizontal size={22} />
+                            )}
+                        </div>
+                        <span className="text-[10px] font-bold">More</span>
+                    </button>
+                )}
 
                 {/* More Menu Content */}
                 {isMoreOpen && (

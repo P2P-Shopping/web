@@ -25,6 +25,7 @@ interface ListsState {
     isLoading: boolean;
     error: string | null;
     isModalOpen: boolean;
+    deletingListId: string | null;
     fetchLists: () => Promise<void>;
     addList: (name: string) => Promise<ShoppingList | null>;
     updateList: (id: string, updates: Partial<ShoppingList>) => void;
@@ -44,10 +45,18 @@ const getBaseUrl = () =>
     import.meta.env.VITE_API_BASE_URL ||
     "http://localhost:8081";
 
-const getAuthHeaders = (withContentType = false): HeadersInit => {
+const jsonHeaders = (withContentType = false): HeadersInit => {
     return {
         ...(withContentType ? { "Content-Type": "application/json" } : {}),
     };
+};
+
+const handleAuthResponse = (response: Response) => {
+    if (response.status === 401) {
+        useStore.getState().setAuth(null);
+        throw new Error("Session expired. Please log in again.");
+    }
+    return response;
 };
 
 const normalizeItem = (item: ApiItem): Item => ({
@@ -88,20 +97,19 @@ export const useListsStore = create<ListsState>((set, get) => ({
     isLoading: false,
     error: null,
     isModalOpen: false,
+    deletingListId: null,
 
     fetchLists: async () => {
         set({ isLoading: true, error: null });
         try {
             const response = await fetch(`${getBaseUrl()}/api/lists`, {
-                headers: getAuthHeaders(),
+                headers: jsonHeaders(),
                 credentials: "include",
             });
 
+            handleAuthResponse(response);
+
             if (!response.ok) {
-                if (response.status === 401) {
-                    useStore.getState().setAuth(null);
-                    throw new Error("Session expired. Please log in again.");
-                }
                 throw new Error(`Failed to fetch lists (${response.status})`);
             }
 
@@ -133,10 +141,12 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
             const response = await fetch(`${getBaseUrl()}/api/lists`, {
                 method: "POST",
-                headers: getAuthHeaders(true),
+                headers: jsonHeaders(true),
                 body: JSON.stringify({ title: trimmedName }),
                 credentials: "include",
             });
+
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to create list (${response.status})`);
@@ -173,13 +183,15 @@ export const useListsStore = create<ListsState>((set, get) => ({
     },
 
     deleteList: async (id: string) => {
-        set({ isLoading: true, error: null });
+        set({ deletingListId: id, error: null });
         try {
             const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
                 method: "DELETE",
-                headers: getAuthHeaders(),
+                headers: jsonHeaders(),
                 credentials: "include",
             });
+
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to delete list (${response.status})`);
@@ -191,6 +203,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     state.currentList?.id === id ? null : state.currentList,
                 error: null,
                 isLoading: false,
+                deletingListId: null,
             }));
             return true;
         } catch (error) {
@@ -200,6 +213,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                         ? error.message
                         : "Failed to delete list",
                 isLoading: false,
+                deletingListId: null,
             });
             return false;
         }
@@ -215,11 +229,13 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getBaseUrl()}/api/lists/${listId}/items`,
                 {
                     method: "POST",
-                    headers: getAuthHeaders(true),
+                    headers: jsonHeaders(true),
                     body: JSON.stringify(buildItemRequest(item)),
                     credentials: "include",
                 },
             );
+
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to add item (${response.status})`);
@@ -260,13 +276,15 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getBaseUrl()}/api/items/${itemId}`,
                 {
                     method: "PUT",
-                    headers: getAuthHeaders(true),
+                    headers: jsonHeaders(true),
                     body: JSON.stringify(
                         buildItemRequest({ ...item, checked: nextChecked }),
                     ),
                     credentials: "include",
                 },
             );
+
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to update item (${response.status})`);
@@ -305,10 +323,12 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getBaseUrl()}/api/items/${itemId}`,
                 {
                     method: "DELETE",
-                    headers: getAuthHeaders(),
+                    headers: jsonHeaders(),
                     credentials: "include",
                 },
             );
+
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to delete item (${response.status})`);

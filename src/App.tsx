@@ -21,19 +21,6 @@ import { useThemeStore } from "./store/useThemeStore";
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     const authChecked = useStore((state) => state.authChecked);
     const isAuthenticated = useStore((state) => state.isAuthenticated);
-    const setAuth = useStore((state) => state.setAuth);
-
-    useEffect(() => {
-        if (!authChecked) {
-            checkAuthRequest()
-                .then((user) => {
-                    setAuth(user);
-                })
-                .catch(() => {
-                    setAuth(null);
-                });
-        }
-    }, [authChecked, setAuth]);
 
     if (!authChecked) {
         return (
@@ -160,19 +147,24 @@ function App() {
 
             <main className="flex-1 flex flex-col overflow-y-auto min-h-0 relative">
                 {toastMessage && (
-                    <output
+                    <div
+                        role="status"
                         className="fixed bottom-24 left-1/2 -translate-x-1/2 z-500 px-6 py-3 bg-text-strong text-bg rounded-full shadow-2xl text-sm font-bold animate-in fade-in slide-in-from-bottom-4 duration-300"
                         aria-live="polite"
                     >
                         {toastMessage}
-                    </output>
+                    </div>
                 )}
 
                 <Routes>
                     <Route
                         path="/login"
                         element={
-                            isAuthenticated ? (
+                            !authChecked ? (
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted">
+                                    Loading session...
+                                </div>
+                            ) : isAuthenticated ? (
                                 <Navigate to="/dashboard" replace />
                             ) : (
                                 <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
@@ -184,7 +176,11 @@ function App() {
                     <Route
                         path="/register"
                         element={
-                            isAuthenticated ? (
+                            !authChecked ? (
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted">
+                                    Loading session...
+                                </div>
+                            ) : isAuthenticated ? (
                                 <Navigate to="/dashboard" replace />
                             ) : (
                                 <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
@@ -246,7 +242,9 @@ function App() {
                     <Route
                         path="*"
                         element={
-                            isAuthenticated ? (
+                            !authChecked ? (
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted" />
+                            ) : isAuthenticated ? (
                                 <div className="flex-1 flex items-center justify-center text-text-muted">
                                     Page not found
                                 </div>
