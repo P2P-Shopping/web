@@ -48,11 +48,7 @@ const Dashboard = () => {
 
     // Handle AI Import Param
     useEffect(() => {
-        if (searchParams.get("import") === "ai") {
-            setShowAiImport(true);
-            // Clear the param after opening to avoid re-opening on refresh if desired,
-            // or keep it for deep linking.
-        }
+        setShowAiImport(searchParams.get("import") === "ai");
     }, [searchParams]);
 
     // Handle Card Click

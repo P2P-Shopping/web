@@ -7,17 +7,25 @@ const LoginPage = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
         setError("");
+        setIsSubmitting(true);
         try {
             await loginRequest(email, password);
             navigate("/dashboard");
-            // biome-ignore lint/suspicious/noExplicitAny: API error response format
-        } catch (err: any) {
-            setError(err.message ?? "Login failed. Please try again.");
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error
+                    ? err.message
+                    : String(err) || "Login failed. Please try again.";
+            setError(message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -40,12 +48,9 @@ const LoginPage = () => {
             </p>
 
             <div className="flex p-1 bg-bg-muted rounded-lg mb-8">
-                <button
-                    type="button"
-                    className="flex-1 py-2 text-sm font-bold bg-surface text-text-strong rounded-md shadow-sm transition-all"
-                >
+                <div className="flex-1 py-2 text-sm font-bold bg-surface text-text-strong rounded-md shadow-sm text-center">
                     Login
-                </button>
+                </div>
                 <button
                     type="button"
                     className="flex-1 py-2 text-sm font-semibold text-text-muted hover:text-text-strong rounded-md transition-all"
@@ -104,9 +109,10 @@ const LoginPage = () => {
 
                 <button
                     type="submit"
-                    className="w-full py-3.5 bg-accent text-text-on-accent border-none rounded-xl text-base font-bold shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 bg-accent text-text-on-accent border-none rounded-xl text-base font-bold shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Sign In
+                    {isSubmitting ? "Signing In..." : "Sign In"}
                 </button>
             </form>
         </div>

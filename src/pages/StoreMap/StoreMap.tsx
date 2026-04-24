@@ -624,21 +624,21 @@ const useMapEngine = (
     };
 
     const zoomIn = () => {
-        const nextZoom = Math.min(
-            camera.current.zoom * 1.5,
-            MAP_CONFIG.MAX_ZOOM,
-        );
+        const oldZoom = camera.current.zoom;
+        const nextZoom = Math.min(oldZoom * 1.5, MAP_CONFIG.MAX_ZOOM);
+        const zoomRatio = nextZoom / oldZoom;
         camera.current.zoom = nextZoom;
-        recenterCamera();
+        camera.current.x *= zoomRatio;
+        camera.current.y *= zoomRatio;
     };
 
     const zoomOut = () => {
-        const nextZoom = Math.max(
-            camera.current.zoom / 1.5,
-            MAP_CONFIG.MIN_ZOOM,
-        );
+        const oldZoom = camera.current.zoom;
+        const nextZoom = Math.max(oldZoom / 1.5, MAP_CONFIG.MIN_ZOOM);
+        const zoomRatio = nextZoom / oldZoom;
         camera.current.zoom = nextZoom;
-        recenterCamera();
+        camera.current.x *= zoomRatio;
+        camera.current.y *= zoomRatio;
     };
 
     const recenterCamera = () => {
@@ -755,7 +755,7 @@ const StoreMap: React.FC = () => {
                 {/* Responsive Sidebar */}
                 <div
                     aria-hidden={!isSidebarExpanded}
-                    {...(!isSidebarExpanded ? { inert: true } : {})}
+                    inert={!isSidebarExpanded ? true : undefined}
                     className={`
                         absolute z-30 transition-all duration-500 ease-spring
                         /* Desktop: Right-side Drawer */
@@ -776,6 +776,7 @@ const StoreMap: React.FC = () => {
                                 : "max-[1000px]:translate-y-full"
                         }
                         
+                        ${!isSidebarExpanded ? "pointer-events-none" : ""}
                         bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
                     `}
                 >

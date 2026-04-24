@@ -1,5 +1,5 @@
 import { Check, Trash2 } from "lucide-react";
-import type React from "react";
+import React from "react";
 
 interface Item {
     id: string;
@@ -60,25 +60,57 @@ const ShoppingListItems: React.FC<Props> = ({ items, onCheck, onDelete }) => {
                                 {item.name}
                             </span>
                             <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted mt-0.5">
-                                {item.brand && (
-                                    <span className="px-1.5 py-0.5 bg-bg-muted rounded text-[10px] uppercase font-bold tracking-wider">
-                                        {item.brand}
-                                    </span>
-                                )}
-                                {item.quantity && (
-                                    <span>
-                                        {item.brand ? "• " : ""}
-                                        {item.quantity}
-                                    </span>
-                                )}
-                                {item.price != null && (
-                                    <span> • {formatPrice(item.price)}</span>
-                                )}
-                                {item.category && (
-                                    <span className="text-accent/70 font-medium">
-                                        {` #${item.category}`}
-                                    </span>
-                                )}
+                                {(() => {
+                                    const parts: React.ReactNode[] = [];
+                                    if (item.brand) {
+                                        parts.push(
+                                            <span
+                                                key="brand"
+                                                className="px-1.5 py-0.5 bg-bg-muted rounded text-[10px] uppercase font-bold tracking-wider"
+                                            >
+                                                {item.brand}
+                                            </span>,
+                                        );
+                                    }
+                                    if (item.quantity) {
+                                        parts.push(
+                                            <span key="qty">
+                                                {item.quantity}
+                                            </span>,
+                                        );
+                                    }
+                                    if (item.price != null) {
+                                        parts.push(
+                                            <span key="price">
+                                                {formatPrice(item.price)}
+                                            </span>,
+                                        );
+                                    }
+                                    if (item.category) {
+                                        parts.push(
+                                            <span
+                                                key="category"
+                                                className="text-accent/70 font-medium"
+                                            >
+                                                {`#${item.category}`}
+                                            </span>,
+                                        );
+                                    }
+
+                                    return parts.map((part, index) => {
+                                        const partKey =
+                                            (part as React.ReactElement).key ||
+                                            index;
+                                        return (
+                                            <React.Fragment
+                                                key={`meta-${partKey}`}
+                                            >
+                                                {index > 0 && <span> • </span>}
+                                                {part}
+                                            </React.Fragment>
+                                        );
+                                    });
+                                })()}
                             </div>
                         </div>
                     </label>

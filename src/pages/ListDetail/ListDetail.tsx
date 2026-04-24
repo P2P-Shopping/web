@@ -40,6 +40,30 @@ interface ListDetailProps {
     listTitle?: string;
 }
 
+const getUsernameFromToken = (token: string | null): string => {
+    if (!token) return "Anonymous";
+    try {
+        const base64Url = token.split(".")[1];
+        if (!base64Url) return "Anonymous";
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+            window
+                .atob(base64)
+                .split("")
+                .map(
+                    (c) =>
+                        `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`,
+                )
+                .join(""),
+        );
+        const payload = JSON.parse(jsonPayload);
+        return payload.sub || payload.name || "Anonymous";
+    } catch (e) {
+        console.error("Failed to decode JWT token:", e);
+        return "Anonymous";
+    }
+};
+
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
@@ -154,24 +178,11 @@ const ListDetail = ({
 
     // WebSocket Presence Logic
     useEffect(() => {
-        if (
-            !effectiveListId ||
-            effectiveListId === "default" ||
-            !stompClient.connected
-        ) {
+        if (!effectiveListId || effectiveListId === "default") {
             return;
         }
 
-        const token = localStorage.getItem("token");
-        let username = "Anonymous";
-        try {
-            if (token) {
-                const payload = JSON.parse(atob(token.split(".")[1]));
-                username = payload.sub || payload.name || "Anonymous";
-            }
-        } catch (e) {
-            console.error("Failed to decode token for presence", e);
-        }
+        const username = getUsernameFromToken(localStorage.getItem("token"));
 
         const subscription = stompClient.subscribe(
             `/topic/presence/${effectiveListId}`,
@@ -182,18 +193,19 @@ const ListDetail = ({
         );
 
         // Join
-        const joinEvent = {
-            eventType: "JOIN" as const,
-            username,
-            listId: effectiveListId,
-        };
-        stompClient.publish({
-            destination: `/app/presence/${effectiveListId}`,
-            body: JSON.stringify(joinEvent),
-        });
-
-        // Optimistically add self to active users
-        handlePresenceEvent(joinEvent);
+        if (stompClient.connected) {
+            const joinEvent = {
+                eventType: "JOIN" as const,
+                username,
+                listId: effectiveListId,
+            };
+            stompClient.publish({
+                destination: `/app/presence/${effectiveListId}`,
+                body: JSON.stringify(joinEvent),
+            });
+            // Optimistically add self to active users
+            handlePresenceEvent(joinEvent);
+        }
 
         return () => {
             // Leave
@@ -225,14 +237,9 @@ const ListDetail = ({
 
         const now = Date.now();
         if (now - lastTypingSentRef.current > 1500) {
-            const token = localStorage.getItem("token");
-            let username = "Anonymous";
-            try {
-                if (token) {
-                    const payload = JSON.parse(atob(token.split(".")[1]));
-                    username = payload.sub || payload.name || "Anonymous";
-                }
-            } catch {}
+            const username = getUsernameFromToken(
+                localStorage.getItem("token"),
+            );
 
             const typingEvent = {
                 eventType: "TYPING" as const,
@@ -316,11 +323,8 @@ const ListDetail = ({
             })
             .catch(() => {
                 setError("Failed to add the product.");
-                const rolledBack = optimisticItems.filter(
-                    (i) => i.id !== newItem.id,
-                );
-                setItems(rolledBack);
-                syncListItemsInStore(rolledBack);
+                setItems((prev) => prev.filter((i) => i.id !== newItem.id));
+                syncListItemsInStore(items.filter((i) => i.id !== newItem.id));
             });
     };
 
@@ -384,13 +388,13 @@ const ListDetail = ({
             })
             .catch(() => {
                 setError("Failed to update the product.");
-                const rolledBack = items.map((item) =>
-                    item.id === itemId
-                        ? { ...item, checked: currentItem.checked }
-                        : item,
+                setItems((prev) =>
+                    prev.map((item) =>
+                        item.id === itemId
+                            ? { ...item, checked: currentItem.checked }
+                            : item,
+                    ),
                 );
-                setItems(rolledBack);
-                syncListItemsInStore(rolledBack);
             });
     };
 
@@ -409,8 +413,13 @@ const ListDetail = ({
             })
             .catch(() => {
                 setError("Failed to delete the product.");
-                setItems(previousItems);
-                syncListItemsInStore(previousItems);
+                setItems((prev) => {
+                    if (prev.find((i) => i.id === itemId)) return prev;
+                    const itemToRestore = previousItems.find(
+                        (i) => i.id === itemId,
+                    );
+                    return itemToRestore ? [...prev, itemToRestore] : prev;
+                });
             });
     };
 

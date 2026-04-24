@@ -22,16 +22,15 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
         if (!trimmedName) return;
 
         setIsSubmitting(true);
-        let success = false;
         try {
-            success = await addList(trimmedName);
+            const newList = await addList(trimmedName);
+            if (newList) {
+                onClose();
+            }
         } catch (error) {
             console.error("Failed to create list:", error);
         } finally {
             setIsSubmitting(false);
-            if (success) {
-                onClose();
-            }
         }
     };
 

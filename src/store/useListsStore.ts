@@ -25,7 +25,7 @@ interface ListsState {
     error: string | null;
     isModalOpen: boolean;
     fetchLists: () => Promise<void>;
-    addList: (name: string) => Promise<boolean>;
+    addList: (name: string) => Promise<ShoppingList | null>;
     updateList: (id: string, updates: Partial<ShoppingList>) => void;
     deleteList: (id: string) => Promise<boolean>;
     setCurrentList: (list: ShoppingList | null) => void;
@@ -145,7 +145,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 isLoading: false,
                 isModalOpen: false,
             }));
-            return true;
+            return createdList;
         } catch (error) {
             set({
                 error:
@@ -154,7 +154,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                         : "Failed to create list",
                 isLoading: false,
             });
-            return false;
+            return null;
         }
     },
 

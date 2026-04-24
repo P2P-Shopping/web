@@ -19,50 +19,40 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
         setIsProcessing(true);
         try {
-            // 1. Create a new list for the import
             const timestamp = new Date().toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
             });
             const listName = `AI Import - ${timestamp}`;
-            const success = await addList(listName);
+            const newList = await addList(listName);
 
-            if (success) {
-                // Get the newly created list (it should be the first one in the store now)
-                // We might need to fetch lists first or wait for the store update
-                // But addList in useListsStore already updates the local state.
-
-                // For now, let's assume the first list is our new list
-                // Realistically, we should get the ID from the addList return value or similar.
-                // In useListsStore, addList returns boolean, but updates the 'lists' array.
-
-                // Let's split by lines and add each as an item
-                const items = text
-                    .split("\n")
-                    .map((line) => line.trim())
-                    .filter((line) => line.length > 0);
-
-                // Wait a bit for the store to update if needed, but Zustand is synchronous
-                // However, we need the ID. Let's find the list by name if needed,
-                // but addList doesn't return the ID.
-                // Let's improve useListsStore later if needed, but for now:
-
-                // Re-fetch lists to ensure we have the new one with its real ID
-                await useListsStore.getState().fetchLists();
-                const newList = useListsStore.getState().lists[0]; // Usually the newest one is first
-
-                if (newList) {
-                    for (const itemName of items) {
-                        await addItem(newList.id, {
-                            name: itemName,
-                            checked: false,
-                        });
-                    }
-                }
+            if (!newList) {
+                throw new Error("Failed to create list for import");
             }
+
+            const items = text
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0);
+
+            const results = await Promise.all(
+                items.map((itemName) =>
+                    addItem(newList.id, {
+                        name: itemName,
+                        checked: false,
+                    }),
+                ),
+            );
+
+            const failures = results.filter((success) => !success).length;
+            if (failures > 0) {
+                console.warn(`${failures} items failed to import.`);
+            }
+
             onClose();
         } catch (error) {
             console.error("AI Import failed:", error);
+            // Optionally set a local error state here if the Modal supported it
         } finally {
             setIsProcessing(false);
         }
