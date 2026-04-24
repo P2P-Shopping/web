@@ -182,14 +182,18 @@ const ListDetail = ({
         );
 
         // Join
+        const joinEvent = {
+            eventType: "JOIN" as const,
+            username,
+            listId: effectiveListId,
+        };
         stompClient.publish({
             destination: `/app/presence/${effectiveListId}`,
-            body: JSON.stringify({
-                eventType: "JOIN",
-                username,
-                listId: effectiveListId,
-            }),
+            body: JSON.stringify(joinEvent),
         });
+
+        // Optimistically add self to active users
+        handlePresenceEvent(joinEvent);
 
         return () => {
             // Leave
@@ -209,14 +213,9 @@ const ListDetail = ({
     }, [effectiveListId, handlePresenceEvent, clearPresence]);
 
     // Typing Logic
-    const _typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-        null,
-    );
     const lastTypingSentRef = useRef<number>(0);
 
-    const handleNewItemNameChange = (name: string) => {
-        setNewItemName(name);
-
+    const sendTypingEvent = useCallback(() => {
         if (
             !effectiveListId ||
             effectiveListId === "default" ||
@@ -235,16 +234,23 @@ const ListDetail = ({
                 }
             } catch {}
 
+            const typingEvent = {
+                eventType: "TYPING" as const,
+                username,
+                listId: effectiveListId,
+            };
             stompClient.publish({
                 destination: `/app/presence/${effectiveListId}`,
-                body: JSON.stringify({
-                    eventType: "TYPING",
-                    username,
-                    listId: effectiveListId,
-                }),
+                body: JSON.stringify(typingEvent),
             });
+            handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }
+    }, [effectiveListId, handlePresenceEvent]);
+
+    const handleNewItemNameChange = (name: string) => {
+        setNewItemName(name);
+        sendTypingEvent();
     };
 
     const _openDetailsModal = () => {
@@ -615,7 +621,10 @@ const ListDetail = ({
                             id="mobile-item-name"
                             type="text"
                             value={detailName}
-                            onChange={(e) => setDetailName(e.target.value)}
+                            onChange={(e) => {
+                                setDetailName(e.target.value);
+                                sendTypingEvent();
+                            }}
                             placeholder="e.g. Milk"
                             required
                             className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
@@ -747,7 +756,10 @@ const ListDetail = ({
                             id="ld-item-name"
                             type="text"
                             value={detailName}
-                            onChange={(e) => setDetailName(e.target.value)}
+                            onChange={(e) => {
+                                setDetailName(e.target.value);
+                                sendTypingEvent();
+                            }}
                             placeholder="e.g., Milk"
                             required
                             className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"

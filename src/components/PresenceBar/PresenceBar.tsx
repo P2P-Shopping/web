@@ -38,22 +38,45 @@ const PresenceBar: React.FC<PresenceBarProps> = ({ variant = "avatars" }) => {
         if (usersArray.length === 0) return null;
 
         return (
-            <div className="flex items-center gap-2 animate-in fade-in duration-300">
-                <div className="flex -space-x-2">
-                    {usersArray.map((username) => (
-                        <div
-                            key={username}
-                            className="w-8 h-8 rounded-full border-2 border-surface flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-1 ring-border/50"
-                            style={{ backgroundColor: stringToColor(username) }}
-                            title={username}
-                        >
-                            {username.charAt(0).toUpperCase()}
-                        </div>
-                    ))}
+            <div className="flex items-center gap-4 animate-in fade-in duration-300">
+                <div className="flex -space-x-3">
+                    {usersArray.map((username) => {
+                        const isTyping = !!typingUsers[username];
+                        return (
+                            <div key={username} className="relative group">
+                                <div
+                                    className={`w-10 h-10 rounded-full border-2 border-surface flex items-center justify-center text-sm font-bold text-white shadow-md ring-1 ring-border/50 transition-all ${
+                                        isTyping
+                                            ? "ring-accent ring-offset-2 scale-110 z-10"
+                                            : "hover:scale-105 hover:z-10"
+                                    }`}
+                                    style={{
+                                        backgroundColor:
+                                            stringToColor(username),
+                                    }}
+                                    title={
+                                        isTyping
+                                            ? `${username} is typing...`
+                                            : username
+                                    }
+                                >
+                                    {username.charAt(0).toUpperCase()}
+                                </div>
+                                {isTyping && (
+                                    <div className="absolute -bottom-1 -right-1 flex gap-0.5 px-1.5 py-1 bg-accent text-white rounded-full text-[8px] shadow-lg animate-bounce border border-surface">
+                                        <span className="w-1 h-1 bg-white rounded-full animate-pulse" />
+                                        <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.2s]" />
+                                        <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.4s]" />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
-                <span className="text-[10px] font-bold text-text-muted uppercase tracking-tighter">
+                <div className="w-px h-6 bg-border/60" aria-hidden="true" />
+                <span className="text-[11px] font-extrabold text-text-muted uppercase tracking-wider bg-bg-muted px-2 py-1 rounded-md">
                     {usersArray.length}{" "}
-                    {usersArray.length === 1 ? "online" : "online"}
+                    {usersArray.length === 1 ? "User" : "Users"}
                 </span>
             </div>
         );
