@@ -55,6 +55,27 @@ function GuestRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     return children;
 }
 
+function NotFound() {
+    const authChecked = useStore((state) => state.authChecked);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
+
+    if (!authChecked) {
+        return (
+            <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted" />
+        );
+    }
+
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return (
+        <div className="flex-1 flex items-center justify-center text-text-muted">
+            Page not found
+        </div>
+    );
+}
+
 function App() {
     useNetworkState();
     const location = useLocation();
@@ -245,22 +266,7 @@ function App() {
                             )
                         }
                     />
-                    <Route
-                        path="*"
-                        element={
-                            authChecked ? (
-                                isAuthenticated ? (
-                                    <div className="flex-1 flex items-center justify-center text-text-muted">
-                                        Page not found
-                                    </div>
-                                ) : (
-                                    <Navigate to="/login" replace />
-                                )
-                            ) : (
-                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted" />
-                            )
-                        }
-                    />
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
             </main>
             {showNavbar && <Navbar />}
