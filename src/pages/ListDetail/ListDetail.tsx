@@ -77,7 +77,6 @@ const ListDetail = ({
 
     const [items, setItems] = useState<Item[]>([]);
     const [newItemName, setNewItemName] = useState("");
-    const [_isAiLoading, _setIsAiLoading] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
