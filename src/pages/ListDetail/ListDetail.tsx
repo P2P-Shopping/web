@@ -41,34 +41,11 @@ interface ListDetailProps {
     listTitle?: string;
 }
 
-// getUsernameFromToken is no longer needed as we use the user state from the store
-
-const ListDetail = ({
-    isEmbedded = false,
-    listIdOverride,
-    listTitle: _listTitle,
-}: ListDetailProps) => {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const effectiveListId = listIdOverride ?? id;
+const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
-    const { handlePresenceEvent, clearPresence } = usePresenceStore();
-    const user = useStore((state) => state.user);
-    const isServerConnected = useStore((state) => state.isServerConnected);
-
     const [items, setItems] = useState<Item[]>([]);
-    const [newItemName, setNewItemName] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
-    const [detailName, setDetailName] = useState("");
-    const [detailQuantity, setDetailQuantity] = useState("");
-    const [detailBrand, setDetailBrand] = useState("");
-    const [detailPrice, setDetailPrice] = useState("");
-
-    const addInputRef = useRef<HTMLInputElement | null>(null);
-    const prevShowDetailsModalRef = useRef(showDetailsModal);
 
     const getBaseUrl = useCallback(
         () => import.meta.env.VITE_API_URL || "http://localhost:8081",
@@ -148,124 +125,6 @@ const ListDetail = ({
         fetchListData();
     }, [fetchListData]);
 
-    // Sync detail name when modal opens
-    // biome-ignore lint/correctness/useExhaustiveDependencies: Only sync on open transition
-    useEffect(() => {
-        if (showDetailsModal && !prevShowDetailsModalRef.current) {
-            setDetailName(newItemName);
-        }
-        prevShowDetailsModalRef.current = showDetailsModal;
-    }, [showDetailsModal]); // Removed newItemName from deps to prevent clobbering
-
-    // Reset local modal states when list changes
-    // biome-ignore lint/correctness/useExhaustiveDependencies: Reset on ID change
-    useEffect(() => {
-        setShowDetailsModal(false);
-        setShowMobileAddModal(false);
-        setShowExpandedDetails(false);
-    }, [effectiveListId]);
-
-    // WebSocket Presence Logic
-    useEffect(() => {
-        if (
-            !effectiveListId ||
-            effectiveListId === "default" ||
-            !isServerConnected
-        ) {
-            return;
-        }
-
-        const username = user?.firstName || user?.userId || "Anonymous";
-
-        const subscription = stompClient.subscribe(
-            `/topic/presence/${effectiveListId}`,
-            (message) => {
-                const event = JSON.parse(message.body);
-                handlePresenceEvent(event);
-            },
-        );
-
-        // Join
-        if (stompClient.connected) {
-            const joinEvent = {
-                eventType: "JOIN" as const,
-                username,
-                listId: effectiveListId,
-            };
-            stompClient.publish({
-                destination: `/app/presence/${effectiveListId}`,
-                body: JSON.stringify(joinEvent),
-            });
-            // Optimistically add self to active users
-            handlePresenceEvent(joinEvent);
-        }
-
-        return () => {
-            // Leave
-            if (stompClient.connected) {
-                stompClient.publish({
-                    destination: `/app/presence/${effectiveListId}`,
-                    body: JSON.stringify({
-                        eventType: "LEAVE",
-                        username,
-                        listId: effectiveListId,
-                    }),
-                });
-            }
-            subscription?.unsubscribe();
-            clearPresence();
-        };
-    }, [
-        effectiveListId,
-        handlePresenceEvent,
-        clearPresence,
-        user?.firstName,
-        user?.userId,
-        isServerConnected,
-    ]);
-
-    // Typing Logic
-    const lastTypingSentRef = useRef<number>(0);
-
-    const sendTypingEvent = useCallback(() => {
-        if (
-            !effectiveListId ||
-            effectiveListId === "default" ||
-            !stompClient.connected
-        )
-            return;
-
-        const now = Date.now();
-        if (now - lastTypingSentRef.current > 1500) {
-            const username = user?.firstName || user?.userId || "Anonymous";
-
-            const typingEvent = {
-                eventType: "TYPING" as const,
-                username,
-                listId: effectiveListId,
-            };
-            stompClient.publish({
-                destination: `/app/presence/${effectiveListId}`,
-                body: JSON.stringify(typingEvent),
-            });
-            handlePresenceEvent(typingEvent);
-            lastTypingSentRef.current = now;
-        }
-    }, [effectiveListId, handlePresenceEvent, user?.firstName, user?.userId]);
-
-    const handleNewItemNameChange = (name: string) => {
-        setNewItemName(name);
-        sendTypingEvent();
-    };
-
-    const openDetailsModal = () => {
-        setDetailName(newItemName);
-        setDetailQuantity("");
-        setDetailBrand("");
-        setDetailPrice("");
-        setShowDetailsModal(true);
-    };
-
     const rollbackItem = useCallback(
         (itemId: string) => {
             setItems((prev) => {
@@ -292,9 +151,7 @@ const ListDetail = ({
         [syncListItemsInStore],
     );
 
-    const closeDetailsModal = () => setShowDetailsModal(false);
-
-    const commitItem = async (
+    const addItem = async (
         name: string,
         quantity?: string,
         brand?: string,
@@ -302,6 +159,7 @@ const ListDetail = ({
     ) => {
         if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
+
         const newItem: Item = {
             id: crypto.randomUUID(),
             name: name.trim(),
@@ -310,10 +168,10 @@ const ListDetail = ({
             quantity: quantity || undefined,
             price: price ?? undefined,
         };
+
         const optimisticItems = [...items, newItem];
         setItems(optimisticItems);
         syncListItemsInStore(optimisticItems);
-        setNewItemName("");
 
         try {
             const res = await fetch(
@@ -357,7 +215,6 @@ const ListDetail = ({
 
             await fetchListData(effectiveListId);
 
-            // Publish after confirmation with server data
             if (stompClient.connected) {
                 stompClient.publish({
                     destination: "/app/sync",
@@ -374,30 +231,11 @@ const ListDetail = ({
         }
     };
 
-    const handleInlineAdd = (e: React.FormEvent) => {
-        e.preventDefault();
-        commitItem(newItemName);
-    };
-
-    const handleDetailsSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const price = detailPrice ? Number.parseFloat(detailPrice) : undefined;
-        commitItem(detailName, detailQuantity, detailBrand, price);
-        setShowDetailsModal(false);
-        setShowMobileAddModal(false);
-        setShowExpandedDetails(false);
-
-        // Reset detail fields
-        setDetailName("");
-        setDetailQuantity("");
-        setDetailBrand("");
-        setDetailPrice("");
-    };
-
-    const handleCheck = async (itemId: string) => {
+    const toggleItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const currentItem = items.find((item) => item.id === itemId);
         if (!currentItem) return;
+
         const newChecked = !currentItem.checked;
         const nextItems = items.map((item) =>
             item.id === itemId ? { ...item, checked: newChecked } : item,
@@ -446,10 +284,9 @@ const ListDetail = ({
         }
     };
 
-    const handleDelete = async (itemId: string) => {
+    const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
-        const previousItems = items;
-        const nextItems = previousItems.filter((item) => item.id !== itemId);
+        const nextItems = items.filter((item) => item.id !== itemId);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
 
@@ -473,27 +310,201 @@ const ListDetail = ({
         }
     };
 
+    return {
+        items,
+        isLoading,
+        error,
+        addItem,
+        toggleItem,
+        deleteItem,
+        setError,
+    };
+};
+
+const useListPresence = (effectiveListId: string | undefined) => {
+    const { handlePresenceEvent, clearPresence } = usePresenceStore();
+    const user = useStore((state) => state.user);
+    const isServerConnected = useStore((state) => state.isServerConnected);
+    const lastTypingSentRef = useRef<number>(0);
+
+    useEffect(() => {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !isServerConnected
+        ) {
+            return;
+        }
+
+        const username = user?.firstName || user?.userId || "Anonymous";
+
+        const subscription = stompClient.subscribe(
+            `/topic/presence/${effectiveListId}`,
+            (message) => {
+                const event = JSON.parse(message.body);
+                handlePresenceEvent(event);
+            },
+        );
+
+        if (stompClient.connected) {
+            const joinEvent = {
+                eventType: "JOIN" as const,
+                username,
+                listId: effectiveListId,
+            };
+            stompClient.publish({
+                destination: `/app/presence/${effectiveListId}`,
+                body: JSON.stringify(joinEvent),
+            });
+            handlePresenceEvent(joinEvent);
+        }
+
+        return () => {
+            if (stompClient.connected) {
+                stompClient.publish({
+                    destination: `/app/presence/${effectiveListId}`,
+                    body: JSON.stringify({
+                        eventType: "LEAVE",
+                        username,
+                        listId: effectiveListId,
+                    }),
+                });
+            }
+            subscription?.unsubscribe();
+            clearPresence();
+        };
+    }, [
+        effectiveListId,
+        handlePresenceEvent,
+        clearPresence,
+        user?.firstName,
+        user?.userId,
+        isServerConnected,
+    ]);
+
+    const sendTypingEvent = useCallback(() => {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !stompClient.connected
+        )
+            return;
+
+        const now = Date.now();
+        if (now - lastTypingSentRef.current > 1500) {
+            const username = user?.firstName || user?.userId || "Anonymous";
+
+            const typingEvent = {
+                eventType: "TYPING" as const,
+                username,
+                listId: effectiveListId,
+            };
+            stompClient.publish({
+                destination: `/app/presence/${effectiveListId}`,
+                body: JSON.stringify(typingEvent),
+            });
+            handlePresenceEvent(typingEvent);
+            lastTypingSentRef.current = now;
+        }
+    }, [effectiveListId, handlePresenceEvent, user?.firstName, user?.userId]);
+
+    return { sendTypingEvent };
+};
+
+const ListDetail = ({
+    isEmbedded = false,
+    listIdOverride,
+}: ListDetailProps) => {
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const effectiveListId = listIdOverride ?? id;
+
+    // Logic hooks
+    const { items, isLoading, error, addItem, toggleItem, deleteItem } =
+        useListItems(effectiveListId);
+
+    const { sendTypingEvent } = useListPresence(effectiveListId);
+
+    // Local UI State
+    const [newItemName, setNewItemName] = useState("");
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
 
-    const closeMobileAddModal = () => {
-        setShowMobileAddModal(false);
-        setShowExpandedDetails(false);
-        setNewItemName("");
-    };
+    // Detail form state
+    const [detailName, setDetailName] = useState("");
+    const [detailQuantity, setDetailQuantity] = useState("");
+    const [detailBrand, setDetailBrand] = useState("");
+    const [detailPrice, setDetailPrice] = useState("");
+
+    const addInputRef = useRef<HTMLInputElement | null>(null);
+    const prevShowDetailsModalRef = useRef(showDetailsModal);
 
     const { lists, fetchLists } = useListsStore();
 
-    // Fetch lists if embedded to allow selection
     useEffect(() => {
         if (isEmbedded && lists.length === 0) {
             fetchLists();
         }
     }, [isEmbedded, lists.length, fetchLists]);
 
+    // Sync detail name when modal opens
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Only sync on open transition
+    useEffect(() => {
+        if (showDetailsModal && !prevShowDetailsModalRef.current) {
+            setDetailName(newItemName);
+        }
+        prevShowDetailsModalRef.current = showDetailsModal;
+    }, [showDetailsModal]);
+
+    // Reset local modal states when list changes
+    // biome-ignore lint/correctness/useExhaustiveDependencies: reset on change
+    useEffect(() => {
+        setShowDetailsModal(false);
+        setShowMobileAddModal(false);
+        setShowExpandedDetails(false);
+    }, [effectiveListId]);
+
+    const handleNewItemNameChange = (name: string) => {
+        setNewItemName(name);
+        sendTypingEvent();
+    };
+
+    const handleInlineAdd = (e: React.FormEvent) => {
+        e.preventDefault();
+        addItem(newItemName);
+        setNewItemName("");
+    };
+
+    const openDetailsModal = () => {
+        setDetailName(newItemName);
+        setDetailQuantity("");
+        setDetailBrand("");
+        setDetailPrice("");
+        setShowDetailsModal(true);
+    };
+
+    const handleDetailsSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const price = detailPrice ? Number.parseFloat(detailPrice) : undefined;
+        addItem(detailName, detailQuantity, detailBrand, price);
+
+        setShowDetailsModal(false);
+        setShowMobileAddModal(false);
+        setShowExpandedDetails(false);
+
+        setDetailName("");
+        setDetailQuantity("");
+        setDetailBrand("");
+        setDetailPrice("");
+        setNewItemName("");
+    };
+
     const handleListSelect = (listId: string) => {
         navigate(`/nav/${listId}`);
     };
+
+    const isReadOnly = error === "Failed to sync the list.";
 
     return (
         <div
@@ -580,7 +591,6 @@ const ListDetail = ({
                     </div>
                 ) : (
                     <>
-                        {/* ── Inline add bar (Desktop & Embedded) ── */}
                         <div className="flex flex-col gap-1.5">
                             <form
                                 onSubmit={handleInlineAdd}
@@ -594,50 +604,37 @@ const ListDetail = ({
                                         handleNewItemNameChange(e.target.value)
                                     }
                                     placeholder={
-                                        error === "Failed to sync the list."
+                                        isReadOnly
                                             ? "List is read-only (sync failed)"
                                             : "Add item..."
                                     }
-                                    disabled={
-                                        error === "Failed to sync the list."
-                                    }
-                                    className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${error === "Failed to sync the list." ? "cursor-not-allowed opacity-50" : ""}`}
+                                    disabled={isReadOnly}
+                                    className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
                                 />
                                 <button
                                     type="button"
                                     className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
-                                    disabled={
-                                        error === "Failed to sync the list."
-                                    }
+                                    disabled={isReadOnly}
                                     onClick={openDetailsModal}
-                                    title={
-                                        error === "Failed to sync the list."
-                                            ? "Sync failed"
-                                            : "Add item details"
-                                    }
                                     aria-label="Add item details"
                                 >
                                     <Settings size={18} />
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={
-                                        error === "Failed to sync the list."
-                                    }
-                                    className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 ${error === "Failed to sync the list." ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}`}
+                                    disabled={isReadOnly}
+                                    className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 ${isReadOnly ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}`}
                                     aria-label="Add"
                                 >
                                     <Plus size={18} strokeWidth={3} />
                                 </button>
                             </form>
 
-                            {/* ── Typing Indicator (Discord-style) ── */}
                             <div className="min-h-[20px] px-2 flex items-center">
                                 <PresenceBar variant="typing" />
                             </div>
                         </div>
 
-                        {/* ── Items list ── */}
                         <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
                             {isLoading ? (
                                 <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
@@ -648,11 +645,9 @@ const ListDetail = ({
                                 <div className="divide-y divide-border/50 h-full overflow-y-auto p-4">
                                     <ShoppingListItems
                                         items={items}
-                                        onCheck={handleCheck}
-                                        onDelete={handleDelete}
-                                        disabled={
-                                            error === "Failed to sync the list."
-                                        }
+                                        onCheck={toggleItem}
+                                        onDelete={deleteItem}
+                                        disabled={isReadOnly}
                                     />
                                 </div>
                             )}
@@ -661,8 +656,7 @@ const ListDetail = ({
                 )}
             </div>
 
-            {/* Mobile FAB */}
-            {error !== "Failed to sync the list." && (
+            {!isReadOnly && (
                 <button
                     type="button"
                     className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
@@ -673,10 +667,13 @@ const ListDetail = ({
                 </button>
             )}
 
-            {/* ── Mobile Add Item Modal ── */}
             <Modal
                 isOpen={showMobileAddModal}
-                onClose={closeMobileAddModal}
+                onClose={() => {
+                    setShowMobileAddModal(false);
+                    setShowExpandedDetails(false);
+                    setNewItemName("");
+                }}
                 title="Add Item"
                 initialFocusSelector="#mobile-item-name"
                 footer={
@@ -684,7 +681,11 @@ const ListDetail = ({
                         <button
                             type="button"
                             className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
-                            onClick={closeMobileAddModal}
+                            onClick={() => {
+                                setShowMobileAddModal(false);
+                                setShowExpandedDetails(false);
+                                setNewItemName("");
+                            }}
                         >
                             Cancel
                         </button>
@@ -807,10 +808,9 @@ const ListDetail = ({
                 </form>
             </Modal>
 
-            {/* ── Add Item Details modal ── */}
             <Modal
                 isOpen={showDetailsModal}
-                onClose={closeDetailsModal}
+                onClose={() => setShowDetailsModal(false)}
                 title="Add Item Details"
                 subtitle="Add optional details like quantity, brand, and price"
                 initialFocusSelector="#ld-item-name"
@@ -819,7 +819,7 @@ const ListDetail = ({
                         <button
                             type="button"
                             className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
-                            onClick={closeDetailsModal}
+                            onClick={() => setShowDetailsModal(false)}
                         >
                             Cancel
                         </button>
