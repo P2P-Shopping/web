@@ -8,13 +8,14 @@ interface ListCardProps {
 
 export default function ListCard({ list, onClick }: ListCardProps) {
     const totalItems = list.items?.length || 0;
-    const checkedItems = list.items?.filter(item => item.checked).length || 0;
-    const progress = totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
+    const checkedItems = list.items?.filter((item) => item.checked).length || 0;
+    const progress =
+        totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
 
     const formattedDate = new Date(list.createdAt).toLocaleDateString("ro-RO", {
         day: "numeric",
         month: "short",
-        year: "numeric"
+        year: "numeric",
     });
 
     return (
@@ -38,19 +39,21 @@ export default function ListCard({ list, onClick }: ListCardProps) {
                         </div>
                     </div>
                 </div>
-                <ChevronRight 
-                    size={20} 
-                    className="text-text-muted group-hover:text-accent group-hover:translate-x-1 transition-all duration-300" 
+                <ChevronRight
+                    size={20}
+                    className="text-text-muted group-hover:text-accent group-hover:translate-x-1 transition-all duration-300"
                 />
             </div>
 
             <div className="mt-4">
                 <div className="flex justify-between text-[11px] font-semibold text-text-muted mb-1.5 uppercase tracking-wider">
                     <span>Progres</span>
-                    <span>{checkedItems} / {totalItems}</span>
+                    <span>
+                        {checkedItems} / {totalItems}
+                    </span>
                 </div>
                 <div className="w-full bg-bg-muted rounded-full h-1.5 overflow-hidden">
-                    <div 
+                    <div
                         className="bg-accent h-full rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${progress}%` }}
                     />
