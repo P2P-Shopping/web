@@ -30,6 +30,14 @@ interface AppState {
     conflictItems: Record<string, boolean>;
     /** Tracks whether the application is currently online (has network connectivity) */
     isOnline: boolean;
+    /** Tracks whether the application is connected to the backend server */
+    isServerConnected: boolean;
+    /** Current authenticated user info */
+    user: { email: string; firstName?: string; userId?: string } | null;
+    /** Whether the user is authenticated */
+    isAuthenticated: boolean;
+    /** Whether the initial auth check has been completed */
+    authChecked: boolean;
     /** Updates user location */
     setUserLocation: (loc: Coordinate) => void;
     /** Sets the map route */
@@ -38,6 +46,8 @@ interface AppState {
     setStatus: (status: string) => void;
     /** Sets the online status of the application */
     setOnlineStatus: (status: boolean) => void;
+    /** Sets the server connection status */
+    setServerConnected: (status: boolean) => void;
     /** Sets the full list of items */
     setItems: (items: Item[]) => void;
     /** Creates a backup of the item before an optimistic update */
@@ -48,6 +58,8 @@ interface AppState {
     rollbackItemState: (itemId: string) => void;
     /** Flags an item as experiencing a sync conflict */
     setItemConflict: (itemId: string, hasConflict: boolean) => void;
+    /** Updates authentication state */
+    setAuth: (user: unknown) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -58,10 +70,15 @@ export const useStore = create<AppState>((set, get) => ({
     backupItems: {},
     conflictItems: {},
     isOnline: navigator.onLine,
+    isServerConnected: false,
+    user: null,
+    isAuthenticated: false,
+    authChecked: false,
     setUserLocation: (loc) => set({ userLocation: loc }),
     setRoute: (route) => set({ route }),
     setStatus: (status) => set({ status }),
     setOnlineStatus: (status) => set({ isOnline: status }),
+    setServerConnected: (status) => set({ isServerConnected: status }),
     setItems: (items) => set({ items }),
     backupItemState: (item) =>
         set((state) => ({
@@ -70,7 +87,7 @@ export const useStore = create<AppState>((set, get) => ({
     toggleItemOptimistic: (itemId, newChecked) =>
         set((state) => ({
             items: state.items.map((i) =>
-                i.id === itemId ? { ...i, checked: newChecked } : i
+                i.id === itemId ? { ...i, checked: newChecked } : i,
             ),
         })),
     rollbackItemState: (itemId) => {
@@ -80,7 +97,9 @@ export const useStore = create<AppState>((set, get) => ({
                 const newBackupItems = { ...state.backupItems };
                 delete newBackupItems[itemId];
                 return {
-                    items: state.items.map((i) => (i.id === itemId ? { ...backup } : i)),
+                    items: state.items.map((i) =>
+                        i.id === itemId ? { ...backup } : i,
+                    ),
                     backupItems: newBackupItems,
                 };
             });
@@ -90,4 +109,18 @@ export const useStore = create<AppState>((set, get) => ({
         set((state) => ({
             conflictItems: { ...state.conflictItems, [itemId]: hasConflict },
         })),
+    setAuth: (user) => {
+        const isUser = (u: unknown): u is { email: string } =>
+            typeof u === "object" && u !== null && "email" in u;
+
+        const authenticatedUser = isUser(user)
+            ? (user as AppState["user"])
+            : null;
+
+        set({
+            user: authenticatedUser,
+            isAuthenticated: isUser(user),
+            authChecked: true,
+        });
+    },
 }));

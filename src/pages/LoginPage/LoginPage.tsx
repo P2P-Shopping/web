@@ -1,74 +1,122 @@
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useStore } from "../../context/useStore";
 import { loginRequest } from "../../services/authService";
-
-import "./LoginPage.css";
 
 const LoginPage = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
+    const setAuth = useStore((state) => state.setAuth);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setError("");
+        setIsSubmitting(true);
         try {
-            await loginRequest(email, password);
+            const result = await loginRequest(email, password);
+            setAuth(result);
             navigate("/dashboard");
-        } catch (err: any) {
-            alert(err.message);
+        } catch (err: unknown) {
+            let message = "Login failed. Please try again.";
+            if (err instanceof Error) {
+                message = err.message;
+            } else if (typeof err === "string" && err.trim().length > 0) {
+                message = err;
+            }
+            setError(message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="auth-container">
-            <div className="auth-card">
-                <h2>Welcome to P2P Shopping</h2>
-                <p className="auth-subtitle">
-                    Login or create an account to manage your shopping lists
-                </p>
+        <div className="flex flex-col w-full max-w-[400px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
+            <div className="flex items-center justify-center gap-3 mb-8">
+                <span className="text-2xl font-black text-text-strong tracking-tighter">
+                    P2P Shopping
+                </span>
+            </div>
 
-                <div className="auth-tabs">
-                    <button type="button" className="tab-btn active">
-                        Login
-                    </button>
-                    <button
-                        type="button"
-                        className="tab-btn"
-                        onClick={() => navigate("/register")}
+            <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
+                Welcome back
+            </h1>
+            <p className="text-[15px] text-text-muted mb-8">
+                Sign in to manage your shopping lists
+            </p>
+
+            <div className="flex p-1 bg-bg-muted rounded-lg mb-8">
+                <div className="flex-1 py-2 text-sm font-bold bg-surface text-text-strong rounded-md shadow-sm text-center">
+                    Login
+                </div>
+                <button
+                    type="button"
+                    className="flex-1 py-2 text-sm font-semibold text-text-muted hover:text-text-strong rounded-md transition-all"
+                    onClick={() => navigate("/register")}
+                >
+                    Register
+                </button>
+            </div>
+
+            <form onSubmit={handleLogin} className="flex flex-col gap-5">
+                <div className="flex flex-col gap-2">
+                    <label
+                        htmlFor="email"
+                        className="text-[13px] font-bold text-text-strong uppercase tracking-wider"
                     >
-                        Register
-                    </button>
+                        Email
+                    </label>
+                    <input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoComplete="email"
+                        className="w-full px-4 py-3 bg-bg-subtle border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
+                    />
+                </div>
+                <div className="flex flex-col gap-2">
+                    <label
+                        htmlFor="password"
+                        className="text-[13px] font-bold text-text-strong uppercase tracking-wider"
+                    >
+                        Password
+                    </label>
+                    <input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        autoComplete="current-password"
+                        className="w-full px-4 py-3 bg-bg-subtle border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
+                    />
                 </div>
 
-                <form onSubmit={handleLogin}>
-                    <div className="form-group">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            id="email"
-                            type="email"
-                            placeholder="your@email.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="password">Password</label>
-                        <input
-                            id="password"
-                            type="password"
-                            placeholder="********"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <button type="submit" className="submit-btn">
-                        Login
-                    </button>
-                </form>
-            </div>
+                {error && (
+                    <p
+                        role="alert"
+                        className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium animate-in shake-in duration-300"
+                    >
+                        {error}
+                    </p>
+                )}
+
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 bg-accent text-text-on-accent border-none rounded-xl text-base font-bold shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {isSubmitting ? "Signing In..." : "Sign In"}
+                </button>
+            </form>
         </div>
     );
 };

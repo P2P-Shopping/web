@@ -1,16 +1,6 @@
-// ============================================
-// CREATE LIST MODAL - Create new shopping list
-// ============================================
-
-import {
-    type FormEvent,
-    type KeyboardEvent,
-    useEffect,
-    useRef,
-    useState,
-} from "react";
+import { type SubmitEvent, useState } from "react";
+import { Modal } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
-import "./CreateListModal.css";
 
 interface CreateListModalProps {
     onClose: () => void;
@@ -19,167 +9,90 @@ interface CreateListModalProps {
 const CreateListModal = ({ onClose }: CreateListModalProps) => {
     const [listName, setListName] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const dialogRef = useRef<HTMLDialogElement | null>(null);
-    const listNameInputRef = useRef<HTMLInputElement | null>(null);
-    const isMountedRef = useRef(true);
-    const previousFocusRef = useRef<HTMLElement | null>(null);
     const { addList } = useListsStore();
 
-    useEffect(() => {
-        previousFocusRef.current = document.activeElement as HTMLElement | null;
-        isMountedRef.current = true;
-        dialogRef.current?.showModal();
-        const rafId = window.requestAnimationFrame(() => {
-            listNameInputRef.current?.focus();
-        });
-
-        return () => {
-            isMountedRef.current = false;
-            window.cancelAnimationFrame(rafId);
-            dialogRef.current?.close();
-            previousFocusRef.current?.focus();
-        };
-    }, []);
-
-    const focusableSelector =
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-    const trapFocus = (e: KeyboardEvent<HTMLDialogElement>) => {
-        if (e.key === "Escape") {
-            e.preventDefault();
-            onClose();
-            return;
-        }
-
-        if (e.key !== "Tab" || !dialogRef.current) return;
-
-        const focusableElements = Array.from(
-            dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector),
-        ).filter((element) => !element.hasAttribute("disabled"));
-
-        if (focusableElements.length === 0) {
-            e.preventDefault();
-            return;
-        }
-
-        const firstFocusable = focusableElements[0];
-        const lastFocusable = focusableElements[focusableElements.length - 1];
-
-        if (e.shiftKey && document.activeElement === firstFocusable) {
-            e.preventDefault();
-            lastFocusable.focus();
-        } else if (!e.shiftKey && document.activeElement === lastFocusable) {
-            e.preventDefault();
-            firstFocusable.focus();
-        }
+    const handleClose = () => {
+        if (isSubmitting) return;
+        onClose();
     };
 
-    const handleSubmit = async (e: FormEvent) => {
+    const handleSubmit = async (e: SubmitEvent) => {
         e.preventDefault();
-
-        // Validate
         const trimmedName = listName.trim();
-        if (!trimmedName) {
-            return;
-        }
+        if (!trimmedName) return;
 
         setIsSubmitting(true);
-
         try {
-            const success = await addList(trimmedName);
-            if (success) {
+            const newList = await addList(trimmedName);
+            if (newList) {
                 onClose();
             }
         } catch (error) {
             console.error("Failed to create list:", error);
         } finally {
-            if (isMountedRef.current) {
-                setIsSubmitting(false);
-            }
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <dialog
-            ref={dialogRef}
-            className="modal-backdrop"
-            aria-labelledby="create-list-title"
-            onCancel={(e) => {
-                e.preventDefault();
-                onClose();
-            }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                    onClose();
-                }
-            }}
-            onKeyDown={trapFocus}
-        >
-            <div className="modal-content">
-                <div className="modal-header">
-                    <h2 id="create-list-title">Creare Listă Nouă</h2>
+        <Modal
+            isOpen={true}
+            onClose={handleClose}
+            title="Create New List"
+            initialFocusSelector="#list-name"
+            footer={
+                <div className="grid grid-cols-2 gap-3 w-full">
                     <button
                         type="button"
-                        className="close-btn"
-                        onClick={onClose}
-                        aria-label="Închide"
+                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border disabled:opacity-50"
+                        onClick={handleClose}
+                        disabled={isSubmitting}
                     >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="24"
-                            height="24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="none"
-                            aria-hidden="true"
-                        >
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        form="create-list-form"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!listName.trim() || isSubmitting}
+                        aria-busy={isSubmitting}
+                        aria-label={
+                            isSubmitting ? "Creating list..." : undefined
+                        }
+                    >
+                        {isSubmitting ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            "Create List"
+                        )}
                     </button>
                 </div>
-
-                <form onSubmit={handleSubmit}>
-                    <div className="modal-body">
-                        <label htmlFor="list-name">Numele listei</label>
-                        <input
-                            ref={listNameInputRef}
-                            id="list-name"
-                            type="text"
-                            value={listName}
-                            onChange={(e) => setListName(e.target.value)}
-                            placeholder="Ex: Cumpărături săptămâna asta"
-                            maxLength={100}
-                        />
-                        <p className="helper-text">
-                            Dă un nume descriptiv pentru lista ta
-                        </p>
-                    </div>
-
-                    <div className="modal-footer">
-                        <button
-                            type="button"
-                            className="cancel-btn"
-                            onClick={onClose}
-                            disabled={isSubmitting}
-                        >
-                            Anulează
-                        </button>
-                        <button
-                            type="submit"
-                            className="submit-btn"
-                            disabled={!listName.trim() || isSubmitting}
-                        >
-                            {isSubmitting ? (
-                                <span className="loading-spinner" />
-                            ) : (
-                                "Crează Lista"
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </dialog>
+            }
+        >
+            <form
+                id="create-list-form"
+                onSubmit={handleSubmit}
+                className="flex flex-col gap-4"
+            >
+                <div className="flex flex-col gap-2">
+                    <label
+                        htmlFor="list-name"
+                        className="text-[13px] font-semibold text-text-strong"
+                    >
+                        List name
+                    </label>
+                    <input
+                        id="list-name"
+                        type="text"
+                        value={listName}
+                        onChange={(e) => setListName(e.target.value)}
+                        placeholder="Give it a descriptive name"
+                        maxLength={100}
+                        className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong transition-all focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] outline-none"
+                    />
+                </div>
+            </form>
+        </Modal>
     );
 };
 

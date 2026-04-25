@@ -1,48 +1,54 @@
 import axios from "axios";
+import { useStore } from "../context/useStore";
 
 const API_URL = import.meta.env.VITE_API_BASE_URL;
-const MOCK_USER = { id: "1", email: "your@email.com", name: "Adrian Hordila" };
 
 export const loginRequest = async (email: string, password: string) => {
+    const response = await axios.post(
+        `${API_URL}/api/auth/login`,
+        { email, password },
+        { withCredentials: true },
+    );
+
+    // Tokens are now set by HttpOnly cookies from the backend.
+    // We don't store them in localStorage anymore.
+    return response.data;
+};
+
+export const registerRequest = async (data: Record<string, unknown>) => {
+    const response = await axios.post(`${API_URL}/api/auth/register`, data, {
+        withCredentials: true,
+    });
+    return response.data;
+};
+
+export const checkAuthRequest = async () => {
     try {
-        const response = await axios.post(
-            `${API_URL}/api/auth/login`,
-            { email, password },
-            { withCredentials: true },
-        );
-
-        if (response.data?.token) {
-            localStorage.setItem("token", response.data.token);
-        }
-
+        const response = await axios.get(`${API_URL}/api/auth/me`, {
+            withCredentials: true,
+        });
         return response.data;
     } catch (error) {
-        console.error("Eroare autentificare (Backend Offline):", error);
-        if (email === "your@email.com" && password === "12345678") {
-            localStorage.setItem("token", "mock-token");
-            return MOCK_USER;
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+            return null;
         }
-        throw new Error("Date incorecte (Modul Mock)");
+        throw error;
     }
 };
-export const registerRequest = async (data: Record<string, unknown>) => {
+
+export const logoutRequest = async () => {
     try {
-        const response = await axios.post(
-            `${API_URL}/api/auth/register`,
-            data,
-            { withCredentials: true },
+        await axios.post(
+            `${API_URL}/api/auth/logout`,
+            {},
+            {
+                withCredentials: true,
+            },
         );
-        return response.data;
+        useStore.getState().setAuth(null);
     } catch (error) {
-        console.error("Eroare înregistrare:", error);
-
-        const useMockAuth =
-            import.meta.env.DEV || import.meta.env.ENABLE_MOCK_AUTH === "true";
-
-        if (useMockAuth) {
-            return { message: "User registered successfully (Mock Mode)" };
-        }
-
+        console.error("Logout request failed:", error);
+        useStore.getState().setAuth(null);
         throw error;
     }
 };

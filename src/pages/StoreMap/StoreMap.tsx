@@ -1,9 +1,16 @@
+import {
+    List,
+    LocateFixed,
+    Navigation,
+    X,
+    ZoomIn,
+    ZoomOut,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import Modal from "../../components/Modal/Modal";
 import ListDetail from "../ListDetail/ListDetail";
-
-import "./StoreMap.css";
 
 interface Coordinate {
     lat: number;
@@ -217,8 +224,11 @@ const useMapEngine = (
 
         const rect = canvas.getBoundingClientRect();
         const viewport = {
-            width: Math.max(1, Math.round(rect.width || window.innerWidth)),
-            height: Math.max(1, Math.round(rect.height || window.innerHeight)),
+            width: Math.max(1, Math.round(rect.width || globalThis.innerWidth)),
+            height: Math.max(
+                1,
+                Math.round(rect.height || globalThis.innerHeight),
+            ),
         };
 
         const userPos = getRelativePixels(currentRenderedGps.current, anchor);
@@ -318,11 +328,14 @@ const useMapEngine = (
         const rootStyles = getComputedStyle(document.documentElement);
         const theme: ThemeColors = {
             product:
-                rootStyles.getPropertyValue("--red-neon").trim() || "#FF3366",
+                rootStyles.getPropertyValue("--color-accent").trim() ||
+                "#FF3366",
             user:
-                rootStyles.getPropertyValue("--blue-neon").trim() || "#00D4FF",
+                rootStyles.getPropertyValue("--color-blue-neon").trim() ||
+                "#00D4FF",
             route:
-                rootStyles.getPropertyValue("--green-neon").trim() || "#00FF66",
+                rootStyles.getPropertyValue("--color-green-neon").trim() ||
+                "#00FF66",
         };
 
         let animationFrameId: number;
@@ -341,13 +354,13 @@ const useMapEngine = (
                 const rect = canvas.parentElement?.getBoundingClientRect();
                 const targetW = Math.max(
                     1,
-                    Math.round(rect?.width || window.innerWidth),
+                    Math.round(rect?.width || globalThis.innerWidth),
                 );
                 const targetH = Math.max(
                     1,
-                    Math.round(rect?.height || window.innerHeight),
+                    Math.round(rect?.height || globalThis.innerHeight),
                 );
-                const dpr = window.devicePixelRatio || 1;
+                const dpr = globalThis.devicePixelRatio || 1;
                 const backingW = Math.max(1, Math.round(targetW * dpr));
                 const backingH = Math.max(1, Math.round(targetH * dpr));
 
@@ -416,7 +429,7 @@ const useMapEngine = (
                     ctx.fill();
 
                     ctx.fillStyle = "white";
-                    ctx.font = `${12 / camera.current.zoom}px Arial`;
+                    ctx.font = `bold ${12 / camera.current.zoom}px Inter, sans-serif`;
                     ctx.fillText(
                         product.name,
                         x + 12 / camera.current.zoom,
@@ -457,7 +470,6 @@ const useMapEngine = (
     useEffect(() => {
         if (!("geolocation" in navigator)) {
             setGpsError("Geolocation is not supported by your browser.");
-            // Fallback for development if needed
             const newCoords = USER_GPS_DEFAULT;
             originGps.current = { ...newCoords };
             targetGps.current = { ...newCoords };
@@ -487,21 +499,7 @@ const useMapEngine = (
             },
             (error) => {
                 console.warn("GPS Error:", error.message);
-
-                if (error.code === error.PERMISSION_DENIED) {
-                    setGpsError(
-                        "Location access denied. Please allow GPS to use the map.",
-                    );
-                } else if (error.code === error.TIMEOUT) {
-                    setGpsError(
-                        "GPS signal lost. Make sure you are outside or have clear sky view.",
-                    );
-                } else {
-                    setGpsError("Unable to acquire GPS signal.");
-                }
-
                 if (isFirstLocationUpdate.current) {
-                    // Fallback for testing
                     const newCoords = USER_GPS_DEFAULT;
                     originGps.current = { ...newCoords };
                     targetGps.current = { ...newCoords };
@@ -636,6 +634,26 @@ const useMapEngine = (
         lastPanPoint.current = null;
     };
 
+    const zoomIn = () => {
+        const oldZoom = camera.current.zoom;
+        const nextZoom = Math.min(oldZoom * 1.5, MAP_CONFIG.MAX_ZOOM);
+        const zoomRatio = nextZoom / oldZoom;
+        camera.current.zoom = nextZoom;
+        camera.current.x *= zoomRatio;
+        camera.current.y *= zoomRatio;
+        clampCameraPosition(camera.current.x, camera.current.y, nextZoom);
+    };
+
+    const zoomOut = () => {
+        const oldZoom = camera.current.zoom;
+        const nextZoom = Math.max(oldZoom / 1.5, MAP_CONFIG.MIN_ZOOM);
+        const zoomRatio = nextZoom / oldZoom;
+        camera.current.zoom = nextZoom;
+        camera.current.x *= zoomRatio;
+        camera.current.y *= zoomRatio;
+        clampCameraPosition(camera.current.x, camera.current.y, nextZoom);
+    };
+
     const recenterCamera = () => {
         if (!originGps.current) return;
 
@@ -654,7 +672,10 @@ const useMapEngine = (
         hasLocationLock,
         gpsError,
         isRouting,
+        currentGps: currentRenderedGps.current,
         recenterCamera,
+        zoomIn,
+        zoomOut,
         handlers: {
             onTouchStart: handleTouchStart,
             onTouchMove: handleTouchMove,
@@ -671,48 +692,252 @@ const useMapEngine = (
 const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { id: listId } = useParams<{ id: string }>();
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+    const [isCoordsModalOpen, setIsCoordsModalOpen] = useState(false);
+
+    useEffect(() => {
+        const originalInlineStyle = document.body.getAttribute("style");
+        document.body.style.overflow = "hidden";
+        return () => {
+            if (originalInlineStyle === null) {
+                document.body.removeAttribute("style");
+            } else {
+                document.body.setAttribute("style", originalInlineStyle);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isSidebarExpanded) return;
+
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setIsSidebarExpanded(false);
+            }
+        };
+
+        document.addEventListener("keydown", handleEscape);
+        return () => document.removeEventListener("keydown", handleEscape);
+    }, [isSidebarExpanded]);
+
     const {
         isDragging,
         hasLocationLock,
         gpsError,
         isRouting,
+        currentGps,
         handlers,
         recenterCamera,
+        zoomIn,
+        zoomOut,
     } = useMapEngine(canvasRef, listId);
 
     if (!hasLocationLock) {
         return (
-            <div className="map-loading-screen">
-                <h2>{gpsError ? gpsError : "Acquiring GPS Signal... 🛰️"}</h2>
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4 bg-bg">
+                <div className="w-12 h-12 border-4 border-border border-t-accent rounded-full animate-spin" />
+                <h2 className="text-xl font-bold text-text-strong tracking-tight">
+                    {gpsError || "Acquiring GPS Signal..."}
+                </h2>
             </div>
         );
     }
 
     return (
-        <div className={`mapContainer ${isDragging ? "dragging" : ""}`}>
-            {isRouting && (
-                <div className="routing-loader">Calculating route...</div>
-            )}
-            <canvas ref={canvasRef} className="map-canvas" {...handlers} />
-
-            {gpsError && (
-                <div className="map-status-banner" role="status">
-                    {gpsError}
-                </div>
-            )}
-
-            <button
-                type="button"
-                className="recenter-button"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    recenterCamera();
-                }}
+        <div className="flex flex-col h-full overflow-hidden bg-bg-muted">
+            <div
+                className={`relative flex-1 overflow-hidden ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
             >
-                RECENTER
-            </button>
+                {isRouting && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-text-strong text-bg rounded-full text-xs font-bold shadow-lg animate-pulse">
+                        Calculating route...
+                    </div>
+                )}
 
-            <ListDetail isEmbedded={true} />
+                <canvas
+                    ref={canvasRef}
+                    className="w-full h-full block bg-bg-muted touch-none"
+                    {...handlers}
+                />
+
+                {gpsError && (
+                    <div
+                        role="alert"
+                        aria-live="assertive"
+                        className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
+                    >
+                        {gpsError}
+                    </div>
+                )}
+
+                {/* Sidebar Overlay (Mobile) */}
+                {isSidebarExpanded && (
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-30 min-[1000px]:hidden animate-fade-in"
+                        onClick={() => setIsSidebarExpanded(false)}
+                        aria-label="Close list drawer"
+                    />
+                )}
+
+                {/* Responsive Sidebar */}
+                <div
+                    aria-hidden={!isSidebarExpanded}
+                    inert={!isSidebarExpanded}
+                    className={`
+                        absolute z-30 transition-all duration-500 ease-spring
+                        /* Desktop: Right-side Drawer */
+                        min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 
+                        min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border
+                        ${
+                            isSidebarExpanded
+                                ? "min-[1000px]:translate-x-0"
+                                : "min-[1000px]:translate-x-full"
+                        }
+                        
+                        /* Mobile: Bottom Sheet */
+                        max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 
+                        max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh]
+                        ${
+                            isSidebarExpanded
+                                ? "max-[1000px]:translate-y-0"
+                                : "max-[1000px]:translate-y-full"
+                        }
+                        
+                        ${isSidebarExpanded ? "" : "pointer-events-none"}
+                        bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
+                    `}
+                >
+                    {/* Drag Handle for Mobile */}
+                    <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
+
+                    <div className="flex-1 overflow-y-auto px-1">
+                        <ListDetail isEmbedded={true} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Map Control Bar - Separated from map view */}
+            <div className="relative z-40 bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
+                <div className="flex items-center gap-4">
+                    <button
+                        type="button"
+                        className="w-12 h-12 flex items-center justify-center bg-accent text-text-on-accent rounded-full shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            recenterCamera();
+                        }}
+                        title="Recenter Map"
+                    >
+                        <LocateFixed size={20} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="w-12 h-12 flex items-center justify-center bg-bg-muted text-text-strong border border-border rounded-full shadow-sm transition-all hover:bg-surface hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsCoordsModalOpen(true);
+                        }}
+                        title="Live Coordinates"
+                    >
+                        <Navigation size={20} />
+                    </button>
+
+                    <div className="flex items-center bg-bg-muted border border-border rounded-2xl p-1">
+                        <button
+                            type="button"
+                            className="w-10 h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                zoomIn();
+                            }}
+                            title="Zoom In"
+                        >
+                            <ZoomIn size={18} />
+                        </button>
+                        <div className="w-px h-6 bg-border mx-1" />
+                        <button
+                            type="button"
+                            className="w-10 h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                zoomOut();
+                            }}
+                            title="Zoom Out"
+                        >
+                            <ZoomOut size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 ${
+                        isSidebarExpanded
+                            ? "bg-accent text-text-on-accent"
+                            : "bg-text-strong text-bg"
+                    }`}
+                    onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                    aria-label={isSidebarExpanded ? "Close List" : "Show List"}
+                >
+                    {isSidebarExpanded ? (
+                        <X size={20} className="rotate-90" />
+                    ) : (
+                        <List size={20} />
+                    )}
+                    <span className="hidden sm:inline">
+                        {isSidebarExpanded ? "Close List" : "View List"}
+                    </span>
+                </button>
+            </div>
+
+            <Modal
+                isOpen={isCoordsModalOpen}
+                onClose={() => setIsCoordsModalOpen(false)}
+                title="Live Store Coordinates"
+            >
+                <div className="flex flex-col gap-6 p-2">
+                    <div className="flex items-center gap-4 bg-bg-muted p-4 rounded-2xl border border-border">
+                        <div className="p-3 bg-accent/10 rounded-xl text-accent">
+                            <Navigation size={24} />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                Current Location
+                            </p>
+                            <p className="text-sm font-mono font-bold text-text-strong">
+                                {currentGps.lat.toFixed(6)},{" "}
+                                {currentGps.lng.toFixed(6)}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-text-muted">Latitude</span>
+                            <span className="font-mono font-bold text-text-strong">
+                                {currentGps.lat}
+                            </span>
+                        </div>
+                        <div className="h-px bg-border" />
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-text-muted">Longitude</span>
+                            <span className="font-mono font-bold text-text-strong">
+                                {currentGps.lng}
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="w-full py-4 bg-text-strong text-bg rounded-2xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        onClick={() => setIsCoordsModalOpen(false)}
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 };

@@ -1,18 +1,21 @@
 import { useStore } from "../context/useStore";
 
-let intervalId: number | null = null;
+let intervalId: ReturnType<typeof setInterval> | null = null;
 
 export const startMockEmitter = () => {
     if (intervalId) return;
 
-    const { userLocation } = useStore.getState();
-    let currentLat = userLocation?.lat ?? 47.151726;
-    let currentLng = userLocation?.lng ?? 27.587914;
+    const state = useStore.getState();
+    let currentLat = state.userLocation?.lat ?? 47.151726;
+    let currentLng = state.userLocation?.lng ?? 27.587914;
 
-    intervalId = globalThis.setInterval(() => {
-        // Secure pseudo-random location mock update to bypass Sonar Security Hotspot constraints
-        const randLat = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
-        const randLng = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295;
+    intervalId = setInterval(() => {
+        // Secure pseudo-random location mock update
+        const randArray = new Uint32Array(2);
+        globalThis.crypto.getRandomValues(randArray);
+        const randLat = randArray[0] / 4294967295;
+        const randLng = randArray[1] / 4294967295;
+
         currentLat += (randLat - 0.5) * 0.00005;
         currentLng += (randLng - 0.5) * 0.00005;
 
@@ -20,7 +23,9 @@ export const startMockEmitter = () => {
             lat: currentLat,
             lng: currentLng,
         });
-        console.log("GPS Update:", currentLat, currentLng);
+        if (import.meta.env.DEV) {
+            console.log("GPS Update:", currentLat, currentLng);
+        }
     }, 1000);
 };
 
