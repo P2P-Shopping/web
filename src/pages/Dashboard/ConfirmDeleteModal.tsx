@@ -52,7 +52,7 @@ const ConfirmDeleteModal = ({
                         title={listName}
                     >
                         {listName}?
-                    </strong>
+                    </strong>{" "}
                     This action cannot be undone.
                 </p>
 
