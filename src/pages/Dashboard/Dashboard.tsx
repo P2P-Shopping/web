@@ -51,9 +51,13 @@ const Dashboard = () => {
         setSearchParams({ list: listId });
     };
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString("ro-RO", {
+    /**
+     * Formats a date string according to the user's browser locale.
+     * @param dateStr - The ISO date string to format.
+     */
+    const formatDate = (dateStr: string) => {
+        return new Date(dateStr).toLocaleDateString(undefined, {
+            // Schimbă din "en-US" în undefined
             day: "numeric",
             month: "short",
             hour: "2-digit",

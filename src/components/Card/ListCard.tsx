@@ -19,11 +19,18 @@ export default function ListCard({ list, onClick }: ListCardProps) {
     const progress =
         totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
 
-    const formattedDate = new Date(list.createdAt).toLocaleDateString("ro-RO", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    });
+    /**
+     * Component to display a summary card for a shopping list.
+     */
+    const formattedDate = new Date(list.createdAt).toLocaleDateString(
+        undefined,
+        {
+            // Schimbă din "ro-RO" în undefined
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        },
+    );
 
     return (
         <button

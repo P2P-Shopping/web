@@ -67,11 +67,13 @@ const normalizeItem = (item: ApiItem): Item => ({
 });
 
 /**
- * Maps the raw shopping list data from the server to the ShoppingList type used in UI.
+ * Normalizes the raw list data from the API into the application's ShoppingList format.
+ * @param list - The raw API shopping list data.
  */
 const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     id: list.id,
     name: list.title,
+    // Folosim datele de la API sau un fallback dacă nu există
     createdAt: list.createdAt ?? new Date().toISOString(),
     updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
     status: "active",
