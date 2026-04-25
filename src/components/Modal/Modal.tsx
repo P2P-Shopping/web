@@ -77,13 +77,19 @@ export default function Modal({
         }
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDialogElement>) => {
+        if (e.key === "Escape") {
+            onClose();
+        }
+    };
+
     return (
-        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click doesn't need keyboard events as Escape is handled by onCancel
         <dialog
             ref={dialogRef}
             className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-xs border-none p-0 outline-none open:animate-in open:fade-in duration-200"
             onCancel={handleCancel}
             onClick={handleBackdropClick}
+            onKeyDown={handleKeyDown}
             aria-labelledby={title ? modalTitleId : undefined}
             aria-describedby={subtitle ? modalSubtitleId : undefined}
         >
