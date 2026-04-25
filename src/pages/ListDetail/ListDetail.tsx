@@ -39,7 +39,9 @@ interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
 }
-
+/**
+ * Custom hook to manage shopping list items, including fetching, adding, and toggling.
+ */
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
     const [items, setItems] = useState<Item[]>([]);
@@ -152,7 +154,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         },
         [syncListItemsInStore],
     );
-
+    /**
+     * Adds a new item to the current shopping list with optional details.
+     */
     const addItem = async (
         name: string,
         quantity?: string,

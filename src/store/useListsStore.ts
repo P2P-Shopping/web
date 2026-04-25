@@ -52,7 +52,9 @@ const jsonHeaders = (withContentType = false): HeadersInit => {
         ...(withContentType ? { "Content-Type": "application/json" } : {}),
     };
 };
-
+/**
+ * Converts an item from the API format to the internal application format.
+ */
 const normalizeItem = (item: ApiItem): Item => ({
     id: item.id,
     name: item.name,
@@ -64,7 +66,9 @@ const normalizeItem = (item: ApiItem): Item => ({
     isRecurrent: item.isRecurrent,
 });
 
-// DEFINIȚIE UNICĂ: Folosește datele reale de la API
+/**
+ * Maps the raw shopping list data from the server to the ShoppingList type used in UI.
+ */
 const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     id: list.id,
     name: list.title,
@@ -93,7 +97,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
     error: null,
     isModalOpen: false,
     deletingListId: null,
-
+    /**
+     * Fetches all shopping lists for the current user from the backend API.
+     */
     fetchLists: async () => {
         set({ isLoading: true, error: null });
         try {
