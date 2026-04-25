@@ -43,22 +43,13 @@ export default function Navbar() {
 
     // Update width on resize
     useEffect(() => {
-        const mql = window.matchMedia("(max-width: 399px)");
+        const mql = globalThis.matchMedia("(max-width: 399px)");
         const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
 
-        // Support both modern and older browsers
-        if (mql.addEventListener) {
-            mql.addEventListener("change", handler);
-        } else {
-            mql.addListener(handler);
-        }
+        mql.addEventListener("change", handler);
 
         return () => {
-            if (mql.removeEventListener) {
-                mql.removeEventListener("change", handler);
-            } else {
-                mql.removeListener(handler);
-            }
+            mql.removeEventListener("change", handler);
         };
     }, []);
 

@@ -31,6 +31,31 @@ export default function Modal({
 
     useEffect(() => {
         const dialog = dialogRef.current;
+        if (!dialog) return;
+
+        const handleClick = (e: MouseEvent) => {
+            if (e.target === dialog) {
+                onClose();
+            }
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                onClose();
+            }
+        };
+
+        dialog.addEventListener("click", handleClick);
+        dialog.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            dialog.removeEventListener("click", handleClick);
+            dialog.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [onClose]);
+
+    useEffect(() => {
+        const dialog = dialogRef.current;
         if (isOpen) {
             previousFocusRef.current = document.activeElement as HTMLElement;
             if (dialog && !dialog.open) {
@@ -71,25 +96,11 @@ export default function Modal({
         onClose();
     };
 
-    const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
-        if (e.target === dialogRef.current) {
-            onClose();
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLDialogElement>) => {
-        if (e.key === "Escape") {
-            onClose();
-        }
-    };
-
     return (
         <dialog
             ref={dialogRef}
             className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-xs border-none p-0 outline-none open:animate-in open:fade-in duration-200"
             onCancel={handleCancel}
-            onClick={handleBackdropClick}
-            onKeyDown={handleKeyDown}
             aria-labelledby={title ? modalTitleId : undefined}
             aria-describedby={subtitle ? modalSubtitleId : undefined}
         >
