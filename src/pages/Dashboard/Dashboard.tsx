@@ -37,7 +37,6 @@ const Dashboard = () => {
 
     const showAiImport = searchParams.get("import") === "ai";
 
-    // Fetch lists on mount
     useEffect(() => {
         void fetchLists();
     }, [fetchLists]);
@@ -48,12 +47,10 @@ const Dashboard = () => {
         [lists, selectedListId],
     );
 
-    // Handle Card Click
     const handleCardClick = (listId: string) => {
         setSearchParams({ list: listId });
     };
 
-    // Format date nicely
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString("en-US", {
@@ -64,7 +61,6 @@ const Dashboard = () => {
         });
     };
 
-    // Handle delete list
     const handleDeleteList = (
         e: MouseEvent<HTMLButtonElement>,
         listId: string,
@@ -100,7 +96,6 @@ const Dashboard = () => {
         setSearchParams({});
     };
 
-    // Calculate items count
     const getItemsCount = (items: Item[]) => {
         const checked = items.filter((item) => item.checked).length;
         if (items.length === 0) {
@@ -251,7 +246,6 @@ const Dashboard = () => {
                                 </div>
                             </button>
 
-                            {/* Delete Button (Separate from card button to avoid nesting) */}
                             <button
                                 type="button"
                                 className="absolute top-5 right-5 flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 z-10"
@@ -272,7 +266,6 @@ const Dashboard = () => {
 
     return (
         <div className="flex flex-col bg-bg">
-            {/* Header */}
             <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
                 {selectedList ? (
                     <>
@@ -329,12 +322,10 @@ const Dashboard = () => {
                 )}
             </header>
 
-            {/* Content */}
             <main className="flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4">
                 {mainContent}
             </main>
 
-            {/* Create List Modal */}
             {isModalOpen && <CreateListModal onClose={closeModal} />}
             {deleteTarget && (
                 <ConfirmDeleteModal
