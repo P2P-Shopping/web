@@ -154,7 +154,9 @@ export default function Navbar() {
                                     <span className="text-sm">{label}</span>
                                 </Link>
                             ))}
-                            <div className="h-px bg-border my-1" />
+                            {extraLinks.length > 0 && (
+                                <div className="h-px bg-border my-1" />
+                            )}
                             <div className="px-4 py-2 flex items-center justify-between">
                                 <span className="text-xs font-bold text-text-muted">
                                     Theme

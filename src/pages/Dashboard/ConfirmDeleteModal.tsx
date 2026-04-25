@@ -51,9 +51,9 @@ const ConfirmDeleteModal = ({
                         className="text-text-strong font-bold block my-2 line-clamp-3 wrap-break-word"
                         title={listName}
                     >
-                        {listName}
+                        {listName}?
                     </strong>
-                    ? This action cannot be undone.
+                    This action cannot be undone.
                 </p>
 
                 {error && (

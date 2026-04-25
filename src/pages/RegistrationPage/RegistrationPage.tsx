@@ -25,6 +25,32 @@ const RegistrationPage = () => {
         setError("");
         if (isSubmitting) return;
 
+        // Frontend Validation
+        if (formData.firstName.length < 2 || formData.firstName.length > 50) {
+            setError("First name must be between 2 and 50 characters.");
+            return;
+        }
+        if (formData.lastName.length < 2 || formData.lastName.length > 50) {
+            setError("Last name must be between 2 and 50 characters.");
+            return;
+        }
+
+        const nameRegex = /^[a-zA-Z\s-]+$/;
+        if (!nameRegex.test(formData.firstName)) {
+            setError("First name can only contain letters, spaces, or hyphens.");
+            return;
+        }
+        if (!nameRegex.test(formData.lastName)) {
+            setError("Last name can only contain letters, spaces, or hyphens.");
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            setError("Please enter a valid email address.");
+            return;
+        }
+
         if (formData.password !== formData.confirmPassword) {
             setError("Passwords do not match.");
             return;
@@ -43,10 +69,12 @@ const RegistrationPage = () => {
             navigate("/login");
             // biome-ignore lint/suspicious/noExplicitAny: API error response format
         } catch (err: any) {
-            setError(
-                err.response?.data?.message ??
-                    "Registration failed. Please try again.",
-            );
+            const serverError = err.response?.data;
+            const displayError =
+                serverError?.details ||
+                serverError?.message ||
+                "Registration failed. Please try again.";
+            setError(displayError);
         } finally {
             setIsSubmitting(false);
         }
@@ -55,9 +83,6 @@ const RegistrationPage = () => {
     return (
         <div className="flex flex-col w-full max-w-[440px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
             <div className="flex items-center justify-center gap-3 mb-8">
-                <span className="text-3xl" aria-hidden="true">
-                    🛒
-                </span>
                 <span className="text-2xl font-black text-text-strong tracking-tighter">
                     P2P Shopping
                 </span>

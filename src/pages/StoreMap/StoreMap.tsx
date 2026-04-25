@@ -737,7 +737,7 @@ const StoreMap: React.FC = () => {
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4 bg-bg">
                 <div className="w-12 h-12 border-4 border-border border-t-accent rounded-full animate-spin" />
                 <h2 className="text-xl font-bold text-text-strong tracking-tight">
-                    {gpsError || "Acquiring GPS Signal... 🛰️"}
+                    {gpsError || "Acquiring GPS Signal..."}
                 </h2>
             </div>
         );
