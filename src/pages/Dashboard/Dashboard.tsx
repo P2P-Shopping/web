@@ -15,7 +15,7 @@ import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
 
-const PREVIEW_LIMIT = 3;
+const PREVIEW_LIMIT = 2;
 
 const Dashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -238,7 +238,7 @@ const Dashboard = () => {
                                                     {uncheckedItems.length >
                                                         PREVIEW_LIMIT && (
                                                         <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[11px] font-bold text-text-muted transition-all hover:bg-border/40">
-                                                            ...and another{" "}
+                                                            and another{" "}
                                                             {uncheckedItems.length -
                                                                 PREVIEW_LIMIT}{" "}
                                                             unchecked items
