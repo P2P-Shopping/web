@@ -6,6 +6,7 @@ import type { Item } from "../../types";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
 import "./Dashboard.css";
+import { ListCard } from "../../components";
 
 const Dashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -147,83 +148,10 @@ const Dashboard = () => {
             <div className="lists-grid">
                 {lists.map((list) => (
                     <div key={list.id} className="list-card-shell">
-                        <div
-                            className="list-card"
-                            onClick={() => handleCardClick(list.id)}
-                            onKeyUp={(e) =>
-                                e.key === "Enter" && handleCardClick(list.id)
-                            }
-                            tabIndex={0}
-                            role="button"
-                            aria-label={`Deschide lista ${list.name}`}
-                        >
-                            <div className="card-header">
-                                <div className="card-title-group">
-                                    <p className="card-kicker">
-                                        Listă partajată
-                                    </p>
-                                    <h3>{list.name}</h3>
-                                </div>
-                                <div className="card-actions">
-                                    <span className="updated-pill">
-                                        {formatDate(list.updatedAt)}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="delete-btn"
-                                        onClick={(e) =>
-                                            handleDeleteList(
-                                                e,
-                                                list.id,
-                                                list.name,
-                                            )
-                                        }
-                                        title="Șterge lista"
-                                        aria-label="Șterge lista"
-                                    >
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            width="16"
-                                            height="16"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            fill="none"
-                                            aria-hidden="true"
-                                        >
-                                            <polyline points="3,6 5,6 21,6" />
-                                            <path d="M19,6v14a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6m3,0V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2v2" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="card-body">
-                                <div className="list-stats">
-                                    <span className="stat stat-pill">{getItemsCount(list.items)}</span>
-                                    <span className="stat stat-pill">{list.ownerName || "Tu"}</span>
-                                </div>
-
-                                <div className="items-preview">
-                                    {list.items.slice(0, 3).map((item) => (
-                                        <div
-                                            key={item.id}
-                                            className={`item-preview ${item.checked ? "checked" : ""}`}
-                                        >
-                                            <span className="checkbox-icon" aria-hidden="true" />
-                                            <span className="item-name">
-                                                {item.name}
-                                            </span>
-                                        </div>
-                                    ))}
-                                    {list.items.length > 3 && (
-                                        <div className="more-items">
-                                            +{list.items.length - 3} produse în
-                                            plus
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                        <ListCard 
+                            list={list} 
+                            onClick={() => handleCardClick(list.id)} 
+                        />
                     </div>
                 ))}
             </div>

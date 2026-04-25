@@ -3,34 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
+import type { Item, ShoppingList as ApiShoppingList } from "../../types"; 
 import "./ListDetail.css";
-
-interface Item {
-    id: string;
-    name: string;
-    checked: boolean;
-    brand?: string;
-    quantity?: string;
-    price?: number;
-    category?: string;
-    isRecurrent?: boolean;
-}
-
-interface ApiListItem {
-    id: string;
-    name: string;
-    isChecked?: boolean;
-    brand?: string;
-    quantity?: string;
-    price?: number;
-    category?: string;
-    isRecurrent?: boolean;
-}
-
-interface ApiShoppingList {
-    id: string;
-    items?: ApiListItem[];
-}
 
 interface CreatedListResponse {
     id: string;
@@ -110,7 +84,7 @@ const ListDetail = ({
             const mappedItems = (currentList.items ?? []).map((item) => ({
                 id: item.id,
                 name: item.name,
-                checked: Boolean(item.isChecked),
+                checked: Boolean((item as any).isChecked ?? item.checked),
                 brand: item.brand,
                 price: item.price,
                 quantity: item.quantity,
@@ -432,4 +406,3 @@ const ListDetail = ({
 };
 
 export default ListDetail;
-
