@@ -21,16 +21,6 @@ interface ApiShoppingList {
     items?: ApiItem[];
 }
 
-const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
-    id: list.id,
-    name: list.title,
-    createdAt: list.createdAt ?? new Date().toISOString(),
-    updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
-    status: "active",
-    ownerName: "Tu",
-    items: (list.items ?? []).map(normalizeItem),
-});
-
 interface ListsState {
     lists: ShoppingList[];
     currentList: ShoppingList | null;
@@ -63,15 +53,6 @@ const jsonHeaders = (withContentType = false): HeadersInit => {
     };
 };
 
-const handleAuthResponse = (response: Response) => {
-    if (response.status === 401) {
-        useStore.getState().setAuth(null);
-        useListsStore.getState().clearLists();
-        throw new Error("Session expired. Please log in again.");
-    }
-    return response;
-};
-
 const normalizeItem = (item: ApiItem): Item => ({
     id: item.id,
     name: item.name,
@@ -83,11 +64,12 @@ const normalizeItem = (item: ApiItem): Item => ({
     isRecurrent: item.isRecurrent,
 });
 
+// DEFINIȚIE UNICĂ: Folosește datele reale de la API
 const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     id: list.id,
     name: list.title,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: list.createdAt ?? new Date().toISOString(),
+    updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
     status: "active",
     ownerName: "Tu",
     items: (list.items ?? []).map(normalizeItem),
@@ -120,7 +102,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 credentials: "include",
             });
 
-            handleAuthResponse(response);
+            if (response.status === 401) {
+                useStore.getState().setAuth(null);
+                get().clearLists();
+                throw new Error("Session expired. Please log in again.");
+            }
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch lists (${response.status})`);
@@ -159,7 +145,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 credentials: "include",
             });
 
-            handleAuthResponse(response);
+            if (response.status === 401) {
+                useStore.getState().setAuth(null);
+                get().clearLists();
+                throw new Error("Session expired.");
+            }
 
             if (!response.ok) {
                 throw new Error(`Failed to create list (${response.status})`);
@@ -204,7 +194,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 credentials: "include",
             });
 
-            handleAuthResponse(response);
+            if (response.status === 401) {
+                useStore.getState().setAuth(null);
+                get().clearLists();
+                throw new Error("Session expired.");
+            }
 
             if (!response.ok) {
                 throw new Error(`Failed to delete list (${response.status})`);
@@ -248,7 +242,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 },
             );
 
-            handleAuthResponse(response);
+            if (response.status === 401) {
+                useStore.getState().setAuth(null);
+                get().clearLists();
+                throw new Error("Session expired.");
+            }
 
             if (!response.ok) {
                 throw new Error(`Failed to add item (${response.status})`);
@@ -297,7 +295,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 },
             );
 
-            handleAuthResponse(response);
+            if (response.status === 401) {
+                useStore.getState().setAuth(null);
+                get().clearLists();
+                throw new Error("Session expired.");
+            }
 
             if (!response.ok) {
                 throw new Error(`Failed to update item (${response.status})`);
@@ -341,7 +343,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 },
             );
 
-            handleAuthResponse(response);
+            if (response.status === 401) {
+                useStore.getState().setAuth(null);
+                get().clearLists();
+                throw new Error("Session expired.");
+            }
 
             if (!response.ok) {
                 throw new Error(`Failed to delete item (${response.status})`);
