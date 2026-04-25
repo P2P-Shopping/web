@@ -38,7 +38,6 @@ interface ApiShoppingList {
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
-    listTitle?: string;
 }
 
 const useListItems = (effectiveListId: string | undefined) => {
@@ -478,6 +477,145 @@ interface AddItemModalProps {
     setShowExpanded?: (val: boolean) => void;
 }
 
+const ItemNameField = ({
+    idPrefix,
+    value,
+    onChange,
+    onTyping,
+    isMobile,
+}: {
+    idPrefix: string;
+    value: string;
+    onChange: (val: string) => void;
+    onTyping?: () => void;
+    isMobile: boolean;
+}) => (
+    <div className="flex flex-col gap-1.5">
+        <label
+            htmlFor={`${idPrefix}-item-name`}
+            className="text-[13px] font-semibold text-text-strong"
+        >
+            Item Name
+        </label>
+        <input
+            id={`${idPrefix}-item-name`}
+            type="text"
+            value={value}
+            onChange={(e) => {
+                onChange(e.target.value);
+                onTyping?.();
+            }}
+            placeholder={isMobile ? "e.g. Milk" : "e.g., Milk"}
+            required
+            className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
+        />
+    </div>
+);
+
+const ExpandDetailsButton = ({
+    showExpanded,
+    onClick,
+}: {
+    showExpanded: boolean;
+    onClick: () => void;
+}) => (
+    <button
+        type="button"
+        className="flex items-center justify-between w-full p-[12px_14px] bg-bg-muted border border-border rounded-md text-text-strong text-sm font-semibold cursor-pointer transition-all hover:bg-border/50"
+        onClick={onClick}
+    >
+        {showExpanded ? "Fewer details" : "Add details (qty, price...)"}
+        <ChevronDown
+            size={16}
+            className="transition-transform duration-200"
+            style={{
+                transform: showExpanded ? "rotate(180deg)" : "none",
+            }}
+        />
+    </button>
+);
+
+const ItemDetailsFields = ({
+    idPrefix,
+    quantity,
+    setQuantity,
+    price,
+    setPrice,
+    brand,
+    setBrand,
+    isMobile,
+}: {
+    idPrefix: string;
+    quantity: string;
+    setQuantity: (val: string) => void;
+    price: string;
+    setPrice: (val: string) => void;
+    brand: string;
+    setBrand: (val: string) => void;
+    isMobile: boolean;
+}) => (
+    <div
+        className={
+            isMobile
+                ? "flex flex-col gap-4 p-4 bg-bg-subtle rounded-xl border border-border border-dashed animate-in slide-in-from-top-2 duration-200"
+                : "grid grid-cols-2 gap-4"
+        }
+    >
+        <div className="flex flex-col gap-1.5">
+            <label
+                htmlFor={`${idPrefix}-quantity`}
+                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+            >
+                Quantity
+            </label>
+            <input
+                id={`${idPrefix}-quantity`}
+                type="text"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder={isMobile ? "e.g. 2 pcs" : "e.g., 2"}
+                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+            />
+        </div>
+        <div className="flex flex-col gap-1.5">
+            <label
+                htmlFor={`${idPrefix}-price`}
+                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+            >
+                Price {isMobile ? "" : "(Optional)"}
+            </label>
+            <input
+                id={`${idPrefix}-price`}
+                type="number"
+                step="0.01"
+                min="0"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder={isMobile ? "0.00" : "e.g., 4.99"}
+                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+            />
+        </div>
+        <div
+            className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}
+        >
+            <label
+                htmlFor={`${idPrefix}-brand`}
+                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+            >
+                Brand {isMobile ? "" : "(Optional)"}
+            </label>
+            <input
+                id={`${idPrefix}-brand`}
+                type="text"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder={isMobile ? "e.g. Zuzu" : "e.g., Organic Valley"}
+                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+            />
+        </div>
+    </div>
+);
+
 const AddItemDetailsModal = ({
     isOpen,
     onClose,
@@ -529,120 +667,130 @@ const AddItemDetailsModal = ({
                 onSubmit={onSubmit}
                 className="flex flex-col gap-4"
             >
-                <div className="flex flex-col gap-1.5">
-                    <label
-                        htmlFor={`${idPrefix}-item-name`}
-                        className="text-[13px] font-semibold text-text-strong"
-                    >
-                        Item Name
-                    </label>
-                    <input
-                        id={`${idPrefix}-item-name`}
-                        type="text"
-                        value={itemName}
-                        onChange={(e) => {
-                            setItemName(e.target.value);
-                            onTyping?.();
-                        }}
-                        placeholder={isMobile ? "e.g. Milk" : "e.g., Milk"}
-                        required
-                        className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
-                    />
-                </div>
+                <ItemNameField
+                    idPrefix={idPrefix}
+                    value={itemName}
+                    onChange={setItemName}
+                    onTyping={onTyping}
+                    isMobile={isMobile}
+                />
 
                 {isMobile && setShowExpanded && (
-                    <button
-                        type="button"
-                        className="flex items-center justify-between w-full p-[12px_14px] bg-bg-muted border border-border rounded-md text-text-strong text-sm font-semibold cursor-pointer transition-all hover:bg-border/50"
+                    <ExpandDetailsButton
+                        showExpanded={showExpanded}
                         onClick={() => setShowExpanded(!showExpanded)}
-                    >
-                        {showExpanded
-                            ? "Fewer details"
-                            : "Add details (qty, price...)"}
-                        <ChevronDown
-                            size={16}
-                            className="transition-transform duration-200"
-                            style={{
-                                transform: showExpanded
-                                    ? "rotate(180deg)"
-                                    : "none",
-                            }}
-                        />
-                    </button>
+                    />
                 )}
 
                 {showExpanded && (
-                    <div
-                        className={
-                            isMobile
-                                ? "flex flex-col gap-4 p-4 bg-bg-subtle rounded-xl border border-border border-dashed animate-in slide-in-from-top-2 duration-200"
-                                : "grid grid-cols-2 gap-4"
-                        }
-                    >
-                        <div className="flex flex-col gap-1.5">
-                            <label
-                                htmlFor={`${idPrefix}-quantity`}
-                                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
-                            >
-                                Quantity
-                            </label>
-                            <input
-                                id={`${idPrefix}-quantity`}
-                                type="text"
-                                value={quantity}
-                                onChange={(e) => setQuantity(e.target.value)}
-                                placeholder={
-                                    isMobile ? "e.g. 2 pcs" : "e.g., 2"
-                                }
-                                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label
-                                htmlFor={`${idPrefix}-price`}
-                                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
-                            >
-                                Price {isMobile ? "" : "(Optional)"}
-                            </label>
-                            <input
-                                id={`${idPrefix}-price`}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                                placeholder={isMobile ? "0.00" : "e.g., 4.99"}
-                                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
-                            />
-                        </div>
-                        <div
-                            className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}
-                        >
-                            <label
-                                htmlFor={`${idPrefix}-brand`}
-                                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
-                            >
-                                Brand {isMobile ? "" : "(Optional)"}
-                            </label>
-                            <input
-                                id={`${idPrefix}-brand`}
-                                type="text"
-                                value={brand}
-                                onChange={(e) => setBrand(e.target.value)}
-                                placeholder={
-                                    isMobile
-                                        ? "e.g. Zuzu"
-                                        : "e.g., Organic Valley"
-                                }
-                                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
-                            />
-                        </div>
-                    </div>
+                    <ItemDetailsFields
+                        idPrefix={idPrefix}
+                        quantity={quantity}
+                        setQuantity={setQuantity}
+                        price={price}
+                        setPrice={setPrice}
+                        brand={brand}
+                        setBrand={setBrand}
+                        isMobile={isMobile}
+                    />
                 )}
             </form>
         </Modal>
     );
 };
+
+const ListErrorAlert = ({
+    error,
+    isEmbedded,
+}: {
+    error: string;
+    isEmbedded: boolean;
+}) => (
+    <div
+        className={`bg-danger-subtle text-danger border border-danger-border p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300 ${isEmbedded ? "mb-2" : "-mt-2 mb-2"}`}
+    >
+        <AlertCircle size={20} className="shrink-0" />
+        <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold leading-none mb-1">System Error</p>
+            <p className="text-[13px] opacity-90 leading-tight">{error}</p>
+        </div>
+    </div>
+);
+
+const ListHeader = ({
+    effectiveListId,
+    onSwitchList,
+}: {
+    effectiveListId: string;
+    onSwitchList: () => void;
+}) => (
+    <header className="flex items-center justify-between mb-2">
+        <h2 className="text-xl font-black text-text-strong tracking-tighter uppercase italic">
+            {effectiveListId === "default" ? "Select a List" : "Shopping List"}
+        </h2>
+        {effectiveListId !== "default" && (
+            <button
+                type="button"
+                onClick={onSwitchList}
+                className="text-[10px] font-bold text-accent hover:underline uppercase"
+            >
+                Switch List
+            </button>
+        )}
+    </header>
+);
+
+const InlineAddForm = ({
+    addInputRef,
+    newItemName,
+    onNameChange,
+    onSubmit,
+    onOpenDetails,
+    isReadOnly,
+    isEmbedded,
+}: {
+    addInputRef: React.RefObject<HTMLInputElement | null>;
+    newItemName: string;
+    onNameChange: (val: string) => void;
+    onSubmit: (e: React.FormEvent) => void;
+    onOpenDetails: () => void;
+    isReadOnly: boolean;
+    isEmbedded: boolean;
+}) => (
+    <form
+        onSubmit={onSubmit}
+        className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${isEmbedded ? "" : "max-[600px]:hidden"}`}
+    >
+        <input
+            ref={addInputRef}
+            type="text"
+            value={newItemName}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder={
+                isReadOnly ? "List is read-only (sync failed)" : "Add item..."
+            }
+            disabled={isReadOnly}
+            className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
+        />
+        <button
+            type="button"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
+            disabled={isReadOnly}
+            onClick={onOpenDetails}
+            aria-label="Add item details"
+        >
+            <Settings size={18} />
+        </button>
+        <button
+            type="submit"
+            disabled={isReadOnly}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 ${isReadOnly ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}`}
+            aria-label="Add"
+        >
+            <Plus size={18} strokeWidth={3} />
+        </button>
+    </form>
+);
 
 const ListDetail = ({
     isEmbedded = false,
@@ -733,38 +881,14 @@ const ListDetail = ({
                 className={`w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`}
             >
                 {isEmbedded && (
-                    <header className="flex items-center justify-between mb-2">
-                        <h2 className="text-xl font-black text-text-strong tracking-tighter uppercase italic">
-                            {effectiveListId === "default"
-                                ? "Select a List"
-                                : "Shopping List"}
-                        </h2>
-                        {effectiveListId !== "default" && (
-                            <button
-                                type="button"
-                                onClick={() => navigate("/nav/default")}
-                                className="text-[10px] font-bold text-accent hover:underline uppercase"
-                            >
-                                Switch List
-                            </button>
-                        )}
-                    </header>
+                    <ListHeader
+                        effectiveListId={effectiveListId ?? "default"}
+                        onSwitchList={() => navigate("/nav/default")}
+                    />
                 )}
 
                 {error && (
-                    <div
-                        className={`bg-danger-subtle text-danger border border-danger-border p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300 ${isEmbedded ? "mb-2" : "-mt-2 mb-2"}`}
-                    >
-                        <AlertCircle size={20} className="shrink-0" />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold leading-none mb-1">
-                                System Error
-                            </p>
-                            <p className="text-[13px] opacity-90 leading-tight">
-                                {error}
-                            </p>
-                        </div>
-                    </div>
+                    <ListErrorAlert error={error} isEmbedded={isEmbedded} />
                 )}
 
                 {effectiveListId === "default" && isEmbedded ? (
@@ -776,43 +900,15 @@ const ListDetail = ({
                 ) : (
                     <>
                         <div className="flex flex-col gap-1.5">
-                            <form
+                            <InlineAddForm
+                                addInputRef={addInputRef}
+                                newItemName={newItemName}
+                                onNameChange={handleNewItemNameChange}
                                 onSubmit={handleInlineAdd}
-                                className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${isEmbedded ? "" : "max-[600px]:hidden"}`}
-                            >
-                                <input
-                                    ref={addInputRef}
-                                    type="text"
-                                    value={newItemName}
-                                    onChange={(e) =>
-                                        handleNewItemNameChange(e.target.value)
-                                    }
-                                    placeholder={
-                                        isReadOnly
-                                            ? "List is read-only (sync failed)"
-                                            : "Add item..."
-                                    }
-                                    disabled={isReadOnly}
-                                    className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
-                                />
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
-                                    disabled={isReadOnly}
-                                    onClick={openDetailsModal}
-                                    aria-label="Add item details"
-                                >
-                                    <Settings size={18} />
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isReadOnly}
-                                    className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 ${isReadOnly ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}`}
-                                    aria-label="Add"
-                                >
-                                    <Plus size={18} strokeWidth={3} />
-                                </button>
-                            </form>
+                                onOpenDetails={openDetailsModal}
+                                isReadOnly={isReadOnly}
+                                isEmbedded={isEmbedded}
+                            />
 
                             <div className="min-h-[20px] px-2 flex items-center">
                                 <PresenceBar variant="typing" />

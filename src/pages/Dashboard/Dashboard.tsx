@@ -132,10 +132,7 @@ const Dashboard = () => {
     } else if (selectedList) {
         mainContent = (
             <div className="max-w-[860px] mx-auto w-full">
-                <ListDetail
-                    listIdOverride={selectedList.id}
-                    listTitle={selectedList.name}
-                />
+                <ListDetail listIdOverride={selectedList.id} />
             </div>
         );
     } else {
