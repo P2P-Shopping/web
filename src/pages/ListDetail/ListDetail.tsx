@@ -45,6 +45,7 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [items, setItems] = useState<Item[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [syncFailed, setSyncFailed] = useState(false);
 
     const getBaseUrl = useCallback(
         () => import.meta.env.VITE_API_URL || "http://localhost:8081",
@@ -88,6 +89,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 if (!response.ok) {
                     if (response.status === 401) {
                         useStore.getState().setAuth(null);
+                        setSyncFailed(true);
                         throw new Error("Session expired.");
                     }
                     throw new Error("Failed to fetch list");
@@ -112,6 +114,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             } catch (error) {
                 console.error("fetchListData error:", error);
                 setError("Failed to sync the list.");
+                setSyncFailed(true);
             } finally {
                 setIsLoading(false);
             }
@@ -224,7 +227,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                     }),
                 });
             }
-        } catch {
+        } catch (err) {
+            console.error("addItem error:", err);
             setError("Failed to add the product.");
             rollbackItem(newItem.id);
         }
@@ -277,7 +281,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                     }),
                 });
             }
-        } catch {
+        } catch (err) {
+            console.error("toggleItem error:", err);
             setError("Failed to update the product.");
             revertItemChecked(itemId, currentItem.checked);
         }
@@ -303,7 +308,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                 }
                 throw new Error("Failed to delete item");
             }
-        } catch {
+        } catch (err) {
+            console.error("deleteItem error:", err);
             setError("Failed to delete the product.");
             fetchListData(effectiveListId);
         }
@@ -313,6 +319,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         items,
         isLoading,
         error,
+        syncFailed,
         addItem,
         toggleItem,
         deleteItem,
@@ -800,8 +807,15 @@ const ListDetail = ({
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
 
-    const { items, isLoading, error, addItem, toggleItem, deleteItem } =
-        useListItems(effectiveListId);
+    const {
+        items,
+        isLoading,
+        error,
+        syncFailed,
+        addItem,
+        toggleItem,
+        deleteItem,
+    } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
 
@@ -826,10 +840,19 @@ const ListDetail = ({
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: reset on change
     useEffect(() => {
+        resetDetailFields();
+    }, [effectiveListId]);
+
+    const resetDetailFields = useCallback(() => {
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
         setShowExpandedDetails(false);
-    }, [effectiveListId]);
+        setNewItemName("");
+        setDetailName("");
+        setDetailQuantity("");
+        setDetailBrand("");
+        setDetailPrice("");
+    }, []);
 
     const handleNewItemNameChange = (name: string) => {
         setNewItemName(name);
@@ -867,7 +890,7 @@ const ListDetail = ({
         setNewItemName("");
     };
 
-    const isReadOnly = error === "Failed to sync the list.";
+    const isReadOnly = syncFailed;
 
     return (
         <div
@@ -918,7 +941,7 @@ const ListDetail = ({
                         <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
                             {isLoading ? (
                                 <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
-                                    <div className="w-8 h-8 border-3 border-border border-t-accent rounded-full animate-spin" />
+                                    <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
                                     <p>Loading...</p>
                                 </div>
                             ) : (
@@ -952,11 +975,7 @@ const ListDetail = ({
 
             <AddItemDetailsModal
                 isOpen={showMobileAddModal}
-                onClose={() => {
-                    setShowMobileAddModal(false);
-                    setShowExpandedDetails(false);
-                    setNewItemName("");
-                }}
+                onClose={resetDetailFields}
                 onSubmit={handleDetailsSubmit}
                 title="Add Item"
                 idPrefix="mobile"
@@ -976,7 +995,7 @@ const ListDetail = ({
 
             <AddItemDetailsModal
                 isOpen={showDetailsModal}
-                onClose={() => setShowDetailsModal(false)}
+                onClose={resetDetailFields}
                 onSubmit={handleDetailsSubmit}
                 title="Add Item Details"
                 subtitle="Add optional details like quantity, brand, and price"

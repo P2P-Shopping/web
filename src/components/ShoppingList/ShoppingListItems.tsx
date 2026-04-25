@@ -48,7 +48,7 @@ const ShoppingListItems: React.FC<Props> = ({
                             type="checkbox"
                             className="sr-only"
                             checked={item.checked}
-                            onChange={() => !disabled && onCheck(item.id)}
+                            onChange={() => onCheck(item.id)}
                             disabled={disabled}
                         />
                         <div
@@ -126,9 +126,8 @@ const ShoppingListItems: React.FC<Props> = ({
                     {onDelete && (
                         <button
                             type="button"
-                            className="flex items-center justify-center w-8 h-8 rounded-lg text-text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-danger-subtle hover:text-danger shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-danger"
+                            className="flex items-center justify-center w-8 h-8 rounded-lg text-text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all hover:bg-danger-subtle hover:text-danger shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                             onClick={(e) => {
-                                if (disabled) return;
                                 e.stopPropagation();
                                 onDelete(item.id);
                             }}

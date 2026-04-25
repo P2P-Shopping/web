@@ -126,9 +126,12 @@ function App() {
                     setAuth(null);
                 });
         }
+    }, [setAuth, authChecked]);
+
+    useEffect(() => {
         startMockEmitter();
         return () => stopMockEmitter();
-    }, [setAuth, authChecked]);
+    }, []);
 
     useEffect(() => {
         let subscription: StompSubscription | null = null;

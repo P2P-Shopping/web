@@ -59,9 +59,7 @@ interface AppState {
     /** Flags an item as experiencing a sync conflict */
     setItemConflict: (itemId: string, hasConflict: boolean) => void;
     /** Updates authentication state */
-    setAuth: (
-        user: { email: string; firstName?: string; userId?: string } | null,
-    ) => void;
+    setAuth: (user: unknown) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -111,10 +109,18 @@ export const useStore = create<AppState>((set, get) => ({
         set((state) => ({
             conflictItems: { ...state.conflictItems, [itemId]: hasConflict },
         })),
-    setAuth: (user) =>
+    setAuth: (user) => {
+        const isUser = (u: unknown): u is { email: string } =>
+            typeof u === "object" && u !== null && "email" in u;
+
+        const authenticatedUser = isUser(user)
+            ? (user as AppState["user"])
+            : null;
+
         set({
-            user: user && "email" in user ? user : null,
-            isAuthenticated: !!(user && "email" in user),
+            user: authenticatedUser,
+            isAuthenticated: isUser(user),
             authChecked: true,
-        }),
+        });
+    },
 }));

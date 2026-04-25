@@ -21,17 +21,21 @@ const NAV_LINKS = [
 export default function Navbar() {
     const { pathname } = useLocation();
     const [isMoreOpen, setIsMoreOpen] = useState(false);
-    const [windowWidth, setWindowWidth] = useState(globalThis.innerWidth);
+    const [isNarrow, setIsNarrow] = useState(
+        () => globalThis.matchMedia?.("(max-width: 399px)").matches ?? false,
+    );
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const clearLists = useListsStore((state) => state.clearLists);
     const user = useStore((state) => state.user);
 
     // Dynamic priority count based on width
-    const priorityCount = windowWidth < 400 ? 2 : 3;
+    const priorityCount = isNarrow ? 2 : 3;
 
     const handleLogout = async () => {
         try {
             await logoutRequest();
+        } catch (err) {
+            console.error("Logout failed:", err);
         } finally {
             clearLists();
         }
@@ -39,9 +43,23 @@ export default function Navbar() {
 
     // Update width on resize
     useEffect(() => {
-        const handleResize = () => setWindowWidth(globalThis.innerWidth);
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
+        const mql = window.matchMedia("(max-width: 399px)");
+        const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+
+        // Support both modern and older browsers
+        if (mql.addEventListener) {
+            mql.addEventListener("change", handler);
+        } else {
+            mql.addListener(handler);
+        }
+
+        return () => {
+            if (mql.removeEventListener) {
+                mql.removeEventListener("change", handler);
+            } else {
+                mql.removeListener(handler);
+            }
+        };
     }, []);
 
     // Close more menu when clicking outside

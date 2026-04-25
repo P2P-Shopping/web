@@ -54,6 +54,7 @@ const jsonHeaders = (withContentType = false): HeadersInit => {
 const handleAuthResponse = (response: Response) => {
     if (response.status === 401) {
         useStore.getState().setAuth(null);
+        useListsStore.getState().clearLists();
         throw new Error("Session expired. Please log in again.");
     }
     return response;

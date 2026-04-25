@@ -23,6 +23,7 @@ const Dashboard = () => {
         id: string;
         name: string;
     } | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
     const {
         lists,
         isLoading,
@@ -71,13 +72,23 @@ const Dashboard = () => {
     ) => {
         e.preventDefault();
         e.stopPropagation();
+        setDeleteError(null);
         setDeleteTarget({ id: listId, name: listName });
     };
 
     const confirmDeleteList = async (listId: string) => {
-        const deleted = await deleteList(listId);
-        if (deleted) {
-            setDeleteTarget(null);
+        try {
+            const deleted = await deleteList(listId);
+            if (deleted) {
+                setDeleteError(null);
+                setDeleteTarget(null);
+            } else {
+                setDeleteError("Failed to delete the list. Please try again.");
+            }
+        } catch (error) {
+            setDeleteError(
+                error instanceof Error ? error.message : "An error occurred",
+            );
         }
     };
 
@@ -96,14 +107,15 @@ const Dashboard = () => {
             return "No items";
         }
 
-        return `${checked}/${items.length} items`;
+        const label = items.length === 1 ? "item" : "items";
+        return `${checked}/${items.length} ${label}`;
     };
 
     let mainContent: ReactNode;
     if (isLoading) {
         mainContent = (
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-text-muted text-sm">
-                <div className="w-9 h-9 border-3 border-border border-t-accent rounded-full animate-spin" />
+                <div className="w-9 h-9 border-[3px] border-border border-t-accent rounded-full animate-spin" />
                 <p>Loading lists...</p>
             </div>
         );
@@ -329,6 +341,7 @@ const Dashboard = () => {
                     listId={deleteTarget.id}
                     listName={deleteTarget.name}
                     isDeleting={deletingListId === deleteTarget.id}
+                    error={deleteError}
                     onCancel={cancelDeleteList}
                     onConfirm={confirmDeleteList}
                 />
