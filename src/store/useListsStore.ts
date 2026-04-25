@@ -42,18 +42,30 @@ interface ListsState {
     clearLists: () => void;
 }
 
+/**
+ * Resolves the base URL for API requests from environment variables.
+ * @returns The base URL string.
+ */
 const getBaseUrl = () =>
     import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_API_BASE_URL ||
     "http://localhost:8081";
 
+/**
+ * Constructs standard headers for API requests.
+ * @param withContentType - Whether to include the application/json Content-Type header.
+ * @returns Headers initialization object.
+ */
 const jsonHeaders = (withContentType = false): HeadersInit => {
     return {
         ...(withContentType ? { "Content-Type": "application/json" } : {}),
     };
 };
+
 /**
  * Converts an item from the API format to the internal application format.
+ * @param item - The raw API item data.
+ * @returns A formatted Item object.
  */
 const normalizeItem = (item: ApiItem): Item => ({
     id: item.id,
@@ -69,11 +81,11 @@ const normalizeItem = (item: ApiItem): Item => ({
 /**
  * Normalizes the raw list data from the API into the application's ShoppingList format.
  * @param list - The raw API shopping list data.
+ * @returns A formatted ShoppingList object.
  */
 const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     id: list.id,
     name: list.title,
-    // Folosim datele de la API sau un fallback dacă nu există
     createdAt: list.createdAt ?? new Date().toISOString(),
     updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
     status: "active",
@@ -81,6 +93,11 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     items: (list.items ?? []).map(normalizeItem),
 });
 
+/**
+ * Formats a partial item object into the payload expected by the API.
+ * @param item - Partial item data to be formatted.
+ * @returns The API-ready request payload.
+ */
 const buildItemRequest = (item: Partial<Item>) => ({
     name: item.name ?? "",
     isChecked: Boolean(item.checked),
@@ -99,6 +116,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     error: null,
     isModalOpen: false,
     deletingListId: null,
+
     /**
      * Fetches all shopping lists for the current user from the backend API.
      */
@@ -138,6 +156,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
+    /**
+     * Creates a new shopping list via the API and updates the local store.
+     * @param name - The title of the new list.
+     * @returns The newly created list or null if creation failed.
+     */
     addList: async (name: string) => {
         set({ isLoading: true, error: null });
         try {
@@ -185,6 +208,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
+    /**
+     * Updates a shopping list locally in the state.
+     * @param id - The ID of the list to update.
+     * @param updates - The partial data to update.
+     */
     updateList: (id: string, updates: Partial<ShoppingList>) => {
         set((state) => ({
             lists: state.lists.map((list) =>
@@ -193,6 +221,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }));
     },
 
+    /**
+     * Deletes a shopping list via the API and removes it from the local store.
+     * @param id - The ID of the list to delete.
+     * @returns True if successful, false otherwise.
+     */
     deleteList: async (id: string) => {
         set({ deletingListId: id, error: null });
         try {
@@ -234,10 +267,20 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
+    /**
+     * Sets the currently active shopping list in the application state.
+     * @param list - The list to set as active, or null to clear it.
+     */
     setCurrentList: (list: ShoppingList | null) => {
         set({ currentList: list });
     },
 
+    /**
+     * Adds a new item to a specific shopping list via the API.
+     * @param listId - The ID of the list to add the item to.
+     * @param item - The item details (excluding ID).
+     * @returns True if successful, false otherwise.
+     */
     addItem: async (listId: string, item: Omit<Item, "id">) => {
         try {
             const response = await fetch(
@@ -282,6 +325,12 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
+    /**
+     * Toggles the checked status of a specific item via the API.
+     * @param listId - The ID of the list containing the item.
+     * @param itemId - The ID of the item to toggle.
+     * @returns True if successful, false otherwise.
+     */
     toggleItem: async (listId: string, itemId: string) => {
         const list = get().lists.find((entry) => entry.id === listId);
         const item = list?.items.find((entry) => entry.id === itemId);
@@ -340,6 +389,12 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
+    /**
+     * Deletes a specific item from a shopping list via the API.
+     * @param listId - The ID of the list containing the item.
+     * @param itemId - The ID of the item to delete.
+     * @returns True if successful, false otherwise.
+     */
     deleteItem: async (listId: string, itemId: string) => {
         try {
             const response = await fetch(
@@ -385,9 +440,19 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
+    /** Opens the 'Create List' modal. */
     openModal: () => set({ isModalOpen: true }),
+
+    /** Closes the 'Create List' modal. */
     closeModal: () => set({ isModalOpen: false }),
 
+    /**
+     * Retrieves a specific shopping list by its ID from the local state.
+     * @param id - The ID of the list to retrieve.
+     * @returns The matching shopping list or undefined.
+     */
     getListById: (id: string) => get().lists.find((list) => list.id === id),
+
+    /** Clears all lists from the store and resets state. */
     clearLists: () => set({ lists: [], currentList: null, error: null }),
 }));

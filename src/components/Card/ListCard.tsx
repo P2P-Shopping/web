@@ -1,11 +1,18 @@
 import { CalendarDays, ChevronRight, ShoppingCart } from "lucide-react";
 import type { ShoppingList } from "../../types";
 
+/**
+ * Props for the ListCard component.
+ */
 interface ListCardProps {
     list: ShoppingList;
     onClick?: () => void;
 }
 
+/**
+ * Component to display a summary card for a shopping list.
+ * Shows the list name, creation date, and progress of checked items.
+ */
 export default function ListCard({ list, onClick }: ListCardProps) {
     const { totalItems, checkedItems } = (list.items || []).reduce(
         (acc, item) => {
@@ -19,13 +26,9 @@ export default function ListCard({ list, onClick }: ListCardProps) {
     const progress =
         totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
 
-    /**
-     * Component to display a summary card for a shopping list.
-     */
     const formattedDate = new Date(list.createdAt).toLocaleDateString(
         undefined,
         {
-            // Schimbă din "ro-RO" în undefined
             day: "numeric",
             month: "short",
             year: "numeric",

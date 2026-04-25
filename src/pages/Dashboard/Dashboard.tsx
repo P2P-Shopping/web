@@ -17,6 +17,10 @@ import CreateListModal from "./CreateListModal";
 
 const PREVIEW_LIMIT = 2;
 
+/**
+ * Main dashboard component that displays the user's shopping lists.
+ * Handles list selection, deletion, and rendering the details view.
+ */
 const Dashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [deleteTarget, setDeleteTarget] = useState<{
@@ -47,6 +51,10 @@ const Dashboard = () => {
         [lists, selectedListId],
     );
 
+    /**
+     * Updates the URL search parameters to select a specific list.
+     * @param listId - The ID of the list to select.
+     */
     const handleCardClick = (listId: string) => {
         setSearchParams({ list: listId });
     };
@@ -57,7 +65,6 @@ const Dashboard = () => {
      */
     const formatDate = (dateStr: string) => {
         return new Date(dateStr).toLocaleDateString(undefined, {
-            // Schimbă din "en-US" în undefined
             day: "numeric",
             month: "short",
             hour: "2-digit",
@@ -65,6 +72,9 @@ const Dashboard = () => {
         });
     };
 
+    /**
+     * Opens the deletion confirmation modal for a specific list.
+     */
     const handleDeleteList = (
         e: MouseEvent<HTMLButtonElement>,
         listId: string,
@@ -76,6 +86,10 @@ const Dashboard = () => {
         setDeleteTarget({ id: listId, name: listName });
     };
 
+    /**
+     * Confirms and processes the deletion of a list.
+     * @param listId - The ID of the list to delete.
+     */
     const confirmDeleteList = async (listId: string) => {
         try {
             const deleted = await deleteList(listId);
@@ -92,14 +106,24 @@ const Dashboard = () => {
         }
     };
 
+    /**
+     * Cancels the deletion process and closes the modal.
+     */
     const cancelDeleteList = () => {
         setDeleteTarget(null);
     };
 
+    /**
+     * Clears the currently selected list from the URL search parameters.
+     */
     const clearSelectedList = () => {
         setSearchParams({});
     };
 
+    /**
+     * Calculates the string representation of checked vs total items.
+     * @param items - The array of items in the list.
+     */
     const getItemsCount = (items: Item[]) => {
         const checked = items.filter((item) => item.checked).length;
         if (items.length === 0) {
