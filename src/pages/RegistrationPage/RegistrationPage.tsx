@@ -37,7 +37,9 @@ const RegistrationPage = () => {
 
         const nameRegex = /^[a-zA-Z\s-]+$/;
         if (!nameRegex.test(formData.firstName)) {
-            setError("First name can only contain letters, spaces, or hyphens.");
+            setError(
+                "First name can only contain letters, spaces, or hyphens.",
+            );
             return;
         }
         if (!nameRegex.test(formData.lastName)) {
