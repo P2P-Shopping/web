@@ -53,7 +53,7 @@ const Dashboard = () => {
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
-        return date.toLocaleDateString("en-US", {
+        return date.toLocaleDateString("ro-RO", {
             day: "numeric",
             month: "short",
             hour: "2-digit",

@@ -16,8 +16,20 @@ interface ApiItem {
 interface ApiShoppingList {
     id: string;
     title: string;
+    createdAt?: string;
+    updatedAt?: string;
     items?: ApiItem[];
 }
+
+const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
+    id: list.id,
+    name: list.title,
+    createdAt: list.createdAt ?? new Date().toISOString(),
+    updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
+    status: "active",
+    ownerName: "Tu",
+    items: (list.items ?? []).map(normalizeItem),
+});
 
 interface ListsState {
     lists: ShoppingList[];

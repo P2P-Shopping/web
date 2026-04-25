@@ -7,8 +7,15 @@ interface ListCardProps {
 }
 
 export default function ListCard({ list, onClick }: ListCardProps) {
-    const totalItems = list.items?.length || 0;
-    const checkedItems = list.items?.filter((item) => item.checked).length || 0;
+    const { totalItems, checkedItems } = (list.items || []).reduce(
+        (acc, item) => {
+            acc.totalItems++;
+            if (item.checked) acc.checkedItems++;
+            return acc;
+        },
+        { totalItems: 0, checkedItems: 0 },
+    );
+
     const progress =
         totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
 
