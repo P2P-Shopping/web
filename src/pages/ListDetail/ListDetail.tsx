@@ -952,6 +952,42 @@ const ListDetail = ({
                                         onDelete={deleteItem}
                                         disabled={isReadOnly}
                                     />
+                                    {items.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                                                    Estimated Total
+                                                </span>
+                                                <span className="text-xs text-text-muted opacity-70">
+                                                    {items.length} items
+                                                </span>
+                                            </div>
+                                            <span className="text-xl font-black text-accent tracking-tight">
+                                                {items
+                                                    .reduce((sum, item) => {
+                                                        const qtyStr =
+                                                            item.quantity ||
+                                                            "1";
+                                                        const qtyMatch =
+                                                            qtyStr.match(
+                                                                /(\d+(?:\.\d+)?)/,
+                                                            );
+                                                        const qty = qtyMatch
+                                                            ? Number.parseFloat(
+                                                                  qtyMatch[1],
+                                                              )
+                                                            : 1;
+                                                        return (
+                                                            sum +
+                                                            (item.price || 0) *
+                                                                qty
+                                                        );
+                                                    }, 0)
+                                                    .toFixed(2)}{" "}
+                                                lei
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
