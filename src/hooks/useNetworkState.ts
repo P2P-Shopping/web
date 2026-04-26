@@ -10,8 +10,8 @@ import { useStore } from "../context/useStore";
  */
 export const useNetworkState = (): void => {
     const setOnlineStatus = useStore((state) => state.setOnlineStatus);
-      const setServerConnected = useStore((state) => state.setServerConnected);
-      const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const setServerConnected = useStore((state) => state.setServerConnected);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         /**
