@@ -1,7 +1,7 @@
 import { AlertCircle, ChevronDown, Plus, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Modal, PresenceBar } from "../../components";
+import { Modal, PresenceBar, SmartReviewModal, type ReviewItem } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
@@ -46,6 +46,10 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [syncFailed, setSyncFailed] = useState(false);
+
+    
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
     const getBaseUrl = useCallback(
         () => import.meta.env.VITE_API_URL || "http://localhost:8081",
@@ -126,6 +130,74 @@ const useListItems = (effectiveListId: string | undefined) => {
         setIsLoading(true);
         fetchListData();
     }, [fetchListData]);
+
+
+    const handleAiImport = async (recipeText: string) => {
+        if (!recipeText.trim() || !effectiveListId) return;
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`${getBaseUrl()}/api/ai/recipe-to-list`, {
+                method: "POST",
+                headers: getAuthHeaders(true),
+                body: JSON.stringify({ text: recipeText, listId: effectiveListId }),
+                credentials: "include",
+            });
+
+            if (!response.ok) throw new Error("AI Service error");
+
+            const aiData = await response.json();
+            
+          type AiResponseItem = {
+    id?: string;
+    name?: string;
+    brand?: string;
+    quantity?: string;
+};
+
+const rawItems = (Array.isArray(aiData) ? aiData : aiData.items || []) as AiResponseItem[];
+
+const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
+    id: item.id || crypto.randomUUID(),
+    name: item.name || "",
+    brand: item.brand || "",
+    quantity: item.quantity || "",
+    checked: false, 
+}));
+
+            setReviewItems(itemsToReview);
+            setIsReviewModalOpen(true);
+        } catch (err) {
+            setError("AI processing error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleReviewConfirm = async (feedback: ReviewItem[]) => {
+        try {
+            const savePromises = feedback.map(item => 
+                fetch(`${getBaseUrl()}/api/lists/${effectiveListId}/items`, {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({
+                        name: item.name,
+                        isChecked: false,
+                        brand: item.brand ?? null,
+                        quantity: item.quantity ?? null,
+                        timestamp: Date.now(),
+                    }),
+                    credentials: "include",
+                })
+            );
+            await Promise.all(savePromises);
+            await fetchListData(effectiveListId);
+            setIsReviewModalOpen(false);
+        } catch (err) {
+            setError("Error saving reviewed items.");
+        }
+    };
 
     const rollbackItem = useCallback(
         (itemId: string) => {
@@ -324,6 +396,11 @@ const useListItems = (effectiveListId: string | undefined) => {
         toggleItem,
         deleteItem,
         setError,
+        handleAiImport,
+        isReviewModalOpen,
+        setIsReviewModalOpen,
+        reviewItems,
+        handleReviewConfirm
     };
 };
 
@@ -815,6 +892,10 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        isReviewModalOpen,
+        setIsReviewModalOpen,
+        reviewItems,
+        handleReviewConfirm
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -838,7 +919,6 @@ const ListDetail = ({
         }
     }, [isEmbedded, lists.length, fetchLists]);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: reset on change
     useEffect(() => {
         resetDetailFields();
     }, [effectiveListId]);
@@ -1045,6 +1125,13 @@ const ListDetail = ({
                 price={detailPrice}
                 setPrice={setDetailPrice}
                 onTyping={sendTypingEvent}
+            />
+
+            <SmartReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                items={reviewItems}
+                onConfirm={handleReviewConfirm}
             />
         </div>
     );
