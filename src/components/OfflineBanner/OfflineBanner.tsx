@@ -7,7 +7,7 @@ import { useStore } from "../../context/useStore";
  * or when the backend server is unreachable.
  */
 export const OfflineBanner: React.FC = () => {
-const isOnline = useStore((state) => state.isOnline);
+    const isOnline = useStore((state) => state.isOnline);
     const isServerConnected = useStore((state) => state.isServerConnected);
     // If we have a top navbar/header, we might want to offset this,
     // but usually global banners stay at the very top (top-0).
