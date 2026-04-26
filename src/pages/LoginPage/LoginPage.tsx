@@ -19,7 +19,7 @@ const LoginPage = () => {
         setIsSubmitting(true);
         try {
             const result = await loginRequest(email, password);
-            setAuth(result);
+            setAuth(result, result.token);
             navigate("/dashboard");
         } catch (err: unknown) {
             let message = "Login failed. Please try again.";
