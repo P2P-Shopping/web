@@ -121,7 +121,7 @@ export const useStore = create<AppState>()(
                         [itemId]: hasConflict,
                     },
                 })),
-            setAuth: (user, token = null) => {
+            setAuth: (user, token) => {
                 const isUser = (u: unknown): u is { email: string } =>
                     typeof u === "object" && u !== null && "email" in u;
 
@@ -140,7 +140,6 @@ export const useStore = create<AppState>()(
         {
             name: "p2p-shopping-storage",
             partialize: (state) => ({
-                token: state.token,
                 user: state.user,
                 isAuthenticated: state.isAuthenticated,
             }),

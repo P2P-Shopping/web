@@ -185,7 +185,13 @@ function App() {
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
             stompClient.onStompError = () => {};
-            stompClient.deactivate();
+            (async () => {
+                try {
+                    await stompClient.deactivate();
+                } catch (err) {
+                    console.error("Failed to deactivate STOMP client:", err);
+                }
+            })();
         };
     }, [handlePongMessage, setServerConnected, clearToastTimeout, token]);
 

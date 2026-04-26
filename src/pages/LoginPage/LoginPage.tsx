@@ -19,6 +19,15 @@ const LoginPage = () => {
         setIsSubmitting(true);
         try {
             const result = await loginRequest(email, password);
+            if (
+                !result ||
+                typeof result.token !== "string" ||
+                result.token.trim().length === 0
+            ) {
+                throw new Error(
+                    "Invalid response from server. No token received.",
+                );
+            }
             setAuth(result, result.token);
             navigate("/dashboard");
         } catch (err: unknown) {
