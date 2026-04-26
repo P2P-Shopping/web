@@ -40,6 +40,13 @@ interface ListDetailProps {
     listIdOverride?: string;
 }
 
+type AiResponseItem = {
+    id?: string;
+    name?: string;
+    brand?: string;
+    quantity?: string;
+};
+
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
     const [items, setItems] = useState<Item[]>([]);
@@ -149,20 +156,13 @@ const useListItems = (effectiveListId: string | undefined) => {
 
             const aiData = await response.json();
             
-          type AiResponseItem = {
-    id?: string;
-    name?: string;
-    brand?: string;
-    quantity?: string;
-};
-
 const rawItems = (Array.isArray(aiData) ? aiData : aiData.items || []) as AiResponseItem[];
 
 const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
     id: item.id || crypto.randomUUID(),
     name: item.name || "",
-    brand: item.brand || "",
-    quantity: item.quantity || "",
+    brand: item.brand || undefined,   
+    quantity: item.quantity || undefined, 
     checked: false, 
 }));
 
@@ -175,29 +175,33 @@ const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
         }
     };
 
-    const handleReviewConfirm = async (feedback: ReviewItem[]) => {
-        try {
-            const savePromises = feedback.map(item => 
-                fetch(`${getBaseUrl()}/api/lists/${effectiveListId}/items`, {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        name: item.name,
-                        isChecked: false,
-                        brand: item.brand ?? null,
-                        quantity: item.quantity ?? null,
-                        timestamp: Date.now(),
-                    }),
-                    credentials: "include",
-                })
-            );
-            await Promise.all(savePromises);
-            await fetchListData(effectiveListId);
-            setIsReviewModalOpen(false);
-        } catch (err) {
-            setError("Error saving reviewed items.");
+const handleReviewConfirm = async (feedback: ReviewItem[]) => {
+    try {
+        for (const item of feedback) {
+            const res = await fetch(`${getBaseUrl()}/api/lists/${effectiveListId}/items`, {
+                method: "POST",
+                headers: getAuthHeaders(true),
+                body: JSON.stringify({
+                    name: item.name,
+                    isChecked: false,
+                    brand: item.brand?.trim() ? item.brand.trim() : null,
+                    quantity: item.quantity?.trim() ? item.quantity.trim() : null,
+                    timestamp: Date.now(),
+                }),
+                credentials: "include",
+            });
+            
+            if (!res.ok) {
+                throw new Error(`Failed to save item: ${item.name}`);
+            }
         }
-    };
+        await fetchListData(effectiveListId);
+        setIsReviewModalOpen(false);
+    } catch (err) {
+        console.error("handleReviewConfirm error:", err);
+        setError("Error saving reviewed items.");
+    }
+};
 
     const rollbackItem = useCallback(
         (itemId: string) => {
