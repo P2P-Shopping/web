@@ -9,7 +9,11 @@ interface NetworkStore {
   setIsOnline: (v: boolean) => void;
   setIsServerConnected: (v: boolean) => void;
 }
-
+const computeStatus = (isOnline: boolean, isServerConnected: boolean): NetworkStatus => {
+    if (!isOnline) return "offline";
+    if (!isServerConnected) return "reconnecting";
+    return "online";
+};
 export const useNetworkStore = create<NetworkStore>((set) => ({
   isOnline: navigator.onLine,
   isServerConnected: true,
@@ -18,12 +22,12 @@ export const useNetworkStore = create<NetworkStore>((set) => ({
   setIsOnline: (isOnline) =>
     set((s) => ({
       isOnline,
-      status: !isOnline ? "offline" : !s.isServerConnected ? "reconnecting" : "online",
+      status: computeStatus(isOnline, s.isServerConnected),
     })),
 
   setIsServerConnected: (isServerConnected) =>
     set((s) => ({
       isServerConnected,
-      status: !s.isOnline ? "offline" : !isServerConnected ? "reconnecting" : "online",
+            status: computeStatus(s.isOnline, isServerConnected),
     })),
 }));
