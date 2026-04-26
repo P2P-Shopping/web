@@ -63,6 +63,7 @@ const MapPage = () => {
                     </p>
 
                     <button 
+                        type="button"
                         onClick={handleMockGeofenceEntry}
                         className="mt-2 w-full py-4 bg-accent text-text-on-accent rounded-xl font-bold tracking-wide transition-all hover:scale-[1.01] active:scale-[0.98] shadow-[0_4px_14px_var(--color-accent-glow)]"
                     >
