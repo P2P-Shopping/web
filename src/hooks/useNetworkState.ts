@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "../context/useStore";
 
 /**
@@ -10,6 +10,8 @@ import { useStore } from "../context/useStore";
  */
 export const useNetworkState = (): void => {
     const setOnlineStatus = useStore((state) => state.setOnlineStatus);
+      const setServerConnected = useStore((state) => state.setServerConnected);
+      const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         /**
@@ -41,4 +43,29 @@ export const useNetworkState = (): void => {
             globalThis.removeEventListener("offline", handleOffline);
         };
     }, [setOnlineStatus]);
+    useEffect(() => {
+        const ping = async (): Promise<void> => {
+            if (!navigator.onLine) {
+                setServerConnected(false);
+                return;
+            }
+            try {
+                const res = await fetch("/api/v1/telemetry/ping", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ts: Date.now() }),
+                    signal: AbortSignal.timeout(5000),
+                });
+                setServerConnected(res.ok || res.status === 202);
+            } catch {
+                setServerConnected(false);
+            }
+        };
+        ping(); // imediat la mount
+        intervalRef.current = setInterval(ping, 10_000);
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, [setServerConnected]);
 };
