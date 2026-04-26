@@ -22,7 +22,7 @@ api.interceptors.response.use(
     (error) => {
         if (axios.isAxiosError(error) && error.response?.status === 401) {
             // Only clear auth if we weren't already on the login page
-            if (!window.location.pathname.includes("/login")) {
+            if (!globalThis.location.pathname.includes("/login")) {
                 useStore.getState().setAuth(null, null);
             }
         }

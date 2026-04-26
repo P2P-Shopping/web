@@ -15,7 +15,8 @@ export const checkAuthRequest = async () => {
     try {
         const response = await api.get("/api/auth/me");
         return response.data;
-    } catch (_error) {
+    } catch {
+        // Silently fail auth check as it's expected when not logged in
         return null;
     }
 };

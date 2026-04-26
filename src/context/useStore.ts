@@ -133,7 +133,7 @@ export const useStore = create<AppState>()(
                     user: authenticatedUser,
                     isAuthenticated: isUser(user),
                     authChecked: true,
-                    token: token !== undefined ? token : get().token,
+                    token: token === undefined ? get().token : token,
                 });
             },
         }),
