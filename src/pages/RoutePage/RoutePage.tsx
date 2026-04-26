@@ -1,13 +1,24 @@
 import { useEffect } from "react";
 import { useStore } from "../../context/useStore";
-import { loadMockRoute } from "../../services/loadRoute";
+import { loadRoute } from "../../services/loadRoute"; 
 
 const RoutePage = () => {
     const route = useStore((state) => state.route);
 
-    useEffect(() => {
-        loadMockRoute();
-    }, []);
+useEffect(() => {
+   loadRoute(
+    [
+        "33333333-c3d4-e5f6-a7b8-3456789012cd",
+        "22222222-b2c3-d4e5-f6a7-2345678901bc",
+        "11111111-a1b2-c3d4-e5f6-1234567890ab",
+        "66666666-f6a7-b8c9-d0e1-6789012345f0",
+        "55555555-e5f6-a7b8-c9d0-5678901234ef",
+        "44444444-d4e5-f6a7-b8c9-4567890123de",
+    ],
+    47.156,
+    27.587
+);},[]);
+		
 
     return (
         <div className="flex-1 p-7 max-w-[1200px] mx-auto w-full flex flex-col gap-6">
