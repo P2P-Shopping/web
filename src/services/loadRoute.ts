@@ -1,9 +1,9 @@
 // src/services/loadRoute.ts
 import { type RoutePoint, useStore } from "../context/useStore";
 import {
+    type BackendRoutePoint,
     calculateRoute,
     pollFullRoute,
-    type BackendRoutePoint,
 } from "./routingService";
 
 // Converts backend format { itemId, lat, lng } to store format { itemId, name, lat, lng }
@@ -23,11 +23,16 @@ function toRoutePoint(p: BackendRoutePoint): RoutePoint {
 export async function loadRoute(
     productIds: string[],
     userLat: number,
-    userLng: number
+    userLng: number,
 ): Promise<void> {
     const { setRoute } = useStore.getState();
 
-    const data = await calculateRoute({ userLat, userLng, productIds, lazyN: 5 });
+    const data = await calculateRoute({
+        userLat,
+        userLng,
+        productIds,
+        lazyN: 5,
+    });
 
     if (data.status === "error") {
         console.warn("Routing error:", data.warnings);

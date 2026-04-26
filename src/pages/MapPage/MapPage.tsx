@@ -5,24 +5,28 @@ import { loadRoute } from "../../services/loadRoute";
 
 const MapPage = () => {
     const userLocation = useStore((state) => state.userLocation);
-    const setTargetStoreLocation = useStore((state) => state.setTargetStoreLocation);
+    const setTargetStoreLocation = useStore(
+        (state) => state.setTargetStoreLocation,
+    );
     const items = useStore((state) => state.items);
-    
+
     const navigate = useNavigate();
 
     const handleMockGeofenceEntry = () => {
         // 1. Simulate the store being exactly where the user is currently standing
         // This ensures the backend and the Canvas map have a valid anchor point
-        setTargetStoreLocation({ 
-            lat: userLocation.lat, 
-            lng: userLocation.lng 
+        setTargetStoreLocation({
+            lat: userLocation.lat,
+            lng: userLocation.lng,
         });
 
         // 2. Extract item IDs for the backend
-        const productIds = items.map(item => item.id);
+        const productIds = items.map((item) => item.id);
 
         // 3. Fire the backend lazy-loading TSP math
-        loadRoute(productIds, userLocation.lat, userLocation.lng).catch(console.error);
+        loadRoute(productIds, userLocation.lat, userLocation.lng).catch(
+            console.error,
+        );
 
         // 4. Instantly switch to the indoor canvas Map
         navigate("/nav", { replace: true });
@@ -59,10 +63,13 @@ const MapPage = () => {
             <Card title="Geofence Simulation">
                 <div className="flex flex-col gap-4">
                     <p className="text-sm text-text-muted leading-relaxed">
-                        In production, the app automatically transitions to the indoor map when your GPS gets within 150 meters of the target store. For this demo, use the button below to simulate crossing that threshold.
+                        In production, the app automatically transitions to the
+                        indoor map when your GPS gets within 150 meters of the
+                        target store. For this demo, use the button below to
+                        simulate crossing that threshold.
                     </p>
 
-                    <button 
+                    <button
                         type="button"
                         onClick={handleMockGeofenceEntry}
                         className="mt-2 w-full py-4 bg-accent text-text-on-accent rounded-xl font-bold tracking-wide transition-all hover:scale-[1.01] active:scale-[0.98] shadow-[0_4px_14px_var(--color-accent-glow)]"

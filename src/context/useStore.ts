@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
 // 👇 Exported so MapPage and StoreMap can use it
-export interface Coordinate { 
-    lat: number; 
-    lng: number; 
+export interface Coordinate {
+    lat: number;
+    lng: number;
 }
 
 export interface RoutePoint {
@@ -25,8 +25,8 @@ export interface Item {
 interface AppState {
     userLocation: Coordinate;
     // 👇 ADDED: To pass the store location to the canvas
-    targetStoreLocation: Coordinate | null; 
-    
+    targetStoreLocation: Coordinate | null;
+
     route: RoutePoint[];
     status: string;
     /** Current list of items */
@@ -45,13 +45,13 @@ interface AppState {
     isAuthenticated: boolean;
     /** Whether the initial auth check has been completed */
     authChecked: boolean;
-    
+
     /** Updates user location */
     setUserLocation: (loc: Coordinate) => void;
-    
+
     // 👇 ADDED: Setter for target store
-    setTargetStoreLocation: (loc: Coordinate) => void; 
-    
+    setTargetStoreLocation: (loc: Coordinate) => void;
+
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
     /** Sets application status */
@@ -87,30 +87,30 @@ export const useStore = create<AppState>((set, get) => ({
     user: null,
     isAuthenticated: false,
     authChecked: false,
-    
+
     setUserLocation: (loc) => set({ userLocation: loc }),
-    
+
     // 👇 SETTER IMPLEMENTATION
-    setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }), 
-    
+    setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
+
     setRoute: (route) => set({ route }),
     setStatus: (status) => set({ status }),
     setOnlineStatus: (status) => set({ isOnline: status }),
     setServerConnected: (status) => set({ isServerConnected: status }),
     setItems: (items) => set({ items }),
-    
+
     backupItemState: (item) =>
         set((state) => ({
             backupItems: { ...state.backupItems, [item.id]: { ...item } },
         })),
-        
+
     toggleItemOptimistic: (itemId, newChecked) =>
         set((state) => ({
             items: state.items.map((i) =>
                 i.id === itemId ? { ...i, checked: newChecked } : i,
             ),
         })),
-        
+
     rollbackItemState: (itemId) => {
         const backup = get().backupItems[itemId];
         if (backup) {
@@ -126,12 +126,12 @@ export const useStore = create<AppState>((set, get) => ({
             });
         }
     },
-    
+
     setItemConflict: (itemId, hasConflict) =>
         set((state) => ({
             conflictItems: { ...state.conflictItems, [itemId]: hasConflict },
         })),
-        
+
     setAuth: (user) => {
         const isUser = (u: unknown): u is { email: string } =>
             typeof u === "object" && u !== null && "email" in u;

@@ -41,7 +41,7 @@ const BASE_URL = "/api/routing";
  * and starts background optimization.
  */
 export async function calculateRoute(
-    request: CalculateRouteRequest
+    request: CalculateRouteRequest,
 ): Promise<CalculateRouteResponse> {
     const res = await fetch(`${BASE_URL}/calculate`, {
         method: "POST",
@@ -59,7 +59,7 @@ export async function calculateRoute(
  * Returns null if still computing (202), throws on error.
  */
 export async function getFullRoute(
-    routeId: string
+    routeId: string,
 ): Promise<CalculateRouteResponse | null> {
     const res = await fetch(`${BASE_URL}/full/${routeId}`);
 
@@ -75,7 +75,7 @@ export async function getFullRoute(
 export async function getMacroEstimates(
     userLat: number,
     userLng: number,
-    storeId: string
+    storeId: string,
 ): Promise<MacroRoutingResponse> {
     const params = new URLSearchParams({
         userLat: String(userLat),
@@ -96,7 +96,7 @@ export async function getMacroEstimates(
 export function pollFullRoute(
     routeId: string,
     onUpdate: (route: BackendRoutePoint[]) => void,
-    intervalMs = 2000
+    intervalMs = 2000,
 ): () => void {
     const id = setInterval(async () => {
         try {
