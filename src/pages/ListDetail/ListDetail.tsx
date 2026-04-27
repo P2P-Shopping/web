@@ -178,7 +178,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                 name: item.name || "",
                 brand: item.brand || undefined,
                 quantity: item.quantity || undefined,
-                checked: false,
             }));
 
             setReviewItems(itemsToReview);

@@ -4,10 +4,11 @@ import { Modal } from "../";
 export type ReviewItem = {
     id: string;
     name: string;
-    checked: boolean;
     brand?: string;
     quantity?: string;
 };
+
+type EditableField = "name" | "brand" | "quantity";
 
 type SmartReviewModalProps = {
     isOpen: boolean;
@@ -23,15 +24,17 @@ const SmartReviewModal = ({
     onConfirm,
 }: SmartReviewModalProps) => {
     const [editedItems, setEditedItems] = useState<ReviewItem[]>(items);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const prevIsOpen = useRef(false);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally omitting items to prevent overwriting user edits
     useEffect(() => {
         if (isOpen && !prevIsOpen.current) {
             setEditedItems(items);
+            setIsSubmitting(false);
         }
         prevIsOpen.current = isOpen;
     }, [isOpen]);
-    type EditableField = "name" | "brand" | "quantity";
 
     const updateItem = (index: number, field: EditableField, value: string) => {
         setEditedItems((prev) =>
@@ -39,6 +42,11 @@ const SmartReviewModal = ({
                 i === index ? { ...item, [field]: value } : item,
             ),
         );
+    };
+
+    const handleConfirm = () => {
+        setIsSubmitting(true);
+        onConfirm(editedItems);
     };
 
     return (
@@ -53,17 +61,21 @@ const SmartReviewModal = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-5 py-2.5 text-sm font-semibold text-text-strong bg-bg-muted rounded-xl hover:bg-border transition-colors"
+                        disabled={isSubmitting}
+                        className="px-5 py-2.5 text-sm font-semibold text-text-strong bg-bg-muted rounded-xl hover:bg-border transition-colors disabled:opacity-50"
                     >
                         Cancel
                     </button>
                     <button
                         type="button"
-                        disabled={editedItems.some((item) => !item.name.trim())}
-                        onClick={() => onConfirm(editedItems)}
+                        disabled={
+                            isSubmitting ||
+                            editedItems.some((item) => !item.name.trim())
+                        }
+                        onClick={handleConfirm}
                         className="px-5 py-2.5 text-sm font-bold text-white bg-text-strong rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Confirm & Save
+                        {isSubmitting ? "Saving..." : "Confirm & Save"}
                     </button>
                 </div>
             }
