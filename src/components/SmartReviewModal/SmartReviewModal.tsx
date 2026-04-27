@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Modal } from "../"; // Adjust import path if needed based on your structure
+import { Modal } from "../"; 
 
 export type ReviewItem = {
   id: string;
@@ -26,9 +26,7 @@ const SmartReviewModal = ({ isOpen, items, onClose, onConfirm }: SmartReviewModa
       setEditedItems(items);
     }
     prevIsOpen.current = isOpen;
-  }, [isOpen, items]);
-
-  if (!isOpen) return null;
+  }, [isOpen]);
 
   const updateItem = (index: number, field: keyof ReviewItem, value: string) => {
     setEditedItems((prev) =>
