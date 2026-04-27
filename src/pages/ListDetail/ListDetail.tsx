@@ -1,7 +1,12 @@
 import { AlertCircle, ChevronDown, Plus, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Modal, PresenceBar, SmartReviewModal, type ReviewItem } from "../../components";
+import {
+    Modal,
+    PresenceBar,
+    type ReviewItem,
+    SmartReviewModal,
+} from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
@@ -54,7 +59,6 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [error, setError] = useState<string | null>(null);
     const [syncFailed, setSyncFailed] = useState(false);
 
-    
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
@@ -138,64 +142,78 @@ const useListItems = (effectiveListId: string | undefined) => {
         fetchListData();
     }, [fetchListData]);
 
-
     const handleAiImport = async (recipeText: string) => {
         if (!recipeText.trim() || !effectiveListId) return;
         setIsLoading(true);
         setError(null);
 
         try {
-            const response = await fetch(`${getBaseUrl()}/api/ai/recipe-to-list`, {
-                method: "POST",
-                headers: getAuthHeaders(true),
-                body: JSON.stringify({ text: recipeText, listId: effectiveListId }),
-                credentials: "include",
-            });
+            const response = await fetch(
+                `${getBaseUrl()}/api/ai/recipe-to-list`,
+                {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({
+                        text: recipeText,
+                        listId: effectiveListId,
+                    }),
+                    credentials: "include",
+                },
+            );
 
             if (!response.ok) throw new Error("AI Service error");
 
             const aiData = await response.json();
-            
+
             const rawItems = (
-                Array.isArray(aiData) 
-                    ? aiData 
-                    : (typeof aiData === "object" && aiData !== null ? aiData.items : []) || []
+                Array.isArray(aiData)
+                    ? aiData
+                    : (typeof aiData === "object" && aiData !== null
+                          ? aiData.items
+                          : []) || []
             ) as AiResponseItem[];
 
             const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
                 id: item.id || crypto.randomUUID(),
                 name: item.name || "",
-                brand: item.brand || undefined,   
-                quantity: item.quantity || undefined, 
-                checked: false, 
+                brand: item.brand || undefined,
+                quantity: item.quantity || undefined,
+                checked: false,
             }));
 
             setReviewItems(itemsToReview);
             setIsReviewModalOpen(true);
         } catch (err) {
-            console.error("AI processing error:", err); 
+            console.error("AI processing error:", err);
             setError("AI processing error");
         } finally {
             setIsLoading(false);
         }
     };
 
-const handleReviewConfirm = async (feedback: ReviewItem[]) => {
+    const handleReviewConfirm = async (feedback: ReviewItem[]) => {
         try {
             for (const item of feedback) {
-                const res = await fetch(`${getBaseUrl()}/api/lists/${effectiveListId}/items`, {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        name: item.name,
-                        isChecked: false,
-                        brand: item.brand?.trim() ? item.brand.trim() : null,
-                        quantity: item.quantity?.trim() ? item.quantity.trim() : null,
-                        timestamp: Date.now(),
-                    }),
-                    credentials: "include",
-                });
-                
+                const res = await fetch(
+                    `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
+                    {
+                        method: "POST",
+                        headers: getAuthHeaders(true),
+                        body: JSON.stringify({
+                            name: item.name,
+                            isChecked: false,
+                            brand: item.brand?.trim()
+                                ? item.brand.trim()
+                                : null,
+                            quantity: item.quantity?.trim()
+                                ? item.quantity.trim()
+                                : null,
+                            timestamp: Date.now(),
+                        }),
+                        credentials: "include",
+                    },
+                );
+
                 if (!res.ok) {
                     throw new Error(`Failed to save item: ${item.name}`);
                 }
@@ -205,7 +223,7 @@ const handleReviewConfirm = async (feedback: ReviewItem[]) => {
         } catch (err) {
             console.error("handleReviewConfirm error:", err);
             setError("Error saving some items. Please check your list.");
-            
+
             // NEW: Fetch the list anyway to show any items that successfully saved before the crash
             await fetchListData(effectiveListId);
         }
@@ -412,7 +430,7 @@ const handleReviewConfirm = async (feedback: ReviewItem[]) => {
         isReviewModalOpen,
         setIsReviewModalOpen,
         reviewItems,
-        handleReviewConfirm
+        handleReviewConfirm,
     };
 };
 
@@ -907,7 +925,7 @@ const ListDetail = ({
         isReviewModalOpen,
         setIsReviewModalOpen,
         reviewItems,
-        handleReviewConfirm
+        handleReviewConfirm,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
