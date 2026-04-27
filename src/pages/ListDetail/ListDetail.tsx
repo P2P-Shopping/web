@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronDown, Plus, Settings } from "lucide-react";
+import { AlertCircle, ChevronDown, Plus, Settings, Camera } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Modal, PresenceBar } from "../../components";
@@ -7,6 +7,7 @@ import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
+import { finishShoppingRequest } from "../../services/api";
 
 interface Item {
     id: string;
@@ -815,6 +816,7 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        setError,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -828,6 +830,12 @@ const ListDetail = ({
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
+
+    // Task 4 States
+    const [isFinishing, setIsFinishing] = useState(false);
+    const [showFinishModal, setShowFinishModal] = useState(false);
+    const [finishStoreName, setFinishStoreName] = useState("");
+    const [receiptImage, setReceiptImage] = useState<File | null>(null);
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const { lists, fetchLists } = useListsStore();
@@ -945,7 +953,7 @@ const ListDetail = ({
                                     <p>Loading...</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4">
+                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}
@@ -953,39 +961,35 @@ const ListDetail = ({
                                         disabled={isReadOnly}
                                     />
                                     {items.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                                                    Estimated Total
-                                                </span>
-                                                <span className="text-xs text-text-muted opacity-70">
-                                                    {items.length} items
+                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                                                        Estimated Total
+                                                    </span>
+                                                    <span className="text-xs text-text-muted opacity-70">
+                                                        {items.length} items
+                                                    </span>
+                                                </div>
+                                                <span className="text-xl font-black text-accent tracking-tight">
+                                                    {items
+                                                        .reduce((sum, item) => {
+                                                            const qtyStr = (item.quantity || "1").trim();
+                                                            const qty = /^\d+(?:\.\d+)?$/.test(qtyStr)
+                                                                ? Number.parseFloat(qtyStr)
+                                                                : 1;
+                                                            return sum + (item.price || 0) * qty;
+                                                        }, 0)
+                                                        .toFixed(2)}{" "}
+                                                    lei
                                                 </span>
                                             </div>
-                                            <span className="text-xl font-black text-accent tracking-tight">
-                                                {items
-                                                    .reduce((sum, item) => {
-                                                        const qtyStr =
-                                                            item.quantity ||
-                                                            "1";
-                                                        const qtyMatch =
-                                                            qtyStr.match(
-                                                                /(\d+(?:\.\d+)?)/,
-                                                            );
-                                                        const qty = qtyMatch
-                                                            ? Number.parseFloat(
-                                                                  qtyMatch[1],
-                                                              )
-                                                            : 1;
-                                                        return (
-                                                            sum +
-                                                            (item.price || 0) *
-                                                                qty
-                                                        );
-                                                    }, 0)
-                                                    .toFixed(2)}{" "}
-                                                lei
-                                            </span>
+                                            <button 
+                                                onClick={() => setShowFinishModal(true)}
+                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                            >
+                                                Finish Shopping
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -1046,6 +1050,49 @@ const ListDetail = ({
                 setPrice={setDetailPrice}
                 onTyping={sendTypingEvent}
             />
+
+            {/* Finish Shopping Modal */}
+            <Modal isOpen={showFinishModal} onClose={() => setShowFinishModal(false)} title="Finish Shopping" subtitle="Enter store and take a photo of your receipt.">
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-black uppercase text-text-strong tracking-wider">Store Name</label>
+                        <input type="text" value={finishStoreName} onChange={(e) => setFinishStoreName(e.target.value)} placeholder="e.g. Lidl" className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="text-[11px] font-black uppercase text-text-strong tracking-wider">Receipt Photo</label>
+                        <div className="relative">
+                            <input type="file" accept="image/*" capture="environment" id="receipt-cam" className="hidden" onChange={(e) => setReceiptImage(e.target.files?.[0] || null)} />
+                            <label htmlFor="receipt-cam" className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}>
+                                <Camera size={28} />
+                                <span className="text-sm font-black">{receiptImage ? receiptImage.name : "TAKE PHOTO"}</span>
+                                <span className="text-[10px] uppercase font-bold opacity-50">Click to open camera</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                        <button onClick={() => setShowFinishModal(false)} className="py-3 bg-bg-muted rounded-lg font-bold">Cancel</button>
+                        <button 
+                            disabled={!finishStoreName.trim() || isFinishing || !effectiveListId || effectiveListId === "default"}
+                            onClick={async () => {
+                                if (!effectiveListId || effectiveListId === "default") return;
+                                setIsFinishing(true);
+                                try {
+                                    await finishShoppingRequest({ storeName: finishStoreName.trim(), receiptImage, listId: effectiveListId });
+                                    setShowFinishModal(false);
+                                    setFinishStoreName("");
+                                    setReceiptImage(null);
+                                    navigate("/dashboard");
+                                } catch (err) {
+                                    setError("Failed to complete shopping.");
+                                } finally { setIsFinishing(false); }
+                            }}
+                            className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
+                        >
+                            {isFinishing ? "Processing..." : "Complete"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

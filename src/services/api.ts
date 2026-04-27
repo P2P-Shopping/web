@@ -16,10 +16,19 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Global response interceptor for 401s
+// Global response interceptor for error handling
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        if (axios.isAxiosError(error) && error.response?.data) {
+            const data = error.response.data;
+            // Use the server-provided message if available
+            const serverMessage = data.message || data.error || data.details;
+            if (serverMessage && typeof serverMessage === "string") {
+                error.message = serverMessage;
+            }
+        }
+
         if (axios.isAxiosError(error) && error.response?.status === 401) {
             // Only clear auth if we weren't already on the login page
             if (!globalThis.location.pathname.includes("/login")) {
