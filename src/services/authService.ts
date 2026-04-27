@@ -1,54 +1,33 @@
-import axios from "axios";
 import { useStore } from "../context/useStore";
-
-const API_URL = import.meta.env.VITE_API_BASE_URL;
+import api from "./api";
 
 export const loginRequest = async (email: string, password: string) => {
-    const response = await axios.post(
-        `${API_URL}/api/auth/login`,
-        { email, password },
-        { withCredentials: true },
-    );
-
-    // Tokens are now set by HttpOnly cookies from the backend.
-    // We don't store them in localStorage anymore.
+    const response = await api.post("/api/auth/login", { email, password });
     return response.data;
 };
 
 export const registerRequest = async (data: Record<string, unknown>) => {
-    const response = await axios.post(`${API_URL}/api/auth/register`, data, {
-        withCredentials: true,
-    });
+    const response = await api.post("/api/auth/register", data);
     return response.data;
 };
 
 export const checkAuthRequest = async () => {
     try {
-        const response = await axios.get(`${API_URL}/api/auth/me`, {
-            withCredentials: true,
-        });
+        const response = await api.get("/api/auth/me");
         return response.data;
-    } catch (error) {
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-            return null;
-        }
-        throw error;
+    } catch {
+        // Silently fail auth check as it's expected when not logged in
+        return null;
     }
 };
 
 export const logoutRequest = async () => {
     try {
-        await axios.post(
-            `${API_URL}/api/auth/logout`,
-            {},
-            {
-                withCredentials: true,
-            },
-        );
-        useStore.getState().setAuth(null);
+        await api.post("/api/auth/logout", {});
+        useStore.getState().setAuth(null, null);
     } catch (error) {
         console.error("Logout request failed:", error);
-        useStore.getState().setAuth(null);
+        useStore.getState().setAuth(null, null);
         throw error;
     }
 };

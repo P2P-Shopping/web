@@ -133,8 +133,18 @@ function App() {
         return () => stopMockEmitter();
     }, []);
 
+    const token = useStore((state) => state.token);
+
     useEffect(() => {
         let subscription: StompSubscription | null = null;
+
+        if (token) {
+            stompClient.connectHeaders = {
+                Authorization: `Bearer ${token}`,
+            };
+        } else {
+            stompClient.connectHeaders = {};
+        }
 
         stompClient.onConnect = () => {
             setServerConnected(true);
@@ -175,9 +185,15 @@ function App() {
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
             stompClient.onStompError = () => {};
-            stompClient.deactivate();
+            (async () => {
+                try {
+                    await stompClient.deactivate();
+                } catch (err) {
+                    console.error("Failed to deactivate STOMP client:", err);
+                }
+            })();
         };
-    }, [handlePongMessage, setServerConnected, clearToastTimeout]);
+    }, [handlePongMessage, setServerConnected, clearToastTimeout, token]);
 
     // Determine if Navbar should be shown
     const isAuthPage =
