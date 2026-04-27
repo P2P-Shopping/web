@@ -20,15 +20,15 @@ const SmartReviewModal = ({ isOpen, items, onClose, onConfirm }: SmartReviewModa
   const [editedItems, setEditedItems] = useState<ReviewItem[]>(items);
   const prevIsOpen = useRef(false);
 
-  // Only reset the state when the modal transitions from closed to open
   useEffect(() => {
     if (isOpen && !prevIsOpen.current) {
       setEditedItems(items);
     }
     prevIsOpen.current = isOpen;
   }, [isOpen]);
+type EditableField = "name" | "brand" | "quantity";
 
-  const updateItem = (index: number, field: keyof ReviewItem, value: string) => {
+  const updateItem = (index: number, field: EditableField, value: string) => {
     setEditedItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -52,8 +52,9 @@ const SmartReviewModal = ({ isOpen, items, onClose, onConfirm }: SmartReviewModa
           </button>
           <button
             type="button"
+            disabled={editedItems.some((item) => !item.name.trim())}
             onClick={() => onConfirm(editedItems)}
-            className="px-5 py-2.5 text-sm font-bold text-white bg-text-strong rounded-xl hover:opacity-90 transition-opacity"
+            className="px-5 py-2.5 text-sm font-bold text-white bg-text-strong rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Confirm & Save
           </button>
