@@ -948,11 +948,7 @@ const ListDetail = ({
         }
     }, [isEmbedded, lists.length, fetchLists]);
 
-    useEffect(() => {
-        resetDetailFields();
-    }, [effectiveListId]);
-
-    const resetDetailFields = useCallback(() => {
+ const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
         setShowExpandedDetails(false);
@@ -962,6 +958,10 @@ const ListDetail = ({
         setDetailBrand("");
         setDetailPrice("");
     }, []);
+
+    useEffect(() => {
+        resetDetailFields(effectiveListId);
+    }, [effectiveListId, resetDetailFields]);
 
     const handleNewItemNameChange = (name: string) => {
         setNewItemName(name);
