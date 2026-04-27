@@ -120,7 +120,7 @@ function App() {
         if (!authChecked) {
             checkAuthRequest()
                 .then((user) => {
-                    setAuth(user);
+                    setAuth(user, (user as { token?: string })?.token);
                 })
                 .catch(() => {
                     setAuth(null);

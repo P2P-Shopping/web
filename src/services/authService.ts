@@ -2,7 +2,15 @@ import { useStore } from "../context/useStore";
 import api from "./api";
 
 export const loginRequest = async (email: string, password: string) => {
-    const response = await api.post("/api/auth/login", { email, password });
+    const response = await api.post(
+        "/api/auth/login",
+        { email, password },
+        {
+            headers: {
+                "X-Return-Token": "true",
+            },
+        },
+    );
     return response.data;
 };
 
@@ -13,7 +21,11 @@ export const registerRequest = async (data: Record<string, unknown>) => {
 
 export const checkAuthRequest = async () => {
     try {
-        const response = await api.get("/api/auth/me");
+        const response = await api.get("/api/auth/me", {
+            headers: {
+                "X-Return-Token": "true",
+            },
+        });
         return response.data;
     } catch {
         // Silently fail auth check as it's expected when not logged in

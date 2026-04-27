@@ -16,9 +16,18 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+// Global response interceptor for error handling
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        if (axios.isAxiosError(error) && error.response?.data) {
+            const data = error.response.data;
+            const serverMessage = data.message || data.error || data.details;
+            if (serverMessage && typeof serverMessage === "string") {
+                error.message = serverMessage;
+            }
+        }
+
         if (axios.isAxiosError(error) && error.response?.status === 401) {
             if (!globalThis.location.pathname.includes("/login")) {
                 useStore.getState().setAuth(null, null);
@@ -28,7 +37,10 @@ api.interceptors.response.use(
     },
 );
 
-// Task 4: Finish Shopping Flow
+/**
+ * Task 4: API Request for Finishing Shopping
+ * REPARAT: Fără header-ul Content-Type manual pentru a lăsa Axios să pună 'boundary' corect.
+ */
 export const finishShoppingRequest = async (data: { storeName: string; receiptImage: File | null; listId: string }) => {
     const formData = new FormData();
     formData.append("storeName", data.storeName);
@@ -36,9 +48,21 @@ export const finishShoppingRequest = async (data: { storeName: string; receiptIm
     if (data.receiptImage) {
         formData.append("receipt", data.receiptImage);
     }
-    return api.post("/api/shopping/finish", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-    });
+
+    return api.post("/api/shopping/finish", formData);
+};
+
+/**
+ * Task 4: API Request for Multimodal AI Input
+ */
+export const aiMultimodalRequest = async (prompt: string, image: File | null) => {
+    const formData = new FormData();
+    formData.append("prompt", prompt);
+    if (image) {
+        formData.append("image", image);
+    }
+
+    return api.post("/api/ai/analyze", formData);
 };
 
 export default api;
