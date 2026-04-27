@@ -4,7 +4,7 @@ import { useStore } from "../context/useStore";
 /**
  * Custom React hook to monitor OS/browser network connectivity.
  * Attaches to the global window 'online' and 'offline' events.
- * 
+ *
  * When network state changes, it updates the global Zustand store,
  * which triggers reactivity globally.
  */

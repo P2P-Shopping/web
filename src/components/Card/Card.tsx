@@ -1,5 +1,4 @@
 import type React from "react";
-import "./Card.css";
 
 interface CardProps {
     title?: string;
@@ -8,10 +7,14 @@ interface CardProps {
 
 export default function Card({ title, children }: CardProps) {
     return (
-        <div className="card">
-            {title && <h2 className="card-title">{title}</h2>}
+        <div className="bg-surface border border-border rounded-xl p-6 shadow-sm flex flex-col gap-4">
+            {title && (
+                <h2 className="text-lg font-bold text-text-strong tracking-tight">
+                    {title}
+                </h2>
+            )}
 
-            <div className="card-content">{children}</div>
+            <div className="flex flex-col gap-2">{children}</div>
         </div>
     );
 }
