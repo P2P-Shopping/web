@@ -948,7 +948,7 @@ const ListDetail = ({
         }
     }, [isEmbedded, lists.length, fetchLists]);
 
- const resetDetailFields = useCallback((_targetListId?: string) => {
+    const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
         setShowExpandedDetails(false);
