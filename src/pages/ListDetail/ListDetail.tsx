@@ -974,6 +974,10 @@ const ListDetail = ({
                                                 <span className="text-xl font-black text-accent tracking-tight">
                                                     {items
                                                         .reduce((sum, item) => {
+                                                            /**
+                                                             * Task 4: Fix miscomputation for strings like "500g"
+                                                             * CodeRabbit: If the quantity is not purely numeric, count as 1.
+                                                             */
                                                             const qtyStr = (item.quantity || "1").trim();
                                                             const qty = /^\d+(?:\.\d+)?$/.test(qtyStr)
                                                                 ? Number.parseFloat(qtyStr)
@@ -985,6 +989,7 @@ const ListDetail = ({
                                                 </span>
                                             </div>
                                             <button 
+                                                type="button"
                                                 onClick={() => setShowFinishModal(true)}
                                                 className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
                                             >
@@ -1070,8 +1075,9 @@ const ListDetail = ({
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mt-4">
-                        <button onClick={() => setShowFinishModal(false)} className="py-3 bg-bg-muted rounded-lg font-bold">Cancel</button>
+                        <button type="button" onClick={() => setShowFinishModal(false)} className="py-3 bg-bg-muted rounded-lg font-bold">Cancel</button>
                         <button 
+                            type="button"
                             disabled={!finishStoreName.trim() || isFinishing || !effectiveListId || effectiveListId === "default"}
                             onClick={async () => {
                                 if (!effectiveListId || effectiveListId === "default") return;

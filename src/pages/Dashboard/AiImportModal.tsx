@@ -1,6 +1,7 @@
 import { Loader2, Sparkles, Image as ImageIcon } from "lucide-react";
 import { useState, useRef } from "react";
 import { Modal } from "../../components";
+import { aiMultimodalRequest } from "../../services/api";
 
 interface AiImportModalProps {
     onClose: () => void;
@@ -18,12 +19,22 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
         setIsProcessing(true);
         
-        // TODO(task4): wire up real multimodal AI endpoint (prompt + image upload)
-        // Simulation for Task 4 UI flow
-        setTimeout(() => {
-            setIsProcessing(false);
+        try {
+            /**
+             * Task 4: Real multimodal AI call
+             * The result will be handled by Dev 5 (The Gatekeeper) in the next stage.
+             */
+            const response = await aiMultimodalRequest(prompt, image);
+            console.log("AI Analysis Result:", response.data);
+            
+            // For now, we close the modal. Dev 5 will intercept this.
             onClose();
-        }, 2000);
+        } catch (error) {
+            console.error("AI Analysis failed:", error);
+            alert("AI service is currently unavailable. Please try again later.");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     return (
