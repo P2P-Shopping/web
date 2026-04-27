@@ -71,12 +71,7 @@ const RegistrationPage = () => {
             navigate("/login");
             // biome-ignore lint/suspicious/noExplicitAny: API error response format
         } catch (err: any) {
-            const serverError = err.response?.data;
-            const displayError =
-                serverError?.details ||
-                serverError?.message ||
-                "Registration failed. Please try again.";
-            setError(displayError);
+            setError(err.message || "Registration failed. Please try again.");
         } finally {
             setIsSubmitting(false);
         }
