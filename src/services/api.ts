@@ -16,12 +16,10 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Global response interceptor for 401s
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (axios.isAxiosError(error) && error.response?.status === 401) {
-            // Only clear auth if we weren't already on the login page
             if (!globalThis.location.pathname.includes("/login")) {
                 useStore.getState().setAuth(null, null);
             }
@@ -29,5 +27,18 @@ api.interceptors.response.use(
         return Promise.reject(error);
     },
 );
+
+// Task 4: Finish Shopping Flow
+export const finishShoppingRequest = async (data: { storeName: string; receiptImage: File | null; listId: string }) => {
+    const formData = new FormData();
+    formData.append("storeName", data.storeName);
+    formData.append("listId", data.listId);
+    if (data.receiptImage) {
+        formData.append("receipt", data.receiptImage);
+    }
+    return api.post("/api/shopping/finish", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+    });
+};
 
 export default api;

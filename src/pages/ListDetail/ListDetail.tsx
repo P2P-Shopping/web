@@ -828,6 +828,10 @@ const ListDetail = ({
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
+    const [isFinishing, setIsFinishing] = useState(false);
+    const [showFinishModal, setShowFinishModal] = useState(false);
+    const [finishStoreName, setFinishStoreName] = useState("");
+    const [receiptImage, setReceiptImage] = useState<File | null>(null);
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const { lists, fetchLists } = useListsStore();
@@ -945,47 +949,46 @@ const ListDetail = ({
                                     <p>Loading...</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4">
+                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}
                                         onDelete={deleteItem}
                                         disabled={isReadOnly}
                                     />
+                                    
                                     {items.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                                                    Estimated Total
-                                                </span>
-                                                <span className="text-xs text-text-muted opacity-70">
-                                                    {items.length} items
+                                        <div className="mt-auto">
+                                            <div className="mt-4 pt-4 border-t border-border flex justify-between items-center bg-bg-muted/30 -mx-4 px-6 py-4">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                                                        Estimated Total
+                                                    </span>
+                                                    <span className="text-xs text-text-muted opacity-70">
+                                                        {items.length} items
+                                                    </span>
+                                                </div>
+                                                <span className="text-xl font-black text-accent tracking-tight">
+                                                    {items
+                                                        .reduce((sum, item) => {
+                                                            const qtyStr = item.quantity || "1";
+                                                            const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)/);
+                                                            const qty = qtyMatch ? Number.parseFloat(qtyMatch[1]) : 1;
+                                                            return sum + (item.price || 0) * qty;
+                                                        }, 0)
+                                                        .toFixed(2)}{" "}
+                                                    lei
                                                 </span>
                                             </div>
-                                            <span className="text-xl font-black text-accent tracking-tight">
-                                                {items
-                                                    .reduce((sum, item) => {
-                                                        const qtyStr =
-                                                            item.quantity ||
-                                                            "1";
-                                                        const qtyMatch =
-                                                            qtyStr.match(
-                                                                /(\d+(?:\.\d+)?)/,
-                                                            );
-                                                        const qty = qtyMatch
-                                                            ? Number.parseFloat(
-                                                                  qtyMatch[1],
-                                                              )
-                                                            : 1;
-                                                        return (
-                                                            sum +
-                                                            (item.price || 0) *
-                                                                qty
-                                                        );
-                                                    }, 0)
-                                                    .toFixed(2)}{" "}
-                                                lei
-                                            </span>
+
+                                            {/* Task 4: Finish Shopping Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowFinishModal(true)}
+                                                className="mt-4 w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-[0_4px_12px_var(--color-accent-glow)] hover:opacity-90 active:scale-95 transition-all"
+                                            >
+                                                Finish Shopping
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -998,12 +1001,11 @@ const ListDetail = ({
             {!isReadOnly && (
                 <button
                     type="button"
-                    className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
+                    className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 z-100"
                     onClick={() => {
                         setDetailName(newItemName);
                         setShowMobileAddModal(true);
                     }}
-                    aria-label="Add Item"
                 >
                     <Plus size={28} strokeWidth={3} />
                 </button>
@@ -1023,7 +1025,6 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
-                onTyping={sendTypingEvent}
                 isMobile={true}
                 showExpanded={showExpandedDetails}
                 setShowExpanded={setShowExpandedDetails}
@@ -1034,7 +1035,6 @@ const ListDetail = ({
                 onClose={resetDetailFields}
                 onSubmit={handleDetailsSubmit}
                 title="Add Item Details"
-                subtitle="Add optional details like quantity, brand, and price"
                 idPrefix="ld"
                 itemName={detailName}
                 setItemName={setDetailName}
@@ -1044,8 +1044,50 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
-                onTyping={sendTypingEvent}
             />
+
+            <Modal
+                isOpen={showFinishModal}
+                onClose={() => setShowFinishModal(false)}
+                title="Finish Shopping"
+                subtitle="Enter the store and attach a photo of your receipt."
+                footer={
+                    <div className="grid grid-cols-2 gap-3 w-full">
+                        <button type="button" className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold" onClick={() => setShowFinishModal(false)}>Cancel</button>
+                        <button 
+                            className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg rounded-md text-sm font-bold disabled:opacity-50"
+                            disabled={!finishStoreName || isFinishing}
+                            onClick={() => {
+                                setIsFinishing(true);
+                                setTimeout(() => { 
+                                    setIsFinishing(false); 
+                                    setShowFinishModal(false); 
+                                    navigate('/dashboard');
+                                }, 1500);
+                            }}
+                        >
+                            {isFinishing ? "Processing..." : "Complete"}
+                        </button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col gap-4">
+                    <input 
+                        type="text" 
+                        placeholder="Store Name (e.g. Lidl)" 
+                        className="w-full px-4 py-3 bg-bg-muted border border-border rounded-xl text-text-strong outline-none focus:border-accent"
+                        value={finishStoreName}
+                        onChange={(e) => setFinishStoreName(e.target.value)}
+                    />
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        onChange={(e) => setReceiptImage(e.target.files?.[0] || null)}
+                        className="text-sm text-text-muted"
+                    />
+                </div>
+            </Modal>
         </div>
     );
 };
