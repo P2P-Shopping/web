@@ -34,8 +34,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             alert("AI service is currently unavailable. Please try again later.");
         } finally {
             setIsProcessing(false);
-            onClose();
-        }, 2000);
+        }
     };
 
     return (
@@ -65,7 +64,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                 </div>
             }
         >
-            <form id="ai-assistant-form" onSubmit={handleImport} className="flex flex-col gap-4">
+            <form id="ai-import-form" onSubmit={handleImport} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                     <label
                         htmlFor="ai-input"
