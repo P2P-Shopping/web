@@ -17,6 +17,8 @@ interface ApiShoppingList {
     id: string;
     title: string;
     items?: ApiItem[];
+    ownerEmail?: string;
+    collaboratorEmails?: string[];
 }
 
 interface ListsState {
@@ -34,6 +36,7 @@ interface ListsState {
     addItem: (listId: string, item: Omit<Item, "id">) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
+    shareList: (listId: string, email: string) => Promise<boolean>;
     openModal: () => void;
     closeModal: () => void;
     getListById: (id: string) => ShoppingList | undefined;
@@ -77,7 +80,9 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     status: "active",
-    ownerName: "Tu",
+    ownerName: "You",
+    ownerEmail: list.ownerEmail,
+    collaboratorEmails: list.collaboratorEmails ?? [],
     items: (list.items ?? []).map(normalizeItem),
 });
 
@@ -354,6 +359,40 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     error instanceof Error
                         ? error.message
                         : "Failed to delete item",
+            });
+            return false;
+        }
+    },
+
+    shareList: async (listId: string, email: string) => {
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/lists/${listId}/share`,
+                {
+                    method: "POST",
+                    headers: jsonHeaders(true),
+                    body: JSON.stringify({ email }),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(
+                    errorData.message ||
+                        `Failed to share list (${response.status})`,
+                );
+            }
+
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to share list",
             });
             return false;
         }
