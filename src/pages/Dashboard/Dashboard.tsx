@@ -59,10 +59,6 @@ const Dashboard = () => {
     /**
      * Opens the deletion confirmation modal for a specific list.
      */
-
-    /**
-     * Opens the deletion confirmation modal for a specific list.
-     */
     const handleDeleteList = (
         e: MouseEvent<HTMLButtonElement>,
         listId: string,

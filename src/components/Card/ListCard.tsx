@@ -64,10 +64,7 @@ export default function ListCard({
 
         const isOwner =
             (listUserId && listUserId === currentUserId) ||
-            (listOwnerEmail && listOwnerEmail === userEmail) ||
-            // Fallback for when backend hasn't provided owner info yet (legacy/placeholder)
-            !list.ownerName ||
-            list.ownerName === "Tu";
+            (listOwnerEmail && listOwnerEmail === userEmail);
 
         if (isOwner) return "You";
         if (!list.ownerName) return "Unknown";
@@ -195,6 +192,7 @@ export default function ListCard({
                     onClick={onDelete}
                     disabled={isDeleting}
                     title="Delete list"
+                    aria-label="Delete list"
                 >
                     <Trash2 size={16} />
                 </button>
