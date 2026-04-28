@@ -117,15 +117,32 @@ function App() {
     const authChecked = useStore((state) => state.authChecked);
 
     useEffect(() => {
+        let timeoutId: ReturnType<typeof setTimeout>;
+
         if (!authChecked) {
+            // Safety timeout to prevent permanent "Loading session..."
+            timeoutId = setTimeout(() => {
+                if (!useStore.getState().authChecked) {
+                    console.warn("Auth check timed out, proceeding as guest");
+                    setAuth(null);
+                }
+            }, 12_000);
+
             checkAuthRequest()
                 .then((user) => {
                     setAuth(user, (user as { token?: string })?.token);
                 })
                 .catch(() => {
                     setAuth(null);
+                })
+                .finally(() => {
+                    clearTimeout(timeoutId);
                 });
         }
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
     }, [setAuth, authChecked]);
 
     useEffect(() => {

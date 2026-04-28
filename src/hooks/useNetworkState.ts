@@ -38,7 +38,7 @@ export const useNetworkState = (): void => {
                     signal: AbortSignal.timeout(5000),
                 });
 
-                if (res.ok || res.status === 202) {
+                if (res.ok || res.status === 202 || res.status === 401) {
                     setServerConnected(true);
                     retryCountRef.current = 0;
                     schedulePing(BASE_DELAY);
