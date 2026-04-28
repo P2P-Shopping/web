@@ -123,8 +123,11 @@ const RoutePage = () => {
                 return;
             }
 
-            const baseUrl =
-                import.meta.env.VITE_API_URL || "http://localhost:8081";
+            const baseUrlResolved =
+                import.meta.env.VITE_API_URL ||
+                import.meta.env.VITE_API_BASE_URL ||
+                "http://localhost:8081";
+            const baseUrl = baseUrlResolved === "/" ? "" : baseUrlResolved;
 
             const response = await fetch(
                 `${baseUrl}/api/routing/stores-match`,

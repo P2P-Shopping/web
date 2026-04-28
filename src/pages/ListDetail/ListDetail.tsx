@@ -76,10 +76,13 @@ const useListItems = (effectiveListId: string | undefined) => {
     /**
      * Retrieves the base URL for API requests.
      */
-    const getBaseUrl = useCallback(
-        () => import.meta.env.VITE_API_URL || "http://localhost:8081",
-        [],
-    );
+    const getBaseUrl = useCallback(() => {
+        const base =
+            import.meta.env.VITE_API_URL ||
+            import.meta.env.VITE_API_BASE_URL ||
+            "http://localhost:8081";
+        return base === "/" ? "" : base;
+    }, []);
 
     /**
      * Constructs the necessary headers for authentication and content type.

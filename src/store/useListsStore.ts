@@ -51,10 +51,13 @@ interface ListsState {
  * Resolves the base URL for API requests from environment variables.
  * @returns The base URL string.
  */
-const getBaseUrl = () =>
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost:8081";
+const getBaseUrl = () => {
+    const base =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        "http://localhost:8081";
+    return base === "/" ? "" : base;
+};
 
 /**
  * Constructs standard headers for API requests.
