@@ -19,6 +19,9 @@ interface ApiShoppingList {
     createdAt?: string;
     updatedAt?: string;
     items?: ApiItem[];
+    ownerName?: string;
+    ownerEmail?: string;
+    userId?: string;
 }
 
 interface ListsState {
@@ -89,7 +92,9 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     createdAt: list.createdAt ?? new Date().toISOString(),
     updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
     status: "active",
-    ownerName: "Tu",
+    ownerName: list.ownerName,
+    ownerEmail: list.ownerEmail,
+    userId: list.userId,
     items: (list.items ?? []).map(normalizeItem),
 });
 

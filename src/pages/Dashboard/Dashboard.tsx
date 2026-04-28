@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ChevronLeft, Plus, Sparkles } from "lucide-react";
 import {
     type MouseEvent,
     type ReactNode,
@@ -7,15 +7,12 @@ import {
     useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { PresenceBar } from "../../components";
+import { ListCard, PresenceBar } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
-import type { Item } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
-
-const PREVIEW_LIMIT = 2;
 
 /**
  * Main dashboard component that displays the user's shopping lists.
@@ -60,17 +57,8 @@ const Dashboard = () => {
     };
 
     /**
-     * Formats a date string according to the user's browser locale.
-     * @param dateStr - The ISO date string to format.
+     * Opens the deletion confirmation modal for a specific list.
      */
-    const formatDate = (dateStr: string) => {
-        return new Date(dateStr).toLocaleDateString(undefined, {
-            day: "numeric",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
 
     /**
      * Opens the deletion confirmation modal for a specific list.
@@ -120,20 +108,6 @@ const Dashboard = () => {
         setSearchParams({});
     };
 
-    /**
-     * Calculates the string representation of checked vs total items.
-     * @param items - The array of items in the list.
-     */
-    const getItemsCount = (items: Item[]) => {
-        const checked = items.filter((item) => item.checked).length;
-        if (items.length === 0) {
-            return "No items";
-        }
-
-        const label = items.length === 1 ? "item" : "items";
-        return `${checked}/${items.length} ${label}`;
-    };
-
     let mainContent: ReactNode;
     if (isLoading) {
         mainContent = (
@@ -173,121 +147,17 @@ const Dashboard = () => {
     } else {
         mainContent = (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
-                {lists.map((list) => {
-                    const uncheckedItems = list.items.filter(
-                        (item) => !item.checked,
-                    );
-                    return (
-                        <div key={list.id} className="relative group">
-                            <button
-                                type="button"
-                                className="w-full h-full text-left relative bg-surface border border-border rounded-xl p-[22px_22px_18px] cursor-pointer transition-all duration-200 ease-out hover:border-accent-border hover:shadow-md hover:shadow-accent-glow/20 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 flex flex-col gap-[18px] outline-none"
-                                onClick={() => handleCardClick(list.id)}
-                                aria-label={`Open list ${list.name}`}
-                            >
-                                <div className="flex justify-between items-start gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <h3
-                                            className="text-lg font-bold text-text-strong leading-tight truncate"
-                                            title={list.name}
-                                        >
-                                            {list.name}
-                                        </h3>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0 pr-12">
-                                        <span className="px-2.5 py-1 rounded-full bg-bg-muted text-text-muted text-[11px] font-semibold border border-border whitespace-nowrap">
-                                            {formatDate(list.updatedAt)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-3.5 mt-auto">
-                                    <div className="flex flex-wrap gap-1.5">
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
-                                            {getItemsCount(list.items)}
-                                        </span>
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
-                                            {list.ownerName || "You"}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex flex-col gap-1.5">
-                                        {(() => {
-                                            if (list.items.length === 0) {
-                                                return (
-                                                    <div className="flex flex-col items-center justify-center py-8 rounded-xl border-2 border-dashed border-border/40 text-text-muted/60 gap-1.5">
-                                                        <Plus size={20} />
-                                                        <span className="text-[11px] font-bold uppercase tracking-wider">
-                                                            Empty List
-                                                        </span>
-                                                    </div>
-                                                );
-                                            }
-
-                                            if (uncheckedItems.length === 0) {
-                                                return (
-                                                    <div className="flex flex-col items-center justify-center py-8 rounded-xl bg-success-subtle/10 border border-success-border/20 text-success gap-2 animate-in fade-in zoom-in-95 duration-500">
-                                                        <div className="w-9 h-9 rounded-full bg-success/10 flex items-center justify-center">
-                                                            <Check
-                                                                size={20}
-                                                                className="text-success"
-                                                            />
-                                                        </div>
-                                                        <span className="text-[11px] font-extrabold uppercase tracking-widest">
-                                                            All items checked
-                                                        </span>
-                                                    </div>
-                                                );
-                                            }
-
-                                            return (
-                                                <>
-                                                    {uncheckedItems
-                                                        .slice(0, PREVIEW_LIMIT)
-                                                        .map((item) => (
-                                                            <div
-                                                                key={item.id}
-                                                                className="flex items-center gap-2.5 p-[8px_12px] rounded-md bg-bg-subtle border border-border text-sm text-text transition-colors duration-200 ease-out"
-                                                            >
-                                                                <span
-                                                                    className="w-[18px] h-[18px] border-2 border-border-strong rounded-[5px] shrink-0 flex items-center justify-center transition-all bg-surface"
-                                                                    aria-hidden="true"
-                                                                />
-                                                                <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                                                                    {item.name}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    {uncheckedItems.length >
-                                                        PREVIEW_LIMIT && (
-                                                        <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[11px] font-bold text-text-muted transition-all hover:bg-border/40">
-                                                            and another{" "}
-                                                            {uncheckedItems.length -
-                                                                PREVIEW_LIMIT}{" "}
-                                                            unchecked items
-                                                        </div>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                className="absolute top-5 right-5 flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 z-10"
-                                onClick={(e) =>
-                                    handleDeleteList(e, list.id, list.name)
-                                }
-                                title={`Delete ${list.name}`}
-                                aria-label={`Delete list ${list.name}`}
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    );
-                })}
+                {lists.map((list) => (
+                    <ListCard
+                        key={list.id}
+                        list={list}
+                        onClick={() => handleCardClick(list.id)}
+                        onDelete={(e) =>
+                            handleDeleteList(e, list.id, list.name)
+                        }
+                        isDeleting={deletingListId === list.id}
+                    />
+                ))}
             </div>
         );
     }
