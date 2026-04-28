@@ -17,8 +17,8 @@ import {
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
-import api, { finishShoppingRequest } from "../../services/api";
 import type { SyncPayload } from "../../dto/SyncPayload";
+import api, { finishShoppingRequest } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import ShareListModal from "../Dashboard/ShareListModal";
@@ -136,7 +136,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 // main: if (!response.ok) { ... } const currentList = (await response.json()) as ApiShoppingList;
                 // If 'api' is the axios-like wrapper from feature branch, it has .data.
                 // Let's check what 'api' is.
-                
+
                 const currentList = response.data;
                 if (!currentList) {
                     setItems([]);
@@ -193,7 +193,12 @@ const useListItems = (effectiveListId: string | undefined) => {
                 },
             );
 
-            if (!response.ok) throw new Error("AI Service error");
+            if (!response.ok) {
+                if (response.status === 401) {
+                    handleUnauthorizedResponse();
+                }
+                throw new Error("AI Service error");
+            }
 
             const aiData = await response.json();
 
@@ -249,6 +254,9 @@ const useListItems = (effectiveListId: string | undefined) => {
                 );
 
                 if (!res.ok) {
+                    if (res.status === 401) {
+                        handleUnauthorizedResponse();
+                    }
                     throw new Error(`Failed to save item: ${item.name}`);
                 }
             }
