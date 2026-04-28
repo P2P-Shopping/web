@@ -8,7 +8,7 @@
  * LEAVE: A user exited the list.
  * TYPING: A user is actively typing a new item.
  */
-export type PresenceEventType = "JOIN" | "LEAVE" | "TYPING";
+export type PresenceEventType = "JOIN" | "LEAVE" | "TYPING" | "SYNC";
 
 /**
  * Data Transfer Object for presence synchronization.

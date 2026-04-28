@@ -1,5 +1,6 @@
 import {
     LayoutDashboard,
+    Map as MapIcon,
     MapPinned,
     MoreHorizontal,
     Route as RouteIcon,
@@ -14,6 +15,7 @@ import ThemeSwitcher from "../ThemeSwitcher/ThemeSwitcher";
 
 const NAV_LINKS = [
     { to: "/dashboard", label: "My Lists", icon: LayoutDashboard },
+    { to: "/map", label: "Map", icon: MapIcon },
     { to: "/route", label: "Route", icon: RouteIcon },
     { to: "/nav", label: "Store Map", icon: MapPinned },
 ];
