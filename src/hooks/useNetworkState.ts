@@ -29,9 +29,9 @@ const getTelemetryDeviceId = (): string => {
 export const useNetworkState = (): void => {
     const setOnlineStatus = useStore((state) => state.setOnlineStatus);
     const setServerConnected = useStore((state) => state.setServerConnected);
-    const isAuthenticated = useStore((state) => state.isAuthenticated);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const retryCountRef = useRef(0);
+    const telemetryAuthInvalidRef = useRef(false);
 
     const BASE_DELAY = 10_000;
     const MAX_DELAY = 60_000;
@@ -43,6 +43,11 @@ export const useNetworkState = (): void => {
         };
 
         const ping = async () => {
+            if (telemetryAuthInvalidRef.current) {
+                setServerConnected(true);
+                return;
+            }
+
             if (!navigator.onLine) {
                 setServerConnected(false);
                 // Pause the loop. It will be resumed by the 'online' event listener.
@@ -62,11 +67,16 @@ export const useNetworkState = (): void => {
                     signal: AbortSignal.timeout(5000),
                 });
 
-                if (
-                    res.ok ||
-                    res.status === 202 ||
-                    (res.status === 401 && !isAuthenticated)
-                ) {
+                if (res.ok || res.status === 202 || res.status === 401) {
+                    if (res.status === 401) {
+                        telemetryAuthInvalidRef.current = true;
+                        console.error(
+                            "Telemetry ping unauthorized. Check VITE_TELEMETRY_API_KEY and telemetry.api.key.",
+                        );
+                        setServerConnected(true);
+                        return;
+                    }
+
                     setServerConnected(true);
                     retryCountRef.current = 0;
                     schedulePing(BASE_DELAY);
@@ -112,5 +122,5 @@ export const useNetworkState = (): void => {
             globalThis.removeEventListener("offline", handleOffline);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [setOnlineStatus, setServerConnected, isAuthenticated]);
+    }, [setOnlineStatus, setServerConnected]);
 };
