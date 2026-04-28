@@ -48,6 +48,10 @@ interface ListDetailProps {
     listIdOverride?: string;
 }
 
+/**
+ * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
+ * @param effectiveListId - The ID of the currently active list.
+ */
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
     const [items, setItems] = useState<Item[]>([]);
@@ -56,11 +60,17 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [syncFailed, setSyncFailed] = useState(false);
     const isServerConnected = useStore((state) => state.isServerConnected);
 
+    /**
+     * Retrieves the base URL for API requests.
+     */
     const getBaseUrl = useCallback(
         () => import.meta.env.VITE_API_URL || "http://localhost:8081",
         [],
     );
 
+    /**
+     * Constructs the necessary headers for authentication and content type.
+     */
     const getAuthHeaders = useCallback(
         (withContentType = false): HeadersInit => {
             return {
@@ -72,6 +82,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         [],
     );
 
+    /**
+     * Synchronizes the local item state with the global store state.
+     */
     const syncListItemsInStore = useCallback(
         (nextItems: Item[], targetListId = effectiveListId) => {
             if (!targetListId || targetListId === "default") return;
@@ -85,6 +98,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         setSyncFailed(true);
     }, []);
 
+    /**
+     * Fetches the complete data for a specific shopping list from the server.
+     */
     const fetchListData = useCallback(
         async (targetListId = effectiveListId) => {
             if (!targetListId || targetListId === "default") {
@@ -187,6 +203,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         };
     }, [effectiveListId, handleSyncMessage, isServerConnected]);
 
+    /**
+     * Reverts an item addition locally if the server request fails.
+     */
     const rollbackItem = useCallback(
         (itemId: string) => {
             setItems((prev) => {
@@ -198,6 +217,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
+    /**
+     * Reverts an item's checked status if the server request fails.
+     */
     const revertItemChecked = useCallback(
         (itemId: string, originalChecked: boolean) => {
             setItems((prev) => {
@@ -213,6 +235,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
+    /**
+     * Adds a new item to the current shopping list with optional details.
+     */
     const addItem = async (
         name: string,
         quantity?: string,
@@ -296,6 +321,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    /**
+     * Toggles the checked status of an item and updates the server.
+     */
     const toggleItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const currentItem = items.find((item) => item.id === itemId);
@@ -351,6 +379,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    /**
+     * Deletes an item from the list and the server.
+     */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const nextItems = items.filter((item) => item.id !== itemId);
@@ -390,6 +421,9 @@ const useListItems = (effectiveListId: string | undefined) => {
     };
 };
 
+/**
+ * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
+ */
 const useListPresence = (effectiveListId: string | undefined) => {
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
     const user = useStore((state) => state.user);
@@ -480,6 +514,9 @@ const useListPresence = (effectiveListId: string | undefined) => {
         handlePresenceMessage,
     ]);
 
+    /**
+     * Sends a typing event to the server to notify other connected users.
+     */
     const sendTypingEvent = useCallback(() => {
         if (
             !effectiveListId ||
@@ -509,6 +546,9 @@ const useListPresence = (effectiveListId: string | undefined) => {
     return { sendTypingEvent };
 };
 
+/**
+ * Renders a view for selecting a list when no specific list is active.
+ */
 const ListSelectionView = ({
     lists,
     isLoading,
@@ -576,6 +616,7 @@ interface AddItemModalProps {
     setShowExpanded?: (val: boolean) => void;
 }
 
+/** Component for the item name input field inside the add modal. */
 const ItemNameField = ({
     idPrefix,
     value,
@@ -611,6 +652,7 @@ const ItemNameField = ({
     </div>
 );
 
+/** Button to toggle the display of extra item details (price, brand, etc). */
 const ExpandDetailsButton = ({
     showExpanded,
     onClick,
@@ -634,6 +676,7 @@ const ExpandDetailsButton = ({
     </button>
 );
 
+/** Component containing the detailed input fields (quantity, price, brand). */
 const ItemDetailsFields = ({
     idPrefix,
     quantity,
@@ -715,6 +758,7 @@ const ItemDetailsFields = ({
     </div>
 );
 
+/** Modal component for adding an item with optional details. */
 const AddItemDetailsModal = ({
     isOpen,
     onClose,
@@ -798,6 +842,7 @@ const AddItemDetailsModal = ({
     );
 };
 
+/** Component to display an error alert within the list detail view. */
 const ListErrorAlert = ({
     error,
     isEmbedded,
@@ -816,6 +861,7 @@ const ListErrorAlert = ({
     </div>
 );
 
+/** Header component for the list detail view. */
 const ListHeader = ({
     effectiveListId,
     onSwitchList,
@@ -839,6 +885,7 @@ const ListHeader = ({
     </header>
 );
 
+/** Inline form component for quickly adding items without details. */
 const InlineAddForm = ({
     addInputRef,
     newItemName,
@@ -891,6 +938,9 @@ const InlineAddForm = ({
     </form>
 );
 
+/**
+ * Main ListDetail component that orchestrates displaying items, managing presence, and handling item additions.
+ */
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
