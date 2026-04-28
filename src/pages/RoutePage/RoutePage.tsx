@@ -7,8 +7,10 @@ import {
     MapPin,
     Store,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useStore } from "../../context/useStore";
+import { loadRoute } from "../../services/loadRoute";
 import { useListsStore } from "../../store/useListsStore";
 
 // --- 1. INTERFEȚE ȘI DATE MOCK ---
@@ -73,7 +75,29 @@ const RoutePage = () => {
     const navigate = useNavigate();
     const { lists } = useListsStore();
 
-    // --- STATE ---
+    // --- LUCA'S DATA (for TSP Route) ---
+    const items = useStore((state) => state.items);
+    const userLocation = useStore((state) => state.userLocation);
+
+    useEffect(() => {
+        async function fetchRoute() {
+            if (items.length > 0 && userLocation) {
+                const productIds = items.map((i) => i.id);
+                try {
+                    await loadRoute(
+                        productIds,
+                        userLocation.lat,
+                        userLocation.lng,
+                    );
+                } catch (err) {
+                    console.error("Failed to load route in RoutePage:", err);
+                }
+            }
+        }
+        fetchRoute();
+    }, [items, userLocation]);
+
+    // --- ANDREEA'S STATE (for Store Selection) ---
     const [selectedListId, setSelectedListId] = useState<string | null>(null);
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
@@ -125,7 +149,6 @@ const RoutePage = () => {
             const data = await response.json();
             const storesArray = Array.isArray(data) ? data : [data];
 
-            // MODIFICARE AICI: Am înlocuit (store: any) cu (store: ApiStoreMatch)
             const mappedStores: StoreRecommendation[] = storesArray.map(
                 (store: ApiStoreMatch) => {
                     const distanceKm = (store.distanceMeters / 1000).toFixed(1);
