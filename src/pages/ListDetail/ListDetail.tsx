@@ -1,13 +1,13 @@
-import { AlertCircle, ChevronDown, Plus, Settings, Camera } from "lucide-react";
+import { AlertCircle, Camera, ChevronDown, Plus, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Modal, PresenceBar } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
+import { finishShoppingRequest } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import { finishShoppingRequest } from "../../services/api";
 
 interface Item {
     id: string;
@@ -1080,10 +1080,14 @@ const ListDetail = ({
             >
                 <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                        <label
+                            htmlFor="store-name-input"
+                            className="text-[11px] font-black uppercase text-text-strong tracking-wider"
+                        >
                             Store Name
                         </label>
                         <input
+                            id="store-name-input"
                             type="text"
                             value={finishStoreName}
                             onChange={(e) => setFinishStoreName(e.target.value)}
@@ -1155,7 +1159,7 @@ const ListDetail = ({
                                     setFinishStoreName("");
                                     setReceiptImage(null);
                                     navigate("/dashboard");
-                                } catch (err) {
+                                } catch (_err) {
                                     setError("Failed to complete shopping.");
                                 } finally {
                                     setIsFinishing(false);

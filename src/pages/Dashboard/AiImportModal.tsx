@@ -1,5 +1,5 @@
-import { Loader2, Sparkles, Image as ImageIcon } from "lucide-react";
-import { useState, useRef } from "react";
+import { Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
 import { Modal } from "../../components";
 import { aiMultimodalRequest } from "../../services/api";
 
@@ -94,10 +94,14 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="text-[13px] font-bold text-text-strong uppercase tracking-tight">
+                    <label
+                        htmlFor="visual-context-input"
+                        className="text-[13px] font-bold text-text-strong uppercase tracking-tight"
+                    >
                         Visual Context (Optional)
                     </label>
                     <input
+                        id="visual-context-input"
                         type="file"
                         accept="image/*"
                         capture="environment"
