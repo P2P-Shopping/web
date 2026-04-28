@@ -22,6 +22,7 @@ interface ApiShoppingList {
     ownerName?: string;
     ownerEmail?: string;
     userId?: string;
+    collaboratorEmails?: string[];
 }
 
 interface ListsState {
@@ -39,6 +40,7 @@ interface ListsState {
     addItem: (listId: string, item: Omit<Item, "id">) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
+    shareList: (listId: string, email: string) => Promise<boolean>;
     openModal: () => void;
     closeModal: () => void;
     getListById: (id: string) => ShoppingList | undefined;
@@ -56,13 +58,23 @@ const getBaseUrl = () =>
 
 /**
  * Constructs standard headers for API requests.
- * @param withContentType - Whether to include the application/json Content-Type header.
- * @returns Headers initialization object.
  */
 const jsonHeaders = (withContentType = false): HeadersInit => {
     return {
         ...(withContentType ? { "Content-Type": "application/json" } : {}),
     };
+};
+
+/**
+ * Handles common response scenarios like 401 Unauthorized.
+ */
+const handleAuthResponse = (response: Response) => {
+    if (response.status === 401) {
+        useStore.getState().setAuth(null);
+        useListsStore.getState().clearLists();
+        throw new Error("Session expired. Please log in again.");
+    }
+    return response;
 };
 
 /**
@@ -92,9 +104,10 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     createdAt: list.createdAt ?? new Date().toISOString(),
     updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
     status: "active",
-    ownerName: list.ownerName,
+    ownerName: list.ownerName || "You",
     ownerEmail: list.ownerEmail,
     userId: list.userId,
+    collaboratorEmails: list.collaboratorEmails ?? [],
     items: (list.items ?? []).map(normalizeItem),
 });
 
@@ -133,11 +146,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 credentials: "include",
             });
 
-            if (response.status === 401) {
-                useStore.getState().setAuth(null);
-                get().clearLists();
-                throw new Error("Session expired. Please log in again.");
-            }
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch lists (${response.status})`);
@@ -181,11 +190,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 credentials: "include",
             });
 
-            if (response.status === 401) {
-                useStore.getState().setAuth(null);
-                get().clearLists();
-                throw new Error("Session expired.");
-            }
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to create list (${response.status})`);
@@ -240,11 +245,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 credentials: "include",
             });
 
-            if (response.status === 401) {
-                useStore.getState().setAuth(null);
-                get().clearLists();
-                throw new Error("Session expired.");
-            }
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to delete list (${response.status})`);
@@ -298,11 +299,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 },
             );
 
-            if (response.status === 401) {
-                useStore.getState().setAuth(null);
-                get().clearLists();
-                throw new Error("Session expired.");
-            }
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to add item (${response.status})`);
@@ -357,11 +354,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 },
             );
 
-            if (response.status === 401) {
-                useStore.getState().setAuth(null);
-                get().clearLists();
-                throw new Error("Session expired.");
-            }
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to update item (${response.status})`);
@@ -411,11 +404,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 },
             );
 
-            if (response.status === 401) {
-                useStore.getState().setAuth(null);
-                get().clearLists();
-                throw new Error("Session expired.");
-            }
+            handleAuthResponse(response);
 
             if (!response.ok) {
                 throw new Error(`Failed to delete item (${response.status})`);
@@ -440,6 +429,45 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     error instanceof Error
                         ? error.message
                         : "Failed to delete item",
+            });
+            return false;
+        }
+    },
+
+    /**
+     * Shares a shopping list with another user by email.
+     */
+    shareList: async (listId: string, email: string) => {
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/lists/${listId}/share`,
+                {
+                    method: "POST",
+                    headers: jsonHeaders(true),
+                    body: JSON.stringify({ email }),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                const errorData = (await response.json().catch(
+                    () => ({}),
+                )) as { message?: string };
+                throw new Error(
+                    errorData.message ||
+                        `Failed to share list (${response.status})`,
+                );
+            }
+
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to share list",
             });
             return false;
         }
