@@ -1160,6 +1160,7 @@ const ListDetail = ({
                                     setReceiptImage(null);
                                     navigate("/dashboard");
                                 } catch (_err) {
+                                    console.error("Failed to complete shopping:", _err);
                                     setError("Failed to complete shopping.");
                                 } finally {
                                     setIsFinishing(false);
