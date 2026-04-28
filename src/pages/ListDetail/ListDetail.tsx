@@ -7,7 +7,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Modal, PresenceBar } from "../../components";
+import {
+    Modal,
+    PresenceBar,
+    type ReviewItem,
+    SmartReviewModal,
+} from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
@@ -48,6 +53,13 @@ interface ListDetailProps {
     listIdOverride?: string;
 }
 
+type AiResponseItem = {
+    id?: string;
+    name?: string;
+    brand?: string;
+    quantity?: string;
+};
+
 /**
  * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
  * @param effectiveListId - The ID of the currently active list.
@@ -59,6 +71,9 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [error, setError] = useState<string | null>(null);
     const [syncFailed, setSyncFailed] = useState(false);
     const isServerConnected = useStore((state) => state.isServerConnected);
+
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
     /**
      * Retrieves the base URL for API requests.
@@ -161,6 +176,95 @@ const useListItems = (effectiveListId: string | undefined) => {
         setIsLoading(true);
         fetchListData();
     }, [fetchListData]);
+
+    const handleAiImport = async (recipeText: string) => {
+        if (!recipeText.trim() || !effectiveListId) return;
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/ai/recipe-to-list`,
+                {
+                    method: "POST",
+                    headers: getAuthHeaders(true),
+                    body: JSON.stringify({
+                        text: recipeText,
+                        listId: effectiveListId,
+                    }),
+                    credentials: "include",
+                },
+            );
+
+            if (!response.ok) throw new Error("AI Service error");
+
+            const aiData = await response.json();
+
+            let rawItems: AiResponseItem[] = [];
+            if (Array.isArray(aiData)) {
+                rawItems = aiData;
+            } else if (
+                aiData &&
+                typeof aiData === "object" &&
+                "items" in aiData
+            ) {
+                rawItems = (aiData as { items: AiResponseItem[] }).items ?? [];
+            }
+
+            const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
+                id: item.id || crypto.randomUUID(),
+                name: item.name || "",
+                brand: item.brand || undefined,
+                quantity: item.quantity || undefined,
+            }));
+
+            setReviewItems(itemsToReview);
+            setIsReviewModalOpen(true);
+        } catch (err) {
+            console.error("AI processing error:", err);
+            setError("AI processing error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleReviewConfirm = async (feedback: ReviewItem[]) => {
+        try {
+            for (const item of feedback) {
+                const res = await fetch(
+                    `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
+                    {
+                        method: "POST",
+                        headers: getAuthHeaders(true),
+                        body: JSON.stringify({
+                            name: item.name,
+                            isChecked: false,
+                            brand: item.brand?.trim()
+                                ? item.brand.trim()
+                                : null,
+                            quantity: item.quantity?.trim()
+                                ? item.quantity.trim()
+                                : null,
+                            timestamp: Date.now(),
+                        }),
+                        credentials: "include",
+                    },
+                );
+
+                if (!res.ok) {
+                    throw new Error(`Failed to save item: ${item.name}`);
+                }
+            }
+            await fetchListData(effectiveListId);
+            setIsReviewModalOpen(false);
+        } catch (err) {
+            console.error("handleReviewConfirm error:", err);
+            setError("Error saving some items. Please check your list.");
+
+            // NEW: Fetch the list anyway to show any items that successfully saved before the crash
+            await fetchListData(effectiveListId);
+        }
+    };
 
     const handleSyncMessage = useCallback(
         (message: { body: string }) => {
@@ -418,6 +522,11 @@ const useListItems = (effectiveListId: string | undefined) => {
         toggleItem,
         deleteItem,
         setError,
+        handleAiImport,
+        isReviewModalOpen,
+        setIsReviewModalOpen,
+        reviewItems,
+        handleReviewConfirm,
     };
 };
 
@@ -960,6 +1069,10 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        isReviewModalOpen,
+        setIsReviewModalOpen,
+        reviewItems,
+        handleReviewConfirm,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -1045,12 +1158,7 @@ const ListDetail = ({
         }
     }, [lists.length, fetchLists]);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: reset on change
-    useEffect(() => {
-        resetDetailFields();
-    }, [effectiveListId]);
-
-    const resetDetailFields = useCallback(() => {
+    const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
         setShowExpandedDetails(false);
@@ -1060,6 +1168,10 @@ const ListDetail = ({
         setDetailBrand("");
         setDetailPrice("");
     }, []);
+
+    useEffect(() => {
+        resetDetailFields(effectiveListId);
+    }, [effectiveListId, resetDetailFields]);
 
     const handleNewItemNameChange = (name: string) => {
         setNewItemName(name);
@@ -1274,6 +1386,14 @@ const ListDetail = ({
                 setPrice={setDetailPrice}
                 onTyping={sendTypingEvent}
             />
+
+            <SmartReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                items={reviewItems}
+                onConfirm={handleReviewConfirm}
+            />
+
             {showShareModal && (
                 <ShareListModal
                     listId={effectiveListId ?? ""}
