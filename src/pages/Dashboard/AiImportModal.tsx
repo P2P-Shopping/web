@@ -1,58 +1,39 @@
-import { Loader2, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
 import { Modal } from "../../components";
-import { useListsStore } from "../../store/useListsStore";
+import { aiMultimodalRequest } from "../../services/api";
 
 interface AiImportModalProps {
     onClose: () => void;
 }
 
 const AiImportModal = ({ onClose }: AiImportModalProps) => {
-    const [rawText, setRawText] = useState("");
+    const [prompt, setPrompt] = useState("");
+    const [image, setImage] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
-    const { addList, addItem } = useListsStore();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleImport = async (e: React.FormEvent) => {
         e.preventDefault();
-        const text = rawText.trim();
-        if (!text) return;
+        if (!prompt.trim() && !image) return;
 
         setIsProcessing(true);
+
         try {
-            const timestamp = new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-            const listName = `AI Import - ${timestamp}`;
-            const newList = await addList(listName);
+            /**
+             * Task 4: Real multimodal AI call
+             * The result will be handled by Dev 5 (The Gatekeeper) in the next stage.
+             */
+            const response = await aiMultimodalRequest(prompt, image);
+            console.log("AI Analysis Result:", response.data);
 
-            if (!newList) {
-                throw new Error("Failed to create list for import");
-            }
-
-            const items = text
-                .split("\n")
-                .map((line) => line.trim())
-                .filter((line) => line.length > 0);
-
-            const results = await Promise.all(
-                items.map((itemName) =>
-                    addItem(newList.id, {
-                        name: itemName,
-                        checked: false,
-                    }),
-                ),
-            );
-
-            const failures = results.filter((success) => !success).length;
-            if (failures > 0) {
-                console.warn(`${failures} items failed to import.`);
-            }
-
+            // For now, we close the modal. Dev 5 will intercept this.
             onClose();
         } catch (error) {
-            console.error("AI Import failed:", error);
-            // Optionally set a local error state here if the Modal supported it
+            console.error("AI Analysis failed:", error);
+            alert(
+                "AI service is currently unavailable. Please try again later.",
+            );
         } finally {
             setIsProcessing(false);
         }
@@ -62,14 +43,13 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         <Modal
             isOpen={true}
             onClose={onClose}
-            title="AI Import"
-            subtitle="Paste your shopping list here. We'll automatically extract the items and create a new list for you."
-            initialFocusSelector="#ai-input"
+            title="AI Shopping Assistant"
+            subtitle="Describe a recipe or take a photo of your ingredients. Our AI will help you generate a shopping list."
             footer={
                 <div className="grid grid-cols-2 gap-3 w-full">
                     <button
                         type="button"
-                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
+                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold hover:bg-border"
                         onClick={onClose}
                         disabled={isProcessing}
                     >
@@ -78,15 +58,15 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                     <button
                         type="submit"
                         form="ai-import-form"
-                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all hover:bg-accent-hover active:scale-95 disabled:opacity-50"
-                        disabled={!rawText.trim() || isProcessing}
+                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-accent text-white border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                        disabled={(!prompt.trim() && !image) || isProcessing}
                     >
                         {isProcessing ? (
                             <Loader2 size={18} className="animate-spin" />
                         ) : (
                             <Sparkles size={18} />
                         )}
-                        {isProcessing ? "Processing..." : "Import List"}
+                        {isProcessing ? "Analyzing..." : "Generate List"}
                     </button>
                 </div>
             }
@@ -99,27 +79,60 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                 <div className="flex flex-col gap-2">
                     <label
                         htmlFor="ai-input"
-                        className="text-[13px] font-semibold text-text-strong"
+                        className="text-[13px] font-bold text-text-strong uppercase tracking-tight"
                     >
-                        Paste items (one per line)
+                        Describe what you need
                     </label>
                     <textarea
                         id="ai-input"
-                        value={rawText}
-                        onChange={(e) => setRawText(e.target.value)}
-                        placeholder="Example:
-Milk
-Eggs
-Bread
-Bananas"
-                        rows={10}
-                        className="w-full px-4 py-3 bg-bg-muted border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all resize-none"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Example: I want to make pancakes for 4 people..."
+                        rows={5}
+                        className="w-full px-4 py-3 bg-bg-muted border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent transition-all resize-none"
                     />
                 </div>
-                <p className="text-xs text-text-muted italic">
-                    Note: For now, we extract one item per line. Advanced AI
-                    extraction coming soon!
-                </p>
+
+                <div className="flex flex-col gap-2">
+                    <label
+                        htmlFor="visual-context-input"
+                        className="text-[13px] font-bold text-text-strong uppercase tracking-tight"
+                    >
+                        Visual Context (Optional)
+                    </label>
+                    <input
+                        id="visual-context-input"
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        ref={fileInputRef}
+                        className="hidden"
+                        onChange={(e) => setImage(e.target.files?.[0] || null)}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-2xl transition-all ${
+                            image
+                                ? "border-accent bg-accent-subtle text-accent"
+                                : "border-border text-text-muted hover:border-accent hover:bg-bg-muted"
+                        }`}
+                    >
+                        <div className="p-3 bg-surface rounded-full shadow-sm">
+                            <ImageIcon size={24} />
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm font-bold">
+                                {image
+                                    ? image.name
+                                    : "PHOTO OF FRIDGE / RECIPE"}
+                            </span>
+                            <span className="text-[10px] uppercase opacity-60 font-bold">
+                                Click to use camera
+                            </span>
+                        </div>
+                    </button>
+                </div>
             </form>
         </Modal>
     );

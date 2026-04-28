@@ -1,5 +1,6 @@
 import {
     AlertCircle,
+    Camera,
     ChevronDown,
     Plus,
     Settings,
@@ -17,6 +18,7 @@ import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
+import api, { finishShoppingRequest } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import ShareListModal from "../Dashboard/ShareListModal";
@@ -124,21 +126,18 @@ const useListItems = (effectiveListId: string | undefined) => {
                 return;
             }
             try {
-                const response = await fetch(
-                    `${getBaseUrl()}/api/lists/${targetListId}`,
-                    {
-                        headers: getAuthHeaders(),
-                        credentials: "include",
-                    },
+                const response = await api.get<ApiShoppingList>(
+                    `/api/lists/${targetListId}`,
                 );
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        handleUnauthorizedResponse();
-                        throw new Error("Session expired.");
-                    }
-                    throw new Error("Failed to fetch list");
-                }
-                const currentList = (await response.json()) as ApiShoppingList;
+                // Note: api.get returns response.data directly in the feature branch implementation of 'api' service usually,
+                // but main seems to have switched to 'fetch' or a different api wrapper.
+                // Looking at the conflict:
+                // HEAD: const currentList = response.data;
+                // main: if (!response.ok) { ... } const currentList = (await response.json()) as ApiShoppingList;
+                // If 'api' is the axios-like wrapper from feature branch, it has .data.
+                // Let's check what 'api' is.
+
+                const currentList = response.data;
                 if (!currentList) {
                     setItems([]);
                     return;
@@ -156,20 +155,18 @@ const useListItems = (effectiveListId: string | undefined) => {
                 setItems(mappedItems);
                 syncListItemsInStore(mappedItems, targetListId);
             } catch (error) {
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to sync the list.";
                 console.error("fetchListData error:", error);
-                setError("Failed to sync the list.");
+                setError(errorMessage);
                 setSyncFailed(true);
             } finally {
                 setIsLoading(false);
             }
         },
-        [
-            getBaseUrl,
-            getAuthHeaders,
-            syncListItemsInStore,
-            effectiveListId,
-            handleUnauthorizedResponse,
-        ],
+        [syncListItemsInStore, effectiveListId],
     );
 
     useEffect(() => {
@@ -196,7 +193,12 @@ const useListItems = (effectiveListId: string | undefined) => {
                 },
             );
 
-            if (!response.ok) throw new Error("AI Service error");
+            if (!response.ok) {
+                if (response.status === 401) {
+                    handleUnauthorizedResponse();
+                }
+                throw new Error("AI Service error");
+            }
 
             const aiData = await response.json();
 
@@ -252,6 +254,9 @@ const useListItems = (effectiveListId: string | undefined) => {
                 );
 
                 if (!res.ok) {
+                    if (res.status === 401) {
+                        handleUnauthorizedResponse();
+                    }
                     throw new Error(`Failed to save item: ${item.name}`);
                 }
             }
@@ -365,34 +370,22 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(optimisticItems);
 
         try {
-            const res = await fetch(
-                `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
-                {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        name: newItem.name,
-                        isChecked: false,
-                        brand: newItem.brand ?? null,
-                        quantity: newItem.quantity ?? null,
-                        price: newItem.price ?? null,
-                        category: null,
-                        isRecurrent: false,
-                        timestamp: Date.now(),
-                    }),
-                    credentials: "include",
-                },
+            const payload = {
+                name: newItem.name,
+                isChecked: false,
+                brand: newItem.brand ?? null,
+                quantity: newItem.quantity ?? null,
+                price: newItem.price ?? null,
+                category: null,
+                isRecurrent: false,
+                timestamp: Date.now(),
+            };
+            const res = await api.post<ApiListItem>(
+                `/api/lists/${effectiveListId}/items`,
+                payload,
             );
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    handleUnauthorizedResponse();
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to add item");
-            }
-
-            const createdApiItem = (await res.json()) as ApiListItem;
+            const createdApiItem = res.data;
             const createdItem: Item = {
                 id: createdApiItem.id,
                 name: createdApiItem.name,
@@ -407,7 +400,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             await fetchListData(effectiveListId);
 
             if (stompClient.connected) {
-                const payload: SyncPayload = {
+                const syncPayload: SyncPayload = {
                     action: "ADD",
                     itemId: createdItem.id,
                     content: createdItem.name,
@@ -415,12 +408,16 @@ const useListItems = (effectiveListId: string | undefined) => {
                 };
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify(syncPayload),
                 });
             }
         } catch (err) {
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to add the product.";
             console.error("addItem error:", err);
-            setError("Failed to add the product.");
+            setError(errorMessage);
             rollbackItem(newItem.id);
         }
     };
@@ -441,31 +438,20 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
-            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "PUT",
-                headers: getAuthHeaders(true),
-                body: JSON.stringify({
-                    name: currentItem.name,
-                    isChecked: newChecked,
-                    brand: currentItem.brand ?? null,
-                    quantity: currentItem.quantity ?? null,
-                    price: currentItem.price ?? null,
-                    category: currentItem.category ?? null,
-                    isRecurrent: currentItem.isRecurrent ?? false,
-                    timestamp: Date.now(),
-                }),
-                credentials: "include",
-            });
+            const payload = {
+                name: currentItem.name,
+                isChecked: newChecked,
+                brand: currentItem.brand ?? null,
+                quantity: currentItem.quantity ?? null,
+                price: currentItem.price ?? null,
+                category: currentItem.category ?? null,
+                isRecurrent: currentItem.isRecurrent ?? false,
+                timestamp: Date.now(),
+            };
+            await api.put(`/api/items/${itemId}`, payload);
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    handleUnauthorizedResponse();
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to update item");
-            }
             if (effectiveListId && stompClient.connected) {
-                const payload: SyncPayload = {
+                const syncPayload: SyncPayload = {
                     action: "CHECK_OFF",
                     itemId,
                     checked: newChecked,
@@ -473,12 +459,16 @@ const useListItems = (effectiveListId: string | undefined) => {
                 };
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify(syncPayload),
                 });
             }
         } catch (err) {
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update the product.";
             console.error("toggleItem error:", err);
-            setError("Failed to update the product.");
+            setError(errorMessage);
             revertItemChecked(itemId, currentItem.checked);
         }
     };
@@ -493,22 +483,14 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
-            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "DELETE",
-                headers: getAuthHeaders(),
-                credentials: "include",
-            });
-
-            if (!res.ok) {
-                if (res.status === 401) {
-                    handleUnauthorizedResponse();
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to delete item");
-            }
+            await api.delete(`/api/items/${itemId}`);
         } catch (err) {
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to delete the product.";
             console.error("deleteItem error:", err);
-            setError("Failed to delete the product.");
+            setError(errorMessage);
             fetchListData(effectiveListId);
         }
     };
@@ -1069,6 +1051,7 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
         reviewItems,
@@ -1086,6 +1069,12 @@ const ListDetail = ({
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
+
+    // Task 4 States
+    const [isFinishing, setIsFinishing] = useState(false);
+    const [showFinishModal, setShowFinishModal] = useState(false);
+    const [finishStoreName, setFinishStoreName] = useState("");
+    const [receiptImage, setReceiptImage] = useState<File | null>(null);
 
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
@@ -1108,9 +1097,14 @@ const ListDetail = ({
     const estimatedTotal = useMemo(() => {
         return items
             .reduce((sum, item) => {
-                const qtyStr = item.quantity || "1";
-                const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)/);
-                const qty = qtyMatch ? Number.parseFloat(qtyMatch[1]) : 1;
+                /**
+                 * Task 4: Fix miscomputation for strings like "500g"
+                 * CodeRabbit: If the quantity is not purely numeric, count as 1.
+                 */
+                const qtyStr = (item.quantity || "1").trim();
+                const qty = /^\d+(?:\.\d+)?$/.test(qtyStr)
+                    ? Number.parseFloat(qtyStr)
+                    : 1;
                 return sum + (item.price || 0) * qty;
             }, 0)
             .toFixed(2);
@@ -1306,7 +1300,7 @@ const ListDetail = ({
                                     <p>Loading...</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4">
+                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}
@@ -1314,18 +1308,29 @@ const ListDetail = ({
                                         disabled={isReadOnly}
                                     />
                                     {items.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                                                    Estimated Total
-                                                </span>
-                                                <span className="text-xs text-text-muted opacity-70">
-                                                    {items.length} items
+                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                                                        Estimated Total
+                                                    </span>
+                                                    <span className="text-xs text-text-muted opacity-70">
+                                                        {items.length} items
+                                                    </span>
+                                                </div>
+                                                <span className="text-xl font-black text-accent tracking-tight">
+                                                    {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            <span className="text-xl font-black text-accent tracking-tight">
-                                                {estimatedTotal} lei
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowFinishModal(true)
+                                                }
+                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                            >
+                                                Finish Shopping
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -1386,6 +1391,116 @@ const ListDetail = ({
                 setPrice={setDetailPrice}
                 onTyping={sendTypingEvent}
             />
+
+            {/* Finish Shopping Modal */}
+            <Modal
+                isOpen={showFinishModal}
+                onClose={() => setShowFinishModal(false)}
+                title="Finish Shopping"
+                subtitle="Enter store and take a photo of your receipt."
+            >
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="store-name-input"
+                            className="text-[11px] font-black uppercase text-text-strong tracking-wider"
+                        >
+                            Store Name
+                        </label>
+                        <input
+                            id="store-name-input"
+                            type="text"
+                            value={finishStoreName}
+                            onChange={(e) => setFinishStoreName(e.target.value)}
+                            placeholder="e.g. Lidl"
+                            className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                            Receipt Photo
+                        </span>
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                id="receipt-cam"
+                                className="hidden"
+                                onChange={(e) =>
+                                    setReceiptImage(e.target.files?.[0] || null)
+                                }
+                            />
+                            <label
+                                htmlFor="receipt-cam"
+                                className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
+                            >
+                                <Camera size={28} />
+                                <span className="text-sm font-black">
+                                    {receiptImage
+                                        ? receiptImage.name
+                                        : "TAKE PHOTO"}
+                                </span>
+                                <span className="text-[10px] uppercase font-bold opacity-50">
+                                    Click to open camera
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowFinishModal(false)}
+                            className="py-3 bg-bg-muted rounded-lg font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={
+                                !finishStoreName.trim() ||
+                                isFinishing ||
+                                !effectiveListId ||
+                                effectiveListId === "default"
+                            }
+                            onClick={async () => {
+                                if (
+                                    !effectiveListId ||
+                                    effectiveListId === "default"
+                                )
+                                    return;
+                                setIsFinishing(true);
+                                try {
+                                    await finishShoppingRequest({
+                                        storeName: finishStoreName.trim(),
+                                        receiptImage,
+                                        listId: effectiveListId,
+                                    });
+                                    setShowFinishModal(false);
+                                    setFinishStoreName("");
+                                    setReceiptImage(null);
+                                    navigate("/dashboard");
+                                } catch (_err) {
+                                    const errorMessage =
+                                        _err instanceof Error
+                                            ? _err.message
+                                            : "Failed to complete shopping.";
+                                    console.error(
+                                        "Failed to complete shopping:",
+                                        _err,
+                                    );
+                                    setError(errorMessage);
+                                } finally {
+                                    setIsFinishing(false);
+                                }
+                            }}
+                            className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
+                        >
+                            {isFinishing ? "Processing..." : "Complete"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <SmartReviewModal
                 isOpen={isReviewModalOpen}
