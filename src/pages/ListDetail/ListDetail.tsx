@@ -978,19 +978,34 @@ const ListDetail = ({
                                                              * Task 4: Fix miscomputation for strings like "500g"
                                                              * CodeRabbit: If the quantity is not purely numeric, count as 1.
                                                              */
-                                                            const qtyStr = (item.quantity || "1").trim();
-                                                            const qty = /^\d+(?:\.\d+)?$/.test(qtyStr)
-                                                                ? Number.parseFloat(qtyStr)
-                                                                : 1;
-                                                            return sum + (item.price || 0) * qty;
+                                                            const qtyStr = (
+                                                                item.quantity ||
+                                                                "1"
+                                                            ).trim();
+                                                            const qty =
+                                                                /^\d+(?:\.\d+)?$/.test(
+                                                                    qtyStr,
+                                                                )
+                                                                    ? Number.parseFloat(
+                                                                          qtyStr,
+                                                                      )
+                                                                    : 1;
+                                                            return (
+                                                                sum +
+                                                                (item.price ||
+                                                                    0) *
+                                                                    qty
+                                                            );
                                                         }, 0)
                                                         .toFixed(2)}{" "}
                                                     lei
                                                 </span>
                                             </div>
-                                            <button 
+                                            <button
                                                 type="button"
-                                                onClick={() => setShowFinishModal(true)}
+                                                onClick={() =>
+                                                    setShowFinishModal(true)
+                                                }
                                                 className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
                                             >
                                                 Finish Shopping
@@ -1057,40 +1072,94 @@ const ListDetail = ({
             />
 
             {/* Finish Shopping Modal */}
-            <Modal isOpen={showFinishModal} onClose={() => setShowFinishModal(false)} title="Finish Shopping" subtitle="Enter store and take a photo of your receipt.">
+            <Modal
+                isOpen={showFinishModal}
+                onClose={() => setShowFinishModal(false)}
+                title="Finish Shopping"
+                subtitle="Enter store and take a photo of your receipt."
+            >
                 <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-black uppercase text-text-strong tracking-wider">Store Name</label>
-                        <input type="text" value={finishStoreName} onChange={(e) => setFinishStoreName(e.target.value)} placeholder="e.g. Lidl" className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent" />
+                        <label className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                            Store Name
+                        </label>
+                        <input
+                            type="text"
+                            value={finishStoreName}
+                            onChange={(e) => setFinishStoreName(e.target.value)}
+                            placeholder="e.g. Lidl"
+                            className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
+                        />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label className="text-[11px] font-black uppercase text-text-strong tracking-wider">Receipt Photo</label>
+                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                            Receipt Photo
+                        </span>
                         <div className="relative">
-                            <input type="file" accept="image/*" capture="environment" id="receipt-cam" className="hidden" onChange={(e) => setReceiptImage(e.target.files?.[0] || null)} />
-                            <label htmlFor="receipt-cam" className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                id="receipt-cam"
+                                className="hidden"
+                                onChange={(e) =>
+                                    setReceiptImage(e.target.files?.[0] || null)
+                                }
+                            />
+                            <label
+                                htmlFor="receipt-cam"
+                                className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
+                            >
                                 <Camera size={28} />
-                                <span className="text-sm font-black">{receiptImage ? receiptImage.name : "TAKE PHOTO"}</span>
-                                <span className="text-[10px] uppercase font-bold opacity-50">Click to open camera</span>
+                                <span className="text-sm font-black">
+                                    {receiptImage
+                                        ? receiptImage.name
+                                        : "TAKE PHOTO"}
+                                </span>
+                                <span className="text-[10px] uppercase font-bold opacity-50">
+                                    Click to open camera
+                                </span>
                             </label>
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mt-4">
-                        <button type="button" onClick={() => setShowFinishModal(false)} className="py-3 bg-bg-muted rounded-lg font-bold">Cancel</button>
-                        <button 
+                        <button
                             type="button"
-                            disabled={!finishStoreName.trim() || isFinishing || !effectiveListId || effectiveListId === "default"}
+                            onClick={() => setShowFinishModal(false)}
+                            className="py-3 bg-bg-muted rounded-lg font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={
+                                !finishStoreName.trim() ||
+                                isFinishing ||
+                                !effectiveListId ||
+                                effectiveListId === "default"
+                            }
                             onClick={async () => {
-                                if (!effectiveListId || effectiveListId === "default") return;
+                                if (
+                                    !effectiveListId ||
+                                    effectiveListId === "default"
+                                )
+                                    return;
                                 setIsFinishing(true);
                                 try {
-                                    await finishShoppingRequest({ storeName: finishStoreName.trim(), receiptImage, listId: effectiveListId });
+                                    await finishShoppingRequest({
+                                        storeName: finishStoreName.trim(),
+                                        receiptImage,
+                                        listId: effectiveListId,
+                                    });
                                     setShowFinishModal(false);
                                     setFinishStoreName("");
                                     setReceiptImage(null);
                                     navigate("/dashboard");
                                 } catch (err) {
                                     setError("Failed to complete shopping.");
-                                } finally { setIsFinishing(false); }
+                                } finally {
+                                    setIsFinishing(false);
+                                }
                             }}
                             className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
                         >

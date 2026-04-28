@@ -18,7 +18,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         if (!prompt.trim() && !image) return;
 
         setIsProcessing(true);
-        
+
         try {
             /**
              * Task 4: Real multimodal AI call
@@ -26,12 +26,14 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
              */
             const response = await aiMultimodalRequest(prompt, image);
             console.log("AI Analysis Result:", response.data);
-            
+
             // For now, we close the modal. Dev 5 will intercept this.
             onClose();
         } catch (error) {
             console.error("AI Analysis failed:", error);
-            alert("AI service is currently unavailable. Please try again later.");
+            alert(
+                "AI service is currently unavailable. Please try again later.",
+            );
         } finally {
             setIsProcessing(false);
         }
@@ -45,7 +47,12 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             subtitle="Describe a recipe or take a photo of your ingredients. Our AI will help you generate a shopping list."
             footer={
                 <div className="grid grid-cols-2 gap-3 w-full">
-                    <button type="button" className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold hover:bg-border" onClick={onClose} disabled={isProcessing}>
+                    <button
+                        type="button"
+                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold hover:bg-border"
+                        onClick={onClose}
+                        disabled={isProcessing}
+                    >
                         Cancel
                     </button>
                     <button
@@ -64,7 +71,11 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                 </div>
             }
         >
-            <form id="ai-import-form" onSubmit={handleImport} className="flex flex-col gap-4">
+            <form
+                id="ai-import-form"
+                onSubmit={handleImport}
+                className="flex flex-col gap-4"
+            >
                 <div className="flex flex-col gap-2">
                     <label
                         htmlFor="ai-input"
@@ -86,21 +97,21 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                     <label className="text-[13px] font-bold text-text-strong uppercase tracking-tight">
                         Visual Context (Optional)
                     </label>
-                    <input 
-                        type="file" 
-                        accept="image/*" 
-                        capture="environment" 
+                    <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
                         ref={fileInputRef}
-                        className="hidden" 
+                        className="hidden"
                         onChange={(e) => setImage(e.target.files?.[0] || null)}
                     />
-                    <button 
+                    <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-2xl transition-all ${
-                            image 
-                            ? "border-accent bg-accent-subtle text-accent" 
-                            : "border-border text-text-muted hover:border-accent hover:bg-bg-muted"
+                            image
+                                ? "border-accent bg-accent-subtle text-accent"
+                                : "border-border text-text-muted hover:border-accent hover:bg-bg-muted"
                         }`}
                     >
                         <div className="p-3 bg-surface rounded-full shadow-sm">
@@ -108,7 +119,9 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         </div>
                         <div className="flex flex-col items-center gap-1">
                             <span className="text-sm font-bold">
-                                {image ? image.name : "PHOTO OF FRIDGE / RECIPE"}
+                                {image
+                                    ? image.name
+                                    : "PHOTO OF FRIDGE / RECIPE"}
                             </span>
                             <span className="text-[10px] uppercase opacity-60 font-bold">
                                 Click to use camera

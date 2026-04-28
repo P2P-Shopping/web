@@ -5,7 +5,7 @@ const API_URL = import.meta.env.VITE_API_BASE_URL;
 
 const api = axios.create({
     baseURL: API_URL,
-    withCredentials: true,  
+    withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
@@ -41,7 +41,11 @@ api.interceptors.response.use(
  * Task 4: API Request for Finishing Shopping
  * REPARAT: Fără header-ul Content-Type manual pentru a lăsa Axios să pună 'boundary' corect.
  */
-export const finishShoppingRequest = async (data: { storeName: string; receiptImage: File | null; listId: string }) => {
+export const finishShoppingRequest = async (data: {
+    storeName: string;
+    receiptImage: File | null;
+    listId: string;
+}) => {
     const formData = new FormData();
     formData.append("storeName", data.storeName);
     formData.append("listId", data.listId);
@@ -55,7 +59,10 @@ export const finishShoppingRequest = async (data: { storeName: string; receiptIm
 /**
  * Task 4: API Request for Multimodal AI Input
  */
-export const aiMultimodalRequest = async (prompt: string, image: File | null) => {
+export const aiMultimodalRequest = async (
+    prompt: string,
+    image: File | null,
+) => {
     const formData = new FormData();
     formData.append("prompt", prompt);
     if (image) {
