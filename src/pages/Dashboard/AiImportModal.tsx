@@ -26,6 +26,21 @@ interface AiImportModalProps {
     onClose: () => void;
 }
 
+interface AiItem {
+    specificName?: string;
+    genericName?: string;
+    name?: string;
+    brand?: string;
+    quantity?: number | string;
+    unit?: string;
+    category?: string;
+}
+
+interface AiResponse {
+    items?: AiItem[];
+    listType?: string;
+}
+
 const AiImportModal = ({ onClose }: AiImportModalProps) => {
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -148,9 +163,9 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         }
     };
 
-    const processAiResponse = (data: any) => {
+    const processAiResponse = (data: AiResponse) => {
         if (data.items && Array.isArray(data.items)) {
-            const items: ReviewItem[] = data.items.map((item: any) => ({
+            const items: ReviewItem[] = data.items.map((item) => ({
                 id: crypto.randomUUID(),
                 name: item.specificName || item.genericName || "Unknown Item",
                 brand: item.brand,
@@ -240,11 +255,14 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                     : firstUserMessage.content
                 : `AI List ${new Date().toLocaleDateString()}`;
 
-            let category: "NORMAL" | "RECIPE" | "FREQUENT" = "NORMAL";
-            if (detectedListType === "RECIPE") category = "RECIPE";
-            if (detectedListType === "FREQUENT") category = "FREQUENT";
+            const category =
+                detectedListType === "RECIPE"
+                    ? "RECIPE"
+                    : detectedListType === "FREQUENT"
+                      ? "FREQUENT"
+                      : "NORMAL";
 
-            const newList = await addList(title);
+            const newList = await addList(title, category);
             if (newList) {
                 for (const item of items) {
                     await addItem(newList.id, {

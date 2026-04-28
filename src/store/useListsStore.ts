@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useStore } from "../context/useStore";
-import type { Item, ShoppingList } from "../types";
+import type { Item, ListCategory, ShoppingList } from "../types";
 
 interface ApiItem {
     id: string;
@@ -16,6 +16,9 @@ interface ApiItem {
 interface ApiShoppingList {
     id: string;
     title: string;
+    category?: ListCategory;
+    subcategory?: string;
+    finalStore?: string;
     createdAt?: string;
     updatedAt?: string;
     items?: ApiItem[];
@@ -33,7 +36,10 @@ interface ListsState {
     isModalOpen: boolean;
     deletingListId: string | null;
     fetchLists: () => Promise<void>;
-    addList: (name: string) => Promise<ShoppingList | null>;
+    addList: (
+        name: string,
+        category?: ListCategory,
+    ) => Promise<ShoppingList | null>;
     updateList: (id: string, updates: Partial<ShoppingList>) => void;
     deleteList: (id: string) => Promise<boolean>;
     setCurrentList: (list: ShoppingList | null) => void;
@@ -107,6 +113,9 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     createdAt: list.createdAt ?? new Date().toISOString(),
     updatedAt: list.updatedAt ?? list.createdAt ?? new Date().toISOString(),
     status: "active",
+    category: list.category ?? "NORMAL",
+    subcategory: list.subcategory,
+    finalStore: list.finalStore,
     ownerName: list.ownerName || "You",
     ownerEmail: list.ownerEmail,
     userId: list.userId,
@@ -178,7 +187,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
      * @param name - The title of the new list.
      * @returns The newly created list or null if creation failed.
      */
-    addList: async (name: string) => {
+    addList: async (name: string, category: ListCategory = "NORMAL") => {
         set({ isLoading: true, error: null });
         try {
             const trimmedName = name.trim();
@@ -189,7 +198,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
             const response = await fetch(`${getBaseUrl()}/api/lists`, {
                 method: "POST",
                 headers: jsonHeaders(true),
-                body: JSON.stringify({ title: trimmedName }),
+                body: JSON.stringify({ title: trimmedName, category }),
                 credentials: "include",
             });
 

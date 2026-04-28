@@ -106,7 +106,10 @@ export default function Modal({
         >
             <div
                 className="relative z-10 bg-surface border border-border rounded-xl shadow-xl flex flex-col w-full mx-4 animate-in zoom-in-95 fade-in duration-200"
-                style={{ maxWidth }}
+                style={{
+                    width: `min(${maxWidth}, calc(100vw - 2rem))`,
+                    maxWidth,
+                }}
             >
                 <div className="flex items-start justify-between p-6 pb-2">
                     <div className="flex flex-col gap-1">

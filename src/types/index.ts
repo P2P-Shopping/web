@@ -14,6 +14,8 @@ export interface Item {
     isRecurrent?: boolean;
 }
 
+export type ListCategory = "NORMAL" | "RECIPE" | "FREQUENT";
+
 /**
  * Supported types of actions that can be queued while offline.
  */
@@ -49,6 +51,9 @@ export interface ShoppingList {
     createdAt: string;
     updatedAt: string;
     status: "active" | "completed" | "archived";
+    category?: ListCategory;
+    subcategory?: string;
+    finalStore?: string;
     items: Item[];
     // User relation
     userId?: string;

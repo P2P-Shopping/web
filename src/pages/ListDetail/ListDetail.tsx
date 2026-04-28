@@ -24,6 +24,7 @@ import api, {
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
+import type { ListCategory } from "../../types";
 import ShareListModal from "../Dashboard/ShareListModal";
 
 interface Item {
@@ -50,6 +51,7 @@ interface ApiListItem {
 
 interface ApiShoppingList {
     id: string;
+    category?: ListCategory;
     items?: ApiListItem[];
 }
 
@@ -152,6 +154,11 @@ const useListItems = (effectiveListId: string | undefined) => {
                     isRecurrent: item.isRecurrent,
                 }));
                 setItems(mappedItems);
+                if (currentList.category) {
+                    useListsStore.getState().updateList(targetListId, {
+                        category: currentList.category,
+                    });
+                }
                 syncListItemsInStore(mappedItems, targetListId);
             } catch (error) {
                 const errorMessage =

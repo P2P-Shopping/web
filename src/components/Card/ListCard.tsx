@@ -50,6 +50,17 @@ export default function ListCard({
         return `${checkedItems}/${totalItems} ${label}`;
     };
 
+    const getCategoryLabel = () => {
+        switch (list.category) {
+            case "RECIPE":
+                return "Recipe";
+            case "FREQUENT":
+                return "Frequent";
+            default:
+                return "Normal";
+        }
+    };
+
     const getOwnerLabel = () => {
         if (!currentUser) return list.ownerName?.split(" ")[0] || "Unknown";
 
@@ -103,6 +114,9 @@ export default function ListCard({
 
                 <div className="flex flex-col gap-3.5 mt-auto">
                     <div className="flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-bg-muted text-text-muted text-xs font-semibold whitespace-nowrap border border-border">
+                            {getCategoryLabel()}
+                        </span>
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
                             {getItemsCountLabel()}
                         </span>

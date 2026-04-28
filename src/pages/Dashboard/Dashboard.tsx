@@ -37,6 +37,7 @@ const Dashboard = () => {
     } = useListsStore();
 
     const showAiImport = searchParams.get("import") === "ai";
+    const isOverlayOpen = isModalOpen || showAiImport;
 
     useEffect(() => {
         void fetchLists();
@@ -46,6 +47,28 @@ const Dashboard = () => {
     const selectedList = useMemo(
         () => lists.find((list) => list.id === selectedListId) ?? null,
         [lists, selectedListId],
+    );
+
+    const groupedLists = useMemo(
+        () => ({
+            NORMAL: lists.filter(
+                (list) => (list.category ?? "NORMAL") === "NORMAL",
+            ),
+            RECIPE: lists.filter((list) => list.category === "RECIPE"),
+            FREQUENT: lists.filter((list) => list.category === "FREQUENT"),
+        }),
+        [lists],
+    );
+
+    const sectionOrder = ["NORMAL", "RECIPE", "FREQUENT"] as const;
+    const sectionLabels: Record<(typeof sectionOrder)[number], string> = {
+        NORMAL: "Normal lists",
+        RECIPE: "Recipe lists",
+        FREQUENT: "Frequent lists",
+    };
+
+    const hasGroupedLists = sectionOrder.some(
+        (section) => groupedLists[section].length > 0,
     );
 
     /**
@@ -113,7 +136,7 @@ const Dashboard = () => {
     };
 
     let mainContent: ReactNode;
-    if (isLoading) {
+    if (isLoading && !isOverlayOpen) {
         mainContent = (
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-text-muted text-sm">
                 <div className="w-9 h-9 border-[3px] border-border border-t-accent rounded-full animate-spin" />
@@ -154,7 +177,7 @@ const Dashboard = () => {
                 <ListDetail listIdOverride={selectedList.id} />
             </div>
         );
-    } else {
+    } else if (!hasGroupedLists) {
         mainContent = (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
                 {lists.map((list) => (
@@ -168,6 +191,47 @@ const Dashboard = () => {
                         isDeleting={deletingListId === list.id}
                     />
                 ))}
+            </div>
+        );
+    } else {
+        mainContent = (
+            <div className="flex flex-col gap-8">
+                {sectionOrder.map((section) => {
+                    const sectionLists = groupedLists[section];
+                    if (sectionLists.length === 0) return null;
+
+                    return (
+                        <section key={section} className="flex flex-col gap-4">
+                            <div className="flex items-end justify-between gap-3">
+                                <div>
+                                    <h2 className="text-base font-extrabold text-text-strong tracking-tight">
+                                        {sectionLabels[section]}
+                                    </h2>
+                                    <p className="text-xs text-text-muted mt-0.5">
+                                        {`${sectionLists.length} ${sectionLists.length === 1 ? "list" : "lists"}`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
+                                {sectionLists.map((list) => (
+                                    <ListCard
+                                        key={list.id}
+                                        list={list}
+                                        onClick={() => handleCardClick(list.id)}
+                                        onDelete={(e) =>
+                                            handleDeleteList(
+                                                e,
+                                                list.id,
+                                                list.name,
+                                            )
+                                        }
+                                        isDeleting={deletingListId === list.id}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    );
+                })}
             </div>
         );
     }
