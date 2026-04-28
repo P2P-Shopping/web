@@ -28,6 +28,12 @@ interface AppState {
     userLocation: Coordinate;
     // 👇 ADDED: To pass the store location to the canvas
     targetStoreLocation: Coordinate | null;
+    /** Current navigation stage for macro to micro transition */
+    navigationMode: "city" | "indoor";
+    /** Whether the app already crossed the geofence into the store */
+    hasEnteredStore: boolean;
+    /** Prevents duplicate geofence transitions while indoor route loads */
+    isTransitioningToStore: boolean;
 
     route: RoutePoint[];
     status: string;
@@ -56,6 +62,12 @@ interface AppState {
 
     // 👇 ADDED: Setter for target store
     setTargetStoreLocation: (loc: Coordinate | null) => void;
+    /** Switches between city map and indoor canvas */
+    setNavigationMode: (mode: "city" | "indoor") => void;
+    /** Marks the geofence transition as completed */
+    setHasEnteredStore: (value: boolean) => void;
+    /** Locks or unlocks the geofence transition */
+    setIsTransitioningToStore: (value: boolean) => void;
 
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
@@ -88,6 +100,9 @@ export const useStore = create<AppState>()(
         (set, get) => ({
             userLocation: { lat: 47.151726, lng: 27.587914 },
             targetStoreLocation: null,
+            navigationMode: "city",
+            hasEnteredStore: false,
+            isTransitioningToStore: false,
             route: [],
             status: "idle",
             items: [],
@@ -103,6 +118,10 @@ export const useStore = create<AppState>()(
 
             setUserLocation: (loc) => set({ userLocation: loc }),
             setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
+            setNavigationMode: (mode) => set({ navigationMode: mode }),
+            setHasEnteredStore: (value) => set({ hasEnteredStore: value }),
+            setIsTransitioningToStore: (value) =>
+                set({ isTransitioningToStore: value }),
             setRoute: (route) => set({ route }),
             setStatus: (status) => set({ status }),
             setOnlineStatus: (status) => set({ isOnline: status }),

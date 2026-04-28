@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../../context/useStore";
+import { DEMO_STORE_LOCATION } from "../../services/geofence";
 import { loadRoute } from "../../services/loadRoute";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -106,6 +107,7 @@ const RoutePage = () => {
     const [recommendedStores, setRecommendedStores] = useState<
         StoreRecommendation[]
     >([]);
+    const route = useStore((state) => state.route);
 
     // --- LOGICA DE INTEGRARE BACKEND ---
     const handleListSelect = async (listId: string) => {
@@ -263,6 +265,58 @@ const RoutePage = () => {
     // --- VIEW: STORE SELECTION ---
     return (
         <div className="flex-1 p-6 max-w-[860px] mx-auto w-full flex flex-col gap-6 max-[600px]:pb-[100px]">
+            <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <h3 className="text-lg font-black text-text-strong uppercase tracking-tight">
+                            Mock TSP Preview
+                        </h3>
+                        <p className="text-sm text-text-muted">
+                            Route calculated in frontend, ready for indoor
+                            canvas.
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                            Store anchor
+                        </div>
+                        <div className="text-sm font-mono text-text-strong">
+                            {DEMO_STORE_LOCATION.lat.toFixed(4)},{" "}
+                            {DEMO_STORE_LOCATION.lng.toFixed(4)}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {route.length > 0 ? (
+                        route.map((point, index) => (
+                            <div
+                                key={point.itemId}
+                                className="flex items-center justify-between rounded-xl border border-border bg-bg-muted px-4 py-3"
+                            >
+                                <div className="min-w-0">
+                                    <div className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                                        Stop {index + 1}
+                                    </div>
+                                    <div className="truncate font-semibold text-text-strong">
+                                        {point.name}
+                                    </div>
+                                </div>
+                                <div className="text-xs font-mono text-text-muted">
+                                    {point.lat.toFixed(4)},{" "}
+                                    {point.lng.toFixed(4)}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="rounded-xl border border-dashed border-border bg-bg-muted px-4 py-6 text-sm text-text-muted">
+                            Select a list and enter the geofence to generate the
+                            mock TSP route.
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <header className="flex flex-col gap-4 mb-2">
                 <div className="flex items-start justify-between">
                     <div>

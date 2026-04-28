@@ -8,8 +8,8 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
 import Modal from "../../components/Modal/Modal";
+import { useStore } from "../../context/useStore";
 import ListDetail from "../ListDetail/ListDetail";
 
 interface Coordinate {
@@ -105,38 +105,6 @@ const generateLocalProducts = (centerGps: Coordinate): RoutePoint[] => {
     ];
 };
 
-const calculateNearestNeighborRoute = (
-    startPoint: Point,
-    products: RoutePoint[],
-    anchor: Coordinate,
-): RoutePoint[] => {
-    const unvisited = [...products];
-    const orderedRoute: RoutePoint[] = [];
-    let currentPoint = { ...startPoint };
-
-    while (unvisited.length > 0) {
-        let nearestIdx = 0;
-        let minDist = Infinity;
-        for (let i = 0; i < unvisited.length; i++) {
-            const pPx = getRelativePixels(unvisited[i], anchor);
-            const dist = Math.hypot(
-                pPx.x - currentPoint.x,
-                pPx.y - currentPoint.y,
-            );
-            if (dist < minDist) {
-                minDist = dist;
-                nearestIdx = i;
-            }
-        }
-        const nearestProduct = unvisited[nearestIdx];
-        orderedRoute.push(nearestProduct);
-        currentPoint = getRelativePixels(nearestProduct, anchor);
-        unvisited.splice(nearestIdx, 1);
-    }
-
-    return orderedRoute;
-};
-
 const clamp = (value: number, min: number, max: number): number =>
     Math.min(Math.max(value, min), max);
 
@@ -186,10 +154,7 @@ interface RoutePoint {
     lng: number;
 }
 
-const useMapEngine = (
-    canvasRef: React.RefObject<HTMLCanvasElement | null>,
-    listId: string | undefined,
-) => {
+const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const [isDragging, setIsDragging] = useState(false);
     const [hasLocationLock, setHasLocationLock] = useState(false);
     const [gpsError, setGpsError] = useState<string | null>(null);
@@ -256,67 +221,20 @@ const useMapEngine = (
         camera.current.y = clamp(nextY, constraints.minY, constraints.maxY);
     };
 
+    const storeRoute = useStore((state) => state.route);
+    const navigationMode = useStore((state) => state.navigationMode);
+
     useEffect(() => {
-        const controller = new AbortController();
-        const fetchRoute = async () => {
-            if (!listId || listId === "default") {
-                if (originGps.current) {
-                    routePoints.current = generateLocalProducts(
-                        originGps.current,
-                    );
-                }
-                return;
-            }
-            setIsRouting(true);
-            try {
-                const baseUrl =
-                    import.meta.env.VITE_API_URL || "http://localhost:8081";
-                const response = await fetch(
-                    `${baseUrl}/api/routing/calculate`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        signal: controller.signal,
-                        body: JSON.stringify({
-                            listId: listId,
-                            userLat:
-                                targetGps.current.lat || USER_GPS_DEFAULT.lat,
-                            userLng:
-                                targetGps.current.lng || USER_GPS_DEFAULT.lng,
-                        }),
-                    },
-                );
+        if (!hasLocationLock) return;
 
-                if (controller.signal.aborted) return;
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.route) {
-                        const productsOnly: RoutePoint[] = data.route.filter(
-                            (p: RoutePoint) => p.itemId !== "user_loc",
-                        );
-                        routePoints.current = productsOnly;
-                    }
-                }
-            } catch (error) {
-                if (controller.signal.aborted) return;
-                console.error(error);
-                if (originGps.current) {
-                    routePoints.current = generateLocalProducts(
-                        originGps.current,
-                    );
-                }
-            } finally {
-                if (!controller.signal.aborted) {
-                    setIsRouting(false);
-                }
-            }
-        };
-        if (hasLocationLock) {
-            fetchRoute();
+        if (navigationMode === "indoor") {
+            routePoints.current = storeRoute.length > 0 ? storeRoute : [];
+        } else if (originGps.current) {
+            routePoints.current = generateLocalProducts(originGps.current);
         }
-        return () => controller.abort();
-    }, [listId, hasLocationLock]);
+
+        setIsRouting(false);
+    }, [hasLocationLock, navigationMode, storeRoute]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
@@ -399,12 +317,6 @@ const useMapEngine = (
                 );
 
                 if (routePoints.current.length > 0) {
-                    const orderedRoute = calculateNearestNeighborRoute(
-                        userPos,
-                        routePoints.current,
-                        anchor,
-                    );
-
                     ctx.beginPath();
                     ctx.strokeStyle = theme.route;
                     ctx.lineWidth = 4 / camera.current.zoom;
@@ -413,7 +325,7 @@ const useMapEngine = (
                         10 / camera.current.zoom,
                     ]);
                     ctx.moveTo(userPos.x, userPos.y);
-                    orderedRoute.forEach((product) => {
+                    routePoints.current.forEach((product) => {
                         const { x, y } = getRelativePixels(product, anchor);
                         ctx.lineTo(x, y);
                     });
@@ -691,7 +603,6 @@ const useMapEngine = (
 
 const StoreMap: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { id: listId } = useParams<{ id: string }>();
     const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
     const [isCoordsModalOpen, setIsCoordsModalOpen] = useState(false);
 
@@ -730,7 +641,7 @@ const StoreMap: React.FC = () => {
         recenterCamera,
         zoomIn,
         zoomOut,
-    } = useMapEngine(canvasRef, listId);
+    } = useMapEngine(canvasRef);
 
     if (!hasLocationLock) {
         return (

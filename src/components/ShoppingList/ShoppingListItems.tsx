@@ -48,7 +48,9 @@ const ShoppingListItems: React.FC<Props> = ({
     );
 
     // Sort categories alphabetically
-    const categories = Object.keys(groupedItems).sort();
+    const categories = Object.keys(groupedItems).sort((a, b) =>
+        a.localeCompare(b),
+    );
 
     return (
         <div className="flex flex-col gap-8">

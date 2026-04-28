@@ -1,6 +1,12 @@
 import type { StompSubscription } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import {
+    Navigate,
+    Route,
+    Routes,
+    useLocation,
+    useNavigate,
+} from "react-router-dom";
 import { Navbar, OfflineBanner } from "./components";
 import { useStore } from "./context/useStore";
 import { useNetworkState } from "./hooks/useNetworkState";
@@ -15,6 +21,8 @@ import {
     StoreMap,
 } from "./pages";
 import { checkAuthRequest } from "./services/authService";
+import { DEMO_STORE_LOCATION, isWithinGeofence } from "./services/geofence";
+import { loadRoute } from "./services/loadRoute";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
@@ -81,9 +89,24 @@ function App() {
     useNetworkState();
     useOfflineSync();
     const location = useLocation();
+    const navigate = useNavigate();
     const setServerConnected = useStore((state) => state.setServerConnected);
     const setAuth = useStore((state) => state.setAuth);
     const isAuthenticated = useStore((state) => state.isAuthenticated);
+    const userLocation = useStore((state) => state.userLocation);
+    const targetStoreLocation = useStore((state) => state.targetStoreLocation);
+    const navigationMode = useStore((state) => state.navigationMode);
+    const hasEnteredStore = useStore((state) => state.hasEnteredStore);
+    const isTransitioningToStore = useStore(
+        (state) => state.isTransitioningToStore,
+    );
+    const items = useStore((state) => state.items);
+    const setNavigationMode = useStore((state) => state.setNavigationMode);
+    const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
+    const setIsTransitioningToStore = useStore(
+        (state) => state.setIsTransitioningToStore,
+    );
+    const setStatus = useStore((state) => state.setStatus);
     const { theme } = useThemeStore();
 
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -151,6 +174,67 @@ function App() {
         startMockEmitter();
         return () => stopMockEmitter();
     }, []);
+
+    useEffect(() => {
+        if (
+            navigationMode === "indoor" ||
+            hasEnteredStore ||
+            isTransitioningToStore
+        ) {
+            return;
+        }
+
+        const storeLocation = targetStoreLocation ?? DEMO_STORE_LOCATION;
+        if (!isWithinGeofence(userLocation, storeLocation)) return;
+
+        let cancelled = false;
+
+        (async () => {
+            setIsTransitioningToStore(true);
+            setStatus("Geofence detected. Loading indoor canvas...");
+            await loadRoute(
+                items.map((item) => item.id),
+                storeLocation.lat,
+                storeLocation.lng,
+            );
+
+            if (cancelled) return;
+
+            setNavigationMode("indoor");
+            setHasEnteredStore(true);
+            setStatus("Indoor canvas active.");
+
+            if (!location.pathname.startsWith("/nav")) {
+                navigate("/nav/default", { replace: true });
+            }
+        })()
+            .catch((error) => {
+                console.error("Geofence transition failed:", error);
+                setStatus("Failed to enter indoor canvas.");
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsTransitioningToStore(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        hasEnteredStore,
+        items,
+        location.pathname,
+        navigationMode,
+        navigate,
+        setHasEnteredStore,
+        setNavigationMode,
+        setStatus,
+        setIsTransitioningToStore,
+        targetStoreLocation,
+        userLocation,
+        isTransitioningToStore,
+    ]);
 
     const token = useStore((state) => state.token);
 

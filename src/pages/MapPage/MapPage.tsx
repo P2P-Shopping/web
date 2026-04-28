@@ -1,45 +1,36 @@
-import { useNavigate } from "react-router-dom";
 import { Card } from "../../components";
 import { useStore } from "../../context/useStore";
-import { loadRoute } from "../../services/loadRoute";
+import {
+    DEMO_STORE_LOCATION,
+    GEOFENCE_RADIUS_METERS,
+    getDistanceMeters,
+} from "../../services/geofence";
 
 const MapPage = () => {
     const userLocation = useStore((state) => state.userLocation);
+    const setUserLocation = useStore((state) => state.setUserLocation);
     const setTargetStoreLocation = useStore(
         (state) => state.setTargetStoreLocation,
     );
-    const items = useStore((state) => state.items);
+    const targetStoreLocation = useStore((state) => state.targetStoreLocation);
+    const navigationMode = useStore((state) => state.navigationMode);
+    const hasEnteredStore = useStore((state) => state.hasEnteredStore);
+    const setNavigationMode = useStore((state) => state.setNavigationMode);
+    const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
     const setStatus = useStore((state) => state.setStatus);
-    const navigate = useNavigate();
 
-    const handleMockGeofenceEntry = async () => {
-        if (items.length === 0) {
-            setStatus("Add some items to your list first!");
-            return;
-        }
+    const activeTarget = targetStoreLocation ?? {
+        ...DEMO_STORE_LOCATION,
+    };
+    const currentDistance = getDistanceMeters(userLocation, activeTarget);
+    const isInsideGeofence = currentDistance <= GEOFENCE_RADIUS_METERS;
 
-        // 1. Simulate the store being exactly where the user is currently standing
-        // This ensures the backend and the Canvas map have a valid anchor point
-        setTargetStoreLocation({
-            lat: userLocation.lat,
-            lng: userLocation.lng,
-        });
-
-        // 2. Extract item IDs for the backend
-        const productIds = items.map((item) => item.id);
-
-        try {
-            setStatus("Calculating route...");
-            // 3. Fire the backend lazy-loading TSP math
-            await loadRoute(productIds, userLocation.lat, userLocation.lng);
-
-            // 4. Instantly switch to the indoor canvas Map
-            navigate("/nav", { replace: true });
-            setStatus("Navigating to store entrance");
-        } catch (error) {
-            console.error("Geofence entry simulation failed:", error);
-            setStatus("Failed to calculate route. Please try again.");
-        }
+    const handleMockGeofenceEntry = () => {
+        setTargetStoreLocation(activeTarget);
+        setUserLocation(activeTarget);
+        setNavigationMode("city");
+        setHasEnteredStore(false);
+        setStatus("Geofence threshold reached. Waiting for app transition.");
     };
 
     return (
@@ -67,16 +58,45 @@ const MapPage = () => {
                             </span>
                         </div>
                     </div>
+                    <div className="grid gap-3 sm:grid-cols-3 text-sm">
+                        <div className="rounded-xl border border-border bg-bg-muted p-3">
+                            <div className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                                Mode
+                            </div>
+                            <div className="mt-1 font-black text-text-strong">
+                                {navigationMode === "city"
+                                    ? "City map"
+                                    : "Indoor canvas"}
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-border bg-bg-muted p-3">
+                            <div className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                                Geofence
+                            </div>
+                            <div className="mt-1 font-black text-text-strong">
+                                {isInsideGeofence ? "Inside" : "Outside"}
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-border bg-bg-muted p-3">
+                            <div className="text-xs font-bold uppercase tracking-widest text-text-muted">
+                                Distance
+                            </div>
+                            <div className="mt-1 font-black text-text-strong">
+                                {currentDistance.toFixed(0)} m
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </Card>
 
             <Card title="Geofence Simulation">
                 <div className="flex flex-col gap-4">
                     <p className="text-sm text-text-muted leading-relaxed">
-                        In production, the app automatically transitions to the
-                        indoor map when your GPS gets within 150 meters of the
-                        target store. For this demo, use the button below to
-                        simulate crossing that threshold.
+                        In production, the app switches from the city map to the
+                        indoor canvas when GPS gets within{" "}
+                        {GEOFENCE_RADIUS_METERS} meters of the target store. The
+                        local state manager now mirrors that transition and
+                        keeps the indoor route ready.
                     </p>
 
                     <button
@@ -84,8 +104,16 @@ const MapPage = () => {
                         onClick={handleMockGeofenceEntry}
                         className="mt-2 w-full py-4 bg-accent text-text-on-accent rounded-xl font-bold tracking-wide transition-all hover:scale-[1.01] active:scale-[0.98] shadow-[0_4px_14px_var(--color-accent-glow)]"
                     >
-                        🧪 Simulate Entering Store
+                        Simulate geofence crossing
                     </button>
+
+                    {hasEnteredStore && (
+                        <div className="rounded-xl border border-border bg-bg-muted p-3 text-sm text-text-muted">
+                            Indoor navigation is active. The canvas renderer
+                            will use the mock TSP route when the store view
+                            opens.
+                        </div>
+                    )}
                 </div>
             </Card>
         </div>
