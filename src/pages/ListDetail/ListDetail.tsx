@@ -56,10 +56,8 @@ interface ApiShoppingList {
     items?: ApiListItem[];
 }
 
-const buildItemDuplicateKey = (item: {
-    name?: string;
-    brand?: string;
-}) => `${item.name?.trim().toLowerCase() ?? ""}::${item.brand?.trim().toLowerCase() ?? ""}`;
+const buildItemDuplicateKey = (item: { name?: string; brand?: string }) =>
+    `${item.name?.trim().toLowerCase() ?? ""}::${item.brand?.trim().toLowerCase() ?? ""}`;
 
 interface ListDetailProps {
     isEmbedded?: boolean;
@@ -1270,7 +1268,9 @@ const ImportIntoNormalModal = ({
                             type="button"
                             className="rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={onConfirm}
-                            disabled={selectedEligibleCount === 0 || isSubmitting}
+                            disabled={
+                                selectedEligibleCount === 0 || isSubmitting
+                            }
                         >
                             {isSubmitting ? "Adding..." : "Add selected items"}
                         </button>
@@ -1353,7 +1353,8 @@ const ListDetail = ({
         [effectiveListId, lists],
     );
     const canImportIntoNormalList =
-        (activeList?.category === "RECIPE" || activeList?.category === "FREQUENT") &&
+        (activeList?.category === "RECIPE" ||
+            activeList?.category === "FREQUENT") &&
         items.length > 0;
 
     const activeCollaborationUsers = useMemo(() => {
@@ -1562,9 +1563,9 @@ const ListDetail = ({
 
         try {
             for (const item of itemsToImport) {
-                const added = await useListsStore.getState().addItem(
-                    selectedTargetListId,
-                    {
+                const added = await useListsStore
+                    .getState()
+                    .addItem(selectedTargetListId, {
                         name: item.name,
                         checked: false,
                         brand: item.brand,
@@ -1572,8 +1573,7 @@ const ListDetail = ({
                         price: item.price,
                         category: item.category,
                         isRecurrent: targetList.category === "FREQUENT",
-                    },
-                );
+                    });
 
                 if (!added) {
                     throw new Error(`Failed to add ${item.name}`);
@@ -1673,10 +1673,7 @@ const ListDetail = ({
                                         onClick={() => setShowShareModal(true)}
                                         className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
                                     >
-                                        <UserPlus
-                                            size={14}
-                                            strokeWidth={2.5}
-                                        />
+                                        <UserPlus size={14} strokeWidth={2.5} />
                                         Invite
                                     </button>
                                 </div>

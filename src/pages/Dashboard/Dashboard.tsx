@@ -15,10 +15,7 @@ import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
 
-const buildItemDuplicateKey = (item: {
-    name?: string;
-    brand?: string;
-}) =>
+const buildItemDuplicateKey = (item: { name?: string; brand?: string }) =>
     `${item.name?.trim().toLowerCase() ?? ""}::${item.brand?.trim().toLowerCase() ?? ""}`;
 
 interface ImportSelectionModalProps {
@@ -136,7 +133,8 @@ const ImportSelectionModal = ({
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-text-muted">
-                        {selectedCount} item{selectedCount === 1 ? "" : "s"} selected.
+                        {selectedCount} item{selectedCount === 1 ? "" : "s"}{" "}
+                        selected.
                     </p>
                     <div className="flex gap-3">
                         <button
@@ -493,10 +491,24 @@ const Dashboard = () => {
                                     </span>
                                 )}
                             </div>
+
                             <div className="flex flex-col gap-4">
                                 {sectionLists.map((list) => (
                                     <div
                                         key={list.id}
+                                        // Folosim role="listitem" dacă e într-o listă,
+                                        // sau lăsăm interactivitatea pe ListCard
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (
+                                                e.key === "Enter" ||
+                                                e.key === " "
+                                            ) {
+                                                e.preventDefault();
+                                                handleCardClick(list.id);
+                                            }
+                                        }}
                                         draggable={
                                             section !== "NORMAL" &&
                                             list.items.length > 0
@@ -548,7 +560,9 @@ const Dashboard = () => {
                                                     list.name,
                                                 )
                                             }
-                                            isDeleting={deletingListId === list.id}
+                                            isDeleting={
+                                                deletingListId === list.id
+                                            }
                                         />
                                     </div>
                                 ))}
