@@ -398,6 +398,23 @@ const useListItems = (effectiveListId: string | undefined) => {
                 });
             }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "ADD_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId: newItem.id,
+                        name: newItem.name,
+                        brand: newItem.brand,
+                        quantity: newItem.quantity,
+                        price: newItem.price,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
             const errorMessage =
                 err instanceof Error
                     ? err.message
@@ -449,6 +466,26 @@ const useListItems = (effectiveListId: string | undefined) => {
                 });
             }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "TOGGLE_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId,
+                        checked: newChecked,
+                        name: currentItem.name,
+                        brand: currentItem.brand,
+                        quantity: currentItem.quantity,
+                        price: currentItem.price,
+                        category: currentItem.category,
+                        isRecurrent: currentItem.isRecurrent,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
             const errorMessage =
                 err instanceof Error
                     ? err.message
@@ -471,6 +508,19 @@ const useListItems = (effectiveListId: string | undefined) => {
         try {
             await api.delete(`/api/items/${itemId}`);
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "DELETE_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
             const errorMessage =
                 err instanceof Error
                     ? err.message

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { QueuedAction } from "../types";
 
 // 👇 Exported so MapPage and StoreMap can use it
 export interface Coordinate {
@@ -48,6 +49,8 @@ interface AppState {
     authChecked: boolean;
     /** JWT Token */
     token: string | null;
+    /** Queue of actions to be synced when back online */
+    offlineQueue: QueuedAction[];
     /** Updates user location */
     setUserLocation: (loc: Coordinate) => void;
 
@@ -74,6 +77,10 @@ interface AppState {
     setItemConflict: (itemId: string, hasConflict: boolean) => void;
     /** Updates authentication state */
     setAuth: (user: unknown, token?: string | null) => void;
+    /** Adds an action to the offline sync queue */
+    enqueueAction: (action: QueuedAction) => void;
+    /** Removes an action from the offline sync queue */
+    dequeueAction: (actionId: string) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -92,6 +99,7 @@ export const useStore = create<AppState>()(
             isAuthenticated: false,
             authChecked: false,
             token: null,
+            offlineQueue: [],
 
             setUserLocation: (loc) => set({ userLocation: loc }),
             setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
@@ -155,6 +163,18 @@ export const useStore = create<AppState>()(
                     token: token === undefined ? get().token : token,
                 });
             },
+
+            enqueueAction: (action) =>
+                set((state) => ({
+                    offlineQueue: [...state.offlineQueue, action],
+                })),
+
+            dequeueAction: (actionId) =>
+                set((state) => ({
+                    offlineQueue: state.offlineQueue.filter(
+                        (a) => a.id !== actionId,
+                    ),
+                })),
         }),
         {
             name: "p2p-shopping-storage",
@@ -162,6 +182,7 @@ export const useStore = create<AppState>()(
                 user: state.user,
                 isAuthenticated: state.isAuthenticated,
                 token: state.token,
+                offlineQueue: state.offlineQueue,
             }),
         },
     ),

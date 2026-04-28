@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Navbar, OfflineBanner } from "./components";
 import { useStore } from "./context/useStore";
 import { useNetworkState } from "./hooks/useNetworkState";
+import { useOfflineSync } from "./hooks/useOfflineSync";
 import {
     Dashboard,
     ListDetail,
@@ -78,6 +79,7 @@ function NotFound() {
 
 function App() {
     useNetworkState();
+    useOfflineSync();
     const location = useLocation();
     const setServerConnected = useStore((state) => state.setServerConnected);
     const setAuth = useStore((state) => state.setAuth);

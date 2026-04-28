@@ -150,18 +150,16 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
     const processAiResponse = (data: any) => {
         if (data.items && Array.isArray(data.items)) {
-            const items: ReviewItem[] = data.items.map(
-                (item: any) => ({
-                    id: crypto.randomUUID(),
-                    name: item.specificName || item.genericName || "Unknown Item",
-                    brand: item.brand,
-                    quantity:
-                        item.quantity !== undefined && item.quantity !== null
-                            ? `${item.quantity} ${item.unit || ""}`.trim()
-                            : undefined,
-                    category: item.category,
-                }),
-            );
+            const items: ReviewItem[] = data.items.map((item: any) => ({
+                id: crypto.randomUUID(),
+                name: item.specificName || item.genericName || "Unknown Item",
+                brand: item.brand,
+                quantity:
+                    item.quantity !== undefined && item.quantity !== null
+                        ? `${item.quantity} ${item.unit || ""}`.trim()
+                        : undefined,
+                category: item.category,
+            }));
 
             setReviewItems(items);
             setDetectedListType(data.listType || "NORMAL");
@@ -313,32 +311,39 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                             )}
                             <div className="flex items-center gap-2 px-1 group">
                                 <span className="text-xs text-text-muted uppercase font-bold tracking-tight opacity-70">
-                                    {new Date(message.timestamp).toLocaleTimeString(
-                                        [],
-                                        { hour: "2-digit", minute: "2-digit" },
-                                    )}
+                                    {new Date(
+                                        message.timestamp,
+                                    ).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                    })}
                                 </span>
-                                
+
                                 {message.role === "assistant" && (
                                     <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
                                             type="button"
-                                            onClick={() => handleCopy(message.content)}
+                                            onClick={() =>
+                                                handleCopy(message.content)
+                                            }
                                             className="p-1 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-bg-muted"
                                             title="Copy message"
                                         >
                                             <Copy size={12} />
                                         </button>
-                                        {idx === messages.length - 1 && message.content.includes("error") && (
-                                            <button
-                                                type="button"
-                                                onClick={handleRetry}
-                                                className="p-1 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-bg-muted"
-                                                title="Retry request"
-                                            >
-                                                <RotateCcw size={12} />
-                                            </button>
-                                        )}
+                                        {idx === messages.length - 1 &&
+                                            message.content.includes(
+                                                "error",
+                                            ) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRetry}
+                                                    className="p-1 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-bg-muted"
+                                                    title="Retry request"
+                                                >
+                                                    <RotateCcw size={12} />
+                                                </button>
+                                            )}
                                     </div>
                                 )}
                             </div>
