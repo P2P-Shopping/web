@@ -452,9 +452,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
             handleAuthResponse(response);
 
             if (!response.ok) {
-                const errorData = (await response.json().catch(
-                    () => ({}),
-                )) as { message?: string };
+                const errorData = (await response.json().catch(() => ({}))) as {
+                    message?: string;
+                };
                 throw new Error(
                     errorData.message ||
                         `Failed to share list (${response.status})`,

@@ -7,7 +7,7 @@ import {
     useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ListCard, PresenceBar } from "../../components";
+import { ListCard } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
