@@ -7,12 +7,159 @@ import {
     useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ListCard } from "../../components";
+import { ListCard, Modal } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
+import type { ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
+
+const buildItemDuplicateKey = (item: {
+    name?: string;
+    brand?: string;
+}) =>
+    `${item.name?.trim().toLowerCase() ?? ""}::${item.brand?.trim().toLowerCase() ?? ""}`;
+
+interface ImportSelectionModalProps {
+    isOpen: boolean;
+    sourceList: ShoppingList | null;
+    targetList: ShoppingList | null;
+    selectedItemIds: Set<string>;
+    isSubmitting: boolean;
+    onClose: () => void;
+    onToggleItem: (itemId: string) => void;
+    onConfirm: () => void;
+}
+
+const ImportSelectionModal = ({
+    isOpen,
+    sourceList,
+    targetList,
+    selectedItemIds,
+    isSubmitting,
+    onClose,
+    onToggleItem,
+    onConfirm,
+}: ImportSelectionModalProps) => {
+    const existingKeys = new Set(
+        (targetList?.items ?? []).map((item) => buildItemDuplicateKey(item)),
+    );
+    const sourceItems = sourceList?.items ?? [];
+    const eligibleItems = sourceItems.filter(
+        (item) => !existingKeys.has(buildItemDuplicateKey(item)),
+    );
+    const selectedCount = eligibleItems.filter((item) =>
+        selectedItemIds.has(item.id),
+    ).length;
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Add items to this list"
+            subtitle={
+                sourceList && targetList
+                    ? `Choose which items from "${sourceList.name}" to add to "${targetList.name}".`
+                    : undefined
+            }
+            maxWidth="720px"
+        >
+            <div className="flex flex-col gap-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-bg-subtle px-4 py-3">
+                    <p className="text-sm text-text-muted">
+                        <span className="font-semibold text-text-strong">
+                            {eligibleItems.length}
+                        </span>{" "}
+                        available to add.{" "}
+                        <span className="font-semibold text-text-strong">
+                            {sourceItems.length - eligibleItems.length}
+                        </span>{" "}
+                        already exist in the target list.
+                    </p>
+                </div>
+
+                <div className="max-h-[360px] overflow-y-auto rounded-2xl border border-border bg-bg-subtle p-3">
+                    <div className="flex flex-col gap-2">
+                        {sourceItems.map((item) => {
+                            const isDuplicate = existingKeys.has(
+                                buildItemDuplicateKey(item),
+                            );
+                            const isSelected = selectedItemIds.has(item.id);
+
+                            return (
+                                <label
+                                    key={item.id}
+                                    className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition-all ${
+                                        isDuplicate
+                                            ? "cursor-not-allowed border-border bg-bg-muted opacity-60"
+                                            : "cursor-pointer border-border bg-surface hover:border-accent"
+                                    }`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={isSelected && !isDuplicate}
+                                        onChange={() => onToggleItem(item.id)}
+                                        disabled={isDuplicate}
+                                        className="mt-1 h-4 w-4 rounded border-border"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-semibold text-text-strong">
+                                                {item.name}
+                                            </span>
+                                            {item.brand && (
+                                                <span className="rounded-full bg-accent-subtle px-2 py-0.5 text-[11px] font-semibold text-accent">
+                                                    {item.brand}
+                                                </span>
+                                            )}
+                                            {isDuplicate && (
+                                                <span className="rounded-full bg-bg-muted px-2 py-0.5 text-[11px] font-semibold text-text-muted">
+                                                    Already in target
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-text-muted">
+                                            {item.quantity && (
+                                                <span>{item.quantity}</span>
+                                            )}
+                                            {item.category && (
+                                                <span>{item.category}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </label>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-text-muted">
+                        {selectedCount} item{selectedCount === 1 ? "" : "s"} selected.
+                    </p>
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            className="rounded-lg border border-border bg-bg-muted px-4 py-2.5 text-sm font-semibold text-text-strong transition-all hover:bg-border"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={onConfirm}
+                            disabled={selectedCount === 0 || isSubmitting}
+                        >
+                            {isSubmitting ? "Adding..." : "Add selected"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+};
 
 /**
  * Main dashboard component that displays the user's shopping lists.
@@ -25,6 +172,18 @@ const Dashboard = () => {
         name: string;
     } | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [draggedListId, setDraggedListId] = useState<string | null>(null);
+    const [dragOverListId, setDragOverListId] = useState<string | null>(null);
+    const [importSourceListId, setImportSourceListId] = useState<string | null>(
+        null,
+    );
+    const [importTargetListId, setImportTargetListId] = useState<string | null>(
+        null,
+    );
+    const [selectedImportItemIds, setSelectedImportItemIds] = useState<
+        Set<string>
+    >(new Set());
+    const [isImportingItems, setIsImportingItems] = useState(false);
     const {
         lists,
         isLoading,
@@ -32,6 +191,7 @@ const Dashboard = () => {
         deletingListId,
         fetchLists,
         deleteList,
+        addItem,
         openModal,
         closeModal,
     } = useListsStore();
@@ -69,6 +229,14 @@ const Dashboard = () => {
 
     const hasGroupedLists = sectionOrder.some(
         (section) => groupedLists[section].length > 0,
+    );
+    const importSourceList = useMemo(
+        () => lists.find((list) => list.id === importSourceListId) ?? null,
+        [importSourceListId, lists],
+    );
+    const importTargetList = useMemo(
+        () => lists.find((list) => list.id === importTargetListId) ?? null,
+        [importTargetListId, lists],
     );
 
     /**
@@ -135,6 +303,110 @@ const Dashboard = () => {
         });
     };
 
+    const resetDragState = () => {
+        setDraggedListId(null);
+        setDragOverListId(null);
+    };
+
+    const clearImportSelection = () => {
+        setImportSourceListId(null);
+        setImportTargetListId(null);
+        setSelectedImportItemIds(new Set());
+        setIsImportingItems(false);
+        resetDragState();
+    };
+
+    const handleDragStart = (listId: string) => {
+        setDraggedListId(listId);
+    };
+
+    const handleDropOnNormalList = (targetListId: string) => {
+        if (!draggedListId || draggedListId === targetListId) {
+            resetDragState();
+            return;
+        }
+
+        const sourceList = lists.find((list) => list.id === draggedListId);
+        const targetList = lists.find((list) => list.id === targetListId);
+
+        if (
+            !sourceList ||
+            !targetList ||
+            (sourceList.category !== "RECIPE" &&
+                sourceList.category !== "FREQUENT") ||
+            (targetList.category ?? "NORMAL") !== "NORMAL"
+        ) {
+            resetDragState();
+            return;
+        }
+
+        const existingKeys = new Set(
+            targetList.items.map((item) => buildItemDuplicateKey(item)),
+        );
+        const eligibleItemIds = sourceList.items
+            .filter((item) => !existingKeys.has(buildItemDuplicateKey(item)))
+            .map((item) => item.id);
+
+        setImportSourceListId(sourceList.id);
+        setImportTargetListId(targetList.id);
+        setSelectedImportItemIds(new Set(eligibleItemIds));
+        resetDragState();
+    };
+
+    const toggleImportItem = (itemId: string) => {
+        setSelectedImportItemIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemId)) {
+                next.delete(itemId);
+            } else {
+                next.add(itemId);
+            }
+            return next;
+        });
+    };
+
+    const confirmImportSelection = async () => {
+        if (!importSourceList || !importTargetList) return;
+
+        const existingKeys = new Set(
+            importTargetList.items.map((item) => buildItemDuplicateKey(item)),
+        );
+        const itemsToImport = importSourceList.items.filter(
+            (item) =>
+                selectedImportItemIds.has(item.id) &&
+                !existingKeys.has(buildItemDuplicateKey(item)),
+        );
+
+        if (itemsToImport.length === 0) {
+            clearImportSelection();
+            return;
+        }
+
+        setIsImportingItems(true);
+
+        try {
+            for (const item of itemsToImport) {
+                const added = await addItem(importTargetList.id, {
+                    name: item.name,
+                    checked: false,
+                    brand: item.brand,
+                    quantity: item.quantity,
+                    category: item.category,
+                    price: item.price,
+                    isRecurrent: false,
+                });
+
+                if (!added) {
+                    throw new Error(`Failed to add ${item.name}`);
+                }
+            }
+
+            clearImportSelection();
+        } catch (_error) {
+            setIsImportingItems(false);
+        }
+    };
+
     let mainContent: ReactNode;
     if (isLoading && !isOverlayOpen) {
         mainContent = (
@@ -181,27 +453,31 @@ const Dashboard = () => {
         mainContent = (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
                 {lists.map((list) => (
-                    <ListCard
-                        key={list.id}
-                        list={list}
-                        onClick={() => handleCardClick(list.id)}
-                        onDelete={(e) =>
-                            handleDeleteList(e, list.id, list.name)
-                        }
-                        isDeleting={deletingListId === list.id}
-                    />
+                    <div key={list.id}>
+                        <ListCard
+                            list={list}
+                            onClick={() => handleCardClick(list.id)}
+                            onDelete={(e) =>
+                                handleDeleteList(e, list.id, list.name)
+                            }
+                            isDeleting={deletingListId === list.id}
+                        />
+                    </div>
                 ))}
             </div>
         );
     } else {
         mainContent = (
-            <div className="flex flex-col gap-8">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
                 {sectionOrder.map((section) => {
                     const sectionLists = groupedLists[section];
                     if (sectionLists.length === 0) return null;
 
                     return (
-                        <section key={section} className="flex flex-col gap-4">
+                        <section
+                            key={section}
+                            className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-sm"
+                        >
                             <div className="flex items-end justify-between gap-3">
                                 <div>
                                     <h2 className="text-base font-extrabold text-text-strong tracking-tight">
@@ -211,22 +487,70 @@ const Dashboard = () => {
                                         {`${sectionLists.length} ${sectionLists.length === 1 ? "list" : "lists"}`}
                                     </p>
                                 </div>
+                                {section !== "NORMAL" && (
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                                        Drag onto a normal list
+                                    </span>
+                                )}
                             </div>
-                            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
+                            <div className="flex flex-col gap-4">
                                 {sectionLists.map((list) => (
-                                    <ListCard
+                                    <div
                                         key={list.id}
-                                        list={list}
-                                        onClick={() => handleCardClick(list.id)}
-                                        onDelete={(e) =>
-                                            handleDeleteList(
-                                                e,
-                                                list.id,
-                                                list.name,
-                                            )
+                                        draggable={
+                                            section !== "NORMAL" &&
+                                            list.items.length > 0
                                         }
-                                        isDeleting={deletingListId === list.id}
-                                    />
+                                        onDragStart={() =>
+                                            handleDragStart(list.id)
+                                        }
+                                        onDragEnd={resetDragState}
+                                        onDragOver={(e) => {
+                                            if (section !== "NORMAL") return;
+                                            if (
+                                                !draggedListId ||
+                                                draggedListId === list.id
+                                            )
+                                                return;
+                                            e.preventDefault();
+                                            setDragOverListId(list.id);
+                                        }}
+                                        onDragLeave={() => {
+                                            if (dragOverListId === list.id) {
+                                                setDragOverListId(null);
+                                            }
+                                        }}
+                                        onDrop={(e) => {
+                                            if (section !== "NORMAL") return;
+                                            e.preventDefault();
+                                            handleDropOnNormalList(list.id);
+                                        }}
+                                        className={`rounded-xl transition-all ${
+                                            section !== "NORMAL" &&
+                                            list.items.length > 0
+                                                ? "cursor-grab active:cursor-grabbing"
+                                                : ""
+                                        } ${
+                                            dragOverListId === list.id
+                                                ? "scale-[1.01] ring-2 ring-accent ring-offset-2 ring-offset-bg"
+                                                : ""
+                                        }`}
+                                    >
+                                        <ListCard
+                                            list={list}
+                                            onClick={() =>
+                                                handleCardClick(list.id)
+                                            }
+                                            onDelete={(e) =>
+                                                handleDeleteList(
+                                                    e,
+                                                    list.id,
+                                                    list.name,
+                                                )
+                                            }
+                                            isDeleting={deletingListId === list.id}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         </section>
@@ -310,6 +634,18 @@ const Dashboard = () => {
                     onConfirm={confirmDeleteList}
                 />
             )}
+            <ImportSelectionModal
+                isOpen={Boolean(importSourceList && importTargetList)}
+                sourceList={importSourceList}
+                targetList={importTargetList}
+                selectedItemIds={selectedImportItemIds}
+                isSubmitting={isImportingItems}
+                onClose={clearImportSelection}
+                onToggleItem={toggleImportItem}
+                onConfirm={() => {
+                    void confirmImportSelection();
+                }}
+            />
         </div>
     );
 };

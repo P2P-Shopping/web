@@ -10,7 +10,11 @@ import {
     X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type ReviewItem, SmartReviewModal } from "../../components";
+import {
+    type ReviewItem,
+    type ReviewSubmission,
+    SmartReviewModal,
+} from "../../components";
 import { aiMultimodalRequest } from "../../services/api";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -41,6 +45,14 @@ interface AiResponse {
     listType?: string;
 }
 
+const normalizeListType = (value?: string) => {
+    const normalized = value?.trim().toUpperCase();
+    if (normalized === "RECIPE" || normalized === "FREQUENT") {
+        return normalized;
+    }
+    return "NORMAL";
+};
+
 const AiImportModal = ({ onClose }: AiImportModalProps) => {
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -58,6 +70,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
     const [isReviewOpen, setIsReviewOpen] = useState(false);
     const [detectedListType, setDetectedListType] = useState<string>("NORMAL");
+    const [suggestedListName, setSuggestedListName] = useState("");
     const [location, setLocation] = useState<{
         lat: number;
         lng: number;
@@ -167,7 +180,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         if (data.items && Array.isArray(data.items)) {
             const items: ReviewItem[] = data.items.map((item) => ({
                 id: crypto.randomUUID(),
-                name: item.specificName || item.genericName || "Unknown Item",
+                name: item.genericName || item.specificName || "Unknown Item",
                 brand: item.brand,
                 quantity:
                     item.quantity !== undefined && item.quantity !== null
@@ -177,7 +190,17 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             }));
 
             setReviewItems(items);
-            setDetectedListType(data.listType || "NORMAL");
+            setDetectedListType(normalizeListType(data.listType));
+            const firstUserMessage = [...messages]
+                .reverse()
+                .find((m) => m.role === "user");
+            setSuggestedListName(
+                firstUserMessage?.content.trim()
+                    ? firstUserMessage.content.length > 40
+                        ? `${firstUserMessage.content.substring(0, 40)}...`
+                        : firstUserMessage.content
+                    : `AI List ${new Date().toLocaleDateString()}`,
+            );
 
             const assistantMessage: Message = {
                 id: crypto.randomUUID(),
@@ -246,15 +269,11 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         }
     };
 
-    const handleConfirmReview = async (items: ReviewItem[]) => {
+    const handleConfirmReview = async ({
+        listName,
+        items,
+    }: ReviewSubmission) => {
         try {
-            const firstUserMessage = messages.find((m) => m.role === "user");
-            const title = firstUserMessage?.content.trim()
-                ? firstUserMessage.content.length > 30
-                    ? `${firstUserMessage.content.substring(0, 30)}...`
-                    : firstUserMessage.content
-                : `AI List ${new Date().toLocaleDateString()}`;
-
             const category =
                 detectedListType === "RECIPE"
                     ? "RECIPE"
@@ -262,7 +281,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                       ? "FREQUENT"
                       : "NORMAL";
 
-            const newList = await addList(title, category);
+            const newList = await addList(listName, category);
             if (newList) {
                 for (const item of items) {
                     await addItem(newList.id, {
@@ -485,6 +504,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                 <SmartReviewModal
                     isOpen={true}
                     items={reviewItems}
+                    initialListName={suggestedListName}
                     onClose={() => setIsReviewOpen(false)}
                     onConfirm={handleConfirmReview}
                 />
