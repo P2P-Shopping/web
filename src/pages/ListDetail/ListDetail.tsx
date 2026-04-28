@@ -489,7 +489,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
             handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, handlePresenceEvent, user?.firstName, user?.userId]);
+    }, [effectiveListId, handlePresenceEvent, user?.email]);
 
     return { sendTypingEvent };
 };

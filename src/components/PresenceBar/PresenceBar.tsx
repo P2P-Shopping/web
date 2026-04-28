@@ -50,8 +50,12 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                 <div className="flex -space-x-3">
                     {baseUsers.map((username) => {
                         const cleanUsername = username.trim().toLowerCase();
-                        const isActive = Array.from(activeUsers).some(u => u.trim().toLowerCase() === cleanUsername);
-                        const isTyping = Object.keys(typingUsers).some(u => u.trim().toLowerCase() === cleanUsername);
+                        const isActive = Array.from(activeUsers).some(
+                            (u) => u.trim().toLowerCase() === cleanUsername,
+                        );
+                        const isTyping = Object.keys(typingUsers).some(
+                            (u) => u.trim().toLowerCase() === cleanUsername,
+                        );
                         return (
                             <div key={username} className="relative group">
                                 <div
