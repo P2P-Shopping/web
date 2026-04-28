@@ -1,12 +1,20 @@
-import { AlertCircle, ChevronDown, Plus, Settings } from "lucide-react";
+import {
+    AlertCircle,
+    ChevronDown,
+    Plus,
+    Settings,
+    UserPlus,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Modal, PresenceBar } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
+import type { SyncPayload } from "../../dto/SyncPayload";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
+import ShareListModal from "../Dashboard/ShareListModal";
 
 interface Item {
     id: string;
@@ -46,6 +54,7 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [syncFailed, setSyncFailed] = useState(false);
+    const isServerConnected = useStore((state) => state.isServerConnected);
 
     const getBaseUrl = useCallback(
         () => import.meta.env.VITE_API_URL || "http://localhost:8081",
@@ -126,6 +135,45 @@ const useListItems = (effectiveListId: string | undefined) => {
         setIsLoading(true);
         fetchListData();
     }, [fetchListData]);
+
+    useEffect(() => {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !isServerConnected
+        ) {
+            return;
+        }
+
+        const updateSubscription = stompClient.subscribe(
+            `/topic/list/${effectiveListId}`,
+            (message) => {
+                try {
+                    const payload = JSON.parse(message.body) as SyncPayload;
+                    if (payload.action === "CHECK_OFF" && payload.itemId) {
+                        setItems((prev) =>
+                            prev.map((item) =>
+                                item.id === payload.itemId
+                                    ? {
+                                          ...item,
+                                          checked: Boolean(payload.checked),
+                                      }
+                                    : item,
+                            ),
+                        );
+                    } else if (payload.action === "ADD" && payload.itemId) {
+                        fetchListData();
+                    }
+                } catch (err) {
+                    console.error("Failed to parse sync message:", err);
+                }
+            },
+        );
+
+        return () => {
+            updateSubscription?.unsubscribe();
+        };
+    }, [effectiveListId, fetchListData, isServerConnected]);
 
     const rollbackItem = useCallback(
         (itemId: string) => {
@@ -218,13 +266,15 @@ const useListItems = (effectiveListId: string | undefined) => {
             await fetchListData(effectiveListId);
 
             if (stompClient.connected) {
+                const payload: SyncPayload = {
+                    action: "ADD",
+                    itemId: createdItem.id,
+                    content: createdItem.name,
+                    timestamp: Date.now(),
+                };
                 stompClient.publish({
-                    destination: "/app/sync",
-                    body: JSON.stringify({
-                        eventType: "ITEM_ADDED",
-                        listId: effectiveListId,
-                        item: createdItem,
-                    }),
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify(payload),
                 });
             }
         } catch (err) {
@@ -271,14 +321,15 @@ const useListItems = (effectiveListId: string | undefined) => {
                 throw new Error("Failed to update item");
             }
             if (effectiveListId && stompClient.connected) {
+                const payload: SyncPayload = {
+                    action: "CHECK_OFF",
+                    itemId,
+                    checked: newChecked,
+                    timestamp: Date.now(),
+                };
                 stompClient.publish({
-                    destination: "/app/sync",
-                    body: JSON.stringify({
-                        eventType: "ITEM_TOGGLED",
-                        listId: effectiveListId,
-                        itemId,
-                        checked: newChecked,
-                    }),
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify(payload),
                 });
             }
         } catch (err) {
@@ -341,14 +392,32 @@ const useListPresence = (effectiveListId: string | undefined) => {
         ) {
             return;
         }
+        const username = user?.email || "Anonymous";
 
-        const username = user?.firstName || user?.userId || "Anonymous";
-
-        const subscription = stompClient.subscribe(
-            `/topic/presence/${effectiveListId}`,
+        const presenceSubscription = stompClient.subscribe(
+            `/topic/list/${effectiveListId}/presence`,
             (message) => {
-                const event = JSON.parse(message.body);
-                handlePresenceEvent(event);
+                try {
+                    const event = JSON.parse(message.body);
+                    handlePresenceEvent(event);
+
+                    // If someone requested a SYNC, broadcast our JOIN again so they see us
+                    if (
+                        event.eventType === "SYNC" &&
+                        event.username !== username
+                    ) {
+                        stompClient.publish({
+                            destination: `/app/list/${effectiveListId}/presence`,
+                            body: JSON.stringify({
+                                eventType: "JOIN",
+                                username,
+                                listId: effectiveListId,
+                            }),
+                        });
+                    }
+                } catch (err) {
+                    console.error("Failed to parse presence message:", err);
+                }
             },
         );
 
@@ -359,8 +428,17 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 listId: effectiveListId,
             };
             stompClient.publish({
-                destination: `/app/presence/${effectiveListId}`,
+                destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
+            });
+            // Also request a SYNC to find out who is already here
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/presence`,
+                body: JSON.stringify({
+                    eventType: "SYNC",
+                    username,
+                    listId: effectiveListId,
+                }),
             });
             handlePresenceEvent(joinEvent);
         }
@@ -368,7 +446,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
         return () => {
             if (stompClient.connected) {
                 stompClient.publish({
-                    destination: `/app/presence/${effectiveListId}`,
+                    destination: `/app/list/${effectiveListId}/presence`,
                     body: JSON.stringify({
                         eventType: "LEAVE",
                         username,
@@ -376,15 +454,14 @@ const useListPresence = (effectiveListId: string | undefined) => {
                     }),
                 });
             }
-            subscription?.unsubscribe();
+            presenceSubscription?.unsubscribe();
             clearPresence();
         };
     }, [
         effectiveListId,
         handlePresenceEvent,
         clearPresence,
-        user?.firstName,
-        user?.userId,
+        user?.email,
         isServerConnected,
     ]);
 
@@ -398,7 +475,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
 
         const now = Date.now();
         if (now - lastTypingSentRef.current > 1500) {
-            const username = user?.firstName || user?.userId || "Anonymous";
+            const username = user?.email || "Anonymous";
 
             const typingEvent = {
                 eventType: "TYPING" as const,
@@ -406,7 +483,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 listId: effectiveListId,
             };
             stompClient.publish({
-                destination: `/app/presence/${effectiveListId}`,
+                destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(typingEvent),
             });
             handlePresenceEvent(typingEvent);
@@ -807,9 +884,12 @@ const ListDetail = ({
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
 
+    const [showShareModal, setShowShareModal] = useState(false);
+    const { lists, isLoading: listsLoading, fetchLists } = useListsStore();
+
     const {
         items,
-        isLoading,
+        isLoading: itemsLoading,
         error,
         syncFailed,
         addItem,
@@ -829,14 +909,53 @@ const ListDetail = ({
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
 
+    const [permissionStatus, setPermissionStatus] =
+        useState<PermissionState | null>(null);
+    const [showBanner, setShowBanner] = useState(true);
+
     const addInputRef = useRef<HTMLInputElement | null>(null);
-    const { lists, fetchLists } = useListsStore();
+
+    // Geolocation permission tracking
+    useEffect(() => {
+        let isMounted = true;
+        let permResult: PermissionStatus | null = null;
+
+        const handler = () => {
+            if (isMounted && permResult) setPermissionStatus(permResult.state);
+        };
+
+        if (navigator.permissions) {
+            navigator.permissions
+                .query({ name: "geolocation" as PermissionName })
+                .then((result) => {
+                    if (!isMounted) return;
+                    permResult = result;
+                    setPermissionStatus(result.state);
+                    result.addEventListener("change", handler);
+                })
+                .catch(() => {
+                    // Fail silently for browsers with limited support
+                });
+        }
+
+        return () => {
+            isMounted = false;
+            permResult?.removeEventListener("change", handler);
+        };
+    }, []);
+
+    // Re-show banner if permission transitions to denied
+    useEffect(() => {
+        if (permissionStatus === "denied") {
+            setShowBanner(true);
+        }
+    }, [permissionStatus]);
 
     useEffect(() => {
-        if (isEmbedded && lists.length === 0) {
+        if (lists.length === 0) {
             fetchLists();
         }
-    }, [isEmbedded, lists.length, fetchLists]);
+    }, [lists.length, fetchLists]);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: reset on change
     useEffect(() => {
@@ -914,15 +1033,74 @@ const ListDetail = ({
                     <ListErrorAlert error={error} isEmbedded={isEmbedded} />
                 )}
 
+                {showBanner && permissionStatus === "denied" && (
+                    <div className="bg-warning-subtle text-warning-strong border border-warning-border p-4 rounded-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-300 mb-2">
+                        <div className="flex items-center gap-3">
+                            <AlertCircle size={20} className="shrink-0" />
+                            <span className="text-sm font-medium">
+                                Location access is disabled. Some features may
+                                be limited.
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            className="text-text-muted hover:text-text-strong transition-colors p-1"
+                            onClick={() => setShowBanner(false)}
+                            aria-label="Close warning"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
                 {effectiveListId === "default" && isEmbedded ? (
                     <ListSelectionView
                         lists={lists}
-                        isLoading={isLoading}
+                        isLoading={listsLoading}
                         onSelect={(listId) => navigate(`/nav/${listId}`)}
                     />
                 ) : (
                     <>
-                        <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-col gap-3">
+                            <div className="flex justify-between items-end px-1">
+                                <div className="flex flex-col">
+                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                        Collaboration
+                                    </h2>
+                                    <div className="flex items-center gap-2">
+                                        <PresenceBar
+                                            variant="avatars"
+                                            allUsers={(() => {
+                                                const current = lists.find(
+                                                    (l) =>
+                                                        l.id ===
+                                                        effectiveListId,
+                                                );
+                                                if (!current) return [];
+                                                const users = new Set<string>();
+                                                if (current.ownerEmail)
+                                                    users.add(
+                                                        current.ownerEmail,
+                                                    );
+                                                for (const email of current.collaboratorEmails ||
+                                                    []) {
+                                                    users.add(email);
+                                                }
+                                                return Array.from(users);
+                                            })()}
+                                        />
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowShareModal(true)}
+                                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                                >
+                                    <UserPlus size={14} strokeWidth={2.5} />
+                                    Invite
+                                </button>
+                            </div>
+
                             <InlineAddForm
                                 addInputRef={addInputRef}
                                 newItemName={newItemName}
@@ -933,13 +1111,13 @@ const ListDetail = ({
                                 isEmbedded={isEmbedded}
                             />
 
-                            <div className="min-h-[20px] px-2 flex items-center">
+                            <div className="min-h-[16px] px-2 flex items-center">
                                 <PresenceBar variant="typing" />
                             </div>
                         </div>
 
                         <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
-                            {isLoading ? (
+                            {itemsLoading ? (
                                 <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
                                     <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
                                     <p>Loading...</p>
@@ -1046,6 +1224,16 @@ const ListDetail = ({
                 setPrice={setDetailPrice}
                 onTyping={sendTypingEvent}
             />
+            {showShareModal && (
+                <ShareListModal
+                    listId={effectiveListId ?? ""}
+                    listName={
+                        lists.find((l) => l.id === effectiveListId)?.name ||
+                        "Shopping List"
+                    }
+                    onClose={() => setShowShareModal(false)}
+                />
+            )}
         </div>
     );
 };

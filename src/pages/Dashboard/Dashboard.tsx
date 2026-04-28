@@ -7,7 +7,6 @@ import {
     useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { PresenceBar } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
@@ -287,9 +286,6 @@ const Dashboard = () => {
                         <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
                             {selectedList.name}
                         </h1>
-                        <div className="flex items-center gap-4 shrink-0 max-[600px]:w-full max-[600px]:justify-between">
-                            <PresenceBar variant="avatars" />
-                        </div>
                     </>
                 ) : (
                     <>

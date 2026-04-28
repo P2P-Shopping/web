@@ -24,6 +24,8 @@ export interface ShoppingList {
     // User relation
     userId?: string;
     ownerName?: string;
+    ownerEmail?: string;
+    collaboratorEmails?: string[];
 }
 
 // Auth Types
