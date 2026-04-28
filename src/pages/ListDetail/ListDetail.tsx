@@ -146,6 +146,28 @@ const useListItems = (effectiveListId: string | undefined) => {
         fetchListData();
     }, [fetchListData]);
 
+    const handleSyncMessage = useCallback(
+        (message: { body: string }) => {
+            try {
+                const payload = JSON.parse(message.body) as SyncPayload;
+                if (payload.action === "CHECK_OFF" && payload.itemId) {
+                    setItems((prev) =>
+                        prev.map((item) =>
+                            item.id === payload.itemId
+                                ? { ...item, checked: Boolean(payload.checked) }
+                                : item,
+                        ),
+                    );
+                } else if (payload.action === "ADD" && payload.itemId) {
+                    fetchListData();
+                }
+            } catch (err) {
+                console.error("Failed to parse sync message:", err);
+            }
+        },
+        [fetchListData],
+    );
+
     useEffect(() => {
         if (
             !effectiveListId ||
@@ -157,33 +179,13 @@ const useListItems = (effectiveListId: string | undefined) => {
 
         const updateSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}`,
-            (message) => {
-                try {
-                    const payload = JSON.parse(message.body) as SyncPayload;
-                    if (payload.action === "CHECK_OFF" && payload.itemId) {
-                        setItems((prev) =>
-                            prev.map((item) =>
-                                item.id === payload.itemId
-                                    ? {
-                                          ...item,
-                                          checked: Boolean(payload.checked),
-                                      }
-                                    : item,
-                            ),
-                        );
-                    } else if (payload.action === "ADD" && payload.itemId) {
-                        fetchListData();
-                    }
-                } catch (err) {
-                    console.error("Failed to parse sync message:", err);
-                }
-            },
+            handleSyncMessage,
         );
 
         return () => {
             updateSubscription?.unsubscribe();
         };
-    }, [effectiveListId, fetchListData, isServerConnected]);
+    }, [effectiveListId, handleSyncMessage, isServerConnected]);
 
     const rollbackItem = useCallback(
         (itemId: string) => {
@@ -394,6 +396,30 @@ const useListPresence = (effectiveListId: string | undefined) => {
     const isServerConnected = useStore((state) => state.isServerConnected);
     const lastTypingSentRef = useRef<number>(0);
 
+    const handlePresenceMessage = useCallback(
+        (message: { body: string }) => {
+            try {
+                const event = JSON.parse(message.body);
+                handlePresenceEvent(event);
+
+                const username = user?.email || "Anonymous";
+                if (event.eventType === "SYNC" && event.username !== username) {
+                    stompClient.publish({
+                        destination: `/app/list/${effectiveListId}/presence`,
+                        body: JSON.stringify({
+                            eventType: "JOIN",
+                            username,
+                            listId: effectiveListId,
+                        }),
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to parse presence message:", err);
+            }
+        },
+        [effectiveListId, handlePresenceEvent, user?.email],
+    );
+
     useEffect(() => {
         if (
             !effectiveListId ||
@@ -406,29 +432,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
 
         const presenceSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}/presence`,
-            (message) => {
-                try {
-                    const event = JSON.parse(message.body);
-                    handlePresenceEvent(event);
-
-                    // If someone requested a SYNC, broadcast our JOIN again so they see us
-                    if (
-                        event.eventType === "SYNC" &&
-                        event.username !== username
-                    ) {
-                        stompClient.publish({
-                            destination: `/app/list/${effectiveListId}/presence`,
-                            body: JSON.stringify({
-                                eventType: "JOIN",
-                                username,
-                                listId: effectiveListId,
-                            }),
-                        });
-                    }
-                } catch (err) {
-                    console.error("Failed to parse presence message:", err);
-                }
-            },
+            handlePresenceMessage,
         );
 
         if (stompClient.connected) {
@@ -473,6 +477,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
         clearPresence,
         user?.email,
         isServerConnected,
+        handlePresenceMessage,
     ]);
 
     const sendTypingEvent = useCallback(() => {
