@@ -41,7 +41,10 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
     const [isReviewOpen, setIsReviewOpen] = useState(false);
     const [detectedListType, setDetectedListType] = useState<string>("NORMAL");
-    const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [location, setLocation] = useState<{
+        lat: number;
+        lng: number;
+    } | null>(null);
     const [isLocating, setIsLocating] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -92,7 +95,9 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             },
             (error) => {
                 console.error("Location error:", error);
-                alert("Failed to get your location. Please check your permissions.");
+                alert(
+                    "Failed to get your location. Please check your permissions.",
+                );
                 setIsLocating(false);
             },
         );
@@ -343,7 +348,9 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                                     : "text-text-muted hover:text-accent hover:bg-surface"
                             }`}
                             disabled={isLocating}
-                            title={location ? "Location shared" : "Share location"}
+                            title={
+                                location ? "Location shared" : "Share location"
+                            }
                         >
                             {isLocating ? (
                                 <Loader2 size={20} className="animate-spin" />

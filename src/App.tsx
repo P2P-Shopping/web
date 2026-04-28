@@ -124,7 +124,7 @@ function App() {
             timeoutId = setTimeout(() => {
                 if (!useStore.getState().authChecked) {
                     console.warn("Auth check timed out, proceeding as guest");
-                    setAuth(null);
+                    setAuth(null, null);
                 }
             }, 12_000);
 
@@ -133,7 +133,7 @@ function App() {
                     setAuth(user, (user as { token?: string })?.token);
                 })
                 .catch(() => {
-                    setAuth(null);
+                    setAuth(null, null);
                 })
                 .finally(() => {
                     clearTimeout(timeoutId);

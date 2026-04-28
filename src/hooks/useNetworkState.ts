@@ -11,6 +11,7 @@ import { useStore } from "../context/useStore";
 export const useNetworkState = (): void => {
     const setOnlineStatus = useStore((state) => state.setOnlineStatus);
     const setServerConnected = useStore((state) => state.setServerConnected);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const retryCountRef = useRef(0);
 
@@ -38,7 +39,11 @@ export const useNetworkState = (): void => {
                     signal: AbortSignal.timeout(5000),
                 });
 
-                if (res.ok || res.status === 202 || res.status === 401) {
+                if (
+                    res.ok ||
+                    res.status === 202 ||
+                    (res.status === 401 && !isAuthenticated)
+                ) {
                     setServerConnected(true);
                     retryCountRef.current = 0;
                     schedulePing(BASE_DELAY);
@@ -84,5 +89,5 @@ export const useNetworkState = (): void => {
             globalThis.removeEventListener("offline", handleOffline);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [setOnlineStatus, setServerConnected]);
+    }, [setOnlineStatus, setServerConnected, isAuthenticated]);
 };

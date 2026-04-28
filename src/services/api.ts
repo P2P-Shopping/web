@@ -54,7 +54,7 @@ export const finishShoppingRequest = async (data: {
         formData.append("receipt", data.receiptImage);
     }
 
-    return api.post("/api/shopping/finish", formData);
+    return api.post("/api/shopping/finish", formData, { timeout: 60_000 });
 };
 
 /**
@@ -78,7 +78,7 @@ export const aiMultimodalRequest = async (
         formData.append("longitude", lng.toString());
     }
 
-    return api.post("/api/ai/generate", formData);
+    return api.post("/api/ai/generate", formData, { timeout: 60_000 });
 };
 
 export default api;
