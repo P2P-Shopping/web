@@ -63,7 +63,7 @@ const MOCK_STORES: StoreRecommendation[] = [
         address: "Bulevardul Carol I",
         stockMatchPercentage: 82,
         transit: {
-            driving: { timeMins: 12, distanceKm: 3.0 },
+            driving: { timeMins: 12, distanceKm: 3 },
             walking: { timeMins: 45, distanceKm: 3.5 },
         },
     },
