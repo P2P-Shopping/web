@@ -1,13 +1,30 @@
 import { useEffect } from "react";
 import { useStore } from "../../context/useStore";
-import { loadMockRoute } from "../../services/loadRoute";
+import { loadRoute } from "../../services/loadRoute";
 
 const RoutePage = () => {
     const route = useStore((state) => state.route);
 
+    const items = useStore((state) => state.items);
+    const userLocation = useStore((state) => state.userLocation);
+
     useEffect(() => {
-        loadMockRoute();
-    }, []);
+        async function fetchRoute() {
+            if (items.length > 0 && userLocation) {
+                const productIds = items.map((i) => i.id);
+                try {
+                    await loadRoute(
+                        productIds,
+                        userLocation.lat,
+                        userLocation.lng,
+                    );
+                } catch (err) {
+                    console.error("Failed to load route in RoutePage:", err);
+                }
+            }
+        }
+        fetchRoute();
+    }, [items, userLocation]);
 
     return (
         <div className="flex-1 p-7 max-w-[1200px] mx-auto w-full flex flex-col gap-6">
