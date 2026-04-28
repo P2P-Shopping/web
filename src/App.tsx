@@ -213,9 +213,11 @@ function App() {
     }, [handlePongMessage, setServerConnected, clearToastTimeout, token]);
 
     // Determine if Navbar should be shown
+    const searchParams = new URLSearchParams(location.search);
+    const isAiImport = searchParams.get("import") === "ai";
     const isAuthPage =
         location.pathname === "/login" || location.pathname === "/register";
-    const showNavbar = isAuthenticated && !isAuthPage;
+    const showNavbar = isAuthenticated && !isAuthPage && !isAiImport;
 
     return (
         <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">

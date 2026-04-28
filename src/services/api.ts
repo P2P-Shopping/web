@@ -60,11 +60,22 @@ export const finishShoppingRequest = async (data: {
 /**
  * Task 4: API Request for Multimodal AI Input
  */
-export const aiMultimodalRequest = async (text: string, image: File | null) => {
+export const aiMultimodalRequest = async (
+    text: string,
+    image: File | null,
+    lat?: number | null,
+    lng?: number | null,
+) => {
     const formData = new FormData();
     formData.append("text", text);
     if (image) {
         formData.append("image", image);
+    }
+    if (lat !== undefined && lat !== null) {
+        formData.append("latitude", lat.toString());
+    }
+    if (lng !== undefined && lng !== null) {
+        formData.append("longitude", lng.toString());
     }
 
     return api.post("/api/ai/generate", formData);

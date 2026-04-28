@@ -58,7 +58,6 @@ interface ListDetailProps {
     listIdOverride?: string;
 }
 
-
 /**
  * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
  * @param effectiveListId - The ID of the currently active list.
@@ -199,7 +198,10 @@ const useListItems = (effectiveListId: string | undefined) => {
                 id: crypto.randomUUID(),
                 name: item.specificName || item.genericName || item.name || "",
                 brand: item.brand || undefined,
-                quantity: item.quantity !== undefined ? String(item.quantity) : undefined,
+                quantity:
+                    item.quantity !== undefined
+                        ? String(item.quantity)
+                        : undefined,
                 category: item.category || undefined,
             }));
 

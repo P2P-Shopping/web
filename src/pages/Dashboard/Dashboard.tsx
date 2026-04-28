@@ -104,12 +104,26 @@ const Dashboard = () => {
         setSearchParams({});
     };
 
+    const clearImport = () => {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("import");
+            return next;
+        });
+    };
+
     let mainContent: ReactNode;
     if (isLoading) {
         mainContent = (
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-text-muted text-sm">
                 <div className="w-9 h-9 border-[3px] border-border border-t-accent rounded-full animate-spin" />
                 <p>Loading lists...</p>
+            </div>
+        );
+    } else if (showAiImport) {
+        mainContent = (
+            <div className="max-w-[800px] mx-auto w-full h-[calc(100vh-130px)]">
+                <AiImportModal onClose={clearImport} />
             </div>
         );
     } else if (lists.length === 0) {
@@ -161,18 +175,22 @@ const Dashboard = () => {
     return (
         <div className="flex flex-col bg-bg">
             <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
-                {selectedList ? (
+                {selectedList || showAiImport ? (
                     <>
                         <button
                             type="button"
                             className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-                            onClick={clearSelectedList}
-                            aria-label="Back to lists"
+                            onClick={
+                                showAiImport ? clearImport : clearSelectedList
+                            }
+                            aria-label="Back"
                         >
                             <ChevronLeft size={20} />
                         </button>
                         <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
-                            {selectedList.name}
+                            {showAiImport
+                                ? "AI Shopping Assistant"
+                                : selectedList?.name}
                         </h1>
                     </>
                 ) : (
@@ -226,17 +244,6 @@ const Dashboard = () => {
                     error={deleteError}
                     onCancel={cancelDeleteList}
                     onConfirm={confirmDeleteList}
-                />
-            )}
-            {showAiImport && (
-                <AiImportModal
-                    onClose={() => {
-                        setSearchParams((prev) => {
-                            const next = new URLSearchParams(prev);
-                            next.delete("import");
-                            return next;
-                        });
-                    }}
                 />
             )}
         </div>

@@ -1,58 +1,194 @@
-import { Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
-import { useRef, useState } from "react";
-import { Modal, type ReviewItem, SmartReviewModal } from "../../components";
+import {
+    Image as ImageIcon,
+    Loader2,
+    MapPin,
+    Send,
+    Sparkles,
+    User,
+    X,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReviewItem, SmartReviewModal } from "../../components";
 import { aiMultimodalRequest } from "../../services/api";
 import { useListsStore } from "../../store/useListsStore";
+
+interface Message {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    image?: string;
+    timestamp: number;
+}
 
 interface AiImportModalProps {
     onClose: () => void;
 }
 
 const AiImportModal = ({ onClose }: AiImportModalProps) => {
+    const [messages, setMessages] = useState<Message[]>([
+        {
+            id: "welcome",
+            role: "assistant",
+            content:
+                "Hi! I'm your AI Shopping Assistant. You can describe a recipe, list items you need, or even upload a photo of your fridge or a receipt. I'll help you organize everything into a smart shopping list!",
+            timestamp: Date.now(),
+        },
+    ]);
     const [prompt, setPrompt] = useState("");
     const [image, setImage] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
     const [isReviewOpen, setIsReviewOpen] = useState(false);
     const [detectedListType, setDetectedListType] = useState<string>("NORMAL");
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [isLocating, setIsLocating] = useState(false);
 
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { addList, addItem } = useListsStore();
 
-    const handleImport = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const scrollToBottom = useCallback(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, []);
+
+    useEffect(() => {
+        if (messages.length > 0 || isProcessing) {
+            scrollToBottom();
+        }
+    }, [messages.length, isProcessing, scrollToBottom]);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setImage(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const removeImage = () => {
+        setImage(null);
+        setImagePreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    const handleLocationClick = () => {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser");
+            return;
+        }
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setLocation({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                });
+                setIsLocating(false);
+            },
+            (error) => {
+                console.error("Location error:", error);
+                alert("Failed to get your location. Please check your permissions.");
+                setIsLocating(false);
+            },
+        );
+    };
+
+    const handleSend = async (e?: React.SubmitEvent) => {
+        e?.preventDefault();
         if (!prompt.trim() && !image) return;
 
+        const userMessage: Message = {
+            id: crypto.randomUUID(),
+            role: "user",
+            content: prompt,
+            image: imagePreview || undefined,
+            timestamp: Date.now(),
+        };
+
+        setMessages((prev) => [...prev, userMessage]);
+        const currentPrompt = prompt;
+        const currentImage = image;
+
+        setPrompt("");
+        removeImage();
         setIsProcessing(true);
 
         try {
-            const response = await aiMultimodalRequest(prompt, image);
+            const response = await aiMultimodalRequest(
+                currentPrompt,
+                currentImage,
+                location?.lat,
+                location?.lng,
+            );
             const data = response.data;
 
             if (data.items && Array.isArray(data.items)) {
-                const items: ReviewItem[] = data.items.map((item: {
-                    specificName?: string;
-                    genericName?: string;
-                    brand?: string;
-                    quantity?: number;
-                    unit?: string;
-                    category?: string;
-                }) => ({
-                    id: crypto.randomUUID(),
-                    name: item.specificName || item.genericName || "Unknown Item",
-                    brand: item.brand,
-                    quantity: (item.quantity !== undefined && item.quantity !== null) ? `${item.quantity} ${item.unit || ""}`.trim() : undefined,
-                    category: item.category
-                }));
+                const items: ReviewItem[] = data.items.map(
+                    (item: {
+                        specificName?: string;
+                        genericName?: string;
+                        brand?: string;
+                        quantity?: number;
+                        unit?: string;
+                        category?: string;
+                    }) => ({
+                        id: crypto.randomUUID(),
+                        name:
+                            item.specificName ||
+                            item.genericName ||
+                            "Unknown Item",
+                        brand: item.brand,
+                        quantity:
+                            item.quantity !== undefined &&
+                            item.quantity !== null
+                                ? `${item.quantity} ${item.unit || ""}`.trim()
+                                : undefined,
+                        category: item.category,
+                    }),
+                );
+
                 setReviewItems(items);
                 setDetectedListType(data.listType || "NORMAL");
-                setIsReviewOpen(true);
+
+                const assistantMessage: Message = {
+                    id: crypto.randomUUID(),
+                    role: "assistant",
+                    content: `I've analyzed your input and found ${items.length} items. Please review them below to save them to a new list.`,
+                    timestamp: Date.now(),
+                };
+                setMessages((prev) => [...prev, assistantMessage]);
+
+                // Delay showing the modal slightly for better UX
+                setTimeout(() => setIsReviewOpen(true), 1000);
+            } else {
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        id: crypto.randomUUID(),
+                        role: "assistant",
+                        content:
+                            "I couldn't find any specific items in your request. Could you please provide more details?",
+                        timestamp: Date.now(),
+                    },
+                ]);
             }
         } catch (error) {
             console.error("AI Analysis failed:", error);
-            alert(
-                "AI service is currently unavailable. Please try again later.",
-            );
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: crypto.randomUUID(),
+                    role: "assistant",
+                    content:
+                        "I'm sorry, I encountered an error while processing your request. Please try again later.",
+                    timestamp: Date.now(),
+                },
+            ]);
         } finally {
             setIsProcessing(false);
         }
@@ -60,19 +196,19 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
     const handleConfirmReview = async (items: ReviewItem[]) => {
         try {
-            // 1. Create a new list
-            const title = prompt.trim() 
-                ? (prompt.length > 30 ? `${prompt.substring(0, 30)}...` : prompt)
+            const firstUserMessage = messages.find((m) => m.role === "user");
+            const title = firstUserMessage?.content.trim()
+                ? firstUserMessage.content.length > 30
+                    ? `${firstUserMessage.content.substring(0, 30)}...`
+                    : firstUserMessage.content
                 : `AI List ${new Date().toLocaleDateString()}`;
 
-            // Map detectedListType to ListCategory enum
             let category: "NORMAL" | "RECIPE" | "FREQUENT" = "NORMAL";
             if (detectedListType === "RECIPE") category = "RECIPE";
             if (detectedListType === "FREQUENT") category = "FREQUENT";
 
             const newList = await addList(title);
             if (newList) {
-                // 2. Add approved items to the list
                 for (const item of items) {
                     await addItem(newList.id, {
                         name: item.name,
@@ -91,113 +227,180 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         }
     };
 
-    if (isReviewOpen) {
-        return (
-            <SmartReviewModal
-                isOpen={true}
-                items={reviewItems}
-                onClose={() => setIsReviewOpen(false)}
-                onConfirm={handleConfirmReview}
-            />
-        );
-    }
-
     return (
-        <Modal
-            isOpen={true}
-            onClose={onClose}
-            title="AI Shopping Assistant"
-            subtitle="Describe a recipe or take a photo of your ingredients. Our AI will help you generate a shopping list."
-            footer={
-                <div className="grid grid-cols-2 gap-3 w-full">
-                    <button
-                        type="button"
-                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold hover:bg-border"
-                        onClick={onClose}
-                        disabled={isProcessing}
+        <div className="flex flex-col h-full bg-surface rounded-2xl border border-border overflow-hidden shadow-sm">
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                {messages.map((message) => (
+                    <div
+                        key={message.id}
+                        className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
                     >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        form="ai-import-form"
-                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-accent text-white border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-                        disabled={(!prompt.trim() && !image) || isProcessing}
-                    >
-                        {isProcessing ? (
-                            <Loader2 size={18} className="animate-spin" />
-                        ) : (
-                            <Sparkles size={18} />
-                        )}
-                        {isProcessing ? "Analyzing..." : "Generate List"}
-                    </button>
-                </div>
-            }
-        >
-            <form
-                id="ai-import-form"
-                onSubmit={handleImport}
-                className="flex flex-col gap-4"
-            >
-                <div className="flex flex-col gap-2">
-                    <label
-                        htmlFor="ai-input"
-                        className="text-[13px] font-bold text-text-strong uppercase tracking-tight"
-                    >
-                        Describe what you need
-                    </label>
-                    <textarea
-                        id="ai-input"
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Example: I want to make pancakes for 4 people..."
-                        rows={5}
-                        className="w-full px-4 py-3 bg-bg-muted border border-border rounded-xl text-base text-text-strong outline-none focus:border-accent transition-all resize-none"
-                    />
-                </div>
+                        <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                message.role === "user"
+                                    ? "bg-accent text-white"
+                                    : "bg-bg-muted text-text-strong border border-border"
+                            }`}
+                        >
+                            {message.role === "user" ? (
+                                <User size={16} />
+                            ) : (
+                                <Sparkles size={16} className="text-accent" />
+                            )}
+                        </div>
+                        <div
+                            className={`flex flex-col gap-2 max-w-[80%] ${message.role === "user" ? "items-end" : "items-start"}`}
+                        >
+                            {message.image && (
+                                <div className="rounded-2xl overflow-hidden border border-border shadow-sm max-w-sm">
+                                    <img
+                                        src={message.image}
+                                        alt="User upload"
+                                        className="w-full h-auto"
+                                    />
+                                </div>
+                            )}
+                            {message.content && (
+                                <div
+                                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                                        message.role === "user"
+                                            ? "bg-accent text-white rounded-tr-none"
+                                            : "bg-bg-muted text-text-strong border border-border rounded-tl-none"
+                                    } shadow-sm`}
+                                >
+                                    {message.content}
+                                </div>
+                            )}
+                            <span className="text-[10px] text-text-muted px-1 uppercase font-bold tracking-tight opacity-50">
+                                {new Date(message.timestamp).toLocaleTimeString(
+                                    [],
+                                    { hour: "2-digit", minute: "2-digit" },
+                                )}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+                {isProcessing && (
+                    <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-bg-muted border border-border flex items-center justify-center shrink-0">
+                            <Sparkles
+                                size={16}
+                                className="text-accent animate-pulse"
+                            />
+                        </div>
+                        <div className="bg-bg-muted text-text-strong border border-border px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
+                            <Loader2
+                                size={14}
+                                className="animate-spin text-accent"
+                            />
+                            <span className="text-sm font-medium italic opacity-70">
+                                Analyzing your data...
+                            </span>
+                        </div>
+                    </div>
+                )}
+                <div ref={messagesEndRef} />
+            </div>
 
-                <div className="flex flex-col gap-2">
-                    <label
-                        htmlFor="visual-context-input"
-                        className="text-[13px] font-bold text-text-strong uppercase tracking-tight"
-                    >
-                        Visual Context (Optional)
-                    </label>
-                    <input
-                        id="visual-context-input"
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        ref={fileInputRef}
-                        className="hidden"
-                        onChange={(e) => setImage(e.target.files?.[0] || null)}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-2xl transition-all ${
-                            image
-                                ? "border-accent bg-accent-subtle text-accent"
-                                : "border-border text-text-muted hover:border-accent hover:bg-bg-muted"
-                        }`}
-                    >
-                        <div className="p-3 bg-surface rounded-full shadow-sm">
-                            <ImageIcon size={24} />
+            {/* Input Area */}
+            <div className="p-4 bg-surface border-t border-border">
+                <form
+                    onSubmit={handleSend}
+                    className="flex flex-col gap-3 max-w-3xl mx-auto"
+                >
+                    {imagePreview && (
+                        <div className="relative inline-block self-start">
+                            <img
+                                src={imagePreview}
+                                alt="Preview"
+                                className="w-20 h-20 object-cover rounded-xl border-2 border-accent"
+                            />
+                            <button
+                                type="button"
+                                onClick={removeImage}
+                                className="absolute -top-2 -right-2 bg-text-strong text-white rounded-full p-1 shadow-md hover:bg-danger transition-colors"
+                            >
+                                <X size={12} />
+                            </button>
                         </div>
-                        <div className="flex flex-col items-center gap-1">
-                            <span className="text-sm font-bold">
-                                {image
-                                    ? image.name
-                                    : "PHOTO OF FRIDGE / RECIPE"}
-                            </span>
-                            <span className="text-[10px] uppercase opacity-60 font-bold">
-                                Click to use camera
-                            </span>
-                        </div>
-                    </button>
-                </div>
-            </form>
-        </Modal>
+                    )}
+
+                    <div className="flex items-end gap-2 bg-bg-muted border border-border rounded-2xl p-2 focus-within:border-accent transition-all shadow-sm">
+                        <input
+                            type="file"
+                            accept="image/*"
+                            ref={fileInputRef}
+                            className="hidden"
+                            onChange={handleImageChange}
+                        />
+                        <button
+                            type="button"
+                            onClick={handleLocationClick}
+                            className={`p-2.5 rounded-xl transition-all ${
+                                location
+                                    ? "text-accent bg-accent-subtle shadow-inner"
+                                    : "text-text-muted hover:text-accent hover:bg-surface"
+                            }`}
+                            disabled={isLocating}
+                            title={location ? "Location shared" : "Share location"}
+                        >
+                            {isLocating ? (
+                                <Loader2 size={20} className="animate-spin" />
+                            ) : (
+                                <MapPin size={20} />
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-2.5 text-text-muted hover:text-accent hover:bg-surface rounded-xl transition-all"
+                            title="Attach image"
+                        >
+                            <ImageIcon size={20} />
+                        </button>
+
+                        <textarea
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSend();
+                                }
+                            }}
+                            placeholder="Type your request here..."
+                            className="flex-1 bg-transparent border-none outline-none text-sm py-2 px-1 resize-none max-h-32 min-h-[40px] text-text-strong"
+                            rows={1}
+                        />
+
+                        <button
+                            type="submit"
+                            disabled={
+                                isProcessing || (!prompt.trim() && !image)
+                            }
+                            className="p-2.5 bg-accent text-white rounded-xl shadow-md hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            <Send size={18} />
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-text-muted text-center font-bold tracking-widest opacity-40">
+                        AI may provide inaccurate product matches. Always
+                        verify.
+                    </p>
+                </form>
+            </div>
+
+            {isReviewOpen && (
+                <SmartReviewModal
+                    isOpen={true}
+                    items={reviewItems}
+                    onClose={() => setIsReviewOpen(false)}
+                    onConfirm={handleConfirmReview}
+                />
+            )}
+        </div>
     );
 };
 
