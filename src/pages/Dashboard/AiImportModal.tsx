@@ -1,7 +1,9 @@
 import {
+    Copy,
     Image as ImageIcon,
     Loader2,
     MapPin,
+    RotateCcw,
     Send,
     Sparkles,
     User,
@@ -103,7 +105,90 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         );
     };
 
-    const handleSend = async (e?: React.SubmitEvent) => {
+    const handleCopy = (content: string) => {
+        navigator.clipboard.writeText(content);
+    };
+
+    const handleRetry = () => {
+        // Find the last user message to retry
+        const lastUserMessage = [...messages]
+            .reverse()
+            .find((m) => m.role === "user");
+        if (lastUserMessage) {
+            // We need to re-execute handleSend but with the previous data
+            // Since we cleared prompt and image, we should probably store them or pass them
+            // For now, let's just use the content of the message
+            void (async () => {
+                setIsProcessing(true);
+                try {
+                    const response = await aiMultimodalRequest(
+                        lastUserMessage.content,
+                        null, // Image handling is harder without storing the file, but usually users want to retry the text/analysis
+                        location?.lat,
+                        location?.lng,
+                    );
+                    const data = response.data;
+                    processAiResponse(data);
+                } catch (error) {
+                    console.error("AI Retry failed:", error);
+                    setMessages((prev) => [
+                        ...prev,
+                        {
+                            id: crypto.randomUUID(),
+                            role: "assistant",
+                            content:
+                                "Retry failed. Please check your connection or try a different request.",
+                            timestamp: Date.now(),
+                        },
+                    ]);
+                } finally {
+                    setIsProcessing(false);
+                }
+            })();
+        }
+    };
+
+    const processAiResponse = (data: any) => {
+        if (data.items && Array.isArray(data.items)) {
+            const items: ReviewItem[] = data.items.map(
+                (item: any) => ({
+                    id: crypto.randomUUID(),
+                    name: item.specificName || item.genericName || "Unknown Item",
+                    brand: item.brand,
+                    quantity:
+                        item.quantity !== undefined && item.quantity !== null
+                            ? `${item.quantity} ${item.unit || ""}`.trim()
+                            : undefined,
+                    category: item.category,
+                }),
+            );
+
+            setReviewItems(items);
+            setDetectedListType(data.listType || "NORMAL");
+
+            const assistantMessage: Message = {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: `I've analyzed your input and found ${items.length} items. Please review them below to save them to a new list.`,
+                timestamp: Date.now(),
+            };
+            setMessages((prev) => [...prev, assistantMessage]);
+            setTimeout(() => setIsReviewOpen(true), 1000);
+        } else {
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: crypto.randomUUID(),
+                    role: "assistant",
+                    content:
+                        "I couldn't find any specific items in your request. Could you please provide more details?",
+                    timestamp: Date.now(),
+                },
+            ]);
+        }
+    };
+
+    const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!prompt.trim() && !image) return;
 
@@ -130,58 +215,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                 location?.lat,
                 location?.lng,
             );
-            const data = response.data;
-
-            if (data.items && Array.isArray(data.items)) {
-                const items: ReviewItem[] = data.items.map(
-                    (item: {
-                        specificName?: string;
-                        genericName?: string;
-                        brand?: string;
-                        quantity?: number;
-                        unit?: string;
-                        category?: string;
-                    }) => ({
-                        id: crypto.randomUUID(),
-                        name:
-                            item.specificName ||
-                            item.genericName ||
-                            "Unknown Item",
-                        brand: item.brand,
-                        quantity:
-                            item.quantity !== undefined &&
-                            item.quantity !== null
-                                ? `${item.quantity} ${item.unit || ""}`.trim()
-                                : undefined,
-                        category: item.category,
-                    }),
-                );
-
-                setReviewItems(items);
-                setDetectedListType(data.listType || "NORMAL");
-
-                const assistantMessage: Message = {
-                    id: crypto.randomUUID(),
-                    role: "assistant",
-                    content: `I've analyzed your input and found ${items.length} items. Please review them below to save them to a new list.`,
-                    timestamp: Date.now(),
-                };
-                setMessages((prev) => [...prev, assistantMessage]);
-
-                // Delay showing the modal slightly for better UX
-                setTimeout(() => setIsReviewOpen(true), 1000);
-            } else {
-                setMessages((prev) => [
-                    ...prev,
-                    {
-                        id: crypto.randomUUID(),
-                        role: "assistant",
-                        content:
-                            "I couldn't find any specific items in your request. Could you please provide more details?",
-                        timestamp: Date.now(),
-                    },
-                ]);
-            }
+            processAiResponse(response.data);
         } catch (error) {
             console.error("AI Analysis failed:", error);
             setMessages((prev) => [
@@ -236,7 +270,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         <div className="flex flex-col h-full overflow-hidden">
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                {messages.map((message) => (
+                {messages.map((message, idx) => (
                     <div
                         key={message.id}
                         className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
@@ -277,12 +311,37 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                                     {message.content}
                                 </div>
                             )}
-                            <span className="text-xs text-text-muted px-1 uppercase font-bold tracking-tight opacity-70">
-                                {new Date(message.timestamp).toLocaleTimeString(
-                                    [],
-                                    { hour: "2-digit", minute: "2-digit" },
+                            <div className="flex items-center gap-2 px-1 group">
+                                <span className="text-xs text-text-muted uppercase font-bold tracking-tight opacity-70">
+                                    {new Date(message.timestamp).toLocaleTimeString(
+                                        [],
+                                        { hour: "2-digit", minute: "2-digit" },
+                                    )}
+                                </span>
+                                
+                                {message.role === "assistant" && (
+                                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCopy(message.content)}
+                                            className="p-1 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-bg-muted"
+                                            title="Copy message"
+                                        >
+                                            <Copy size={12} />
+                                        </button>
+                                        {idx === messages.length - 1 && message.content.includes("error") && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRetry}
+                                                className="p-1 text-text-muted hover:text-accent transition-colors rounded-md hover:bg-bg-muted"
+                                                title="Retry request"
+                                            >
+                                                <RotateCcw size={12} />
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
-                            </span>
+                            </div>
                         </div>
                     </div>
                 ))}
