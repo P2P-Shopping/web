@@ -19,6 +19,29 @@ const stringToColor = (name: string): string => {
     return color;
 };
 
+const normalizeUsername = (name: string): string => name.trim().toLowerCase();
+
+const getAvatarTitle = (
+    username: string,
+    isActive: boolean,
+    isTyping: boolean,
+): string => {
+    if (isTyping) return `${username} is typing...`;
+    if (isActive) return `${username} (Active)`;
+    return `${username} (Offline)`;
+};
+
+const getAvatarClassName = (isActive: boolean, isTyping: boolean): string => {
+    const interactionClass = isTyping
+        ? "ring-accent ring-offset-2 scale-110 z-10"
+        : "hover:scale-105 hover:z-10";
+    const presenceClass = isActive
+        ? "ring-2 ring-success ring-offset-1"
+        : "grayscale opacity-40 brightness-75";
+
+    return `w-10 h-10 rounded-full border-2 border-surface flex items-center justify-center text-sm font-bold text-white shadow-md ring-1 ring-border/50 transition-all ${interactionClass} ${presenceClass}`;
+};
+
 interface PresenceBarProps {
     variant?: "avatars" | "typing";
     allUsers?: string[];
@@ -37,6 +60,8 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
 
     const activeArray = Array.from(activeUsers);
     const typingArray = Object.keys(typingUsers);
+    const activeUsernames = new Set(activeArray.map(normalizeUsername));
+    const typingUsernames = new Set(typingArray.map(normalizeUsername));
 
     if (variant === "avatars") {
         // Combine all users and active users to determine full list
@@ -49,36 +74,27 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
             <div className="flex items-center gap-4 animate-in fade-in duration-300">
                 <div className="flex -space-x-3">
                     {baseUsers.map((username) => {
-                        const cleanUsername = username.trim().toLowerCase();
-                        const isActive = Array.from(activeUsers).some(
-                            (u) => u.trim().toLowerCase() === cleanUsername,
+                        const cleanUsername = normalizeUsername(username);
+                        const isActive = activeUsernames.has(cleanUsername);
+                        const isTyping = typingUsernames.has(cleanUsername);
+                        const avatarClassName = getAvatarClassName(
+                            isActive,
+                            isTyping,
                         );
-                        const isTyping = Object.keys(typingUsers).some(
-                            (u) => u.trim().toLowerCase() === cleanUsername,
+                        const avatarTitle = getAvatarTitle(
+                            username,
+                            isActive,
+                            isTyping,
                         );
                         return (
                             <div key={username} className="relative group">
                                 <div
-                                    className={`w-10 h-10 rounded-full border-2 border-surface flex items-center justify-center text-sm font-bold text-white shadow-md ring-1 ring-border/50 transition-all ${
-                                        isTyping
-                                            ? "ring-accent ring-offset-2 scale-110 z-10"
-                                            : "hover:scale-105 hover:z-10"
-                                    } ${
-                                        !isActive
-                                            ? "grayscale opacity-40 brightness-75"
-                                            : "ring-2 ring-success ring-offset-1"
-                                    }`}
+                                    className={avatarClassName}
                                     style={{
                                         backgroundColor:
                                             stringToColor(username),
                                     }}
-                                    title={
-                                        isTyping
-                                            ? `${username} is typing...`
-                                            : isActive
-                                              ? `${username} (Active)`
-                                              : `${username} (Offline)`
-                                    }
+                                    title={avatarTitle}
                                 >
                                     {username.charAt(0).toUpperCase()}
                                 </div>

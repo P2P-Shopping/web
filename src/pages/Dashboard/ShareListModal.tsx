@@ -16,6 +16,23 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
     const [errorMessage, setErrorMessage] = useState("");
     const { shareList } = useListsStore();
 
+    const submitButtonContent = (() => {
+        if (isSubmitting) {
+            return (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            );
+        }
+
+        if (status === "success") return "Shared!";
+
+        return (
+            <>
+                <Send size={16} />
+                Send Invite
+            </>
+        );
+    })();
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const trimmedEmail = email.trim();
@@ -72,16 +89,7 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
                             status === "success"
                         }
                     >
-                        {isSubmitting ? (
-                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : status === "success" ? (
-                            "Shared!"
-                        ) : (
-                            <>
-                                <Send size={16} />
-                                Send Invite
-                            </>
-                        )}
+                        {submitButtonContent}
                     </button>
                 </div>
             }

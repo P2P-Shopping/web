@@ -5,7 +5,7 @@ import {
     Settings,
     UserPlus,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Modal, PresenceBar } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
@@ -80,6 +80,11 @@ const useListItems = (effectiveListId: string | undefined) => {
         [effectiveListId, updateList],
     );
 
+    const handleUnauthorizedResponse = useCallback(() => {
+        useStore.getState().setAuth(null);
+        setSyncFailed(true);
+    }, []);
+
     const fetchListData = useCallback(
         async (targetListId = effectiveListId) => {
             if (!targetListId || targetListId === "default") {
@@ -97,8 +102,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 );
                 if (!response.ok) {
                     if (response.status === 401) {
-                        useStore.getState().setAuth(null);
-                        setSyncFailed(true);
+                        handleUnauthorizedResponse();
                         throw new Error("Session expired.");
                     }
                     throw new Error("Failed to fetch list");
@@ -128,7 +132,13 @@ const useListItems = (effectiveListId: string | undefined) => {
                 setIsLoading(false);
             }
         },
-        [getBaseUrl, getAuthHeaders, syncListItemsInStore, effectiveListId],
+        [
+            getBaseUrl,
+            getAuthHeaders,
+            syncListItemsInStore,
+            effectiveListId,
+            handleUnauthorizedResponse,
+        ],
     );
 
     useEffect(() => {
@@ -245,7 +255,7 @@ const useListItems = (effectiveListId: string | undefined) => {
 
             if (!res.ok) {
                 if (res.status === 401) {
-                    useStore.getState().setAuth(null);
+                    handleUnauthorizedResponse();
                     throw new Error("Session expired.");
                 }
                 throw new Error("Failed to add item");
@@ -315,7 +325,7 @@ const useListItems = (effectiveListId: string | undefined) => {
 
             if (!res.ok) {
                 if (res.status === 401) {
-                    useStore.getState().setAuth(null);
+                    handleUnauthorizedResponse();
                     throw new Error("Session expired.");
                 }
                 throw new Error("Failed to update item");
@@ -354,7 +364,7 @@ const useListItems = (effectiveListId: string | undefined) => {
 
             if (!res.ok) {
                 if (res.status === 401) {
-                    useStore.getState().setAuth(null);
+                    handleUnauthorizedResponse();
                     throw new Error("Session expired.");
                 }
                 throw new Error("Failed to delete item");
@@ -915,6 +925,29 @@ const ListDetail = ({
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
 
+    const activeCollaborationUsers = useMemo(() => {
+        const current = lists.find((l) => l.id === effectiveListId);
+        if (!current) return [];
+
+        const users = new Set<string>();
+        if (current.ownerEmail) users.add(current.ownerEmail);
+        for (const email of current.collaboratorEmails || []) {
+            users.add(email);
+        }
+        return Array.from(users);
+    }, [effectiveListId, lists]);
+
+    const estimatedTotal = useMemo(() => {
+        return items
+            .reduce((sum, item) => {
+                const qtyStr = item.quantity || "1";
+                const qtyMatch = qtyStr.match(/(\d+(?:\.\d+)?)/);
+                const qty = qtyMatch ? Number.parseFloat(qtyMatch[1]) : 1;
+                return sum + (item.price || 0) * qty;
+            }, 0)
+            .toFixed(2);
+    }, [items]);
+
     // Geolocation permission tracking
     useEffect(() => {
         let isMounted = true;
@@ -1070,24 +1103,7 @@ const ListDetail = ({
                                     <div className="flex items-center gap-2">
                                         <PresenceBar
                                             variant="avatars"
-                                            allUsers={(() => {
-                                                const current = lists.find(
-                                                    (l) =>
-                                                        l.id ===
-                                                        effectiveListId,
-                                                );
-                                                if (!current) return [];
-                                                const users = new Set<string>();
-                                                if (current.ownerEmail)
-                                                    users.add(
-                                                        current.ownerEmail,
-                                                    );
-                                                for (const email of current.collaboratorEmails ||
-                                                    []) {
-                                                    users.add(email);
-                                                }
-                                                return Array.from(users);
-                                            })()}
+                                            allUsers={activeCollaborationUsers}
                                         />
                                     </div>
                                 </div>
@@ -1141,28 +1157,7 @@ const ListDetail = ({
                                                 </span>
                                             </div>
                                             <span className="text-xl font-black text-accent tracking-tight">
-                                                {items
-                                                    .reduce((sum, item) => {
-                                                        const qtyStr =
-                                                            item.quantity ||
-                                                            "1";
-                                                        const qtyMatch =
-                                                            qtyStr.match(
-                                                                /(\d+(?:\.\d+)?)/,
-                                                            );
-                                                        const qty = qtyMatch
-                                                            ? Number.parseFloat(
-                                                                  qtyMatch[1],
-                                                              )
-                                                            : 1;
-                                                        return (
-                                                            sum +
-                                                            (item.price || 0) *
-                                                                qty
-                                                        );
-                                                    }, 0)
-                                                    .toFixed(2)}{" "}
-                                                lei
+                                                {estimatedTotal} lei
                                             </span>
                                         </div>
                                     )}
