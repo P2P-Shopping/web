@@ -33,6 +33,7 @@ export interface MacroRoutingResponse {
 }
 
 const BASE_URL = "/api/routing";
+const TIMEOUT_MS = 10000;
 
 /**
  * POST /api/routing/calculate
@@ -46,7 +47,9 @@ export async function calculateRoute(
     const res = await fetch(`${BASE_URL}/calculate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Order is deliberate: request.lazyN will override the default 5
         body: JSON.stringify({ lazyN: 5, ...request }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
     if (!res.ok) throw new Error(`Calculate route failed: ${res.status}`);
@@ -61,7 +64,9 @@ export async function calculateRoute(
 export async function getFullRoute(
     routeId: string,
 ): Promise<CalculateRouteResponse | null> {
-    const res = await fetch(`${BASE_URL}/full/${routeId}`);
+    const res = await fetch(`${BASE_URL}/full/${routeId}`, {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
 
     if (res.status === 202) return null; // still computing
     if (!res.ok) throw new Error(`Get full route failed: ${res.status}`);
@@ -83,33 +88,50 @@ export async function getMacroEstimates(
         storeId,
     });
 
-    const res = await fetch(`${BASE_URL}/macro?${params}`);
+    const res = await fetch(`${BASE_URL}/macro?${params}`, {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     if (!res.ok) throw new Error(`Macro routing failed: ${res.status}`);
     return res.json();
 }
 
 /**
- * Polls GET /full/{routeId} every intervalMs until route is ready.
- * Calls onUpdate with the full route when done.
+ * Polls GET /full/{routeId} until route is ready.
+ * Uses a self-rescheduling setTimeout to avoid overlapping calls.
  * Returns a cleanup function to stop polling.
  */
 export function pollFullRoute(
     routeId: string,
     onUpdate: (route: BackendRoutePoint[]) => void,
+    onError?: (error: Error) => void,
     intervalMs = 2000,
+    maxAttempts = 30,
 ): () => void {
-    const id = setInterval(async () => {
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    async function poll() {
+        attempts++;
+        if (attempts > maxAttempts) {
+            onError?.(new Error("Max polling attempts reached"));
+            return;
+        }
+
         try {
             const data = await getFullRoute(routeId);
             if (data) {
-                clearInterval(id);
                 onUpdate(data.route);
+            } else {
+                timerId = setTimeout(poll, intervalMs);
             }
         } catch (err) {
-            console.error("Polling error:", err);
-            clearInterval(id);
+            onError?.(err instanceof Error ? err : new Error(String(err)));
         }
-    }, intervalMs);
+    }
 
-    return () => clearInterval(id);
+    timerId = setTimeout(poll, intervalMs);
+
+    return () => {
+        if (timerId) clearTimeout(timerId);
+    };
 }

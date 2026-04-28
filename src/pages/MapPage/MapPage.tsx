@@ -9,10 +9,15 @@ const MapPage = () => {
         (state) => state.setTargetStoreLocation,
     );
     const items = useStore((state) => state.items);
-
+    const setStatus = useStore((state) => state.setStatus);
     const navigate = useNavigate();
 
-    const handleMockGeofenceEntry = () => {
+    const handleMockGeofenceEntry = async () => {
+        if (items.length === 0) {
+            setStatus("Add some items to your list first!");
+            return;
+        }
+
         // 1. Simulate the store being exactly where the user is currently standing
         // This ensures the backend and the Canvas map have a valid anchor point
         setTargetStoreLocation({
@@ -23,13 +28,18 @@ const MapPage = () => {
         // 2. Extract item IDs for the backend
         const productIds = items.map((item) => item.id);
 
-        // 3. Fire the backend lazy-loading TSP math
-        loadRoute(productIds, userLocation.lat, userLocation.lng).catch(
-            console.error,
-        );
+        try {
+            setStatus("Calculating route...");
+            // 3. Fire the backend lazy-loading TSP math
+            await loadRoute(productIds, userLocation.lat, userLocation.lng);
 
-        // 4. Instantly switch to the indoor canvas Map
-        navigate("/nav", { replace: true });
+            // 4. Instantly switch to the indoor canvas Map
+            navigate("/nav", { replace: true });
+            setStatus("Navigating to store entrance");
+        } catch (error) {
+            console.error("Geofence entry simulation failed:", error);
+            setStatus("Failed to calculate route. Please try again.");
+        }
     };
 
     return (

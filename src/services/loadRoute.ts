@@ -1,10 +1,15 @@
 // src/services/loadRoute.ts
+
 import { type RoutePoint, useStore } from "../context/useStore";
+import routeData from "../data/route-mock.json";
 import {
     type BackendRoutePoint,
     calculateRoute,
     pollFullRoute,
 } from "./routingService";
+
+// Module-level cleanup to prevent multiple polling loops from accumulating
+let activePollCleanup: (() => void) | null = null;
 
 // Converts backend format { itemId, lat, lng } to store format { itemId, name, lat, lng }
 function toRoutePoint(p: BackendRoutePoint): RoutePoint {
@@ -25,17 +30,17 @@ export async function loadRoute(
     userLat: number,
     userLng: number,
 ): Promise<void> {
-    const { setRoute } = useStore.getState();
+    const { setRoute, setStatus } = useStore.getState();
 
     const data = await calculateRoute({
         userLat,
         userLng,
         productIds,
-        lazyN: 5,
     });
 
     if (data.status === "error") {
         console.warn("Routing error:", data.warnings);
+        setStatus(`Routing error: ${data.warnings.join(", ")}`);
         return;
     }
 
@@ -44,17 +49,27 @@ export async function loadRoute(
 
     // If partial, poll for the full optimized route
     if (data.partial && data.routeId) {
-        pollFullRoute(data.routeId, (fullRoute) => {
-            setRoute(fullRoute.map(toRoutePoint));
-        });
+        // Cancel any existing poll before starting a new one
+        if (activePollCleanup) activePollCleanup();
+
+        activePollCleanup = pollFullRoute(
+            data.routeId,
+            (fullRoute) => {
+                setRoute(fullRoute.map(toRoutePoint));
+                activePollCleanup = null;
+            },
+            (error) => {
+                console.error("Polling failed:", error);
+                setStatus("Failed to load optimized route.");
+                activePollCleanup = null;
+            },
+        );
     }
 }
 
 // -----------------------------------------------------------------------
 // Keep the mock loader so existing code that imports it doesn't break
 // -----------------------------------------------------------------------
-import routeData from "../data/route-mock.json";
-
 export function loadMockRoute() {
     const { setRoute } = useStore.getState();
     console.log("Mock route loaded:", routeData);

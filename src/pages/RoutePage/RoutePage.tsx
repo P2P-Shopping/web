@@ -5,20 +5,26 @@ import { loadRoute } from "../../services/loadRoute";
 const RoutePage = () => {
     const route = useStore((state) => state.route);
 
+    const items = useStore((state) => state.items);
+    const userLocation = useStore((state) => state.userLocation);
+
     useEffect(() => {
-        loadRoute(
-            [
-                "33333333-c3d4-e5f6-a7b8-3456789012cd",
-                "22222222-b2c3-d4e5-f6a7-2345678901bc",
-                "11111111-a1b2-c3d4-e5f6-1234567890ab",
-                "66666666-f6a7-b8c9-d0e1-6789012345f0",
-                "55555555-e5f6-a7b8-c9d0-5678901234ef",
-                "44444444-d4e5-f6a7-b8c9-4567890123de",
-            ],
-            47.156,
-            27.587,
-        );
-    }, []);
+        async function fetchRoute() {
+            if (items.length > 0 && userLocation) {
+                const productIds = items.map((i) => i.id);
+                try {
+                    await loadRoute(
+                        productIds,
+                        userLocation.lat,
+                        userLocation.lng,
+                    );
+                } catch (err) {
+                    console.error("Failed to load route in RoutePage:", err);
+                }
+            }
+        }
+        fetchRoute();
+    }, [items, userLocation]);
 
     return (
         <div className="flex-1 p-7 max-w-[1200px] mx-auto w-full flex flex-col gap-6">
