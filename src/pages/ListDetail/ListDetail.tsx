@@ -5,7 +5,7 @@ import { Modal, PresenceBar } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
-import { finishShoppingRequest } from "../../services/api";
+import api, { finishShoppingRequest } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -48,22 +48,6 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [error, setError] = useState<string | null>(null);
     const [syncFailed, setSyncFailed] = useState(false);
 
-    const getBaseUrl = useCallback(
-        () => import.meta.env.VITE_API_URL || "http://localhost:8081",
-        [],
-    );
-
-    const getAuthHeaders = useCallback(
-        (withContentType = false): HeadersInit => {
-            return {
-                ...(withContentType
-                    ? { "Content-Type": "application/json" }
-                    : {}),
-            };
-        },
-        [],
-    );
-
     const syncListItemsInStore = useCallback(
         (nextItems: Item[], targetListId = effectiveListId) => {
             if (!targetListId || targetListId === "default") return;
@@ -80,22 +64,10 @@ const useListItems = (effectiveListId: string | undefined) => {
                 return;
             }
             try {
-                const response = await fetch(
-                    `${getBaseUrl()}/api/lists/${targetListId}`,
-                    {
-                        headers: getAuthHeaders(),
-                        credentials: "include",
-                    },
+                const response = await api.get<ApiShoppingList>(
+                    `/api/lists/${targetListId}`,
                 );
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        useStore.getState().setAuth(null);
-                        setSyncFailed(true);
-                        throw new Error("Session expired.");
-                    }
-                    throw new Error("Failed to fetch list");
-                }
-                const currentList = (await response.json()) as ApiShoppingList;
+                const currentList = response.data;
                 if (!currentList) {
                     setItems([]);
                     return;
@@ -113,14 +85,18 @@ const useListItems = (effectiveListId: string | undefined) => {
                 setItems(mappedItems);
                 syncListItemsInStore(mappedItems, targetListId);
             } catch (error) {
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to sync the list.";
                 console.error("fetchListData error:", error);
-                setError("Failed to sync the list.");
+                setError(errorMessage);
                 setSyncFailed(true);
             } finally {
                 setIsLoading(false);
             }
         },
-        [getBaseUrl, getAuthHeaders, syncListItemsInStore, effectiveListId],
+        [syncListItemsInStore, effectiveListId],
     );
 
     useEffect(() => {
@@ -177,34 +153,22 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(optimisticItems);
 
         try {
-            const res = await fetch(
-                `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
-                {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        name: newItem.name,
-                        isChecked: false,
-                        brand: newItem.brand ?? null,
-                        quantity: newItem.quantity ?? null,
-                        price: newItem.price ?? null,
-                        category: null,
-                        isRecurrent: false,
-                        timestamp: Date.now(),
-                    }),
-                    credentials: "include",
-                },
+            const payload = {
+                name: newItem.name,
+                isChecked: false,
+                brand: newItem.brand ?? null,
+                quantity: newItem.quantity ?? null,
+                price: newItem.price ?? null,
+                category: null,
+                isRecurrent: false,
+                timestamp: Date.now(),
+            };
+            const res = await api.post<ApiListItem>(
+                `/api/lists/${effectiveListId}/items`,
+                payload,
             );
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    useStore.getState().setAuth(null);
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to add item");
-            }
-
-            const createdApiItem = (await res.json()) as ApiListItem;
+            const createdApiItem = res.data;
             const createdItem: Item = {
                 id: createdApiItem.id,
                 name: createdApiItem.name,
@@ -229,8 +193,12 @@ const useListItems = (effectiveListId: string | undefined) => {
                 });
             }
         } catch (err) {
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to add the product.";
             console.error("addItem error:", err);
-            setError("Failed to add the product.");
+            setError(errorMessage);
             rollbackItem(newItem.id);
         }
     };
@@ -248,29 +216,18 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
-            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "PUT",
-                headers: getAuthHeaders(true),
-                body: JSON.stringify({
-                    name: currentItem.name,
-                    isChecked: newChecked,
-                    brand: currentItem.brand ?? null,
-                    quantity: currentItem.quantity ?? null,
-                    price: currentItem.price ?? null,
-                    category: currentItem.category ?? null,
-                    isRecurrent: currentItem.isRecurrent ?? false,
-                    timestamp: Date.now(),
-                }),
-                credentials: "include",
-            });
+            const payload = {
+                name: currentItem.name,
+                isChecked: newChecked,
+                brand: currentItem.brand ?? null,
+                quantity: currentItem.quantity ?? null,
+                price: currentItem.price ?? null,
+                category: currentItem.category ?? null,
+                isRecurrent: currentItem.isRecurrent ?? false,
+                timestamp: Date.now(),
+            };
+            await api.put(`/api/items/${itemId}`, payload);
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    useStore.getState().setAuth(null);
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to update item");
-            }
             if (effectiveListId && stompClient.connected) {
                 stompClient.publish({
                     destination: "/app/sync",
@@ -283,8 +240,12 @@ const useListItems = (effectiveListId: string | undefined) => {
                 });
             }
         } catch (err) {
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update the product.";
             console.error("toggleItem error:", err);
-            setError("Failed to update the product.");
+            setError(errorMessage);
             revertItemChecked(itemId, currentItem.checked);
         }
     };
@@ -296,22 +257,14 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
-            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "DELETE",
-                headers: getAuthHeaders(),
-                credentials: "include",
-            });
-
-            if (!res.ok) {
-                if (res.status === 401) {
-                    useStore.getState().setAuth(null);
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to delete item");
-            }
+            await api.delete(`/api/items/${itemId}`);
         } catch (err) {
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to delete the product.";
             console.error("deleteItem error:", err);
-            setError("Failed to delete the product.");
+            setError(errorMessage);
             fetchListData(effectiveListId);
         }
     };
@@ -1160,11 +1113,15 @@ const ListDetail = ({
                                     setReceiptImage(null);
                                     navigate("/dashboard");
                                 } catch (_err) {
+                                    const errorMessage =
+                                        _err instanceof Error
+                                            ? _err.message
+                                            : "Failed to complete shopping.";
                                     console.error(
                                         "Failed to complete shopping:",
                                         _err,
                                     );
-                                    setError("Failed to complete shopping.");
+                                    setError(errorMessage);
                                 } finally {
                                     setIsFinishing(false);
                                 }
