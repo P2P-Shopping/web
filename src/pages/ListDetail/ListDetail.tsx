@@ -200,13 +200,16 @@ const useListItems = (effectiveListId: string | undefined) => {
 
             const aiData = await response.json();
 
-            const rawItems = (
-                Array.isArray(aiData)
-                    ? aiData
-                    : (typeof aiData === "object" && aiData !== null
-                          ? aiData.items
-                          : []) || []
-            ) as AiResponseItem[];
+            let rawItems: AiResponseItem[] = [];
+            if (Array.isArray(aiData)) {
+                rawItems = aiData;
+            } else if (
+                aiData &&
+                typeof aiData === "object" &&
+                "items" in aiData
+            ) {
+                rawItems = (aiData as { items: AiResponseItem[] }).items ?? [];
+            }
 
             const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
                 id: item.id || crypto.randomUUID(),
