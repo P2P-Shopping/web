@@ -330,7 +330,7 @@ const RoutePage = () => {
                             >
                                 {isTopMatch && (
                                     <div
-                                        className="absolute -top-3 left-5 px-3 py-1 bg-accent text-white text-[10px] 
+                                        className="absolute -top-3 left-5 px-3 py-1 bg-accent text-white text-xs 
                                     font-black uppercase tracking-widest rounded-full flex items-center gap-1 shadow-sm"
                                     >
                                         <CheckCircle2 size={12} />
@@ -353,7 +353,7 @@ const RoutePage = () => {
                                         <div className="text-2xl font-black text-accent tracking-tighter">
                                             {store.stockMatchPercentage}%
                                         </div>
-                                        <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                        <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
                                             Stock Match
                                         </div>
                                     </div>

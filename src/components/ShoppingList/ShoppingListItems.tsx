@@ -98,7 +98,7 @@ const ShoppingListItems: React.FC<Props> = ({
                                                     parts.push(
                                                         <span
                                                             key="brand"
-                                                            className="px-1.5 py-0.5 bg-bg-muted rounded text-[10px] uppercase font-bold tracking-wider"
+                                                            className="px-1.5 py-0.5 bg-bg-muted rounded text-xs uppercase font-bold tracking-wider"
                                                         >
                                                             {item.brand}
                                                         </span>,

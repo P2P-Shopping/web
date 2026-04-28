@@ -105,7 +105,7 @@ export default function Navbar() {
                                 strokeWidth={pathname.startsWith(to) ? 2.5 : 2}
                             />
                         </div>
-                        <span className="text-[10px] font-bold">{label}</span>
+                        <span className="text-xs font-bold">{label}</span>
                     </Link>
                 ))}
 
@@ -132,7 +132,7 @@ export default function Navbar() {
                             <MoreHorizontal size={22} />
                         )}
                     </div>
-                    <span className="text-[10px] font-bold">More</span>
+                    <span className="text-xs font-bold">More</span>
                 </button>
 
                 {/* More Menu Content */}
@@ -168,7 +168,7 @@ export default function Navbar() {
                             <div className="h-px bg-border my-1" />
                             {user && (
                                 <div className="px-4 py-2 flex flex-col">
-                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                    <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
                                         Account
                                     </span>
                                     <span className="text-xs font-semibold text-text-strong truncate">

@@ -51,7 +51,7 @@ const MapPage = () => {
                     </p>
                     <div className="flex items-center gap-4 p-4 bg-bg-muted rounded-xl border border-border">
                         <div className="flex-1 flex flex-col gap-1 items-center justify-center border-r border-border">
-                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
                                 Latitude
                             </span>
                             <span className="text-xl font-black text-text-strong font-mono">
@@ -59,7 +59,7 @@ const MapPage = () => {
                             </span>
                         </div>
                         <div className="flex-1 flex flex-col gap-1 items-center justify-center">
-                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
                                 Longitude
                             </span>
                             <span className="text-xl font-black text-text-strong font-mono">

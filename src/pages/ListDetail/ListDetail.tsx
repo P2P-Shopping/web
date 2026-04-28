@@ -954,7 +954,7 @@ const ListHeader = ({
             <button
                 type="button"
                 onClick={onSwitchList}
-                className="text-[10px] font-bold text-accent hover:underline uppercase"
+                className="text-xs font-bold text-accent hover:underline uppercase"
             >
                 Switch List
             </button>
@@ -1297,7 +1297,7 @@ const ListDetail = ({
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
                                             <div className="flex justify-between items-center">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
                                                         Estimated Total
                                                     </span>
                                                     <span className="text-xs text-text-muted opacity-70">
@@ -1427,7 +1427,7 @@ const ListDetail = ({
                                         ? receiptImage.name
                                         : "TAKE PHOTO"}
                                 </span>
-                                <span className="text-[10px] uppercase font-bold opacity-50">
+                                <span className="text-xs uppercase font-bold opacity-50">
                                     Click to open camera
                                 </span>
                             </label>

@@ -233,7 +233,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-surface rounded-2xl border border-border overflow-hidden shadow-sm">
+        <div className="flex flex-col h-full overflow-hidden">
             {/* Chat Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
                 {messages.map((message) => (
@@ -277,7 +277,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                                     {message.content}
                                 </div>
                             )}
-                            <span className="text-[10px] text-text-muted px-1 uppercase font-bold tracking-tight opacity-50">
+                            <span className="text-xs text-text-muted px-1 uppercase font-bold tracking-tight opacity-70">
                                 {new Date(message.timestamp).toLocaleTimeString(
                                     [],
                                     { hour: "2-digit", minute: "2-digit" },
@@ -309,7 +309,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-surface border-t border-border">
+            <div className="p-4">
                 <form
                     onSubmit={handleSend}
                     className="flex flex-col gap-3 max-w-3xl mx-auto"
@@ -392,7 +392,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                             <Send size={18} />
                         </button>
                     </div>
-                    <p className="text-[10px] text-text-muted text-center font-bold tracking-widest opacity-40">
+                    <p className="text-xs text-text-muted text-center font-bold tracking-widest opacity-60">
                         AI may provide inaccurate product matches. Always
                         verify.
                     </p>

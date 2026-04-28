@@ -117,7 +117,7 @@ export default function ListCard({
                                 return (
                                     <div className="flex flex-col items-center justify-center py-6 rounded-xl border-2 border-dashed border-border/40 text-text-muted/60 gap-1.5">
                                         <Plus size={18} />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                                        <span className="text-xs font-bold uppercase tracking-wider">
                                             Empty List
                                         </span>
                                     </div>
@@ -133,7 +133,7 @@ export default function ListCard({
                                                 className="text-success"
                                             />
                                         </div>
-                                        <span className="text-[10px] font-extrabold uppercase tracking-widest">
+                                        <span className="text-xs font-extrabold uppercase tracking-widest">
                                             All items checked
                                         </span>
                                     </div>
@@ -159,7 +159,7 @@ export default function ListCard({
                                             </div>
                                         ))}
                                     {uncheckedItems.length > PREVIEW_LIMIT && (
-                                        <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[10px] font-bold text-text-muted">
+                                        <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-xs font-bold text-text-muted">
                                             +
                                             {uncheckedItems.length -
                                                 PREVIEW_LIMIT}{" "}
