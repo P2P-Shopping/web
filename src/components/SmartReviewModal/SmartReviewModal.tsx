@@ -6,9 +6,10 @@ export type ReviewItem = {
     name: string;
     brand?: string;
     quantity?: string;
+    category?: string;
 };
 
-type EditableField = "name" | "brand" | "quantity";
+type EditableField = "name" | "brand" | "quantity" | "category";
 
 type SmartReviewModalProps = {
     isOpen: boolean;
@@ -84,7 +85,7 @@ const SmartReviewModal = ({
                 {editedItems.map((item, index) => (
                     <div
                         key={item.id}
-                        className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-bg-muted rounded-xl border border-border"
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-bg-muted rounded-xl border border-border"
                     >
                         <div className="flex flex-col gap-1">
                             <label
@@ -139,6 +140,27 @@ const SmartReviewModal = ({
                                     )
                                 }
                                 placeholder="Quantity"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label
+                                htmlFor={`item-${index}-category`}
+                                className="sr-only"
+                            >
+                                Category
+                            </label>
+                            <input
+                                id={`item-${index}-category`}
+                                className="px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none font-medium text-accent"
+                                value={item.category || ""}
+                                onChange={(e) =>
+                                    updateItem(
+                                        index,
+                                        "category",
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="Category"
                             />
                         </div>
                     </div>

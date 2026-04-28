@@ -60,17 +60,14 @@ export const finishShoppingRequest = async (data: {
 /**
  * Task 4: API Request for Multimodal AI Input
  */
-export const aiMultimodalRequest = async (
-    prompt: string,
-    image: File | null,
-) => {
+export const aiMultimodalRequest = async (text: string, image: File | null) => {
     const formData = new FormData();
-    formData.append("prompt", prompt);
+    formData.append("text", text);
     if (image) {
         formData.append("image", image);
     }
 
-    return api.post("/api/ai/analyze", formData);
+    return api.post("/api/ai/generate", formData);
 };
 
 export default api;

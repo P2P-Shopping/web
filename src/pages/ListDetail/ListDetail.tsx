@@ -18,7 +18,10 @@ import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
-import api, { finishShoppingRequest } from "../../services/api";
+import api, {
+    aiMultimodalRequest,
+    finishShoppingRequest,
+} from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import ShareListModal from "../Dashboard/ShareListModal";
@@ -55,12 +58,6 @@ interface ListDetailProps {
     listIdOverride?: string;
 }
 
-type AiResponseItem = {
-    id?: string;
-    name?: string;
-    brand?: string;
-    quantity?: string;
-};
 
 /**
  * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
@@ -180,44 +177,30 @@ const useListItems = (effectiveListId: string | undefined) => {
         setError(null);
 
         try {
-            const response = await fetch(
-                `${getBaseUrl()}/api/ai/recipe-to-list`,
-                {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        text: recipeText,
-                        listId: effectiveListId,
-                    }),
-                    credentials: "include",
-                },
-            );
+            const response = await aiMultimodalRequest(recipeText, null);
+            const aiData = response.data;
 
-            if (!response.ok) {
-                if (response.status === 401) {
-                    handleUnauthorizedResponse();
-                }
-                throw new Error("AI Service error");
-            }
-
-            const aiData = await response.json();
-
-            let rawItems: AiResponseItem[] = [];
-            if (Array.isArray(aiData)) {
+            let rawItems: {
+                specificName?: string;
+                genericName?: string;
+                name?: string;
+                brand?: string;
+                quantity?: number | string;
+                unit?: string;
+                category?: string;
+            }[] = [];
+            if (aiData && typeof aiData === "object" && "items" in aiData) {
+                rawItems = aiData.items ?? [];
+            } else if (Array.isArray(aiData)) {
                 rawItems = aiData;
-            } else if (
-                aiData &&
-                typeof aiData === "object" &&
-                "items" in aiData
-            ) {
-                rawItems = (aiData as { items: AiResponseItem[] }).items ?? [];
             }
 
             const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
-                id: item.id || crypto.randomUUID(),
-                name: item.name || "",
+                id: crypto.randomUUID(),
+                name: item.specificName || item.genericName || item.name || "",
                 brand: item.brand || undefined,
-                quantity: item.quantity || undefined,
+                quantity: item.quantity !== undefined ? String(item.quantity) : undefined,
+                category: item.category || undefined,
             }));
 
             setReviewItems(itemsToReview);
@@ -247,6 +230,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                             quantity: item.quantity?.trim()
                                 ? item.quantity.trim()
                                 : null,
+                            category: item.category || null,
                             timestamp: Date.now(),
                         }),
                         credentials: "include",

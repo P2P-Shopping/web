@@ -1,7 +1,8 @@
 import { Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
-import { Modal } from "../../components";
+import { Modal, type ReviewItem, SmartReviewModal } from "../../components";
 import { aiMultimodalRequest } from "../../services/api";
+import { useListsStore } from "../../store/useListsStore";
 
 interface AiImportModalProps {
     onClose: () => void;
@@ -11,7 +12,12 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     const [prompt, setPrompt] = useState("");
     const [image, setImage] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+    const [isReviewOpen, setIsReviewOpen] = useState(false);
+    const [detectedListType, setDetectedListType] = useState<string>("NORMAL");
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const { addList, addItem } = useListsStore();
 
     const handleImport = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,15 +26,28 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         setIsProcessing(true);
 
         try {
-            /**
-             * Task 4: Real multimodal AI call
-             * The result will be handled by Dev 5 (The Gatekeeper) in the next stage.
-             */
             const response = await aiMultimodalRequest(prompt, image);
-            console.log("AI Analysis Result:", response.data);
+            const data = response.data;
 
-            // For now, we close the modal. Dev 5 will intercept this.
-            onClose();
+            if (data.items && Array.isArray(data.items)) {
+                const items: ReviewItem[] = data.items.map((item: {
+                    specificName?: string;
+                    genericName?: string;
+                    brand?: string;
+                    quantity?: number;
+                    unit?: string;
+                    category?: string;
+                }) => ({
+                    id: crypto.randomUUID(),
+                    name: item.specificName || item.genericName || "Unknown Item",
+                    brand: item.brand,
+                    quantity: (item.quantity !== undefined && item.quantity !== null) ? `${item.quantity} ${item.unit || ""}`.trim() : undefined,
+                    category: item.category
+                }));
+                setReviewItems(items);
+                setDetectedListType(data.listType || "NORMAL");
+                setIsReviewOpen(true);
+            }
         } catch (error) {
             console.error("AI Analysis failed:", error);
             alert(
@@ -38,6 +57,50 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             setIsProcessing(false);
         }
     };
+
+    const handleConfirmReview = async (items: ReviewItem[]) => {
+        try {
+            // 1. Create a new list
+            const title = prompt.trim() 
+                ? (prompt.length > 30 ? `${prompt.substring(0, 30)}...` : prompt)
+                : `AI List ${new Date().toLocaleDateString()}`;
+
+            // Map detectedListType to ListCategory enum
+            let category: "NORMAL" | "RECIPE" | "FREQUENT" = "NORMAL";
+            if (detectedListType === "RECIPE") category = "RECIPE";
+            if (detectedListType === "FREQUENT") category = "FREQUENT";
+
+            const newList = await addList(title);
+            if (newList) {
+                // 2. Add approved items to the list
+                for (const item of items) {
+                    await addItem(newList.id, {
+                        name: item.name,
+                        checked: false,
+                        brand: item.brand,
+                        quantity: item.quantity,
+                        category: item.category,
+                        isRecurrent: category === "FREQUENT",
+                    });
+                }
+            }
+            onClose();
+        } catch (error) {
+            console.error("Failed to save reviewed items:", error);
+            alert("Failed to save the list. Please try again.");
+        }
+    };
+
+    if (isReviewOpen) {
+        return (
+            <SmartReviewModal
+                isOpen={true}
+                items={reviewItems}
+                onClose={() => setIsReviewOpen(false)}
+                onConfirm={handleConfirmReview}
+            />
+        );
+    }
 
     return (
         <Modal
