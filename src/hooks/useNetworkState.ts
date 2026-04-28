@@ -1,6 +1,24 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../context/useStore";
 
+const TELEMETRY_API_KEY = import.meta.env.VITE_TELEMETRY_API_KEY;
+const TELEMETRY_DEVICE_ID_KEY = "p2ps.telemetry.device-id";
+
+const getTelemetryDeviceId = (): string => {
+    const existingId = globalThis.localStorage?.getItem(
+        TELEMETRY_DEVICE_ID_KEY,
+    );
+
+    if (existingId) {
+        return existingId;
+    }
+
+    const generatedId = `telemetry-device-${crypto.randomUUID()}`;
+    globalThis.localStorage?.setItem(TELEMETRY_DEVICE_ID_KEY, generatedId);
+
+    return generatedId;
+};
+
 /**
  * Custom React hook to monitor OS/browser network connectivity.
  * Attaches to the global window 'online' and 'offline' events.
@@ -32,9 +50,14 @@ export const useNetworkState = (): void => {
             }
 
             try {
+                const deviceId = getTelemetryDeviceId();
                 const res = await fetch("/api/v1/telemetry/ping", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-API-Key": TELEMETRY_API_KEY,
+                        "X-Device-Id": deviceId,
+                    },
                     body: JSON.stringify({ ts: Date.now() }),
                     signal: AbortSignal.timeout(5000),
                 });
