@@ -85,9 +85,8 @@ export const loadRoute = async (
         });
 
         if (
-            serverData &&
-            serverData.status === "success" &&
-            serverData.route.length > 0
+            serverData?.status === "success" &&
+            (serverData?.route?.length ?? 0) > 0
         ) {
             console.log(
                 "[loadRoute] Successfully received route from server API",

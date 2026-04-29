@@ -17,11 +17,144 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { ImportItemsModal, ListCard } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
+import type { ShoppingList } from "../../types";
 import { buildItemDuplicateKey } from "../../utils/listUtils";
 import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
+
+// --- Sub-components for Dashboard ---
+
+interface DashboardEmptyStateProps {
+    openModal: () => void;
+}
+
+const DashboardEmptyState: React.FC<DashboardEmptyStateProps> = ({
+    openModal,
+}) => (
+    <div className="flex flex-col items-center justify-center py-20 text-center gap-2.5">
+        <span className="text-5xl mb-2 opacity-60" aria-hidden="true">
+            🛒
+        </span>
+        <h2 className="text-xl text-text-strong font-bold">No lists yet</h2>
+        <p className="text-sm text-text-muted mb-4">
+            Create your first shared shopping list!
+        </p>
+        <button
+            type="button"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
+            onClick={openModal}
+        >
+            <Plus size={20} />
+            Create a List
+        </button>
+    </div>
+);
+
+interface ListCategorySectionProps {
+    section: string;
+    label: string;
+    lists: ShoppingList[];
+    isCollapsed: boolean;
+    onToggle: () => void;
+    onDragStart: (e: React.DragEvent, id: string) => void;
+    onDragEnd: () => void;
+    onDragOver: (e: React.DragEvent, id: string) => void;
+    onDragLeave: (id: string) => void;
+    onDrop: (e: React.DragEvent, id: string) => void;
+    dragOverListId: string | null;
+    onCardClick: (id: string) => void;
+    onDeleteList: (
+        e: React.MouseEvent<HTMLButtonElement>,
+        id: string,
+        name: string,
+    ) => void;
+    deletingListId: string | null;
+}
+
+const ListCategorySection: React.FC<ListCategorySectionProps> = ({
+    section,
+    label,
+    lists,
+    isCollapsed,
+    onToggle,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    dragOverListId,
+    onCardClick,
+    onDeleteList,
+    deletingListId,
+}) => (
+    <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-3">
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    className="p-1 hover:bg-bg-muted rounded text-text-muted transition-colors"
+                    title={isCollapsed ? "Expand" : "Collapse"}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight size={20} />
+                    ) : (
+                        <ChevronDown size={20} />
+                    )}
+                </button>
+                <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
+                    {label}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-bg-muted text-text-muted text-xs font-bold">
+                    {lists.length}
+                </span>
+            </div>
+        </div>
+
+        {!isCollapsed && (
+            <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
+                {lists.map((list) => (
+                    <li
+                        key={list.id}
+                        draggable={
+                            section !== "NORMAL" && list.items.length > 0
+                        }
+                        onDragStart={(e) => onDragStart(e, list.id)}
+                        onDragEnd={onDragEnd}
+                        onDragOver={(e) => onDragOver(e, list.id)}
+                        onDragLeave={() => onDragLeave(list.id)}
+                        onDrop={(e) => onDrop(e, list.id)}
+                        className={`w-[320px] shrink-0 rounded-xl transition-all ${
+                            section !== "NORMAL" && list.items.length > 0
+                                ? "cursor-grab active:cursor-grabbing"
+                                : ""
+                        } ${
+                            dragOverListId === list.id
+                                ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg"
+                                : ""
+                        }`}
+                    >
+                        <ListCard
+                            list={list}
+                            onClick={() => onCardClick(list.id)}
+                            onDelete={(e) =>
+                                onDeleteList(e, list.id, list.name)
+                            }
+                            isDeleting={deletingListId === list.id}
+                        />
+                    </li>
+                ))}
+                {lists.length === 0 && (
+                    <li className="w-full py-10 text-center text-text-muted border-2 border-dashed border-border rounded-xl list-none">
+                        No lists in this category
+                    </li>
+                )}
+            </ul>
+        )}
+    </section>
+);
 
 /**
  * Main dashboard component that displays the user's shopping lists.
@@ -246,11 +379,17 @@ const Dashboard = () => {
 
             // Cleanup ghost element after the browser has taken the snapshot
             setTimeout(() => {
-                if (document.body.contains(ghost)) {
-                    document.body.removeChild(ghost);
-                }
+                ghost.remove();
             }, 0);
         }
+    };
+
+    const getTabClassName = (section: string) => {
+        if (activeTab === section)
+            return "bg-accent text-text-on-accent shadow-md";
+        if (dragOverListId === "TAB_NORMAL" && section === "NORMAL")
+            return "bg-accent-subtle text-accent ring-2 ring-accent";
+        return "text-text-muted hover:text-text-strong hover:bg-bg-muted";
     };
 
     const handleDropOnNormalList = (targetListId: string) => {
@@ -378,27 +517,7 @@ const Dashboard = () => {
             </div>
         );
     } else if (lists.length === 0) {
-        mainContent = (
-            <div className="flex flex-col items-center justify-center py-20 text-center gap-2.5">
-                <span className="text-5xl mb-2 opacity-60" aria-hidden="true">
-                    🛒
-                </span>
-                <h2 className="text-xl text-text-strong font-bold">
-                    No lists yet
-                </h2>
-                <p className="text-sm text-text-muted mb-4">
-                    Create your first shared shopping list!
-                </p>
-                <button
-                    type="button"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
-                    onClick={openModal}
-                >
-                    <Plus size={20} />
-                    Create a List
-                </button>
-            </div>
-        );
+        mainContent = <DashboardEmptyState openModal={openModal} />;
     } else if (selectedList) {
         mainContent = (
             <div className="max-w-[860px] mx-auto w-full">
@@ -445,14 +564,7 @@ const Dashboard = () => {
                                         setDragOverListId(null);
                                     }
                                 }}
-                                className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${
-                                    activeTab === section
-                                        ? "bg-accent text-text-on-accent shadow-md"
-                                        : dragOverListId === "TAB_NORMAL" &&
-                                            section === "NORMAL"
-                                          ? "bg-accent-subtle text-accent ring-2 ring-accent"
-                                          : "text-text-muted hover:text-text-strong hover:bg-bg-muted"
-                                }`}
+                                className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${getTabClassName(section)}`}
                             >
                                 {sectionLabels[section]}
                                 <span
@@ -505,125 +617,38 @@ const Dashboard = () => {
         } else {
             mainContent = (
                 <div className="flex flex-col gap-8 pb-4">
-                    {sectionOrder.map((section) => {
-                        const sectionLists = groupedLists[section];
-                        const isCollapsed = collapsedSections.has(section);
-
-                        return (
-                            <section
-                                key={section}
-                                className="flex flex-col gap-4"
-                            >
-                                <div className="flex items-center justify-between border-b border-border pb-3">
-                                    <div className="flex items-center gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                toggleSection(section)
-                                            }
-                                            className="p-1 hover:bg-bg-muted rounded text-text-muted transition-colors"
-                                            title={
-                                                isCollapsed
-                                                    ? "Expand"
-                                                    : "Collapse"
-                                            }
-                                        >
-                                            {isCollapsed ? (
-                                                <ChevronRight size={20} />
-                                            ) : (
-                                                <ChevronDown size={20} />
-                                            )}
-                                        </button>
-                                        <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
-                                            {sectionLabels[section]}
-                                        </h2>
-                                        <span className="px-2 py-0.5 rounded-full bg-bg-muted text-text-muted text-xs font-bold">
-                                            {sectionLists.length}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {!isCollapsed && (
-                                    <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
-                                        {sectionLists.map((list) => (
-                                            <li
-                                                key={list.id}
-                                                draggable={
-                                                    section !== "NORMAL" &&
-                                                    list.items.length > 0
-                                                }
-                                                onDragStart={(e) =>
-                                                    handleDragStart(e, list.id)
-                                                }
-                                                onDragEnd={resetDragState}
-                                                onDragOver={(e) => {
-                                                    if (section !== "NORMAL")
-                                                        return;
-                                                    if (
-                                                        !draggedListId ||
-                                                        draggedListId ===
-                                                            list.id
-                                                    )
-                                                        return;
-                                                    e.preventDefault();
-                                                    setDragOverListId(list.id);
-                                                }}
-                                                onDragLeave={() => {
-                                                    if (
-                                                        dragOverListId ===
-                                                        list.id
-                                                    ) {
-                                                        setDragOverListId(null);
-                                                    }
-                                                }}
-                                                onDrop={(e) => {
-                                                    if (section !== "NORMAL")
-                                                        return;
-                                                    e.preventDefault();
-                                                    handleDropOnNormalList(
-                                                        list.id,
-                                                    );
-                                                }}
-                                                className={`w-[320px] shrink-0 rounded-xl transition-all ${
-                                                    section !== "NORMAL" &&
-                                                    list.items.length > 0
-                                                        ? "cursor-grab active:cursor-grabbing"
-                                                        : ""
-                                                } ${
-                                                    dragOverListId === list.id
-                                                        ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg"
-                                                        : ""
-                                                }`}
-                                            >
-                                                <ListCard
-                                                    list={list}
-                                                    onClick={() =>
-                                                        handleCardClick(list.id)
-                                                    }
-                                                    onDelete={(e) =>
-                                                        handleDeleteList(
-                                                            e,
-                                                            list.id,
-                                                            list.name,
-                                                        )
-                                                    }
-                                                    isDeleting={
-                                                        deletingListId ===
-                                                        list.id
-                                                    }
-                                                />
-                                            </li>
-                                        ))}
-                                        {sectionLists.length === 0 && (
-                                            <li className="w-full py-10 text-center text-text-muted border-2 border-dashed border-border rounded-xl list-none">
-                                                No lists in this category
-                                            </li>
-                                        )}
-                                    </ul>
-                                )}
-                            </section>
-                        );
-                    })}
+                    {sectionOrder.map((section) => (
+                        <ListCategorySection
+                            key={section}
+                            section={section}
+                            label={sectionLabels[section]}
+                            lists={groupedLists[section]}
+                            isCollapsed={collapsedSections.has(section)}
+                            onToggle={() => toggleSection(section)}
+                            onDragStart={handleDragStart}
+                            onDragEnd={resetDragState}
+                            onDragOver={(e, id) => {
+                                if (section !== "NORMAL") return;
+                                if (!draggedListId || draggedListId === id)
+                                    return;
+                                e.preventDefault();
+                                setDragOverListId(id);
+                            }}
+                            onDragLeave={(id) => {
+                                if (dragOverListId === id)
+                                    setDragOverListId(null);
+                            }}
+                            onDrop={(e, id) => {
+                                if (section !== "NORMAL") return;
+                                e.preventDefault();
+                                handleDropOnNormalList(id);
+                            }}
+                            dragOverListId={dragOverListId}
+                            onCardClick={handleCardClick}
+                            onDeleteList={handleDeleteList}
+                            deletingListId={deletingListId}
+                        />
+                    ))}
                 </div>
             );
         }

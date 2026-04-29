@@ -36,6 +36,7 @@ import {
 import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
+import type { ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import StoreMap from "../StoreMap/StoreMap";
 
@@ -151,6 +152,292 @@ const MapEvents = () => {
     return null;
 };
 
+// --- Sub-components for Sidebar ---
+
+interface ListSelectionViewProps {
+    lists: ShoppingList[];
+    isMicroView: boolean;
+    handleListSelect: (listId: string) => void;
+}
+
+const ListSelectionView: React.FC<ListSelectionViewProps> = ({
+    lists,
+    isMicroView,
+    handleListSelect,
+}) => (
+    <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
+        <header>
+            <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
+                {isMicroView ? "Shopping Lists" : "Plan Your Route"}
+            </h2>
+            <p className="text-sm text-text-muted mt-1 leading-relaxed">
+                {isMicroView
+                    ? "Select a list to navigate to its items."
+                    : "Select a shopping list to discover the best retail locations near you."}
+            </p>
+        </header>
+        <div className="flex flex-col gap-4">
+            {lists.length === 0 ? (
+                <div className="py-12 text-center flex flex-col items-center gap-3 bg-bg-muted rounded-3xl border border-dashed border-border">
+                    <ListIcon
+                        size={32}
+                        className="text-text-muted opacity-30"
+                    />
+                    <p className="text-sm font-bold text-text-muted">
+                        No lists found.
+                    </p>
+                </div>
+            ) : (
+                lists.map((list) => (
+                    <button
+                        key={list.id}
+                        type="button"
+                        onClick={() => handleListSelect(list.id)}
+                        className="flex items-center justify-between p-6 bg-surface border border-border/60 rounded-[28px] hover:border-accent hover:bg-accent-subtle/30 transition-all group text-left shadow-sm hover:shadow-xl hover:-translate-y-0.5 relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 left-0 w-1.5 h-full bg-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex flex-col gap-1.5">
+                            <span className="font-extrabold text-text-strong group-hover:text-accent transition-colors text-lg leading-tight">
+                                {list.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-text-muted px-2.5 py-1 bg-bg-muted rounded-full border border-border/30">
+                                    {list.items?.length || 0} items
+                                </span>
+                                {list.category && (
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-accent px-2.5 py-1 bg-accent-subtle rounded-full border border-accent-border/10">
+                                        {list.category}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="w-12 h-12 rounded-2xl bg-bg-muted flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all shadow-inner">
+                            <ChevronRight
+                                size={22}
+                                className="transition-transform group-hover:translate-x-0.5"
+                            />
+                        </div>
+                    </button>
+                ))
+            )}
+        </div>
+    </div>
+);
+
+interface StoreRecommendationViewProps {
+    recommendedStores: StoreRecommendation[];
+    transportMode: "driving" | "walking";
+    setTransportMode: (mode: "driving" | "walking") => void;
+    setSelectedListId: (id: string | null) => void;
+    handleStartRoute: (store: StoreRecommendation) => void;
+}
+
+const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
+    recommendedStores,
+    transportMode,
+    setTransportMode,
+    setSelectedListId,
+    handleStartRoute,
+}) => (
+    <div className="flex flex-col gap-6 animate-in slide-in-from-right-4">
+        <header className="flex flex-col gap-4">
+            <button
+                type="button"
+                onClick={() => setSelectedListId(null)}
+                className="flex items-center gap-2 text-xs font-black text-accent uppercase tracking-widest hover:-translate-x-1 transition-transform w-fit"
+            >
+                <ArrowLeft size={14} /> Back to lists
+            </button>
+            <div className="flex justify-between items-end">
+                <div className="text-left">
+                    <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
+                        Best Matches
+                    </h2>
+                    <p className="text-xs text-text-muted mt-1">
+                        Found {recommendedStores.length} stores nearby.
+                    </p>
+                </div>
+                <div className="flex bg-bg-muted p-1 rounded-2xl border border-border shadow-inner">
+                    <button
+                        type="button"
+                        onClick={() => setTransportMode("driving")}
+                        className={`p-2.5 rounded-xl transition-all ${transportMode === "driving" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
+                    >
+                        <Car size={18} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setTransportMode("walking")}
+                        className={`p-2.5 rounded-xl transition-all ${transportMode === "walking" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
+                    >
+                        <Footprints size={18} />
+                    </button>
+                </div>
+            </div>
+        </header>
+        <div className="flex flex-col gap-4">
+            {recommendedStores.map((store, idx) => (
+                <div
+                    key={store.id}
+                    className={`p-5 rounded-[28px] border transition-all relative ${idx === 0 ? "bg-accent/5 border-accent shadow-[0_8px_30px_rgba(var(--color-accent-rgb),0.1)]" : "bg-bg-muted border-border"}`}
+                >
+                    {idx === 0 && (
+                        <div className="absolute -top-3 left-6 px-3 py-1 bg-accent text-white text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5 shadow-lg">
+                            <CheckCircle2 size={12} />
+                            Optimal Choice
+                        </div>
+                    )}
+                    <div className="flex justify-between text-left">
+                        <div className="flex flex-col gap-1">
+                            <h3 className="font-black text-text-strong text-lg leading-tight">
+                                {store.name}
+                            </h3>
+                            <div className="text-[11px] text-text-muted flex items-center gap-1">
+                                <MapPin size={12} />
+                                {store.address}
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-end shrink-0">
+                            <span className="text-2xl font-black text-accent tracking-tighter">
+                                {store.stockMatchPercentage}%
+                            </span>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-text-muted">
+                                Stock
+                            </span>
+                        </div>
+                    </div>
+                    <div className="mt-6 pt-4 border-t border-border/40 flex items-center justify-between">
+                        <div className="text-xs font-bold text-text-strong flex items-center gap-4">
+                            <div className="flex items-center gap-1.5">
+                                {transportMode === "driving" ? (
+                                    <Car
+                                        size={14}
+                                        className="text-text-muted"
+                                    />
+                                ) : (
+                                    <Footprints
+                                        size={14}
+                                        className="text-text-muted"
+                                    />
+                                )}
+                                {store.transit[transportMode].timeMins} min
+                            </div>
+                            <div className="w-1 h-1 rounded-full bg-border" />
+                            <span className="text-text-muted">
+                                {store.transit[transportMode].distanceKm} km
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => handleStartRoute(store)}
+                            className="px-6 py-2.5 bg-text-strong text-bg rounded-2xl text-xs font-black shadow-lg hover:scale-105 active:scale-95 transition-all"
+                        >
+                            START NAVIGATION
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+interface ListDetailViewProps {
+    selectedListId: string;
+    lists: ShoppingList[];
+    isMicroView: boolean;
+    setSelectedListId: (id: string | null) => void;
+    targetStoreLocation: { lat: number; lng: number } | null;
+    setTargetStoreLocation: (loc: { lat: number; lng: number } | null) => void;
+    handleFetchStores: () => void;
+    isFetchingStores: boolean;
+}
+
+const ListDetailView: React.FC<ListDetailViewProps> = ({
+    selectedListId,
+    lists,
+    isMicroView,
+    setSelectedListId,
+    targetStoreLocation,
+    setTargetStoreLocation,
+    handleFetchStores,
+    isFetchingStores,
+}) => (
+    <div className="relative animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col">
+        <header className="flex items-center justify-between mb-4 shrink-0">
+            <div className="flex items-center gap-4 min-w-0">
+                {!isMicroView && (
+                    <button
+                        type="button"
+                        onClick={() => setSelectedListId(null)}
+                        className="flex items-center justify-center w-8 h-8 rounded-full bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle transition-all shrink-0"
+                        title="Switch List"
+                    >
+                        <ArrowLeft size={18} />
+                    </button>
+                )}
+                <h2 className="text-xl font-black text-text-strong uppercase tracking-tight truncate">
+                    {lists.find((l) => l.id === selectedListId)?.name}
+                </h2>
+            </div>
+            {!isMicroView && (
+                <button
+                    type="button"
+                    onClick={() => setSelectedListId(null)}
+                    className="text-xs font-bold text-accent hover:underline uppercase shrink-0 whitespace-nowrap"
+                >
+                    Switch List
+                </button>
+            )}
+        </header>
+
+        <div className="flex-1 overflow-hidden flex flex-col relative">
+            {targetStoreLocation && (
+                <button
+                    type="button"
+                    onClick={() => setTargetStoreLocation(null)}
+                    className="absolute top-2 right-2 p-2 text-text-muted hover:text-accent z-10 transition-colors bg-surface/80 backdrop-blur rounded-lg"
+                    title="Cancel Route"
+                >
+                    <X size={18} />
+                </button>
+            )}
+            <div className="flex-1 overflow-y-auto scrollbar-thin">
+                <ListDetail
+                    isEmbedded={true}
+                    listIdOverride={selectedListId}
+                    onSwitchList={() => setSelectedListId(null)}
+                />
+            </div>
+
+            {!targetStoreLocation && !isMicroView && (
+                <div className="pt-6 mt-4 border-t border-border shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => handleFetchStores()}
+                        disabled={isFetchingStores}
+                        className="w-full py-4 bg-accent text-white rounded-2xl font-black text-base shadow-[0_8px_25px_var(--color-accent-glow)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                    >
+                        {isFetchingStores ? (
+                            <>
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                FINDING BEST STORES...
+                            </>
+                        ) : (
+                            <>
+                                <Zap size={20} fill="currentColor" />
+                                PLAN MY ROUTE
+                            </>
+                        )}
+                    </button>
+                    <p className="text-[10px] text-text-muted text-center mt-3 font-bold uppercase tracking-widest opacity-60">
+                        Discover stores with best stock & transit time
+                    </p>
+                </div>
+            )}
+        </div>
+    </div>
+);
+
 const UnifiedMap: React.FC = () => {
     const userLocation = useStore((state) => state.userLocation);
     const setUserLocation = useStore((state) => state.setUserLocation);
@@ -200,7 +487,10 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleFetchStores = async (listIdOverride?: string) => {
-        const idToFetch = typeof listIdOverride === "string" ? listIdOverride : selectedListId;
+        const idToFetch =
+            typeof listIdOverride === "string"
+                ? listIdOverride
+                : selectedListId;
         if (!idToFetch) return;
         const selectedList = lists.find((l) => l.id === idToFetch);
         if (!selectedList) return;
@@ -252,11 +542,11 @@ const UnifiedMap: React.FC = () => {
                     transit: {
                         driving: store.transit?.driving || {
                             timeMins: 10,
-                            distanceKm: 2.0,
+                            distanceKm: 2,
                         },
                         walking: store.transit?.walking || {
                             timeMins: 30,
-                            distanceKm: 2.0,
+                            distanceKm: 2,
                         },
                     },
                 }),
@@ -375,7 +665,9 @@ const UnifiedMap: React.FC = () => {
                 {isMicroView ? (
                     <StoreMap
                         isSidebarExpanded={isSidebarExpanded}
-                        onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                        onToggleSidebar={() =>
+                            setIsSidebarExpanded(!isSidebarExpanded)
+                        }
                     />
                 ) : (
                     <MapContainer
@@ -525,280 +817,35 @@ const UnifiedMap: React.FC = () => {
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
                     <div className="flex-1 overflow-y-auto p-6 pt-2">
-                        {!selectedListId ? (
-                            <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                                <header>
-                                    <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
-                                        {isMicroView ? "Shopping Lists" : "Plan Your Route"}
-                                    </h2>
-                                    <p className="text-sm text-text-muted mt-1 leading-relaxed">
-                                        {isMicroView ? "Select a list to navigate to its items." : "Select a shopping list to discover the best retail locations near you."}
-                                    </p>
-                                </header>
-                                <div className="flex flex-col gap-4">
-                                    {lists.length === 0 ? (
-                                        <div className="py-12 text-center flex flex-col items-center gap-3 bg-bg-muted rounded-3xl border border-dashed border-border">
-                                            <ListIcon
-                                                size={32}
-                                                className="text-text-muted opacity-30"
-                                            />
-                                            <p className="text-sm font-bold text-text-muted">
-                                                No lists found.
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        lists.map((list) => (
-                                            <button
-                                                key={list.id}
-                                                type="button"
-                                                onClick={() =>
-                                                    handleListSelect(list.id)
-                                                }
-                                                className="flex items-center justify-between p-6 bg-surface border border-border/60 rounded-[28px] hover:border-accent hover:bg-accent-subtle/30 transition-all group text-left shadow-sm hover:shadow-xl hover:-translate-y-0.5 relative overflow-hidden"
-                                            >
-                                                <div className="absolute top-0 left-0 w-1.5 h-full bg-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                <div className="flex flex-col gap-1.5">
-                                                    <span className="font-extrabold text-text-strong group-hover:text-accent transition-colors text-lg leading-tight">
-                                                        {list.name}
-                                                    </span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-text-muted px-2.5 py-1 bg-bg-muted rounded-full border border-border/30">
-                                                            {list.items
-                                                                ?.length ||
-                                                                0}{" "}
-                                                            items
-                                                        </span>
-                                                        {list.category && (
-                                                            <span className="text-[10px] font-black uppercase tracking-widest text-accent px-2.5 py-1 bg-accent-subtle rounded-full border border-accent-border/10">
-                                                                {list.category}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="w-12 h-12 rounded-2xl bg-bg-muted flex items-center justify-center group-hover:bg-accent group-hover:text-white transition-all shadow-inner">
-                                                    <ChevronRight
-                                                        size={22}
-                                                        className="transition-transform group-hover:translate-x-0.5"
-                                                    />
-                                                </div>
-                                            </button>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        ) : (isShowingStores && !isMicroView) ? (
-                            <div className="flex flex-col gap-6 animate-in slide-in-from-right-4">
-                                <header className="flex flex-col gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setSelectedListId(null)
-                                        }
-                                        className="flex items-center gap-2 text-xs font-black text-accent uppercase tracking-widest hover:-translate-x-1 transition-transform w-fit"
-                                    >
-                                        <ArrowLeft size={14} /> Back to lists
-                                    </button>
-                                    <div className="flex justify-between items-end">
-                                        <div className="text-left">
-                                            <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
-                                                Best Matches
-                                            </h2>
-                                            <p className="text-xs text-text-muted mt-1">
-                                                Found {recommendedStores.length}{" "}
-                                                stores nearby.
-                                            </p>
-                                        </div>
-                                        <div className="flex bg-bg-muted p-1 rounded-2xl border border-border shadow-inner">
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setTransportMode("driving")
-                                                }
-                                                className={`p-2.5 rounded-xl transition-all ${transportMode === "driving" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
-                                            >
-                                                <Car size={18} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setTransportMode("walking")
-                                                }
-                                                className={`p-2.5 rounded-xl transition-all ${transportMode === "walking" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
-                                            >
-                                                <Footprints size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </header>
-                                <div className="flex flex-col gap-4">
-                                    {recommendedStores.map((store, idx) => (
-                                        <div
-                                            key={store.id}
-                                            className={`p-5 rounded-[28px] border transition-all relative ${idx === 0 ? "bg-accent/5 border-accent shadow-[0_8px_30px_rgba(var(--color-accent-rgb),0.1)]" : "bg-bg-muted border-border"}`}
-                                        >
-                                            {idx === 0 && (
-                                                <div className="absolute -top-3 left-6 px-3 py-1 bg-accent text-white text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5 shadow-lg">
-                                                    <CheckCircle2 size={12} />
-                                                    Optimal Choice
-                                                </div>
-                                            )}
-                                            <div className="flex justify-between text-left">
-                                                <div className="flex flex-col gap-1">
-                                                    <h3 className="font-black text-text-strong text-lg leading-tight">
-                                                        {store.name}
-                                                    </h3>
-                                                    <div className="text-[11px] text-text-muted flex items-center gap-1">
-                                                        <MapPin size={12} />
-                                                        {store.address}
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-end shrink-0">
-                                                    <span className="text-2xl font-black text-accent tracking-tighter">
-                                                        {
-                                                            store.stockMatchPercentage
-                                                        }
-                                                        %
-                                                    </span>
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-text-muted">
-                                                        Stock
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="mt-6 pt-4 border-t border-border/40 flex items-center justify-between">
-                                                <div className="text-xs font-bold text-text-strong flex items-center gap-4">
-                                                    <div className="flex items-center gap-1.5">
-                                                        {transportMode ===
-                                                        "driving" ? (
-                                                            <Car
-                                                                size={14}
-                                                                className="text-text-muted"
-                                                            />
-                                                        ) : (
-                                                            <Footprints
-                                                                size={14}
-                                                                className="text-text-muted"
-                                                            />
-                                                        )}
-                                                        {
-                                                            store.transit[
-                                                                transportMode
-                                                            ].timeMins
-                                                        }{" "}
-                                                        min
-                                                    </div>
-                                                    <div className="w-1 h-1 rounded-full bg-border" />
-                                                    <span className="text-text-muted">
-                                                        {
-                                                            store.transit[
-                                                                transportMode
-                                                            ].distanceKm
-                                                        }{" "}
-                                                        km
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleStartRoute(store)
-                                                    }
-                                                    className="px-6 py-2.5 bg-text-strong text-bg rounded-2xl text-xs font-black shadow-lg hover:scale-105 active:scale-95 transition-all"
-                                                >
-                                                    START NAVIGATION
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                        {selectedListId ? (
+                            isShowingStores && !isMicroView ? (
+                                <StoreRecommendationView
+                                    recommendedStores={recommendedStores}
+                                    transportMode={transportMode}
+                                    setTransportMode={setTransportMode}
+                                    setSelectedListId={setSelectedListId}
+                                    handleStartRoute={handleStartRoute}
+                                />
+                            ) : (
+                                <ListDetailView
+                                    selectedListId={selectedListId}
+                                    lists={lists}
+                                    isMicroView={isMicroView}
+                                    setSelectedListId={setSelectedListId}
+                                    targetStoreLocation={targetStoreLocation}
+                                    setTargetStoreLocation={
+                                        setTargetStoreLocation
+                                    }
+                                    handleFetchStores={handleFetchStores}
+                                    isFetchingStores={isFetchingStores}
+                                />
+                            )
                         ) : (
-                            <div className="relative animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col">
-                                <header className="flex items-center justify-between mb-4 shrink-0">
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        {!isMicroView && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedListId(null)}
-                                                className="flex items-center justify-center w-8 h-8 rounded-full bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle transition-all shrink-0"
-                                                title="Switch List"
-                                            >
-                                                <ArrowLeft size={18} />
-                                            </button>
-                                        )}
-                                        <h2 className="text-xl font-black text-text-strong uppercase tracking-tight truncate">
-                                            {
-                                                lists.find(
-                                                    (l) => l.id === selectedListId,
-                                                )?.name
-                                            }
-                                        </h2>
-                                    </div>
-                                    {!isMicroView && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedListId(null)}
-                                            className="text-xs font-bold text-accent hover:underline uppercase shrink-0 whitespace-nowrap"
-                                        >
-                                            Switch List
-                                        </button>
-                                    )}
-                                </header>
-
-                                <div className="flex-1 overflow-hidden flex flex-col relative">
-                                    {targetStoreLocation && (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setTargetStoreLocation(null)
-                                            }
-                                            className="absolute top-2 right-2 p-2 text-text-muted hover:text-accent z-10 transition-colors bg-surface/80 backdrop-blur rounded-lg"
-                                            title="Cancel Route"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    )}
-                                    <div className="flex-1 overflow-y-auto scrollbar-thin">
-                                        <ListDetail
-                                            isEmbedded={true}
-                                            listIdOverride={
-                                                selectedListId ?? undefined
-                                            }
-                                            onSwitchList={() =>
-                                                setSelectedListId(null)
-                                            }
-                                        />
-                                    </div>
-
-                                    {!targetStoreLocation && !isMicroView && (
-                                        <div className="pt-6 mt-4 border-t border-border shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleFetchStores()}
-                                                disabled={isFetchingStores}
-                                                className="w-full py-4 bg-accent text-white rounded-2xl font-black text-base shadow-[0_8px_25px_var(--color-accent-glow)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70"
-                                            >
-                                                {isFetchingStores ? (
-                                                    <>
-                                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        FINDING BEST STORES...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Zap
-                                                            size={20}
-                                                            fill="currentColor"
-                                                        />
-                                                        PLAN MY ROUTE
-                                                    </>
-                                                )}
-                                            </button>
-                                            <p className="text-[10px] text-text-muted text-center mt-3 font-bold uppercase tracking-widest opacity-60">
-                                                Discover stores with best stock
-                                                & transit time
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            <ListSelectionView
+                                lists={lists}
+                                isMicroView={isMicroView}
+                                handleListSelect={handleListSelect}
+                            />
                         )}
                     </div>
                 </div>
@@ -827,14 +874,13 @@ const UnifiedMap: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setIsMockGpsEnabled(false)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${!isMockGpsEnabled ? "bg-blue-600 text-white" : "text-text-muted hover:text-text-strong"}`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "text-text-muted hover:text-text-strong" : "bg-blue-600 text-white"}`}
                             title="Use Real Device GPS"
                         >
                             <Satellite size={12} />
                             Real
                         </button>
                     </div>
-
 
                     <button
                         type="button"

@@ -623,13 +623,20 @@ interface StoreMapProps {
     isSidebarExpanded?: boolean;
 }
 
-const StoreMap: React.FC<StoreMapProps> = ({ onToggleSidebar, isSidebarExpanded: externalIsSidebarExpanded }) => {
+const StoreMap: React.FC<StoreMapProps> = ({
+    onToggleSidebar,
+    isSidebarExpanded: externalIsSidebarExpanded,
+}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [internalIsSidebarExpanded, setInternalIsSidebarExpanded] = useState(false);
+    const [internalIsSidebarExpanded, setInternalIsSidebarExpanded] =
+        useState(false);
     const [isCoordsModalOpen, setIsCoordsModalOpen] = useState(false);
 
-    const isSidebarExpanded = externalIsSidebarExpanded ?? internalIsSidebarExpanded;
-    const toggleSidebar = onToggleSidebar ?? (() => setInternalIsSidebarExpanded(!internalIsSidebarExpanded));
+    const isSidebarExpanded =
+        externalIsSidebarExpanded ?? internalIsSidebarExpanded;
+    const toggleSidebar =
+        onToggleSidebar ??
+        (() => setInternalIsSidebarExpanded(!internalIsSidebarExpanded));
 
     useEffect(() => {
         const originalInlineStyle = document.body.getAttribute("style");
