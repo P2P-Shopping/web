@@ -110,7 +110,7 @@ export const useStore = create<AppState>()(
         (set, get) => ({
             userLocation: { lat: 47.151726, lng: 27.587914 },
             targetStoreLocation: null,
-            navigationMode: "indoor",
+            navigationMode: "city",
             hasEnteredStore: false,
             isTransitioningToStore: false,
             isAutoCenterEnabled: true,

@@ -199,9 +199,10 @@ const UnifiedMap: React.FC = () => {
         setRecommendedStores([]);
     };
 
-    const handleFetchStores = async () => {
-        if (!selectedListId) return;
-        const selectedList = lists.find((l) => l.id === selectedListId);
+    const handleFetchStores = async (listIdOverride?: string) => {
+        const idToFetch = typeof listIdOverride === "string" ? listIdOverride : selectedListId;
+        if (!idToFetch) return;
+        const selectedList = lists.find((l) => l.id === idToFetch);
         if (!selectedList) return;
 
         setIsFetchingStores(true);
@@ -282,16 +283,6 @@ const UnifiedMap: React.FC = () => {
     const handleRecenter = () => {
         setIsAutoCenterEnabled(true);
         setUserLocation({ ...userLocation });
-    };
-
-    const handleSimulateEntry = () => {
-        setIsAutoCenterEnabled(true);
-        teleport(activeTarget.lat + 0.0001, activeTarget.lng + 0.0001);
-    };
-
-    const handleSimulateExit = () => {
-        setIsAutoCenterEnabled(true);
-        teleport(activeTarget.lat + 0.01, activeTarget.lng + 0.01);
     };
 
     const handleForceIndoor = () => {
@@ -382,7 +373,10 @@ const UnifiedMap: React.FC = () => {
         <div className="flex flex-col h-full overflow-hidden bg-bg">
             <div className="relative flex-1 overflow-hidden">
                 {isMicroView ? (
-                    <StoreMap />
+                    <StoreMap
+                        isSidebarExpanded={isSidebarExpanded}
+                        onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                    />
                 ) : (
                     <MapContainer
                         center={[userLocation.lat, userLocation.lng]}
@@ -519,14 +513,14 @@ const UnifiedMap: React.FC = () => {
                 {isSidebarExpanded && (
                     <button
                         type="button"
-                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-[1000] min-[1000px]:hidden animate-fade-in"
+                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-[2400] min-[1000px]:hidden animate-fade-in"
                         onClick={() => setIsSidebarExpanded(false)}
                         aria-label="Close List"
                     />
                 )}
 
                 <div
-                    className={`absolute z-[1001] transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
+                    className={`absolute z-[2500] transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
                 >
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
@@ -535,11 +529,10 @@ const UnifiedMap: React.FC = () => {
                             <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <header>
                                     <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
-                                        Plan Your Route
+                                        {isMicroView ? "Shopping Lists" : "Plan Your Route"}
                                     </h2>
                                     <p className="text-sm text-text-muted mt-1 leading-relaxed">
-                                        Select a shopping list to discover the
-                                        best retail locations near you.
+                                        {isMicroView ? "Select a list to navigate to its items." : "Select a shopping list to discover the best retail locations near you."}
                                     </p>
                                 </header>
                                 <div className="flex flex-col gap-4">
@@ -593,17 +586,17 @@ const UnifiedMap: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-                        ) : isShowingStores ? (
+                        ) : (isShowingStores && !isMicroView) ? (
                             <div className="flex flex-col gap-6 animate-in slide-in-from-right-4">
                                 <header className="flex flex-col gap-4">
                                     <button
                                         type="button"
                                         onClick={() =>
-                                            setIsShowingStores(false)
+                                            setSelectedListId(null)
                                         }
                                         className="flex items-center gap-2 text-xs font-black text-accent uppercase tracking-widest hover:-translate-x-1 transition-transform w-fit"
                                     >
-                                        <ArrowLeft size={14} /> Back to items
+                                        <ArrowLeft size={14} /> Back to lists
                                     </button>
                                     <div className="flex justify-between items-end">
                                         <div className="text-left">
@@ -719,22 +712,35 @@ const UnifiedMap: React.FC = () => {
                             </div>
                         ) : (
                             <div className="relative animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col">
-                                <header className="flex items-center gap-4 mb-4 shrink-0">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedListId(null)}
-                                        className="flex items-center justify-center w-8 h-8 rounded-full bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle transition-all"
-                                        title="Back to lists"
-                                    >
-                                        <ArrowLeft size={18} />
-                                    </button>
-                                    <h2 className="text-xl font-black text-text-strong uppercase tracking-tight truncate">
-                                        {
-                                            lists.find(
-                                                (l) => l.id === selectedListId,
-                                            )?.name
-                                        }
-                                    </h2>
+                                <header className="flex items-center justify-between mb-4 shrink-0">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        {!isMicroView && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedListId(null)}
+                                                className="flex items-center justify-center w-8 h-8 rounded-full bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle transition-all shrink-0"
+                                                title="Switch List"
+                                            >
+                                                <ArrowLeft size={18} />
+                                            </button>
+                                        )}
+                                        <h2 className="text-xl font-black text-text-strong uppercase tracking-tight truncate">
+                                            {
+                                                lists.find(
+                                                    (l) => l.id === selectedListId,
+                                                )?.name
+                                            }
+                                        </h2>
+                                    </div>
+                                    {!isMicroView && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedListId(null)}
+                                            className="text-xs font-bold text-accent hover:underline uppercase shrink-0 whitespace-nowrap"
+                                        >
+                                            Switch List
+                                        </button>
+                                    )}
                                 </header>
 
                                 <div className="flex-1 overflow-hidden flex flex-col relative">
@@ -762,11 +768,11 @@ const UnifiedMap: React.FC = () => {
                                         />
                                     </div>
 
-                                    {!targetStoreLocation && (
+                                    {!targetStoreLocation && !isMicroView && (
                                         <div className="pt-6 mt-4 border-t border-border shrink-0">
                                             <button
                                                 type="button"
-                                                onClick={handleFetchStores}
+                                                onClick={() => handleFetchStores()}
                                                 disabled={isFetchingStores}
                                                 className="w-full py-4 bg-accent text-white rounded-2xl font-black text-base shadow-[0_8px_25px_var(--color-accent-glow)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70"
                                             >
@@ -829,18 +835,6 @@ const UnifiedMap: React.FC = () => {
                         </button>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={
-                            isMicroView
-                                ? handleSimulateExit
-                                : handleSimulateEntry
-                        }
-                        className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95"
-                    >
-                        <Zap size={14} className="text-accent" />
-                        {isMicroView ? "Simulate Exit" : "Simulate Entry"}
-                    </button>
 
                     <button
                         type="button"
@@ -865,7 +859,7 @@ const UnifiedMap: React.FC = () => {
             </div>
 
             {!isMicroView && (
-                <div className="relative z-[1002] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+                <div className="relative z-[3000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
                     <div className="flex items-center gap-4">
                         <button
                             type="button"

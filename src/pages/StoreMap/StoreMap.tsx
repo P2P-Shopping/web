@@ -11,7 +11,6 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import Modal from "../../components/Modal/Modal";
 import { useStore } from "../../context/useStore";
-import ListDetail from "../ListDetail/ListDetail";
 
 interface Coordinate {
     lat: number;
@@ -619,10 +618,18 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     };
 };
 
-const StoreMap: React.FC = () => {
+interface StoreMapProps {
+    onToggleSidebar?: () => void;
+    isSidebarExpanded?: boolean;
+}
+
+const StoreMap: React.FC<StoreMapProps> = ({ onToggleSidebar, isSidebarExpanded: externalIsSidebarExpanded }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+    const [internalIsSidebarExpanded, setInternalIsSidebarExpanded] = useState(false);
     const [isCoordsModalOpen, setIsCoordsModalOpen] = useState(false);
+
+    const isSidebarExpanded = externalIsSidebarExpanded ?? internalIsSidebarExpanded;
+    const toggleSidebar = onToggleSidebar ?? (() => setInternalIsSidebarExpanded(!internalIsSidebarExpanded));
 
     useEffect(() => {
         const originalInlineStyle = document.body.getAttribute("style");
@@ -640,14 +647,14 @@ const StoreMap: React.FC = () => {
         if (!isSidebarExpanded) return;
 
         const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                setIsSidebarExpanded(false);
+            if (e.key === "Escape" && isSidebarExpanded) {
+                toggleSidebar();
             }
         };
 
         document.addEventListener("keydown", handleEscape);
         return () => document.removeEventListener("keydown", handleEscape);
-    }, [isSidebarExpanded]);
+    }, [isSidebarExpanded, toggleSidebar]);
 
     const {
         isDragging,
@@ -699,69 +706,10 @@ const StoreMap: React.FC = () => {
                         {gpsError}
                     </div>
                 )}
-
-                {/* Sidebar Overlay (Mobile) */}
-                {isSidebarExpanded && (
-                    <button
-                        type="button"
-                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-[1400] min-[1000px]:hidden animate-fade-in"
-                        onClick={() => setIsSidebarExpanded(false)}
-                        aria-label="Close list drawer"
-                    />
-                )}
-
-                {/* Responsive Sidebar */}
-                <div
-                    aria-hidden={!isSidebarExpanded}
-                    inert={!isSidebarExpanded}
-                    className={`
-                        absolute z-[1500] transition-all duration-500 ease-spring
-                        /* Desktop: Right-side Drawer */
-                        min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 
-                        min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border
-                        ${
-                            isSidebarExpanded
-                                ? "min-[1000px]:translate-x-0"
-                                : "min-[1000px]:translate-x-full"
-                        }
-                        
-                        /* Mobile: Bottom Sheet */
-                        max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 
-                        max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh]
-                        ${
-                            isSidebarExpanded
-                                ? "max-[1000px]:translate-y-0"
-                                : "max-[1000px]:translate-y-full"
-                        }
-                        
-                        ${isSidebarExpanded ? "" : "pointer-events-none"}
-                        bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
-                    `}
-                >
-                    {/* Drag Handle for Mobile */}
-                    <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
-
-                    <div className="px-6 py-4 flex items-center justify-between border-b border-border min-[1000px]:pt-8">
-                        <h3 className="text-lg font-black uppercase tracking-tight">
-                            Shopping List
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={() => setIsSidebarExpanded(false)}
-                            className="p-2 text-text-muted hover:text-accent transition-colors"
-                        >
-                            <X size={24} />
-                        </button>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto px-1">
-                        <ListDetail isEmbedded={true} />
-                    </div>
-                </div>
             </div>
 
             {/* Map Control Bar - Separated from map view */}
-            <div className="relative z-[2000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
+            <div className="relative z-[3000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
                 <div className="flex items-center gap-4">
                     <button
                         type="button"
@@ -833,7 +781,10 @@ const StoreMap: React.FC = () => {
                             ? "bg-accent text-text-on-accent"
                             : "bg-text-strong text-bg"
                     }`}
-                    onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSidebar();
+                    }}
                     aria-label={isSidebarExpanded ? "Close List" : "Show List"}
                 >
                     {isSidebarExpanded ? (

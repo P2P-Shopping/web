@@ -274,16 +274,20 @@ const useListItems = (effectiveListId: string | undefined) => {
         (message: { body: string }) => {
             try {
                 const payload = JSON.parse(message.body) as SyncPayload;
-                
+
                 setItems((prev) => {
                     let next = prev;
-                    
+
                     if (payload.action === "CHECK_OFF" && payload.itemId) {
                         next = prev.map((item) =>
-                            item.id === payload.itemId ? { ...item, checked: Boolean(payload.checked) } : item
+                            item.id === payload.itemId
+                                ? { ...item, checked: Boolean(payload.checked) }
+                                : item,
                         );
                     } else if (payload.action === "DELETE" && payload.itemId) {
-                        next = prev.filter((item) => item.id !== payload.itemId);
+                        next = prev.filter(
+                            (item) => item.id !== payload.itemId,
+                        );
                     } else if (payload.action === "ADD" && payload.content) {
                         try {
                             const newItem = JSON.parse(payload.content) as Item;
@@ -292,7 +296,10 @@ const useListItems = (effectiveListId: string | undefined) => {
                                 next = [...prev, newItem];
                             }
                         } catch (e) {
-                            console.error("Failed to parse incoming ADD item JSON", e);
+                            console.error(
+                                "Failed to parse incoming ADD item JSON",
+                                e,
+                            );
                         }
                     }
 
@@ -301,14 +308,14 @@ const useListItems = (effectiveListId: string | undefined) => {
                     if (next !== prev) {
                         syncListItemsInStore(next);
                     }
-                    
+
                     return next;
                 });
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore] // Stable dependency prevents STOMP subscription churn
+        [syncListItemsInStore], // Stable dependency prevents STOMP subscription churn
     );
 
     useEffect(() => {
@@ -544,7 +551,11 @@ const useListItems = (effectiveListId: string | undefined) => {
             if (effectiveListId && stompClient.connected) {
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify({ action: "DELETE", itemId, timestamp: Date.now() }),
+                    body: JSON.stringify({
+                        action: "DELETE",
+                        itemId,
+                        timestamp: Date.now(),
+                    }),
                 });
             }
         } catch (err) {
@@ -608,7 +619,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 console.error("Failed to parse presence message:", err);
             }
         },
-        [handlePresenceEvent]
+        [handlePresenceEvent],
     );
 
     useEffect(() => {
@@ -633,14 +644,14 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 username,
                 listId: effectiveListId,
             };
-            
-            // Notify server that we joined. 
+
+            // Notify server that we joined.
             // The server will respond by broadcasting a ROSTER_UPDATE to all clients.
             stompClient.publish({
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
             });
-            
+
             console.debug("[ws] sent presence JOIN", joinEvent);
         }
 
@@ -661,7 +672,6 @@ const useListPresence = (effectiveListId: string | undefined) => {
         };
     }, [
         effectiveListId,
-        handlePresenceEvent,
         clearPresence,
         user?.email,
         handlePresenceMessage,
