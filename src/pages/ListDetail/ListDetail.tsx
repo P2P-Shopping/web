@@ -211,10 +211,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 id: crypto.randomUUID(),
                 name: item.genericName || item.specificName || item.name || "",
                 brand: item.brand || undefined,
-                quantity:
-                    item.quantity !== undefined
-                        ? String(item.quantity)
-                        : undefined,
+                quantity: item.quantity ? String(item.quantity) : undefined,
                 category: item.category || undefined,
             }));
 

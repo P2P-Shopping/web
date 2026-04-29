@@ -154,6 +154,7 @@ const ImportItemsModal = ({
                             return (
                                 <label
                                     key={item.id}
+                                    htmlFor={`import-item-${item.id}`}
                                     className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition-all ${
                                         isDuplicate
                                             ? "cursor-not-allowed border-border bg-bg-muted opacity-60"
@@ -161,11 +162,13 @@ const ImportItemsModal = ({
                                     }`}
                                 >
                                     <input
+                                        id={`import-item-${item.id}`}
                                         type="checkbox"
                                         checked={isSelected && !isDuplicate}
                                         onChange={() => onToggleItem(item.id)}
                                         disabled={isDuplicate}
                                         className="mt-1 h-4 w-4 rounded border-border"
+                                        aria-label={`Select ${item.name}`}
                                     />
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">

@@ -1,5 +1,5 @@
-import { Check, ChevronDown } from "lucide-react";
-import { type SubmitEvent, useEffect, useId, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { type SubmitEvent, useId, useState } from "react";
 import { Modal } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -34,44 +34,13 @@ const LIST_CATEGORY_OPTIONS: Array<{
 const CreateListModal = ({ onClose }: CreateListModalProps) => {
     const [listName, setListName] = useState("");
     const [listCategory, setListCategory] = useState<ListCategory>("NORMAL");
-    const [isCategoryOpen, setIsCategoryOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { addList } = useListsStore();
-    const categoryMenuRef = useRef<HTMLDivElement>(null);
     const categoryButtonId = useId();
     const categoryListId = useId();
 
-    useEffect(() => {
-        if (!isCategoryOpen) return;
-
-        const handlePointerDown = (event: PointerEvent) => {
-            const target = event.target as Node | null;
-            if (target && categoryMenuRef.current?.contains(target)) return;
-            setIsCategoryOpen(false);
-        };
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setIsCategoryOpen(false);
-            }
-        };
-
-        globalThis.addEventListener("pointerdown", handlePointerDown);
-        globalThis.addEventListener("keydown", handleKeyDown);
-
-        return () => {
-            globalThis.removeEventListener("pointerdown", handlePointerDown);
-            globalThis.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [isCategoryOpen]);
-
-    const selectedCategory =
-        LIST_CATEGORY_OPTIONS.find((option) => option.value === listCategory) ??
-        LIST_CATEGORY_OPTIONS[0];
-
     const handleClose = () => {
         if (isSubmitting) return;
-        setIsCategoryOpen(false);
         onClose();
     };
 
@@ -82,7 +51,6 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
 
         setIsSubmitting(true);
         try {
-            setIsCategoryOpen(false);
             const newList = await addList(trimmedName, listCategory);
             if (newList) {
                 onClose();
@@ -158,84 +126,25 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                     <span className="text-[13px] font-semibold text-text-strong">
                         List type
                     </span>
-                    <div className="relative" ref={categoryMenuRef}>
-                        <button
-                            id={categoryButtonId}
-                            type="button"
-                            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-bg-muted px-4 py-3 text-left transition-all hover:border-border-strong focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] outline-none"
-                            onClick={() => setIsCategoryOpen((open) => !open)}
-                            aria-haspopup="listbox"
-                            aria-expanded={isCategoryOpen}
-                            aria-controls={categoryListId}
+                    <div className="relative">
+                        <select
+                            id={categoryListId}
+                            value={listCategory}
+                            onChange={(e) =>
+                                setListCategory(e.target.value as ListCategory)
+                            }
+                            className="w-full appearance-none rounded-2xl border border-border bg-bg-muted px-4 py-3 text-[15px] font-semibold text-text-strong outline-none transition-all hover:border-border-strong focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)]"
+                            aria-labelledby={categoryButtonId}
                         >
-                            <span className="flex flex-col items-start gap-0.5">
-                                <span className="text-[15px] font-semibold text-text-strong">
-                                    {selectedCategory.title}
-                                </span>
-                                <span className="text-xs text-text-muted">
-                                    {selectedCategory.description}
-                                </span>
-                            </span>
-                            <ChevronDown
-                                size={18}
-                                className={`shrink-0 text-text-muted transition-transform ${
-                                    isCategoryOpen ? "rotate-180" : ""
-                                }`}
-                            />
-                        </button>
-
-                        {isCategoryOpen && (
-                            <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 rounded-2xl border border-border bg-surface p-2 shadow-[0_24px_60px_rgba(0,0,0,0.16)]">
-                                <div
-                                    id={categoryListId}
-                                    role="listbox"
-                                    aria-labelledby={categoryButtonId}
-                                    className="flex flex-col gap-1"
-                                >
-                                    {LIST_CATEGORY_OPTIONS.map((option) => {
-                                        const isSelected =
-                                            option.value === listCategory;
-
-                                        return (
-                                            <button
-                                                key={option.value}
-                                                type="button"
-                                                role="option"
-                                                aria-selected={isSelected}
-                                                className={`flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
-                                                    isSelected
-                                                        ? "bg-accent-subtle text-text-strong"
-                                                        : "text-text-strong hover:bg-bg-muted"
-                                                }`}
-                                                onClick={() => {
-                                                    setListCategory(
-                                                        option.value,
-                                                    );
-                                                    setIsCategoryOpen(false);
-                                                }}
-                                            >
-                                                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface">
-                                                    {isSelected && (
-                                                        <Check
-                                                            size={12}
-                                                            className="text-accent"
-                                                        />
-                                                    )}
-                                                </span>
-                                                <span className="flex flex-col gap-0.5">
-                                                    <span className="text-[15px] font-semibold">
-                                                        {option.title}
-                                                    </span>
-                                                    <span className="text-xs text-text-muted">
-                                                        {option.description}
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
+                            {LIST_CATEGORY_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.title} - {option.description}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-text-muted">
+                            <ChevronDown size={18} />
+                        </div>
                     </div>
                 </div>
             </form>

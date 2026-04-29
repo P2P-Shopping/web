@@ -121,7 +121,7 @@ export const useOfflineSync = () => {
 
     useEffect(() => {
         if (isOnline && offlineQueue.length > 0 && !isProcessing.current) {
-            void processQueue();
+            processQueue();
         }
     }, [isOnline, offlineQueue.length, processQueue]);
 };

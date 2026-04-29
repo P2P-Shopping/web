@@ -256,7 +256,8 @@ const Dashboard = () => {
             }
 
             clearImportSelection();
-        } catch (_error) {
+        } catch (error) {
+            console.error("Bulk add failed:", error);
             setIsImportingItems(false);
         }
     };
@@ -303,24 +304,7 @@ const Dashboard = () => {
                 <ListDetail listIdOverride={selectedList.id} />
             </div>
         );
-    } else if (!hasGroupedLists) {
-        mainContent = (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
-                {lists.map((list) => (
-                    <div key={list.id}>
-                        <ListCard
-                            list={list}
-                            onClick={() => handleCardClick(list.id)}
-                            onDelete={(e) =>
-                                handleDeleteList(e, list.id, list.name)
-                            }
-                            isDeleting={deletingListId === list.id}
-                        />
-                    </div>
-                ))}
-            </div>
-        );
-    } else {
+    } else if (hasGroupedLists) {
         mainContent = (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
                 {sectionOrder.map((section) => {
@@ -413,6 +397,23 @@ const Dashboard = () => {
                         </section>
                     );
                 })}
+            </div>
+        );
+    } else {
+        mainContent = (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
+                {lists.map((list) => (
+                    <div key={list.id}>
+                        <ListCard
+                            list={list}
+                            onClick={() => handleCardClick(list.id)}
+                            onDelete={(e) =>
+                                handleDeleteList(e, list.id, list.name)
+                            }
+                            isDeleting={deletingListId === list.id}
+                        />
+                    </div>
+                ))}
             </div>
         );
     }

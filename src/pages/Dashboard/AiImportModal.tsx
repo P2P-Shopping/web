@@ -191,16 +191,19 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
             setReviewItems(items);
             setDetectedListType(normalizeListType(data.listType));
+            let suggestedName = `AI List ${new Date().toLocaleDateString()}`;
             const firstUserMessage = [...messages]
                 .reverse()
                 .find((m) => m.role === "user");
-            setSuggestedListName(
-                firstUserMessage?.content.trim()
-                    ? firstUserMessage.content.length > 40
-                        ? `${firstUserMessage.content.substring(0, 40)}...`
-                        : firstUserMessage.content
-                    : `AI List ${new Date().toLocaleDateString()}`,
-            );
+
+            if (firstUserMessage?.content.trim()) {
+                const content = firstUserMessage.content.trim();
+                suggestedName =
+                    content.length > 40
+                        ? `${content.substring(0, 40)}...`
+                        : content;
+            }
+            setSuggestedListName(suggestedName);
 
             const assistantMessage: Message = {
                 id: crypto.randomUUID(),
@@ -274,14 +277,14 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         items,
     }: ReviewSubmission) => {
         try {
-            const category =
-                detectedListType === "RECIPE"
-                    ? "RECIPE"
-                    : detectedListType === "FREQUENT"
-                      ? "FREQUENT"
-                      : "NORMAL";
+            let listCategory: "NORMAL" | "RECIPE" | "FREQUENT" = "NORMAL";
+            if (detectedListType === "RECIPE") {
+                listCategory = "RECIPE";
+            } else if (detectedListType === "FREQUENT") {
+                listCategory = "FREQUENT";
+            }
 
-            const newList = await addList(listName, category);
+            const newList = await addList(listName, listCategory);
             if (newList) {
                 for (const item of items) {
                     await addItem(newList.id, {
@@ -290,7 +293,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         brand: item.brand,
                         quantity: item.quantity,
                         category: item.category,
-                        isRecurrent: category === "FREQUENT",
+                        isRecurrent: listCategory === "FREQUENT",
                     });
                 }
             }

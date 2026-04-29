@@ -20,6 +20,40 @@ interface Props {
 
 const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
 
+const ItemMetadata = ({ item }: { item: Item }) => {
+    const parts: React.ReactNode[] = [];
+    if (item.brand) {
+        parts.push(
+            <span
+                key="brand"
+                className="px-1.5 py-0.5 bg-bg-muted rounded text-xs uppercase font-bold tracking-wider"
+            >
+                {item.brand}
+            </span>,
+        );
+    }
+    if (item.quantity) {
+        parts.push(<span key="qty">{item.quantity}</span>);
+    }
+    if (item.price != null) {
+        parts.push(<span key="price">{formatPrice(item.price)}</span>);
+    }
+
+    return (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted mt-0.5">
+            {parts.map((part, index) => {
+                const partKey = (part as React.ReactElement).key || index;
+                return (
+                    <React.Fragment key={`meta-${partKey}`}>
+                        {index > 0 && <span> • </span>}
+                        {part}
+                    </React.Fragment>
+                );
+            })}
+        </div>
+    );
+};
+
 const ShoppingListItems: React.FC<Props> = ({
     items,
     onCheck,
@@ -92,60 +126,7 @@ const ShoppingListItems: React.FC<Props> = ({
                                         >
                                             {item.name}
                                         </span>
-                                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted mt-0.5">
-                                            {(() => {
-                                                const parts: React.ReactNode[] =
-                                                    [];
-                                                if (item.brand) {
-                                                    parts.push(
-                                                        <span
-                                                            key="brand"
-                                                            className="px-1.5 py-0.5 bg-bg-muted rounded text-xs uppercase font-bold tracking-wider"
-                                                        >
-                                                            {item.brand}
-                                                        </span>,
-                                                    );
-                                                }
-                                                if (item.quantity) {
-                                                    parts.push(
-                                                        <span key="qty">
-                                                            {item.quantity}
-                                                        </span>,
-                                                    );
-                                                }
-                                                if (item.price != null) {
-                                                    parts.push(
-                                                        <span key="price">
-                                                            {formatPrice(
-                                                                item.price,
-                                                            )}
-                                                        </span>,
-                                                    );
-                                                }
-
-                                                return parts.map(
-                                                    (part, index) => {
-                                                        const partKey =
-                                                            (
-                                                                part as React.ReactElement
-                                                            ).key || index;
-                                                        return (
-                                                            <React.Fragment
-                                                                key={`meta-${partKey}`}
-                                                            >
-                                                                {index > 0 && (
-                                                                    <span>
-                                                                        {" "}
-                                                                        •{" "}
-                                                                    </span>
-                                                                )}
-                                                                {part}
-                                                            </React.Fragment>
-                                                        );
-                                                    },
-                                                );
-                                            })()}
-                                        </div>
+                                        <ItemMetadata item={item} />
                                     </div>
                                 </label>
                                 {onDelete && (

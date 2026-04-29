@@ -31,7 +31,7 @@ export async function loadRoute(
 
         return {
             itemId: productId,
-            name: `${base.name}${layer > 0 ? ` ${layer + 1}` : ""}`,
+            name: layer > 0 ? `${base.name} ${layer + 1}` : base.name,
             lat: base.lat + layer * 0.00003,
             lng: base.lng + layer * 0.00003,
         };
