@@ -7,13 +7,7 @@ import {
     Plus,
     Sparkles,
 } from "lucide-react";
-import {
-    type MouseEvent,
-    type ReactNode,
-    useEffect,
-    useMemo,
-    useState,
-} from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ImportItemsModal, ListCard } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
@@ -237,6 +231,31 @@ const useDashboardDnD = (
         }
     };
 
+    const handleTabDragOver = (e: React.DragEvent, section: string) => {
+        if (section === "NORMAL" && draggedListId) {
+            const draggedList = lists.find((l) => l.id === draggedListId);
+            if (
+                draggedList &&
+                ["RECIPE", "FREQUENT"].includes(draggedList.category ?? "")
+            ) {
+                e.preventDefault();
+                setDragOverListId("TAB_NORMAL");
+            }
+        }
+    };
+
+    const handleTabDragLeave = () => {
+        if (dragOverListId === "TAB_NORMAL") setDragOverListId(null);
+    };
+
+    const handleTabDrop = (e: React.DragEvent, section: string) => {
+        if (section === "NORMAL" && draggedListId) {
+            e.preventDefault();
+            void handleCopyListToNormal(draggedListId);
+            setDragOverListId(null);
+        }
+    };
+
     return {
         draggedListId,
         dragOverListId,
@@ -244,6 +263,58 @@ const useDashboardDnD = (
         resetDragState,
         handleDragStart,
         handleCopyListToNormal,
+        handleTabDragOver,
+        handleTabDragLeave,
+        handleTabDrop,
+    };
+};
+
+/**
+ * Custom hook to handle list management (deletion) logic for Dashboard.
+ */
+const useDashboardListManagement = (
+    deleteList: (id: string) => Promise<boolean>,
+) => {
+    const [deleteTarget, setDeleteTarget] = useState<{
+        id: string;
+        name: string;
+    } | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const handleDeleteList = (
+        e: React.MouseEvent<HTMLButtonElement>,
+        id: string,
+        name: string,
+    ) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDeleteError(null);
+        setDeleteTarget({ id, name });
+    };
+
+    const confirmDeleteList = async (listId: string) => {
+        try {
+            if (await deleteList(listId)) {
+                setDeleteError(null);
+                setDeleteTarget(null);
+            } else {
+                setDeleteError("Failed to delete the list. Please try again.");
+            }
+        } catch (error) {
+            setDeleteError(
+                error instanceof Error ? error.message : "An error occurred",
+            );
+        }
+    };
+
+    const closeDeleteModal = () => setDeleteTarget(null);
+
+    return {
+        deleteTarget,
+        deleteError,
+        handleDeleteList,
+        confirmDeleteList,
+        closeDeleteModal,
     };
 };
 
@@ -380,16 +451,266 @@ const useDashboardImport = (
     };
 };
 
+interface DashboardHeaderProps {
+    selectedList: ShoppingList | null;
+    showAiImport: boolean;
+    listsCount: number;
+    displayMode: "split" | "tabs";
+    setDisplayMode: (mode: "split" | "tabs") => void;
+    onBack: () => void;
+    onAiImport: () => void;
+    onNewList: () => void;
+}
+
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+    selectedList,
+    showAiImport,
+    listsCount,
+    displayMode,
+    setDisplayMode,
+    onBack,
+    onAiImport,
+    onNewList,
+}) => (
+    <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
+        {selectedList || showAiImport ? (
+            <>
+                <button
+                    type="button"
+                    className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                    onClick={onBack}
+                    aria-label="Back"
+                >
+                    <ChevronLeft size={20} />
+                </button>
+                <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
+                    {showAiImport
+                        ? "AI Shopping Assistant"
+                        : selectedList?.name}
+                </h1>
+            </>
+        ) : (
+            <>
+                <div className="flex flex-col">
+                    <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
+                        My Lists
+                    </h1>
+                    <p className="text-[13px] text-text-muted mt-0.5">
+                        {`${listsCount} ${listsCount === 1 ? "list" : "lists"}`}
+                    </p>
+                </div>
+                <div className="flex items-center gap-3 max-[600px]:w-full">
+                    <div className="flex items-center bg-bg-muted border border-border rounded-md p-1 mr-2">
+                        <button
+                            type="button"
+                            onClick={() => setDisplayMode("split")}
+                            className={`p-1.5 rounded transition-all ${displayMode === "split" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
+                            title="Split View"
+                        >
+                            <Columns size={18} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setDisplayMode("tabs")}
+                            className={`p-1.5 rounded transition-all ${displayMode === "tabs" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
+                            title="Tabbed View"
+                        >
+                            <Layout size={18} />
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
+                        onClick={onAiImport}
+                    >
+                        <Sparkles size={18} className="text-accent" />
+                        AI Import
+                    </button>
+                    <button
+                        type="button"
+                        className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:flex-1 max-[600px]:justify-center"
+                        onClick={onNewList}
+                    >
+                        <Plus size={20} />
+                        New List
+                    </button>
+                </div>
+            </>
+        )}
+    </header>
+);
+
+interface DashboardTabsViewProps {
+    activeTab: "NORMAL" | "RECIPE" | "FREQUENT";
+    setActiveTab: (tab: "NORMAL" | "RECIPE" | "FREQUENT") => void;
+    groupedLists: Record<string, ShoppingList[]>;
+    sectionOrder: readonly ("NORMAL" | "RECIPE" | "FREQUENT")[];
+    sectionLabels: Record<string, string>;
+    onCardClick: (id: string) => void;
+    onDeleteList: (
+        e: React.MouseEvent<HTMLButtonElement>,
+        id: string,
+        name: string,
+    ) => void;
+    deletingListId: string | null;
+    handleDragStart: (e: React.DragEvent, id: string) => void;
+    resetDragState: () => void;
+    handleTabDragOver: (e: React.DragEvent, section: string) => void;
+    handleTabDragLeave: () => void;
+    handleTabDrop: (e: React.DragEvent, section: string) => void;
+    getTabClassName: (section: string) => string;
+}
+
+const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
+    activeTab,
+    setActiveTab,
+    groupedLists,
+    sectionOrder,
+    sectionLabels,
+    onCardClick,
+    onDeleteList,
+    deletingListId,
+    handleDragStart,
+    resetDragState,
+    handleTabDragOver,
+    handleTabDragLeave,
+    handleTabDrop,
+    getTabClassName,
+}) => (
+    <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
+            {sectionOrder.map((section) => (
+                <button
+                    key={section}
+                    type="button"
+                    onClick={() => setActiveTab(section)}
+                    onDragOver={(e) => handleTabDragOver(e, section)}
+                    onDragLeave={handleTabDragLeave}
+                    onDrop={(e) => handleTabDrop(e, section)}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${getTabClassName(section)}`}
+                >
+                    {sectionLabels[section]}
+                    <span
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                            activeTab === section
+                                ? "bg-white/20"
+                                : "bg-bg-muted text-text-muted"
+                        }`}
+                    >
+                        {groupedLists[section].length}
+                    </span>
+                </button>
+            ))}
+        </div>
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
+            {groupedLists[activeTab].map((list) => (
+                <li
+                    key={list.id}
+                    draggable={activeTab !== "NORMAL" && list.items.length > 0}
+                    onDragStart={(e) => handleDragStart(e, list.id)}
+                    onDragEnd={resetDragState}
+                    className={
+                        activeTab !== "NORMAL" && list.items.length > 0
+                            ? "cursor-grab active:cursor-grabbing"
+                            : ""
+                    }
+                >
+                    <ListCard
+                        list={list}
+                        onClick={() => onCardClick(list.id)}
+                        onDelete={(e) => onDeleteList(e, list.id, list.name)}
+                        isDeleting={deletingListId === list.id}
+                    />
+                </li>
+            ))}
+            {groupedLists[activeTab].length === 0 && (
+                <li className="col-span-full py-20 text-center text-text-muted list-none">
+                    No lists in this category
+                </li>
+            )}
+        </ul>
+    </div>
+);
+
+interface DashboardSplitViewProps {
+    groupedLists: Record<string, ShoppingList[]>;
+    sectionOrder: readonly ("NORMAL" | "RECIPE" | "FREQUENT")[];
+    sectionLabels: Record<string, string>;
+    collapsedSections: Set<string>;
+    toggleSection: (section: string) => void;
+    draggedListId: string | null;
+    dragOverListId: string | null;
+    setDragOverListId: (id: string | null) => void;
+    handleDragStart: (e: React.DragEvent, id: string) => void;
+    resetDragState: () => void;
+    handleDropOnNormalList: (
+        targetListId: string,
+        draggedListId: string | null,
+    ) => void;
+    onCardClick: (id: string) => void;
+    onDeleteList: (
+        e: React.MouseEvent<HTMLButtonElement>,
+        id: string,
+        name: string,
+    ) => void;
+    deletingListId: string | null;
+}
+
+const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
+    groupedLists,
+    sectionOrder,
+    sectionLabels,
+    collapsedSections,
+    toggleSection,
+    draggedListId,
+    dragOverListId,
+    setDragOverListId,
+    handleDragStart,
+    resetDragState,
+    handleDropOnNormalList,
+    onCardClick,
+    onDeleteList,
+    deletingListId,
+}) => (
+    <div className="flex flex-col gap-8 pb-4">
+        {sectionOrder.map((section) => (
+            <ListCategorySection
+                key={section}
+                section={section}
+                label={sectionLabels[section]}
+                lists={groupedLists[section]}
+                isCollapsed={collapsedSections.has(section)}
+                onToggle={() => toggleSection(section)}
+                onDragStart={handleDragStart}
+                onDragEnd={resetDragState}
+                onDragOver={(e, id) => {
+                    if (section !== "NORMAL") return;
+                    if (!draggedListId || draggedListId === id) return;
+                    e.preventDefault();
+                    setDragOverListId(id);
+                }}
+                onDragLeave={(id) => {
+                    if (dragOverListId === id) setDragOverListId(null);
+                }}
+                onDrop={(e, id) => {
+                    if (section !== "NORMAL") return;
+                    e.preventDefault();
+                    handleDropOnNormalList(id, draggedListId);
+                }}
+                dragOverListId={dragOverListId}
+                onCardClick={onCardClick}
+                onDeleteList={onDeleteList}
+                deletingListId={deletingListId}
+            />
+        ))}
+    </div>
+);
+
 /**
  * Main dashboard component that displays the user's shopping lists.
  */
 const Dashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [deleteTarget, setDeleteTarget] = useState<{
-        id: string;
-        name: string;
-    } | null>(null);
-    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const {
         lists,
@@ -424,8 +745,18 @@ const Dashboard = () => {
         setDragOverListId,
         resetDragState,
         handleDragStart,
-        handleCopyListToNormal,
+        handleTabDragOver,
+        handleTabDragLeave,
+        handleTabDrop,
     } = useDashboardDnD(lists, addItem, addList, setActiveTab);
+
+    const {
+        deleteTarget,
+        deleteError,
+        handleDeleteList,
+        confirmDeleteList,
+        closeDeleteModal,
+    } = useDashboardListManagement(deleteList);
 
     const {
         importSourceList,
@@ -486,31 +817,6 @@ const Dashboard = () => {
 
     const handleCardClick = (listId: string) =>
         setSearchParams({ list: listId });
-    const handleDeleteList = (
-        e: MouseEvent<HTMLButtonElement>,
-        id: string,
-        name: string,
-    ) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDeleteError(null);
-        setDeleteTarget({ id, name });
-    };
-
-    const confirmDeleteList = async (listId: string) => {
-        try {
-            if (await deleteList(listId)) {
-                setDeleteError(null);
-                setDeleteTarget(null);
-            } else {
-                setDeleteError("Failed to delete the list. Please try again.");
-            }
-        } catch (error) {
-            setDeleteError(
-                error instanceof Error ? error.message : "An error occurred",
-            );
-        }
-    };
 
     const clearImport = () =>
         setSearchParams((prev) => {
@@ -526,126 +832,6 @@ const Dashboard = () => {
             return "bg-accent-subtle text-accent ring-2 ring-accent";
         return "text-text-muted hover:text-text-strong hover:bg-bg-muted";
     };
-
-    const handleTabDragOver = (e: React.DragEvent, section: string) => {
-        if (section === "NORMAL" && draggedListId) {
-            const draggedList = lists.find((l) => l.id === draggedListId);
-            if (
-                draggedList &&
-                ["RECIPE", "FREQUENT"].includes(draggedList.category ?? "")
-            ) {
-                e.preventDefault();
-                setDragOverListId("TAB_NORMAL");
-            }
-        }
-    };
-
-    const handleTabDragLeave = () => {
-        if (dragOverListId === "TAB_NORMAL") setDragOverListId(null);
-    };
-
-    const handleTabDrop = (e: React.DragEvent, section: string) => {
-        if (section === "NORMAL" && draggedListId) {
-            e.preventDefault();
-            void handleCopyListToNormal(draggedListId);
-            setDragOverListId(null);
-        }
-    };
-
-    const renderTabsView = (): ReactNode => (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
-                {sectionOrder.map((section) => (
-                    <button
-                        key={section}
-                        type="button"
-                        onClick={() => setActiveTab(section)}
-                        onDragOver={(e) => handleTabDragOver(e, section)}
-                        onDragLeave={handleTabDragLeave}
-                        onDrop={(e) => handleTabDrop(e, section)}
-                        className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${getTabClassName(section)}`}
-                    >
-                        {sectionLabels[section]}
-                        <span
-                            className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                                activeTab === section
-                                    ? "bg-white/20"
-                                    : "bg-bg-muted text-text-muted"
-                            }`}
-                        >
-                            {groupedLists[section].length}
-                        </span>
-                    </button>
-                ))}
-            </div>
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
-                {groupedLists[activeTab].map((list) => (
-                    <li
-                        key={list.id}
-                        draggable={
-                            activeTab !== "NORMAL" && list.items.length > 0
-                        }
-                        onDragStart={(e) => handleDragStart(e, list.id)}
-                        onDragEnd={resetDragState}
-                        className={
-                            activeTab !== "NORMAL" && list.items.length > 0
-                                ? "cursor-grab active:cursor-grabbing"
-                                : ""
-                        }
-                    >
-                        <ListCard
-                            list={list}
-                            onClick={() => handleCardClick(list.id)}
-                            onDelete={(e) =>
-                                handleDeleteList(e, list.id, list.name)
-                            }
-                            isDeleting={deletingListId === list.id}
-                        />
-                    </li>
-                ))}
-                {groupedLists[activeTab].length === 0 && (
-                    <li className="col-span-full py-20 text-center text-text-muted list-none">
-                        No lists in this category
-                    </li>
-                )}
-            </ul>
-        </div>
-    );
-
-    const renderSplitView = (): ReactNode => (
-        <div className="flex flex-col gap-8 pb-4">
-            {sectionOrder.map((section) => (
-                <ListCategorySection
-                    key={section}
-                    section={section}
-                    label={sectionLabels[section]}
-                    lists={groupedLists[section]}
-                    isCollapsed={collapsedSections.has(section)}
-                    onToggle={() => toggleSection(section)}
-                    onDragStart={handleDragStart}
-                    onDragEnd={resetDragState}
-                    onDragOver={(e, id) => {
-                        if (section !== "NORMAL") return;
-                        if (!draggedListId || draggedListId === id) return;
-                        e.preventDefault();
-                        setDragOverListId(id);
-                    }}
-                    onDragLeave={(id) => {
-                        if (dragOverListId === id) setDragOverListId(null);
-                    }}
-                    onDrop={(e, id) => {
-                        if (section !== "NORMAL") return;
-                        e.preventDefault();
-                        handleDropOnNormalList(id, draggedListId);
-                    }}
-                    dragOverListId={dragOverListId}
-                    onCardClick={handleCardClick}
-                    onDeleteList={handleDeleteList}
-                    deletingListId={deletingListId}
-                />
-            ))}
-        </div>
-    );
 
     const renderDashboardContent = (): ReactNode => {
         if (isLoading && !(isModalOpen || showAiImport)) {
@@ -678,15 +864,47 @@ const Dashboard = () => {
         }
 
         if (hasGroupedLists) {
-            return displayMode === "tabs"
-                ? renderTabsView()
-                : renderSplitView();
+            return displayMode === "tabs" ? (
+                <DashboardTabsView
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    groupedLists={groupedLists}
+                    sectionOrder={sectionOrder}
+                    sectionLabels={sectionLabels}
+                    onCardClick={handleCardClick}
+                    onDeleteList={handleDeleteList}
+                    deletingListId={deletingListId}
+                    handleDragStart={handleDragStart}
+                    resetDragState={resetDragState}
+                    handleTabDragOver={handleTabDragOver}
+                    handleTabDragLeave={handleTabDragLeave}
+                    handleTabDrop={handleTabDrop}
+                    getTabClassName={getTabClassName}
+                />
+            ) : (
+                <DashboardSplitView
+                    groupedLists={groupedLists}
+                    sectionOrder={sectionOrder}
+                    sectionLabels={sectionLabels}
+                    collapsedSections={collapsedSections}
+                    toggleSection={toggleSection}
+                    draggedListId={draggedListId}
+                    dragOverListId={dragOverListId}
+                    setDragOverListId={setDragOverListId}
+                    handleDragStart={handleDragStart}
+                    resetDragState={resetDragState}
+                    handleDropOnNormalList={handleDropOnNormalList}
+                    onCardClick={handleCardClick}
+                    onDeleteList={handleDeleteList}
+                    deletingListId={deletingListId}
+                />
+            );
         }
 
         return (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
                 {lists.map((list) => (
-                    <div key={list.id}>
+                    <li key={list.id} className="list-none">
                         <ListCard
                             list={list}
                             onClick={() => handleCardClick(list.id)}
@@ -695,90 +913,30 @@ const Dashboard = () => {
                             }
                             isDeleting={deletingListId === list.id}
                         />
-                    </div>
+                    </li>
                 ))}
-            </div>
+            </ul>
         );
     };
 
     return (
         <div className="flex flex-col bg-bg h-full overflow-hidden">
-            <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
-                {selectedList || showAiImport ? (
-                    <>
-                        <button
-                            type="button"
-                            className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-                            onClick={
-                                showAiImport
-                                    ? clearImport
-                                    : () => setSearchParams({})
-                            }
-                            aria-label="Back"
-                        >
-                            <ChevronLeft size={20} />
-                        </button>
-                        <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
-                            {showAiImport
-                                ? "AI Shopping Assistant"
-                                : selectedList?.name}
-                        </h1>
-                    </>
-                ) : (
-                    <>
-                        <div className="flex flex-col">
-                            <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
-                                My Lists
-                            </h1>
-                            <p className="text-[13px] text-text-muted mt-0.5">
-                                {`${lists.length} ${lists.length === 1 ? "list" : "lists"}`}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3 max-[600px]:w-full">
-                            <div className="flex items-center bg-bg-muted border border-border rounded-md p-1 mr-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setDisplayMode("split")}
-                                    className={`p-1.5 rounded transition-all ${displayMode === "split" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
-                                    title="Split View"
-                                >
-                                    <Columns size={18} />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setDisplayMode("tabs")}
-                                    className={`p-1.5 rounded transition-all ${displayMode === "tabs" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
-                                    title="Tabbed View"
-                                >
-                                    <Layout size={18} />
-                                </button>
-                            </div>
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
-                                onClick={() =>
-                                    setSearchParams((prev) => {
-                                        const next = new URLSearchParams(prev);
-                                        next.set("import", "ai");
-                                        return next;
-                                    })
-                                }
-                            >
-                                <Sparkles size={18} className="text-accent" />
-                                AI Import
-                            </button>
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:flex-1 max-[600px]:justify-center"
-                                onClick={openModal}
-                            >
-                                <Plus size={20} />
-                                New List
-                            </button>
-                        </div>
-                    </>
-                )}
-            </header>
+            <DashboardHeader
+                selectedList={selectedList}
+                showAiImport={showAiImport}
+                listsCount={lists.length}
+                displayMode={displayMode}
+                setDisplayMode={setDisplayMode}
+                onBack={showAiImport ? clearImport : () => setSearchParams({})}
+                onAiImport={() =>
+                    setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.set("import", "ai");
+                        return next;
+                    })
+                }
+                onNewList={openModal}
+            />
 
             <main
                 className={`flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 ${showAiImport ? "overflow-hidden flex flex-col" : "overflow-y-auto scrollbar-thin"}`}
@@ -793,7 +951,7 @@ const Dashboard = () => {
                     listName={deleteTarget.name}
                     isDeleting={deletingListId === deleteTarget.id}
                     error={deleteError}
-                    onCancel={() => setDeleteTarget(null)}
+                    onCancel={closeDeleteModal}
                     onConfirm={confirmDeleteList}
                 />
             )}
@@ -805,9 +963,7 @@ const Dashboard = () => {
                 targetList={importTargetList}
                 selectedItemIds={selectedImportItemIds}
                 onToggleItem={toggleImportItem}
-                onConfirm={() => {
-                    void confirmImportSelection();
-                }}
+                onConfirm={confirmImportSelection}
                 isSubmitting={isImportingItems}
             />
         </div>
