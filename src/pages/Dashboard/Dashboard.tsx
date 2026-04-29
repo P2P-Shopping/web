@@ -7,157 +7,13 @@ import {
     useState,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ListCard, Modal } from "../../components";
+import { ImportItemsModal, ListCard } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
-import type { ShoppingList } from "../../types";
+import { buildItemDuplicateKey } from "../../utils/listUtils";
 import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
-
-const buildItemDuplicateKey = (item: { name?: string; brand?: string }) =>
-    `${item.name?.trim().toLowerCase() ?? ""}::${item.brand?.trim().toLowerCase() ?? ""}`;
-
-interface ImportSelectionModalProps {
-    isOpen: boolean;
-    sourceList: ShoppingList | null;
-    targetList: ShoppingList | null;
-    selectedItemIds: Set<string>;
-    isSubmitting: boolean;
-    onClose: () => void;
-    onToggleItem: (itemId: string) => void;
-    onConfirm: () => void;
-}
-
-const ImportSelectionModal = ({
-    isOpen,
-    sourceList,
-    targetList,
-    selectedItemIds,
-    isSubmitting,
-    onClose,
-    onToggleItem,
-    onConfirm,
-}: ImportSelectionModalProps) => {
-    const existingKeys = new Set(
-        (targetList?.items ?? []).map((item) => buildItemDuplicateKey(item)),
-    );
-    const sourceItems = sourceList?.items ?? [];
-    const eligibleItems = sourceItems.filter(
-        (item) => !existingKeys.has(buildItemDuplicateKey(item)),
-    );
-    const selectedCount = eligibleItems.filter((item) =>
-        selectedItemIds.has(item.id),
-    ).length;
-
-    return (
-        <Modal
-            isOpen={isOpen}
-            onClose={onClose}
-            title="Add items to this list"
-            subtitle={
-                sourceList && targetList
-                    ? `Choose which items from "${sourceList.name}" to add to "${targetList.name}".`
-                    : undefined
-            }
-            maxWidth="720px"
-        >
-            <div className="flex flex-col gap-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-bg-subtle px-4 py-3">
-                    <p className="text-sm text-text-muted">
-                        <span className="font-semibold text-text-strong">
-                            {eligibleItems.length}
-                        </span>{" "}
-                        available to add.{" "}
-                        <span className="font-semibold text-text-strong">
-                            {sourceItems.length - eligibleItems.length}
-                        </span>{" "}
-                        already exist in the target list.
-                    </p>
-                </div>
-
-                <div className="max-h-[360px] overflow-y-auto rounded-2xl border border-border bg-bg-subtle p-3">
-                    <div className="flex flex-col gap-2">
-                        {sourceItems.map((item) => {
-                            const isDuplicate = existingKeys.has(
-                                buildItemDuplicateKey(item),
-                            );
-                            const isSelected = selectedItemIds.has(item.id);
-
-                            return (
-                                <label
-                                    key={item.id}
-                                    className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition-all ${
-                                        isDuplicate
-                                            ? "cursor-not-allowed border-border bg-bg-muted opacity-60"
-                                            : "cursor-pointer border-border bg-surface hover:border-accent"
-                                    }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={isSelected && !isDuplicate}
-                                        onChange={() => onToggleItem(item.id)}
-                                        disabled={isDuplicate}
-                                        className="mt-1 h-4 w-4 rounded border-border"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-semibold text-text-strong">
-                                                {item.name}
-                                            </span>
-                                            {item.brand && (
-                                                <span className="rounded-full bg-accent-subtle px-2 py-0.5 text-[11px] font-semibold text-accent">
-                                                    {item.brand}
-                                                </span>
-                                            )}
-                                            {isDuplicate && (
-                                                <span className="rounded-full bg-bg-muted px-2 py-0.5 text-[11px] font-semibold text-text-muted">
-                                                    Already in target
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-text-muted">
-                                            {item.quantity && (
-                                                <span>{item.quantity}</span>
-                                            )}
-                                            {item.category && (
-                                                <span>{item.category}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </label>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-text-muted">
-                        {selectedCount} item{selectedCount === 1 ? "" : "s"}{" "}
-                        selected.
-                    </p>
-                    <div className="flex gap-3">
-                        <button
-                            type="button"
-                            className="rounded-lg border border-border bg-bg-muted px-4 py-2.5 text-sm font-semibold text-text-strong transition-all hover:bg-border"
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                            onClick={onConfirm}
-                            disabled={selectedCount === 0 || isSubmitting}
-                        >
-                            {isSubmitting ? "Adding..." : "Add selected"}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </Modal>
-    );
-};
 
 /**
  * Main dashboard component that displays the user's shopping lists.
@@ -492,23 +348,10 @@ const Dashboard = () => {
                                 )}
                             </div>
 
-                            <div className="flex flex-col gap-4">
+                            <ul className="flex flex-col gap-4">
                                 {sectionLists.map((list) => (
-                                    <div
+                                    <li
                                         key={list.id}
-                                        // Folosim role="listitem" dacă e într-o listă,
-                                        // sau lăsăm interactivitatea pe ListCard
-                                        role="button"
-                                        tabIndex={0}
-                                        onKeyDown={(e) => {
-                                            if (
-                                                e.key === "Enter" ||
-                                                e.key === " "
-                                            ) {
-                                                e.preventDefault();
-                                                handleCardClick(list.id);
-                                            }
-                                        }}
                                         draggable={
                                             section !== "NORMAL" &&
                                             list.items.length > 0
@@ -564,9 +407,9 @@ const Dashboard = () => {
                                                 deletingListId === list.id
                                             }
                                         />
-                                    </div>
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         </section>
                     );
                 })}
@@ -648,17 +491,18 @@ const Dashboard = () => {
                     onConfirm={confirmDeleteList}
                 />
             )}
-            <ImportSelectionModal
+            <ImportItemsModal
                 isOpen={Boolean(importSourceList && importTargetList)}
-                sourceList={importSourceList}
+                onClose={clearImportSelection}
+                sourceListName={importSourceList?.name}
+                sourceItems={importSourceList?.items ?? []}
                 targetList={importTargetList}
                 selectedItemIds={selectedImportItemIds}
-                isSubmitting={isImportingItems}
-                onClose={clearImportSelection}
                 onToggleItem={toggleImportItem}
                 onConfirm={() => {
                     void confirmImportSelection();
                 }}
+                isSubmitting={isImportingItems}
             />
         </div>
     );

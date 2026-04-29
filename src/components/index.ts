@@ -1,5 +1,6 @@
 export { default as Card } from "./Card/Card";
 export { default as ListCard } from "./Card/ListCard";
+export { default as ImportItemsModal } from "./ImportItemsModal/ImportItemsModal";
 export { default as Modal } from "./Modal/Modal";
 export { default as Navbar } from "./Navbar/Navbar";
 export * from "./OfflineBanner/OfflineBanner";
