@@ -44,6 +44,12 @@ export const useNetworkState = (): void => {
         const ping = async () => {
             if (telemetryAuthInvalidRef.current) return;
 
+            if (!useStore.getState().hasEnteredStore) {
+                // If not in the store, just wait for the next cycle
+                schedulePing(BASE_DELAY);
+                return;
+            }
+
             if (!navigator.onLine) {
                 // Pause the loop. It will be resumed by the 'online' event listener.
                 return;
