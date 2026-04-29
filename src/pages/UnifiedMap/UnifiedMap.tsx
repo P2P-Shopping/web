@@ -187,7 +187,7 @@ const UnifiedMap: React.FC = () => {
 
     useEffect(() => {
         // Automatic geofence transitions disabled per user request
-    }, [userLocation, targetStoreLocation, navigationMode, setNavigationMode]);
+    }, []);
 
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
@@ -378,7 +378,6 @@ const UnifiedMap: React.FC = () => {
         fetchFootprint();
     }, [activeTarget]);
 
-
     return (
         <div className="flex flex-col h-full overflow-hidden bg-bg">
             <div className="relative flex-1 overflow-hidden">
@@ -386,120 +385,135 @@ const UnifiedMap: React.FC = () => {
                     <StoreMap />
                 ) : (
                     <MapContainer
-                    center={[userLocation.lat, userLocation.lng]}
-                    zoom={14}
-                    style={{ height: "100%", width: "100%", background: "var(--color-bg)" }}
-                    zoomControl={false}
-                >
-                    {/* 
+                        center={[userLocation.lat, userLocation.lng]}
+                        zoom={14}
+                        style={{
+                            height: "100%",
+                            width: "100%",
+                            background: "var(--color-bg)",
+                        }}
+                        zoomControl={false}
+                    >
+                        {/* 
                       NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request. 
                       Re-enable the TileLayer below to show the real-world map again.
                     */}
-                    {/* <TileLayer
+                        {/* <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     /> */}
-                    <MapEvents />
-                    <MapController
-                        center={[userLocation.lat, userLocation.lng]}
-                        isMicroView={isMicroView}
-                    />
-
-                    {!targetStoreLocation &&
-                        recommendedStores.map((store) => (
-                            <Marker
-                                key={store.id}
-                                position={[store.lat, store.lng]}
-                                icon={L.divIcon({
-                                    className: "store-marker",
-                                    html: `<div style="color: var(--color-accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
-                                    iconSize: [24, 24],
-                                    iconAnchor: [12, 24],
-                                })}
-                            >
-                                <Popup>{store.name}</Popup>
-                            </Marker>
-                        ))}
-
-                    {targetStoreLocation && (
-                        <>
-                            <Circle
-                                center={[activeTarget.lat, activeTarget.lng]}
-                                radius={GEOFENCE_RADIUS_METERS}
-                                pathOptions={{
-                                    color: isMicroView
-                                        ? "var(--color-green-neon)"
-                                        : "var(--color-accent)",
-                                    fillOpacity: 0.1,
-                                    dashArray: "5, 10",
-                                }}
-                            />
-                            <Polygon
-                                positions={footprint}
-                                pathOptions={{
-                                    color: "var(--color-accent)",
-                                    fillColor: "var(--color-accent-subtle)",
-                                    fillOpacity: isMicroView ? 0.3 : 0.1,
-                                    weight: 2,
-                                }}
-                            />
-                            <Marker
-                                position={[activeTarget.lat, activeTarget.lng]}
-                                icon={L.divIcon({
-                                    className: "target-store-icon",
-                                    html: `<div style="color: var(--color-accent);"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
-                                    iconSize: [32, 32],
-                                    iconAnchor: [16, 32],
-                                })}
-                            />
-                        </>
-                    )}
-
-                    {targetStoreLocation && !isMicroView && (
-                        <Polyline
-                            positions={[
-                                [userLocation.lat, userLocation.lng],
-                                [activeTarget.lat, activeTarget.lng],
-                            ]}
-                            pathOptions={{
-                                color: "var(--color-blue-neon)",
-                                weight: 3,
-                                dashArray: "10, 10",
-                            }}
+                        <MapEvents />
+                        <MapController
+                            center={[userLocation.lat, userLocation.lng]}
+                            isMicroView={isMicroView}
                         />
-                    )}
 
-                    {isMicroView && route.length > 0 && (
-                        <>
+                        {!targetStoreLocation &&
+                            recommendedStores.map((store) => (
+                                <Marker
+                                    key={store.id}
+                                    position={[store.lat, store.lng]}
+                                    icon={L.divIcon({
+                                        className: "store-marker",
+                                        html: `<div style="color: var(--color-accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
+                                        iconSize: [24, 24],
+                                        iconAnchor: [12, 24],
+                                    })}
+                                >
+                                    <Popup>{store.name}</Popup>
+                                </Marker>
+                            ))}
+
+                        {targetStoreLocation && (
+                            <>
+                                <Circle
+                                    center={[
+                                        activeTarget.lat,
+                                        activeTarget.lng,
+                                    ]}
+                                    radius={GEOFENCE_RADIUS_METERS}
+                                    pathOptions={{
+                                        color: isMicroView
+                                            ? "var(--color-green-neon)"
+                                            : "var(--color-accent)",
+                                        fillOpacity: 0.1,
+                                        dashArray: "5, 10",
+                                    }}
+                                />
+                                <Polygon
+                                    positions={footprint}
+                                    pathOptions={{
+                                        color: "var(--color-accent)",
+                                        fillColor: "var(--color-accent-subtle)",
+                                        fillOpacity: isMicroView ? 0.3 : 0.1,
+                                        weight: 2,
+                                    }}
+                                />
+                                <Marker
+                                    position={[
+                                        activeTarget.lat,
+                                        activeTarget.lng,
+                                    ]}
+                                    icon={L.divIcon({
+                                        className: "target-store-icon",
+                                        html: `<div style="color: var(--color-accent);"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
+                                        iconSize: [32, 32],
+                                        iconAnchor: [16, 32],
+                                    })}
+                                />
+                            </>
+                        )}
+
+                        {targetStoreLocation && !isMicroView && (
                             <Polyline
                                 positions={[
                                     [userLocation.lat, userLocation.lng],
-                                    ...route.map(
-                                        (p) =>
-                                            [p.lat, p.lng] as [number, number],
-                                    ),
+                                    [activeTarget.lat, activeTarget.lng],
                                 ]}
                                 pathOptions={{
-                                    color: "var(--color-green-neon)",
-                                    weight: 4,
+                                    color: "var(--color-blue-neon)",
+                                    weight: 3,
+                                    dashArray: "10, 10",
                                 }}
                             />
-                            {route.map((point, idx) => (
-                                <Marker
-                                    key={point.itemId}
-                                    position={[point.lat, point.lng]}
-                                    icon={L.divIcon({
-                                        className: "route-idx",
-                                        html: `<div style="background: var(--color-accent); color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 2px solid white; font-size: 10px;">${idx + 1}</div>`,
-                                        iconSize: [22, 22],
-                                        iconAnchor: [11, 11],
-                                    })}
+                        )}
+
+                        {isMicroView && route.length > 0 && (
+                            <>
+                                <Polyline
+                                    positions={[
+                                        [userLocation.lat, userLocation.lng],
+                                        ...route.map(
+                                            (p) =>
+                                                [p.lat, p.lng] as [
+                                                    number,
+                                                    number,
+                                                ],
+                                        ),
+                                    ]}
+                                    pathOptions={{
+                                        color: "var(--color-green-neon)",
+                                        weight: 4,
+                                    }}
                                 />
-                            ))}
-                        </>
-                    )}
-                    <Marker position={[userLocation.lat, userLocation.lng]} />
-                </MapContainer>
+                                {route.map((point, idx) => (
+                                    <Marker
+                                        key={point.itemId}
+                                        position={[point.lat, point.lng]}
+                                        icon={L.divIcon({
+                                            className: "route-idx",
+                                            html: `<div style="background: var(--color-accent); color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 2px solid white; font-size: 10px;">${idx + 1}</div>`,
+                                            iconSize: [22, 22],
+                                            iconAnchor: [11, 11],
+                                        })}
+                                    />
+                                ))}
+                            </>
+                        )}
+                        <Marker
+                            position={[userLocation.lat, userLocation.lng]}
+                        />
+                    </MapContainer>
                 )}
 
                 {isSidebarExpanded && (
@@ -843,10 +857,7 @@ const UnifiedMap: React.FC = () => {
                             onClick={handleForceIndoor}
                             className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95"
                         >
-                            <Maximize2
-                                size={14}
-                                className="text-green-500"
-                            />
+                            <Maximize2 size={14} className="text-green-500" />
                             Force Indoor
                         </button>
                     )}
@@ -885,7 +896,9 @@ const UnifiedMap: React.FC = () => {
                             <ListIcon size={20} />
                         )}
                         <span className="hidden sm:inline">
-                            {isSidebarExpanded ? "Close Panel" : "Route Planner"}
+                            {isSidebarExpanded
+                                ? "Close Panel"
+                                : "Route Planner"}
                         </span>
                     </button>
                 </div>

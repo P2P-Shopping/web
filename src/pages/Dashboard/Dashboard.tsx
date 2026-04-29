@@ -373,7 +373,7 @@ const Dashboard = () => {
         );
     } else if (showAiImport) {
         mainContent = (
-            <div className="max-w-[800px] mx-auto w-full h-[calc(100vh-130px)]">
+            <div className="max-w-[800px] mx-auto w-full flex-1 flex flex-col min-h-0">
                 <AiImportModal onClose={clearImport} />
             </div>
         );
@@ -647,7 +647,7 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="flex flex-col bg-bg h-screen overflow-hidden">
+        <div className="flex flex-col bg-bg h-full overflow-hidden">
             <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
                 {selectedList || showAiImport ? (
                     <>
@@ -723,7 +723,9 @@ const Dashboard = () => {
                 )}
             </header>
 
-            <main className="flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 overflow-y-auto scrollbar-thin">
+            <main
+                className={`flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 ${showAiImport ? "overflow-hidden flex flex-col" : "overflow-y-auto scrollbar-thin"}`}
+            >
                 {mainContent}
             </main>
 

@@ -1,11 +1,11 @@
 import {
+    ArrowLeft,
     List,
     LocateFixed,
     Navigation,
     X,
     ZoomIn,
     ZoomOut,
-    ArrowLeft,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -742,8 +742,10 @@ const StoreMap: React.FC = () => {
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
                     <div className="px-6 py-4 flex items-center justify-between border-b border-border min-[1000px]:pt-8">
-                        <h3 className="text-lg font-black uppercase tracking-tight">Shopping List</h3>
-                        <button 
+                        <h3 className="text-lg font-black uppercase tracking-tight">
+                            Shopping List
+                        </h3>
+                        <button
                             type="button"
                             onClick={() => setIsSidebarExpanded(false)}
                             className="p-2 text-text-muted hover:text-accent transition-colors"
