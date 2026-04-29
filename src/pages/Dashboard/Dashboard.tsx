@@ -18,6 +18,8 @@ import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
 
+type TabType = "NORMAL" | "RECIPE" | "FREQUENT";
+
 // --- Sub-components for Dashboard ---
 
 interface DashboardEmptyStateProps {
@@ -164,7 +166,7 @@ const useDashboardDnD = (
         name: string,
         category?: ListCategory,
     ) => Promise<ShoppingList | null>,
-    setActiveTab: (tab: "NORMAL" | "RECIPE" | "FREQUENT") => void,
+    setActiveTab: (tab: TabType) => void,
 ) => {
     const [draggedListId, setDraggedListId] = useState<string | null>(null);
     const [dragOverListId, setDragOverListId] = useState<string | null>(null);
@@ -541,10 +543,10 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 );
 
 interface DashboardTabsViewProps {
-    activeTab: "NORMAL" | "RECIPE" | "FREQUENT";
-    setActiveTab: (tab: "NORMAL" | "RECIPE" | "FREQUENT") => void;
+    activeTab: TabType;
+    setActiveTab: (tab: TabType) => void;
     groupedLists: Record<string, ShoppingList[]>;
-    sectionOrder: readonly ("NORMAL" | "RECIPE" | "FREQUENT")[];
+    sectionOrder: readonly TabType[];
     sectionLabels: Record<string, string>;
     onCardClick: (id: string) => void;
     onDeleteList: (
@@ -634,7 +636,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
 
 interface DashboardSplitViewProps {
     groupedLists: Record<string, ShoppingList[]>;
-    sectionOrder: readonly ("NORMAL" | "RECIPE" | "FREQUENT")[];
+    sectionOrder: readonly TabType[];
     sectionLabels: Record<string, string>;
     collapsedSections: Set<string>;
     toggleSection: (section: string) => void;
@@ -732,9 +734,7 @@ const Dashboard = () => {
                 | "tabs") || "split"
         );
     });
-    const [activeTab, setActiveTab] = useState<
-        "NORMAL" | "RECIPE" | "FREQUENT"
-    >("NORMAL");
+    const [activeTab, setActiveTab] = useState<TabType>("NORMAL");
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
         new Set(),
     );
