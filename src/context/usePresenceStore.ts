@@ -8,6 +8,7 @@ export interface PresenceEvent {
     username: string;
     eventType: PresenceEventType;
     listId: string;
+    activeUsers?: string[];
 }
 
 /**
@@ -45,9 +46,12 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
     typingUsers: {},
 
     handlePresenceEvent: (event: PresenceEvent) => {
-        const { username, eventType } = event;
+        const { username, eventType, activeUsers } = event;
 
-        if (eventType === "JOIN") {
+        // CRITICAL: Handle the server-authoritative roster overwrite
+        if (eventType === "ROSTER_UPDATE" && activeUsers) {
+            set({ activeUsers: new Set(activeUsers) });
+        } else if (eventType === "JOIN") {
             set((state) => {
                 const newSet = new Set(state.activeUsers);
                 newSet.add(username);

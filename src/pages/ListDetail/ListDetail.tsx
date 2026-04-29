@@ -273,23 +273,41 @@ const useListItems = (effectiveListId: string | undefined) => {
         (message: { body: string }) => {
             try {
                 const payload = JSON.parse(message.body) as SyncPayload;
-                console.debug("[ws] list sync received", payload);
-                if (payload.action === "CHECK_OFF" && payload.itemId) {
-                    setItems((prev) =>
-                        prev.map((item) =>
-                            item.id === payload.itemId
-                                ? { ...item, checked: Boolean(payload.checked) }
-                                : item,
-                        ),
-                    );
-                } else if (payload.action === "ADD" && payload.itemId) {
-                    fetchListData();
-                }
+                
+                setItems((prev) => {
+                    let next = prev;
+                    
+                    if (payload.action === "CHECK_OFF" && payload.itemId) {
+                        next = prev.map((item) =>
+                            item.id === payload.itemId ? { ...item, checked: Boolean(payload.checked) } : item
+                        );
+                    } else if (payload.action === "DELETE" && payload.itemId) {
+                        next = prev.filter((item) => item.id !== payload.itemId);
+                    } else if (payload.action === "ADD" && payload.content) {
+                        try {
+                            const newItem = JSON.parse(payload.content) as Item;
+                            // Prevent duplicates if the creator receives their own echo
+                            if (!prev.some((i) => i.id === newItem.id)) {
+                                next = [...prev, newItem];
+                            }
+                        } catch (e) {
+                            console.error("Failed to parse incoming ADD item JSON", e);
+                        }
+                    }
+
+                    // CRITICAL FIX: Synchronize the new local state up to the global Zustand store
+                    // This prevents the global store from overriding our real-time WebSocket updates
+                    if (next !== prev) {
+                        syncListItemsInStore(next);
+                    }
+                    
+                    return next;
+                });
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [fetchListData],
+        [syncListItemsInStore] // Stable dependency prevents STOMP subscription churn
     );
 
     useEffect(() => {
@@ -403,7 +421,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 const syncPayload: SyncPayload = {
                     action: "ADD",
                     itemId: createdItem.id,
-                    content: createdItem.name,
+                    content: JSON.stringify(createdItem),
                     timestamp: Date.now(),
                 };
                 stompClient.publish({
@@ -521,6 +539,13 @@ const useListItems = (effectiveListId: string | undefined) => {
 
         try {
             await api.delete(`/api/items/${itemId}`);
+
+            if (effectiveListId && stompClient.connected) {
+                stompClient.publish({
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify({ action: "DELETE", itemId, timestamp: Date.now() }),
+                });
+            }
         } catch (err) {
             if (!navigator.onLine) {
                 useStore.getState().enqueueAction({
@@ -564,6 +589,7 @@ const useListItems = (effectiveListId: string | undefined) => {
 
 /**
  * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
+ * Migrated to a server-authoritative roster model to fix late-arrival sync issues.
  */
 const useListPresence = (effectiveListId: string | undefined) => {
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
@@ -581,7 +607,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 console.error("Failed to parse presence message:", err);
             }
         },
-        [handlePresenceEvent],
+        [handlePresenceEvent]
     );
 
     useEffect(() => {
@@ -606,12 +632,15 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 username,
                 listId: effectiveListId,
             };
+            
+            // Notify server that we joined. 
+            // The server will respond by broadcasting a ROSTER_UPDATE to all clients.
             stompClient.publish({
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
             });
+            
             console.debug("[ws] sent presence JOIN", joinEvent);
-            handlePresenceEvent(joinEvent);
         }
 
         return () => {
@@ -624,11 +653,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                         listId: effectiveListId,
                     }),
                 });
-                console.debug("[ws] sent presence LEAVE", {
-                    eventType: "LEAVE",
-                    username,
-                    listId: effectiveListId,
-                });
+                console.debug("[ws] sent presence LEAVE", username);
             }
             presenceSubscription?.unsubscribe();
             clearPresence();
@@ -666,11 +691,9 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(typingEvent),
             });
-            console.debug("[ws] sent presence TYPING", typingEvent);
-            handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, handlePresenceEvent, user?.email]);
+    }, [effectiveListId, user?.email]);
 
     return { sendTypingEvent };
 };

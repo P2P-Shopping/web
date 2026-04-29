@@ -65,9 +65,8 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
 
     if (variant === "avatars") {
         // Combine all users and active users to determine full list
-        // If allUsers is provided, we use it as the base.
-        const baseUsers = allUsers.length > 0 ? allUsers : activeArray;
-
+        const baseUsers = Array.from(new Set([...allUsers, ...activeArray]));
+        
         if (baseUsers.length === 0) return null;
 
         return (
