@@ -12,26 +12,8 @@ interface ShareListModalProps {
 const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
     const [email, setEmail] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
-    const [errorMessage, setErrorMessage] = useState("");
+    const [error, setError] = useState("");
     const { shareList } = useListsStore();
-
-    const submitButtonContent = (() => {
-        if (isSubmitting) {
-            return (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            );
-        }
-
-        if (status === "success") return "Shared!";
-
-        return (
-            <>
-                <Send size={16} />
-                Send Invite
-            </>
-        );
-    })();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -39,24 +21,16 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
         if (!trimmedEmail) return;
 
         setIsSubmitting(true);
-        setStatus("idle");
+        setError("");
         try {
             const success = await shareList(listId, trimmedEmail);
             if (success) {
-                setStatus("success");
-                setEmail("");
-                setTimeout(() => {
-                    onClose();
-                }, 1500);
+                onClose();
             } else {
-                setStatus("error");
-                setErrorMessage(
-                    "Failed to share the list. User might not exist.",
-                );
+                setError("Failed to share the list. User might not exist.");
             }
         } catch (error) {
-            setStatus("error");
-            setErrorMessage(
+            setError(
                 error instanceof Error ? error.message : "An error occurred",
             );
         } finally {
@@ -68,12 +42,15 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
         <Modal
             isOpen={true}
             onClose={onClose}
+            icon={<UserPlus size={20} />}
             title="Share List"
+            subtitle={`Invite others to "${listName}"`}
+            initialFocusSelector="#share-email"
             footer={
-                <div className="grid grid-cols-2 gap-3 w-full">
+                <div className="flex items-center justify-end gap-3 w-full">
                     <button
                         type="button"
-                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border disabled:opacity-50"
+                        className="px-4 py-2 text-sm font-medium text-text-strong border border-border rounded-md hover:bg-bg-muted"
                         onClick={onClose}
                         disabled={isSubmitting}
                     >
@@ -82,73 +59,51 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
                     <button
                         type="submit"
                         form="share-list-form"
-                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all hover:bg-accent-hover active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_2px_10px_var(--color-accent-glow)]"
-                        disabled={
-                            !email.trim() ||
-                            isSubmitting ||
-                            status === "success"
-                        }
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent rounded-md hover:bg-accent-hover disabled:opacity-50"
+                        disabled={!email.trim() || isSubmitting}
                     >
-                        {submitButtonContent}
+                        {isSubmitting ? (
+                            "Sharing..."
+                        ) : (
+                            <>
+                                <Send size={16} />
+                                Share
+                            </>
+                        )}
                     </button>
                 </div>
             }
         >
-            <div className="flex flex-col gap-5">
-                <div className="flex items-start gap-4 p-4 bg-bg-subtle border border-border rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-accent-subtle flex items-center justify-center shrink-0">
-                        <UserPlus className="text-accent" size={20} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <h3 className="text-sm font-bold text-text-strong">
-                            Share "{listName}"
-                        </h3>
-                        <p className="text-xs text-text-muted leading-relaxed">
-                            Enter the email address of the person you'd like to
-                            collaborate with. They'll be able to see and edit
-                            items in real-time.
-                        </p>
-                    </div>
+            <form
+                id="share-list-form"
+                onSubmit={handleSubmit}
+                className="flex flex-col gap-4"
+            >
+                <p className="text-sm text-text-muted">
+                    Enter the email address of the person you'd like to share
+                    this list with.
+                </p>
+                <div className="flex flex-col gap-2">
+                    <label
+                        htmlFor="share-email"
+                        className="text-sm font-medium text-text-strong"
+                    >
+                        Email
+                    </label>
+                    <input
+                        id="share-email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        className={`w-full px-3 py-2 bg-bg-muted border rounded-md text-sm text-text-strong outline-none focus:border-accent ${
+                            error ? "border-danger" : "border-border"
+                        }`}
+                        required
+                    />
+                    {error && <p className="text-xs text-danger">{error}</p>}
                 </div>
-
-                <form
-                    id="share-list-form"
-                    onSubmit={handleSubmit}
-                    className="flex flex-col gap-4"
-                >
-                    <div className="flex flex-col gap-2">
-                        <label
-                            htmlFor="share-email"
-                            className="text-[13px] font-semibold text-text-strong"
-                        >
-                            Collaborator Email
-                        </label>
-                        <input
-                            id="share-email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="collaborator@example.com"
-                            className={`w-full px-3.5 py-2.5 bg-bg-muted border-1.5 rounded-md text-base text-text-strong transition-all outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] ${
-                                status === "error"
-                                    ? "border-danger"
-                                    : "border-border"
-                            }`}
-                            required
-                        />
-                        {status === "error" && (
-                            <p className="text-xs font-medium text-danger">
-                                {errorMessage}
-                            </p>
-                        )}
-                        {status === "success" && (
-                            <p className="text-xs font-medium text-success">
-                                Invite sent successfully!
-                            </p>
-                        )}
-                    </div>
-                </form>
-            </div>
+            </form>
         </Modal>
     );
 };

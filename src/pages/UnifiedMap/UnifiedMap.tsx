@@ -8,7 +8,7 @@ import {
     Polygon,
     Polyline,
     Popup,
-    TileLayer,
+    // TileLayer,
     useMap,
     useMapEvents,
 } from "react-leaflet";
@@ -32,11 +32,12 @@ import { useStore } from "../../context/useStore";
 import {
     DEMO_STORE_LOCATION,
     GEOFENCE_RADIUS_METERS,
-    isWithinGeofence,
 } from "../../services/geofence";
+import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
 import ListDetail from "../ListDetail/ListDetail";
+import StoreMap from "../StoreMap/StoreMap";
 
 // --- Types & Constants ---
 export interface StoreRecommendation {
@@ -180,21 +181,13 @@ const UnifiedMap: React.FC = () => {
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
-    const [isMicroView, setIsMicroView] = useState(navigationMode === "indoor");
+    const isMicroView = navigationMode === "indoor";
 
     const activeTarget = targetStoreLocation || DEMO_STORE_LOCATION;
 
     useEffect(() => {
-        if (!targetStoreLocation) return;
-        const inside = isWithinGeofence(userLocation, targetStoreLocation);
-        if (inside && navigationMode === "city") {
-            setNavigationMode("indoor");
-            setIsMicroView(true);
-        } else if (!inside && navigationMode === "indoor") {
-            setNavigationMode("city");
-            setIsMicroView(false);
-        }
-    }, [userLocation, targetStoreLocation, navigationMode, setNavigationMode]);
+        // Automatic geofence transitions disabled per user request
+    }, []);
 
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
@@ -284,7 +277,6 @@ const UnifiedMap: React.FC = () => {
     const handleStartRoute = (store: StoreRecommendation) => {
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
         setNavigationMode("city");
-        setIsMicroView(false);
     };
 
     const handleRecenter = () => {
@@ -311,8 +303,8 @@ const UnifiedMap: React.FC = () => {
     const handleDemoTSP = async () => {
         const demoItems = [
             {
-                id: "55555555-e5f6-a7b8-c9d0-5678901234ef",
-                name: "Produs 5",
+                id: "11111111-a1b2-c3d4-e5f6-1234567890ab",
+                name: "Produs 1",
                 checked: false,
             },
             {
@@ -321,8 +313,8 @@ const UnifiedMap: React.FC = () => {
                 checked: false,
             },
             {
-                id: "99999999-c9d0-e1f2-a3b4-901234567823",
-                name: "Produs 9",
+                id: "33333333-c3d4-e5f6-a7b8-3456789012cd",
+                name: "Produs 3",
                 checked: false,
             },
             {
@@ -331,50 +323,28 @@ const UnifiedMap: React.FC = () => {
                 checked: false,
             },
             {
-                id: "11111111-a1b2-c3d4-e5f6-1234567890ab",
-                name: "Produs 1",
+                id: "55555555-e5f6-a7b8-c9d0-5678901234ef",
+                name: "Produs 5",
                 checked: false,
             },
             {
-                id: "88888888-b8c9-d0e1-f2a3-890123456712",
-                name: "Produs 8",
+                id: "66666666-f6a7-b8c9-d0e1-6789012345f0",
+                name: "Produs 6",
                 checked: false,
             },
         ];
 
         setItems(demoItems);
         handleForceIndoor();
-        // Teleport to entrance
+        // Teleport to entrance (center of Palas Mall geofence)
         teleport(DEMO_STORE_LOCATION.lat, DEMO_STORE_LOCATION.lng);
 
-        // Call backend for route
-        try {
-            const baseUrlResolved =
-                import.meta.env.VITE_API_URL ||
-                import.meta.env.VITE_API_BASE_URL ||
-                "http://localhost:8081";
-            const baseUrl = baseUrlResolved === "/" ? "" : baseUrlResolved;
-
-            const response = await fetch(`${baseUrl}/api/routing/optimal`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    productIds: demoItems.map((i) => i.id),
-                    userLat: DEMO_STORE_LOCATION.lat,
-                    userLng: DEMO_STORE_LOCATION.lng,
-                    lazyN: 0,
-                }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.route) {
-                    useStore.getState().setRoute(data.route);
-                }
-            }
-        } catch (err) {
-            console.error("TSP Demo failed:", err);
-        }
+        // Compute and display the TSP route using frontend mock (Palas Mall data)
+        await loadRoute(
+            demoItems.map((i) => i.id),
+            DEMO_STORE_LOCATION.lat,
+            DEMO_STORE_LOCATION.lng,
+        );
     };
 
     const [footprint, setFootprint] = useState<[number, number][]>([
@@ -411,117 +381,140 @@ const UnifiedMap: React.FC = () => {
     return (
         <div className="flex flex-col h-full overflow-hidden bg-bg">
             <div className="relative flex-1 overflow-hidden">
-                <MapContainer
-                    center={[userLocation.lat, userLocation.lng]}
-                    zoom={14}
-                    style={{ height: "100%", width: "100%" }}
-                    zoomControl={false}
-                >
-                    <TileLayer
+                {isMicroView ? (
+                    <StoreMap />
+                ) : (
+                    <MapContainer
+                        center={[userLocation.lat, userLocation.lng]}
+                        zoom={14}
+                        style={{
+                            height: "100%",
+                            width: "100%",
+                            background: "var(--color-bg)",
+                        }}
+                        zoomControl={false}
+                    >
+                        {/* 
+                      NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request. 
+                      Re-enable the TileLayer below to show the real-world map again.
+                    */}
+                        {/* <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <MapEvents />
-                    <MapController
-                        center={[userLocation.lat, userLocation.lng]}
-                        isMicroView={isMicroView}
-                    />
-
-                    {!targetStoreLocation &&
-                        recommendedStores.map((store) => (
-                            <Marker
-                                key={store.id}
-                                position={[store.lat, store.lng]}
-                                icon={L.divIcon({
-                                    className: "store-marker",
-                                    html: `<div style="color: var(--color-accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
-                                    iconSize: [24, 24],
-                                    iconAnchor: [12, 24],
-                                })}
-                            >
-                                <Popup>{store.name}</Popup>
-                            </Marker>
-                        ))}
-
-                    {targetStoreLocation && (
-                        <>
-                            <Circle
-                                center={[activeTarget.lat, activeTarget.lng]}
-                                radius={GEOFENCE_RADIUS_METERS}
-                                pathOptions={{
-                                    color: isMicroView
-                                        ? "var(--color-green-neon)"
-                                        : "var(--color-accent)",
-                                    fillOpacity: 0.1,
-                                    dashArray: "5, 10",
-                                }}
-                            />
-                            <Polygon
-                                positions={footprint}
-                                pathOptions={{
-                                    color: "var(--color-accent)",
-                                    fillColor: "var(--color-accent-subtle)",
-                                    fillOpacity: isMicroView ? 0.3 : 0.1,
-                                    weight: 2,
-                                }}
-                            />
-                            <Marker
-                                position={[activeTarget.lat, activeTarget.lng]}
-                                icon={L.divIcon({
-                                    className: "target-store-icon",
-                                    html: `<div style="color: var(--color-accent);"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
-                                    iconSize: [32, 32],
-                                    iconAnchor: [16, 32],
-                                })}
-                            />
-                        </>
-                    )}
-
-                    {targetStoreLocation && !isMicroView && (
-                        <Polyline
-                            positions={[
-                                [userLocation.lat, userLocation.lng],
-                                [activeTarget.lat, activeTarget.lng],
-                            ]}
-                            pathOptions={{
-                                color: "var(--color-blue-neon)",
-                                weight: 3,
-                                dashArray: "10, 10",
-                            }}
+                    /> */}
+                        <MapEvents />
+                        <MapController
+                            center={[userLocation.lat, userLocation.lng]}
+                            isMicroView={isMicroView}
                         />
-                    )}
 
-                    {isMicroView && route.length > 0 && (
-                        <>
+                        {!targetStoreLocation &&
+                            recommendedStores.map((store) => (
+                                <Marker
+                                    key={store.id}
+                                    position={[store.lat, store.lng]}
+                                    icon={L.divIcon({
+                                        className: "store-marker",
+                                        html: `<div style="color: var(--color-accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
+                                        iconSize: [24, 24],
+                                        iconAnchor: [12, 24],
+                                    })}
+                                >
+                                    <Popup>{store.name}</Popup>
+                                </Marker>
+                            ))}
+
+                        {targetStoreLocation && (
+                            <>
+                                <Circle
+                                    center={[
+                                        activeTarget.lat,
+                                        activeTarget.lng,
+                                    ]}
+                                    radius={GEOFENCE_RADIUS_METERS}
+                                    pathOptions={{
+                                        color: isMicroView
+                                            ? "var(--color-green-neon)"
+                                            : "var(--color-accent)",
+                                        fillOpacity: 0.1,
+                                        dashArray: "5, 10",
+                                    }}
+                                />
+                                <Polygon
+                                    positions={footprint}
+                                    pathOptions={{
+                                        color: "var(--color-accent)",
+                                        fillColor: "var(--color-accent-subtle)",
+                                        fillOpacity: isMicroView ? 0.3 : 0.1,
+                                        weight: 2,
+                                    }}
+                                />
+                                <Marker
+                                    position={[
+                                        activeTarget.lat,
+                                        activeTarget.lng,
+                                    ]}
+                                    icon={L.divIcon({
+                                        className: "target-store-icon",
+                                        html: `<div style="color: var(--color-accent);"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
+                                        iconSize: [32, 32],
+                                        iconAnchor: [16, 32],
+                                    })}
+                                />
+                            </>
+                        )}
+
+                        {targetStoreLocation && !isMicroView && (
                             <Polyline
                                 positions={[
                                     [userLocation.lat, userLocation.lng],
-                                    ...route.map(
-                                        (p) =>
-                                            [p.lat, p.lng] as [number, number],
-                                    ),
+                                    [activeTarget.lat, activeTarget.lng],
                                 ]}
                                 pathOptions={{
-                                    color: "var(--color-green-neon)",
-                                    weight: 4,
+                                    color: "var(--color-blue-neon)",
+                                    weight: 3,
+                                    dashArray: "10, 10",
                                 }}
                             />
-                            {route.map((point, idx) => (
-                                <Marker
-                                    key={point.itemId}
-                                    position={[point.lat, point.lng]}
-                                    icon={L.divIcon({
-                                        className: "route-idx",
-                                        html: `<div style="background: var(--color-accent); color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 2px solid white; font-size: 10px;">${idx + 1}</div>`,
-                                        iconSize: [22, 22],
-                                        iconAnchor: [11, 11],
-                                    })}
+                        )}
+
+                        {isMicroView && route.length > 0 && (
+                            <>
+                                <Polyline
+                                    positions={[
+                                        [userLocation.lat, userLocation.lng],
+                                        ...route.map(
+                                            (p) =>
+                                                [p.lat, p.lng] as [
+                                                    number,
+                                                    number,
+                                                ],
+                                        ),
+                                    ]}
+                                    pathOptions={{
+                                        color: "var(--color-green-neon)",
+                                        weight: 4,
+                                    }}
                                 />
-                            ))}
-                        </>
-                    )}
-                    <Marker position={[userLocation.lat, userLocation.lng]} />
-                </MapContainer>
+                                {route.map((point, idx) => (
+                                    <Marker
+                                        key={point.itemId}
+                                        position={[point.lat, point.lng]}
+                                        icon={L.divIcon({
+                                            className: "route-idx",
+                                            html: `<div style="background: var(--color-accent); color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 2px solid white; font-size: 10px;">${idx + 1}</div>`,
+                                            iconSize: [22, 22],
+                                            iconAnchor: [11, 11],
+                                        })}
+                                    />
+                                ))}
+                            </>
+                        )}
+                        <Marker
+                            position={[userLocation.lat, userLocation.lng]}
+                        />
+                    </MapContainer>
+                )}
 
                 {isSidebarExpanded && (
                     <button
@@ -758,7 +751,15 @@ const UnifiedMap: React.FC = () => {
                                         </button>
                                     )}
                                     <div className="flex-1 overflow-y-auto scrollbar-thin">
-                                        <ListDetail isEmbedded={true} />
+                                        <ListDetail
+                                            isEmbedded={true}
+                                            listIdOverride={
+                                                selectedListId ?? undefined
+                                            }
+                                            onSwitchList={() =>
+                                                setSelectedListId(null)
+                                            }
+                                        />
                                     </div>
 
                                     {!targetStoreLocation && (
@@ -841,67 +842,67 @@ const UnifiedMap: React.FC = () => {
                         {isMicroView ? "Simulate Exit" : "Simulate Entry"}
                     </button>
 
+                    <button
+                        type="button"
+                        onClick={handleDemoTSP}
+                        className="flex items-center gap-2 px-4 py-2 bg-accent text-white border border-accent/20 rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all active:scale-95"
+                    >
+                        <Zap size={14} fill="currentColor" />
+                        Demo TSP Route
+                    </button>
+
                     {!isMicroView && (
-                        <>
-                            <button
-                                type="button"
-                                onClick={handleForceIndoor}
-                                className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95"
-                            >
-                                <Maximize2
-                                    size={14}
-                                    className="text-green-500"
-                                />
-                                Force Indoor
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleDemoTSP}
-                                className="flex items-center gap-2 px-4 py-2 bg-accent text-white border border-accent/20 rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all active:scale-95"
-                            >
-                                <Zap size={14} fill="currentColor" />
-                                Demo TSP Route
-                            </button>
-                        </>
+                        <button
+                            type="button"
+                            onClick={handleForceIndoor}
+                            className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95"
+                        >
+                            <Maximize2 size={14} className="text-green-500" />
+                            Force Indoor
+                        </button>
                     )}
                 </div>
             </div>
 
-            <div className="relative z-[1002] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center gap-4">
+            {!isMicroView && (
+                <div className="relative z-[1002] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center gap-4">
+                        <button
+                            type="button"
+                            onClick={handleRecenter}
+                            className={`w-12 h-12 flex items-center justify-center rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 ${isAutoCenterEnabled ? "bg-accent text-text-on-accent" : "bg-surface border border-border text-text-strong"}`}
+                            title={
+                                isAutoCenterEnabled
+                                    ? "Auto-Center On"
+                                    : "Auto-Center Off"
+                            }
+                        >
+                            <LocateFixed size={20} />
+                        </button>
+                        {!isAutoCenterEnabled && (
+                            <span className="text-[10px] font-black uppercase tracking-widest text-accent animate-pulse">
+                                Manual Mode
+                            </span>
+                        )}
+                    </div>
                     <button
                         type="button"
-                        onClick={handleRecenter}
-                        className={`w-12 h-12 flex items-center justify-center rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 ${isAutoCenterEnabled ? "bg-accent text-text-on-accent" : "bg-surface border border-border text-text-strong"}`}
-                        title={
-                            isAutoCenterEnabled
-                                ? "Auto-Center On"
-                                : "Auto-Center Off"
-                        }
+                        onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-lg transition-all active:scale-95 ${isSidebarExpanded ? "bg-accent text-text-on-accent" : "bg-text-strong text-bg"}`}
                     >
-                        <LocateFixed size={20} />
-                    </button>
-                    {!isAutoCenterEnabled && (
-                        <span className="text-[10px] font-black uppercase tracking-widest text-accent animate-pulse">
-                            Manual Mode
+                        {isSidebarExpanded ? (
+                            <X size={20} />
+                        ) : (
+                            <ListIcon size={20} />
+                        )}
+                        <span className="hidden sm:inline">
+                            {isSidebarExpanded
+                                ? "Close Panel"
+                                : "Route Planner"}
                         </span>
-                    )}
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-lg transition-all active:scale-95 ${isSidebarExpanded ? "bg-accent text-text-on-accent" : "bg-text-strong text-bg"}`}
-                >
-                    {isSidebarExpanded ? (
-                        <X size={20} />
-                    ) : (
-                        <ListIcon size={20} />
-                    )}
-                    <span className="hidden sm:inline">
-                        {isSidebarExpanded ? "Close Panel" : "Route Planner"}
-                    </span>
-                </button>
-            </div>
+            )}
         </div>
     );
 };

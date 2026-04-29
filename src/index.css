@@ -277,3 +277,8 @@
         transform: translateY(0);
     }
 }
+
+.leaflet-control-attribution {
+    /* biome-ignore lint/complexity/noImportantStyles: temporary, do not remove */
+    display: none !important;
+}

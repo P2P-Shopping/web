@@ -4,8 +4,9 @@ import { type ReactNode, useEffect, useId, useRef } from "react";
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
-    title?: string;
+    title?: ReactNode;
     subtitle?: string;
+    icon?: ReactNode;
     children: ReactNode;
     footer?: ReactNode;
     maxWidth?: string;
@@ -18,6 +19,7 @@ export default function Modal({
     onClose,
     title,
     subtitle,
+    icon,
     children,
     footer,
     maxWidth = "440px",
@@ -112,23 +114,28 @@ export default function Modal({
                 }}
             >
                 <div className="flex items-start justify-between p-6 pb-2">
-                    <div className="flex flex-col gap-1">
-                        {title && (
-                            <h2
-                                id={modalTitleId}
-                                className="text-xl font-bold text-text-strong tracking-tight"
-                            >
-                                {title}
-                            </h2>
+                    <div className="flex items-center gap-3 min-w-0">
+                        {icon && (
+                            <span className="text-accent shrink-0">{icon}</span>
                         )}
-                        {subtitle && (
-                            <p
-                                id={modalSubtitleId}
-                                className="text-sm text-text-muted leading-relaxed"
-                            >
-                                {subtitle}
-                            </p>
-                        )}
+                        <div className="flex flex-col gap-1 min-w-0">
+                            {title && (
+                                <h2
+                                    id={modalTitleId}
+                                    className="text-xl font-bold text-text-strong tracking-tight truncate"
+                                >
+                                    {title}
+                                </h2>
+                            )}
+                            {subtitle && (
+                                <p
+                                    id={modalSubtitleId}
+                                    className="text-sm text-text-muted leading-relaxed truncate"
+                                >
+                                    {subtitle}
+                                </p>
+                            )}
+                        </div>
                     </div>
                     <button
                         type="button"

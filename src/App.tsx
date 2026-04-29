@@ -339,7 +339,9 @@ function App() {
         <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">
             <OfflineBanner />
 
-            <main className="flex-1 flex flex-col overflow-y-auto min-h-0 relative">
+            <main
+                className={`flex-1 flex flex-col ${isAiImport ? "overflow-hidden" : "overflow-y-auto"} min-h-0 relative`}
+            >
                 {toastMessage && (
                     <output
                         className="fixed bottom-24 left-1/2 -translate-x-1/2 z-500 px-6 py-3 bg-text-strong text-bg rounded-full shadow-2xl text-sm font-bold animate-in fade-in slide-in-from-bottom-4 duration-300"
