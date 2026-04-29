@@ -61,6 +61,7 @@ interface ApiShoppingList {
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
+    onSwitchList?: () => void;
 }
 
 /**
@@ -1096,6 +1097,7 @@ const InlineAddForm = ({
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
+    onSwitchList,
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -1415,7 +1417,9 @@ const ListDetail = ({
                 {isEmbedded && (
                     <ListHeader
                         effectiveListId={effectiveListId ?? "default"}
-                        onSwitchList={() => navigate("/nav/default")}
+                        onSwitchList={
+                            onSwitchList ?? (() => navigate("/nav/default"))
+                        }
                     />
                 )}
 
