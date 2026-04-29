@@ -527,6 +527,126 @@ const Dashboard = () => {
         return "text-text-muted hover:text-text-strong hover:bg-bg-muted";
     };
 
+    const handleTabDragOver = (e: React.DragEvent, section: string) => {
+        if (section === "NORMAL" && draggedListId) {
+            const draggedList = lists.find((l) => l.id === draggedListId);
+            if (
+                draggedList &&
+                ["RECIPE", "FREQUENT"].includes(draggedList.category ?? "")
+            ) {
+                e.preventDefault();
+                setDragOverListId("TAB_NORMAL");
+            }
+        }
+    };
+
+    const handleTabDragLeave = () => {
+        if (dragOverListId === "TAB_NORMAL") setDragOverListId(null);
+    };
+
+    const handleTabDrop = (e: React.DragEvent, section: string) => {
+        if (section === "NORMAL" && draggedListId) {
+            e.preventDefault();
+            void handleCopyListToNormal(draggedListId);
+            setDragOverListId(null);
+        }
+    };
+
+    const renderTabsView = (): ReactNode => (
+        <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
+                {sectionOrder.map((section) => (
+                    <button
+                        key={section}
+                        type="button"
+                        onClick={() => setActiveTab(section)}
+                        onDragOver={(e) => handleTabDragOver(e, section)}
+                        onDragLeave={handleTabDragLeave}
+                        onDrop={(e) => handleTabDrop(e, section)}
+                        className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${getTabClassName(section)}`}
+                    >
+                        {sectionLabels[section]}
+                        <span
+                            className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                                activeTab === section
+                                    ? "bg-white/20"
+                                    : "bg-bg-muted text-text-muted"
+                            }`}
+                        >
+                            {groupedLists[section].length}
+                        </span>
+                    </button>
+                ))}
+            </div>
+            <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
+                {groupedLists[activeTab].map((list) => (
+                    <li
+                        key={list.id}
+                        draggable={
+                            activeTab !== "NORMAL" && list.items.length > 0
+                        }
+                        onDragStart={(e) => handleDragStart(e, list.id)}
+                        onDragEnd={resetDragState}
+                        className={
+                            activeTab !== "NORMAL" && list.items.length > 0
+                                ? "cursor-grab active:cursor-grabbing"
+                                : ""
+                        }
+                    >
+                        <ListCard
+                            list={list}
+                            onClick={() => handleCardClick(list.id)}
+                            onDelete={(e) =>
+                                handleDeleteList(e, list.id, list.name)
+                            }
+                            isDeleting={deletingListId === list.id}
+                        />
+                    </li>
+                ))}
+                {groupedLists[activeTab].length === 0 && (
+                    <li className="col-span-full py-20 text-center text-text-muted list-none">
+                        No lists in this category
+                    </li>
+                )}
+            </ul>
+        </div>
+    );
+
+    const renderSplitView = (): ReactNode => (
+        <div className="flex flex-col gap-8 pb-4">
+            {sectionOrder.map((section) => (
+                <ListCategorySection
+                    key={section}
+                    section={section}
+                    label={sectionLabels[section]}
+                    lists={groupedLists[section]}
+                    isCollapsed={collapsedSections.has(section)}
+                    onToggle={() => toggleSection(section)}
+                    onDragStart={handleDragStart}
+                    onDragEnd={resetDragState}
+                    onDragOver={(e, id) => {
+                        if (section !== "NORMAL") return;
+                        if (!draggedListId || draggedListId === id) return;
+                        e.preventDefault();
+                        setDragOverListId(id);
+                    }}
+                    onDragLeave={(id) => {
+                        if (dragOverListId === id) setDragOverListId(null);
+                    }}
+                    onDrop={(e, id) => {
+                        if (section !== "NORMAL") return;
+                        e.preventDefault();
+                        handleDropOnNormalList(id, draggedListId);
+                    }}
+                    dragOverListId={dragOverListId}
+                    onCardClick={handleCardClick}
+                    onDeleteList={handleDeleteList}
+                    deletingListId={deletingListId}
+                />
+            ))}
+        </div>
+    );
+
     const renderDashboardContent = (): ReactNode => {
         if (isLoading && !(isModalOpen || showAiImport)) {
             return (
@@ -558,143 +678,9 @@ const Dashboard = () => {
         }
 
         if (hasGroupedLists) {
-            if (displayMode === "tabs") {
-                return (
-                    <div className="flex flex-col gap-6">
-                        <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
-                            {sectionOrder.map((section) => (
-                                <button
-                                    key={section}
-                                    type="button"
-                                    onClick={() => setActiveTab(section)}
-                                    onDragOver={(e) => {
-                                        if (
-                                            section === "NORMAL" &&
-                                            draggedListId
-                                        ) {
-                                            const draggedList = lists.find(
-                                                (l) => l.id === draggedListId,
-                                            );
-                                            if (
-                                                draggedList &&
-                                                ["RECIPE", "FREQUENT"].includes(
-                                                    draggedList.category ?? "",
-                                                )
-                                            ) {
-                                                e.preventDefault();
-                                                setDragOverListId("TAB_NORMAL");
-                                            }
-                                        }
-                                    }}
-                                    onDragLeave={() => {
-                                        if (dragOverListId === "TAB_NORMAL")
-                                            setDragOverListId(null);
-                                    }}
-                                    onDrop={(e) => {
-                                        if (
-                                            section === "NORMAL" &&
-                                            draggedListId
-                                        ) {
-                                            e.preventDefault();
-                                            void handleCopyListToNormal(
-                                                draggedListId,
-                                            );
-                                            setDragOverListId(null);
-                                        }
-                                    }}
-                                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${getTabClassName(section)}`}
-                                >
-                                    {sectionLabels[section]}
-                                    <span
-                                        className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                                            activeTab === section
-                                                ? "bg-white/20"
-                                                : "bg-bg-muted text-text-muted"
-                                        }`}
-                                    >
-                                        {groupedLists[section].length}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                        <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
-                            {groupedLists[activeTab].map((list) => (
-                                <li
-                                    key={list.id}
-                                    draggable={
-                                        activeTab !== "NORMAL" &&
-                                        list.items.length > 0
-                                    }
-                                    onDragStart={(e) =>
-                                        handleDragStart(e, list.id)
-                                    }
-                                    onDragEnd={resetDragState}
-                                    className={
-                                        activeTab !== "NORMAL" &&
-                                        list.items.length > 0
-                                            ? "cursor-grab active:cursor-grabbing"
-                                            : ""
-                                    }
-                                >
-                                    <ListCard
-                                        list={list}
-                                        onClick={() => handleCardClick(list.id)}
-                                        onDelete={(e) =>
-                                            handleDeleteList(
-                                                e,
-                                                list.id,
-                                                list.name,
-                                            )
-                                        }
-                                        isDeleting={deletingListId === list.id}
-                                    />
-                                </li>
-                            ))}
-                            {groupedLists[activeTab].length === 0 && (
-                                <li className="col-span-full py-20 text-center text-text-muted list-none">
-                                    No lists in this category
-                                </li>
-                            )}
-                        </ul>
-                    </div>
-                );
-            }
-            return (
-                <div className="flex flex-col gap-8 pb-4">
-                    {sectionOrder.map((section) => (
-                        <ListCategorySection
-                            key={section}
-                            section={section}
-                            label={sectionLabels[section]}
-                            lists={groupedLists[section]}
-                            isCollapsed={collapsedSections.has(section)}
-                            onToggle={() => toggleSection(section)}
-                            onDragStart={handleDragStart}
-                            onDragEnd={resetDragState}
-                            onDragOver={(e, id) => {
-                                if (section !== "NORMAL") return;
-                                if (!draggedListId || draggedListId === id)
-                                    return;
-                                e.preventDefault();
-                                setDragOverListId(id);
-                            }}
-                            onDragLeave={(id) => {
-                                if (dragOverListId === id)
-                                    setDragOverListId(null);
-                            }}
-                            onDrop={(e, id) => {
-                                if (section !== "NORMAL") return;
-                                e.preventDefault();
-                                handleDropOnNormalList(id, draggedListId);
-                            }}
-                            dragOverListId={dragOverListId}
-                            onCardClick={handleCardClick}
-                            onDeleteList={handleDeleteList}
-                            deletingListId={deletingListId}
-                        />
-                    ))}
-                </div>
-            );
+            return displayMode === "tabs"
+                ? renderTabsView()
+                : renderSplitView();
         }
 
         return (
