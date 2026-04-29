@@ -1,4 +1,5 @@
 import {
+    ArrowLeft,
     List,
     LocateFixed,
     Navigation,
@@ -8,9 +9,8 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
 import Modal from "../../components/Modal/Modal";
-import ListDetail from "../ListDetail/ListDetail";
+import { useStore } from "../../context/useStore";
 
 interface Coordinate {
     lat: number;
@@ -50,7 +50,7 @@ const MAP_CONFIG = {
     METERS_PER_DEGREE_LAT: 111320,
     PIXELS_PER_METER: 20,
     GLIDE_SPEED: 0.1,
-    MIN_ZOOM: 0.3,
+    MIN_ZOOM: 0.05,
     MAX_ZOOM: 4,
     PAN_PADDING: 96,
 };
@@ -105,38 +105,6 @@ const generateLocalProducts = (centerGps: Coordinate): RoutePoint[] => {
     ];
 };
 
-const calculateNearestNeighborRoute = (
-    startPoint: Point,
-    products: RoutePoint[],
-    anchor: Coordinate,
-): RoutePoint[] => {
-    const unvisited = [...products];
-    const orderedRoute: RoutePoint[] = [];
-    let currentPoint = { ...startPoint };
-
-    while (unvisited.length > 0) {
-        let nearestIdx = 0;
-        let minDist = Infinity;
-        for (let i = 0; i < unvisited.length; i++) {
-            const pPx = getRelativePixels(unvisited[i], anchor);
-            const dist = Math.hypot(
-                pPx.x - currentPoint.x,
-                pPx.y - currentPoint.y,
-            );
-            if (dist < minDist) {
-                minDist = dist;
-                nearestIdx = i;
-            }
-        }
-        const nearestProduct = unvisited[nearestIdx];
-        orderedRoute.push(nearestProduct);
-        currentPoint = getRelativePixels(nearestProduct, anchor);
-        unvisited.splice(nearestIdx, 1);
-    }
-
-    return orderedRoute;
-};
-
 const clamp = (value: number, min: number, max: number): number =>
     Math.min(Math.max(value, min), max);
 
@@ -186,10 +154,7 @@ interface RoutePoint {
     lng: number;
 }
 
-const useMapEngine = (
-    canvasRef: React.RefObject<HTMLCanvasElement | null>,
-    listId: string | undefined,
-) => {
+const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const [isDragging, setIsDragging] = useState(false);
     const [hasLocationLock, setHasLocationLock] = useState(false);
     const [gpsError, setGpsError] = useState<string | null>(null);
@@ -201,6 +166,8 @@ const useMapEngine = (
     const routePoints = useRef<RoutePoint[]>([]);
     const isFirstLocationUpdate = useRef(true);
     const camera = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
+    const userLocation = useStore((state) => state.userLocation);
+    const setNavigationMode = useStore((state) => state.setNavigationMode);
     const lastPanPoint = useRef<Point | null>(null);
     const gestureState = useRef<{
         initialDist: number;
@@ -231,8 +198,7 @@ const useMapEngine = (
             ),
         };
 
-        const userPos = getRelativePixels(currentRenderedGps.current, anchor);
-        const pointsToBound = [userPos];
+        const pointsToBound = [];
         if (routePoints.current.length > 0) {
             for (const p of routePoints.current) {
                 pointsToBound.push(getRelativePixels(p, anchor));
@@ -256,67 +222,20 @@ const useMapEngine = (
         camera.current.y = clamp(nextY, constraints.minY, constraints.maxY);
     };
 
+    const storeRoute = useStore((state) => state.route);
+    const navigationMode = useStore((state) => state.navigationMode);
+
     useEffect(() => {
-        const controller = new AbortController();
-        const fetchRoute = async () => {
-            if (!listId || listId === "default") {
-                if (originGps.current) {
-                    routePoints.current = generateLocalProducts(
-                        originGps.current,
-                    );
-                }
-                return;
-            }
-            setIsRouting(true);
-            try {
-                const baseUrl =
-                    import.meta.env.VITE_API_URL || "http://localhost:8081";
-                const response = await fetch(
-                    `${baseUrl}/api/routing/calculate`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        signal: controller.signal,
-                        body: JSON.stringify({
-                            listId: listId,
-                            userLat:
-                                targetGps.current.lat || USER_GPS_DEFAULT.lat,
-                            userLng:
-                                targetGps.current.lng || USER_GPS_DEFAULT.lng,
-                        }),
-                    },
-                );
+        if (!hasLocationLock) return;
 
-                if (controller.signal.aborted) return;
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.route) {
-                        const productsOnly: RoutePoint[] = data.route.filter(
-                            (p: RoutePoint) => p.itemId !== "user_loc",
-                        );
-                        routePoints.current = productsOnly;
-                    }
-                }
-            } catch (error) {
-                if (controller.signal.aborted) return;
-                console.error(error);
-                if (originGps.current) {
-                    routePoints.current = generateLocalProducts(
-                        originGps.current,
-                    );
-                }
-            } finally {
-                if (!controller.signal.aborted) {
-                    setIsRouting(false);
-                }
-            }
-        };
-        if (hasLocationLock) {
-            fetchRoute();
+        if (navigationMode === "indoor") {
+            routePoints.current = storeRoute.length > 0 ? storeRoute : [];
+        } else if (originGps.current) {
+            routePoints.current = generateLocalProducts(originGps.current);
         }
-        return () => controller.abort();
-    }, [listId, hasLocationLock]);
+
+        setIsRouting(false);
+    }, [hasLocationLock, navigationMode, storeRoute]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
@@ -399,12 +318,6 @@ const useMapEngine = (
                 );
 
                 if (routePoints.current.length > 0) {
-                    const orderedRoute = calculateNearestNeighborRoute(
-                        userPos,
-                        routePoints.current,
-                        anchor,
-                    );
-
                     ctx.beginPath();
                     ctx.strokeStyle = theme.route;
                     ctx.lineWidth = 4 / camera.current.zoom;
@@ -413,7 +326,7 @@ const useMapEngine = (
                         10 / camera.current.zoom,
                     ]);
                     ctx.moveTo(userPos.x, userPos.y);
-                    orderedRoute.forEach((product) => {
+                    routePoints.current.forEach((product) => {
                         const { x, y } = getRelativePixels(product, anchor);
                         ctx.lineTo(x, y);
                     });
@@ -517,6 +430,21 @@ const useMapEngine = (
 
         return () => navigator.geolocation.clearWatch(watchId);
     }, []);
+
+    useEffect(() => {
+        if (userLocation) {
+            targetGps.current = {
+                lat: userLocation.lat,
+                lng: userLocation.lng,
+            };
+            if (isFirstLocationUpdate.current) {
+                originGps.current = { ...targetGps.current };
+                currentRenderedGps.current = { ...targetGps.current };
+                isFirstLocationUpdate.current = false;
+                setHasLocationLock(true);
+            }
+        }
+    }, [userLocation]);
 
     const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
         if (e.touches.length === 1) {
@@ -676,6 +604,7 @@ const useMapEngine = (
         recenterCamera,
         zoomIn,
         zoomOut,
+        exitIndoor: () => setNavigationMode("city"),
         handlers: {
             onTouchStart: handleTouchStart,
             onTouchMove: handleTouchMove,
@@ -689,11 +618,25 @@ const useMapEngine = (
     };
 };
 
-const StoreMap: React.FC = () => {
+interface StoreMapProps {
+    onToggleSidebar?: () => void;
+    isSidebarExpanded?: boolean;
+}
+
+const StoreMap: React.FC<StoreMapProps> = ({
+    onToggleSidebar,
+    isSidebarExpanded: externalIsSidebarExpanded,
+}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { id: listId } = useParams<{ id: string }>();
-    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+    const [internalIsSidebarExpanded, setInternalIsSidebarExpanded] =
+        useState(false);
     const [isCoordsModalOpen, setIsCoordsModalOpen] = useState(false);
+
+    const isSidebarExpanded =
+        externalIsSidebarExpanded ?? internalIsSidebarExpanded;
+    const toggleSidebar =
+        onToggleSidebar ??
+        (() => setInternalIsSidebarExpanded(!internalIsSidebarExpanded));
 
     useEffect(() => {
         const originalInlineStyle = document.body.getAttribute("style");
@@ -711,14 +654,14 @@ const StoreMap: React.FC = () => {
         if (!isSidebarExpanded) return;
 
         const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                setIsSidebarExpanded(false);
+            if (e.key === "Escape" && isSidebarExpanded) {
+                toggleSidebar();
             }
         };
 
         document.addEventListener("keydown", handleEscape);
         return () => document.removeEventListener("keydown", handleEscape);
-    }, [isSidebarExpanded]);
+    }, [isSidebarExpanded, toggleSidebar]);
 
     const {
         isDragging,
@@ -730,7 +673,8 @@ const StoreMap: React.FC = () => {
         recenterCamera,
         zoomIn,
         zoomOut,
-    } = useMapEngine(canvasRef, listId);
+        exitIndoor,
+    } = useMapEngine(canvasRef);
 
     if (!hasLocationLock) {
         return (
@@ -769,56 +713,10 @@ const StoreMap: React.FC = () => {
                         {gpsError}
                     </div>
                 )}
-
-                {/* Sidebar Overlay (Mobile) */}
-                {isSidebarExpanded && (
-                    <button
-                        type="button"
-                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-30 min-[1000px]:hidden animate-fade-in"
-                        onClick={() => setIsSidebarExpanded(false)}
-                        aria-label="Close list drawer"
-                    />
-                )}
-
-                {/* Responsive Sidebar */}
-                <div
-                    aria-hidden={!isSidebarExpanded}
-                    inert={!isSidebarExpanded}
-                    className={`
-                        absolute z-30 transition-all duration-500 ease-spring
-                        /* Desktop: Right-side Drawer */
-                        min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 
-                        min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border
-                        ${
-                            isSidebarExpanded
-                                ? "min-[1000px]:translate-x-0"
-                                : "min-[1000px]:translate-x-full"
-                        }
-                        
-                        /* Mobile: Bottom Sheet */
-                        max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 
-                        max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh]
-                        ${
-                            isSidebarExpanded
-                                ? "max-[1000px]:translate-y-0"
-                                : "max-[1000px]:translate-y-full"
-                        }
-                        
-                        ${isSidebarExpanded ? "" : "pointer-events-none"}
-                        bg-surface/90 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden
-                    `}
-                >
-                    {/* Drag Handle for Mobile */}
-                    <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
-
-                    <div className="flex-1 overflow-y-auto px-1">
-                        <ListDetail isEmbedded={true} />
-                    </div>
-                </div>
             </div>
 
             {/* Map Control Bar - Separated from map view */}
-            <div className="relative z-40 bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
+            <div className="relative z-[3000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
                 <div className="flex items-center gap-4">
                     <button
                         type="button"
@@ -830,6 +728,18 @@ const StoreMap: React.FC = () => {
                         title="Recenter Map"
                     >
                         <LocateFixed size={20} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="w-12 h-12 flex items-center justify-center bg-danger text-white rounded-full shadow-lg transition-all hover:bg-danger/80 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            exitIndoor();
+                        }}
+                        title="Exit Indoor Mode"
+                    >
+                        <ArrowLeft size={20} />
                     </button>
 
                     <button
@@ -878,7 +788,10 @@ const StoreMap: React.FC = () => {
                             ? "bg-accent text-text-on-accent"
                             : "bg-text-strong text-bg"
                     }`}
-                    onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSidebar();
+                    }}
                     aria-label={isSidebarExpanded ? "Close List" : "Show List"}
                 >
                     {isSidebarExpanded ? (

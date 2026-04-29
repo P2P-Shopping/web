@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { QueuedAction } from "../types";
 
 // 👇 Exported so MapPage and StoreMap can use it
 export interface Coordinate {
@@ -27,6 +28,16 @@ interface AppState {
     userLocation: Coordinate;
     // 👇 ADDED: To pass the store location to the canvas
     targetStoreLocation: Coordinate | null;
+    /** Current navigation stage for macro to micro transition */
+    navigationMode: "city" | "indoor";
+    /** Whether the app already crossed the geofence into the store */
+    hasEnteredStore: boolean;
+    /** Prevents duplicate geofence transitions while indoor route loads */
+    isTransitioningToStore: boolean;
+    /** Whether the map should automatically center on the user's location */
+    isAutoCenterEnabled: boolean;
+    /** Whether to use mock GPS updates or real navigator.geolocation */
+    isMockGpsEnabled: boolean;
 
     route: RoutePoint[];
     status: string;
@@ -48,11 +59,25 @@ interface AppState {
     authChecked: boolean;
     /** JWT Token */
     token: string | null;
+    /** Queue of actions to be synced when back online */
+    offlineQueue: QueuedAction[];
     /** Updates user location */
     setUserLocation: (loc: Coordinate) => void;
 
     // 👇 ADDED: Setter for target store
     setTargetStoreLocation: (loc: Coordinate | null) => void;
+    /** Switches between city map and indoor canvas */
+    setNavigationMode: (mode: "city" | "indoor") => void;
+    /** Marks the geofence transition as completed */
+    setHasEnteredStore: (value: boolean) => void;
+    /** Locks or unlocks the geofence transition */
+    setIsTransitioningToStore: (value: boolean) => void;
+    /** Toggles map auto-centering */
+    setIsAutoCenterEnabled: (value: boolean) => void;
+    /** Toggles between mock and real GPS */
+    setIsMockGpsEnabled: (value: boolean) => void;
+    /** Manually triggers indoor mode and cross-geofence logic */
+    forceIndoorMode: () => void;
 
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
@@ -74,6 +99,10 @@ interface AppState {
     setItemConflict: (itemId: string, hasConflict: boolean) => void;
     /** Updates authentication state */
     setAuth: (user: unknown, token?: string | null) => void;
+    /** Adds an action to the offline sync queue */
+    enqueueAction: (action: QueuedAction) => void;
+    /** Removes an action from the offline sync queue */
+    dequeueAction: (actionId: string) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -81,6 +110,11 @@ export const useStore = create<AppState>()(
         (set, get) => ({
             userLocation: { lat: 47.151726, lng: 27.587914 },
             targetStoreLocation: null,
+            navigationMode: "city",
+            hasEnteredStore: false,
+            isTransitioningToStore: false,
+            isAutoCenterEnabled: true,
+            isMockGpsEnabled: true,
             route: [],
             status: "idle",
             items: [],
@@ -92,9 +126,24 @@ export const useStore = create<AppState>()(
             isAuthenticated: false,
             authChecked: false,
             token: null,
+            offlineQueue: [],
 
             setUserLocation: (loc) => set({ userLocation: loc }),
             setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
+            setNavigationMode: (mode) => set({ navigationMode: mode }),
+            setHasEnteredStore: (value) => set({ hasEnteredStore: value }),
+            setIsTransitioningToStore: (value) =>
+                set({ isTransitioningToStore: value }),
+            setIsAutoCenterEnabled: (value) =>
+                set({ isAutoCenterEnabled: value }),
+            setIsMockGpsEnabled: (value) => set({ isMockGpsEnabled: value }),
+            forceIndoorMode: () => {
+                set({
+                    navigationMode: "indoor",
+                    hasEnteredStore: true,
+                    isTransitioningToStore: false,
+                });
+            },
             setRoute: (route) => set({ route }),
             setStatus: (status) => set({ status }),
             setOnlineStatus: (status) => set({ isOnline: status }),
@@ -155,6 +204,18 @@ export const useStore = create<AppState>()(
                     token: token === undefined ? get().token : token,
                 });
             },
+
+            enqueueAction: (action) =>
+                set((state) => ({
+                    offlineQueue: [...state.offlineQueue, action],
+                })),
+
+            dequeueAction: (actionId) =>
+                set((state) => ({
+                    offlineQueue: state.offlineQueue.filter(
+                        (a) => a.id !== actionId,
+                    ),
+                })),
         }),
         {
             name: "p2p-shopping-storage",
@@ -162,6 +223,7 @@ export const useStore = create<AppState>()(
                 user: state.user,
                 isAuthenticated: state.isAuthenticated,
                 token: state.token,
+                offlineQueue: state.offlineQueue,
             }),
         },
     ),

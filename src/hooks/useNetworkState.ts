@@ -1,6 +1,24 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../context/useStore";
 
+const TELEMETRY_API_KEY = import.meta.env.VITE_TELEMETRY_API_KEY;
+const TELEMETRY_DEVICE_ID_KEY = "p2ps.telemetry.device-id";
+
+const getTelemetryDeviceId = (): string => {
+    const existingId = globalThis.localStorage?.getItem(
+        TELEMETRY_DEVICE_ID_KEY,
+    );
+
+    if (existingId) {
+        return existingId;
+    }
+
+    const generatedId = `telemetry-device-${crypto.randomUUID()}`;
+    globalThis.localStorage?.setItem(TELEMETRY_DEVICE_ID_KEY, generatedId);
+
+    return generatedId;
+};
+
 /**
  * Custom React hook to monitor OS/browser network connectivity.
  * Attaches to the global window 'online' and 'offline' events.
@@ -10,9 +28,9 @@ import { useStore } from "../context/useStore";
  */
 export const useNetworkState = (): void => {
     const setOnlineStatus = useStore((state) => state.setOnlineStatus);
-    const setServerConnected = useStore((state) => state.setServerConnected);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const retryCountRef = useRef(0);
+    const telemetryAuthInvalidRef = useRef(false);
 
     const BASE_DELAY = 10_000;
     const MAX_DELAY = 60_000;
@@ -24,29 +42,47 @@ export const useNetworkState = (): void => {
         };
 
         const ping = async () => {
+            if (telemetryAuthInvalidRef.current) return;
+
+            if (!useStore.getState().hasEnteredStore) {
+                // If not in the store, just wait for the next cycle
+                schedulePing(BASE_DELAY);
+                return;
+            }
+
             if (!navigator.onLine) {
-                setServerConnected(false);
                 // Pause the loop. It will be resumed by the 'online' event listener.
                 return;
             }
 
             try {
+                const deviceId = getTelemetryDeviceId();
                 const res = await fetch("/api/v1/telemetry/ping", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-API-Key": TELEMETRY_API_KEY,
+                        "X-Device-Id": deviceId,
+                    },
                     body: JSON.stringify({ ts: Date.now() }),
                     signal: AbortSignal.timeout(5000),
                 });
 
-                if (res.ok || res.status === 202) {
-                    setServerConnected(true);
+                if (res.ok || res.status === 202 || res.status === 401) {
+                    if (res.status === 401) {
+                        telemetryAuthInvalidRef.current = true;
+                        console.error(
+                            "Telemetry ping unauthorized. Check VITE_TELEMETRY_API_KEY and telemetry.api.key.",
+                        );
+                        return;
+                    }
+
                     retryCountRef.current = 0;
                     schedulePing(BASE_DELAY);
                 } else {
                     throw new Error("Ping failed");
                 }
             } catch {
-                setServerConnected(false);
                 retryCountRef.current++;
                 const backoffDelay = Math.min(
                     BASE_DELAY * 2 ** retryCountRef.current,
@@ -64,7 +100,6 @@ export const useNetworkState = (): void => {
 
         const handleOffline = (): void => {
             setOnlineStatus(false);
-            setServerConnected(false);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
 
@@ -84,5 +119,5 @@ export const useNetworkState = (): void => {
             globalThis.removeEventListener("offline", handleOffline);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [setOnlineStatus, setServerConnected]);
+    }, [setOnlineStatus]);
 };

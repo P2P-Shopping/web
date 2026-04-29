@@ -50,6 +50,17 @@ export default function ListCard({
         return `${checkedItems}/${totalItems} ${label}`;
     };
 
+    const getCategoryLabel = () => {
+        switch (list.category) {
+            case "RECIPE":
+                return "Recipe";
+            case "FREQUENT":
+                return "Frequent";
+            default:
+                return "Normal";
+        }
+    };
+
     const getOwnerLabel = () => {
         if (!currentUser) return list.ownerName?.split(" ")[0] || "Unknown";
 
@@ -78,7 +89,7 @@ export default function ListCard({
             <button
                 type="button"
                 onClick={onClick}
-                className="w-full h-full text-left relative bg-surface border border-border rounded-xl p-[22px_22px_18px] cursor-pointer transition-all duration-200 ease-out hover:border-accent-border hover:shadow-md hover:shadow-accent-glow/20 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 flex flex-col gap-[18px] outline-none"
+                className="w-full h-full text-left relative bg-surface border border-border rounded-xl p-[22px_22px_18px] cursor-pointer transition-all duration-200 ease-out hover:border-accent-border hover:shadow-md hover:shadow-accent-glow/20 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 flex flex-col gap-[18px] outline-none"
             >
                 <div className="flex justify-between items-start gap-3">
                     <div className="flex-1 min-w-0">
@@ -103,6 +114,9 @@ export default function ListCard({
 
                 <div className="flex flex-col gap-3.5 mt-auto">
                     <div className="flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-bg-muted text-text-muted text-xs font-semibold whitespace-nowrap border border-border">
+                            {getCategoryLabel()}
+                        </span>
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-subtle text-accent text-xs font-semibold whitespace-nowrap">
                             {getItemsCountLabel()}
                         </span>
@@ -117,7 +131,7 @@ export default function ListCard({
                                 return (
                                     <div className="flex flex-col items-center justify-center py-6 rounded-xl border-2 border-dashed border-border/40 text-text-muted/60 gap-1.5">
                                         <Plus size={18} />
-                                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                                        <span className="text-xs font-bold uppercase tracking-wider">
                                             Empty List
                                         </span>
                                     </div>
@@ -133,7 +147,7 @@ export default function ListCard({
                                                 className="text-success"
                                             />
                                         </div>
-                                        <span className="text-[10px] font-extrabold uppercase tracking-widest">
+                                        <span className="text-xs font-extrabold uppercase tracking-widest">
                                             All items checked
                                         </span>
                                     </div>
@@ -159,7 +173,7 @@ export default function ListCard({
                                             </div>
                                         ))}
                                     {uncheckedItems.length > PREVIEW_LIMIT && (
-                                        <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-[10px] font-bold text-text-muted">
+                                        <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-xs font-bold text-text-muted">
                                             +
                                             {uncheckedItems.length -
                                                 PREVIEW_LIMIT}{" "}

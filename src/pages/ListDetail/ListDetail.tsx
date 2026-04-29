@@ -9,18 +9,25 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+    ImportItemsModal,
     Modal,
     PresenceBar,
     type ReviewItem,
+    type ReviewSubmission,
     SmartReviewModal,
 } from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
-import api, { finishShoppingRequest } from "../../services/api";
+import api, {
+    aiMultimodalRequest,
+    finishShoppingRequest,
+} from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
+import type { ListCategory } from "../../types";
+import { buildItemDuplicateKey } from "../../utils/listUtils";
 import ShareListModal from "../Dashboard/ShareListModal";
 
 interface Item {
@@ -47,20 +54,15 @@ interface ApiListItem {
 
 interface ApiShoppingList {
     id: string;
+    category?: ListCategory;
     items?: ApiListItem[];
 }
 
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
+    onSwitchList?: () => void;
 }
-
-type AiResponseItem = {
-    id?: string;
-    name?: string;
-    brand?: string;
-    quantity?: string;
-};
 
 /**
  * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
@@ -80,10 +82,13 @@ const useListItems = (effectiveListId: string | undefined) => {
     /**
      * Retrieves the base URL for API requests.
      */
-    const getBaseUrl = useCallback(
-        () => import.meta.env.VITE_API_URL || "http://localhost:8081",
-        [],
-    );
+    const getBaseUrl = useCallback(() => {
+        const base =
+            import.meta.env.VITE_API_URL ||
+            import.meta.env.VITE_API_BASE_URL ||
+            "http://localhost:8081";
+        return base === "/" ? "" : base;
+    }, []);
 
     /**
      * Constructs the necessary headers for authentication and content type.
@@ -153,6 +158,11 @@ const useListItems = (effectiveListId: string | undefined) => {
                     isRecurrent: item.isRecurrent,
                 }));
                 setItems(mappedItems);
+                if (currentList.category) {
+                    useListsStore.getState().updateList(targetListId, {
+                        category: currentList.category,
+                    });
+                }
                 syncListItemsInStore(mappedItems, targetListId);
             } catch (error) {
                 const errorMessage =
@@ -180,44 +190,30 @@ const useListItems = (effectiveListId: string | undefined) => {
         setError(null);
 
         try {
-            const response = await fetch(
-                `${getBaseUrl()}/api/ai/recipe-to-list`,
-                {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        text: recipeText,
-                        listId: effectiveListId,
-                    }),
-                    credentials: "include",
-                },
-            );
+            const response = await aiMultimodalRequest(recipeText, null);
+            const aiData = response.data;
 
-            if (!response.ok) {
-                if (response.status === 401) {
-                    handleUnauthorizedResponse();
-                }
-                throw new Error("AI Service error");
-            }
-
-            const aiData = await response.json();
-
-            let rawItems: AiResponseItem[] = [];
-            if (Array.isArray(aiData)) {
+            let rawItems: {
+                specificName?: string;
+                genericName?: string;
+                name?: string;
+                brand?: string;
+                quantity?: number | string;
+                unit?: string;
+                category?: string;
+            }[] = [];
+            if (aiData && typeof aiData === "object" && "items" in aiData) {
+                rawItems = aiData.items ?? [];
+            } else if (Array.isArray(aiData)) {
                 rawItems = aiData;
-            } else if (
-                aiData &&
-                typeof aiData === "object" &&
-                "items" in aiData
-            ) {
-                rawItems = (aiData as { items: AiResponseItem[] }).items ?? [];
             }
 
             const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
-                id: item.id || crypto.randomUUID(),
-                name: item.name || "",
+                id: crypto.randomUUID(),
+                name: item.genericName || item.specificName || item.name || "",
                 brand: item.brand || undefined,
-                quantity: item.quantity || undefined,
+                quantity: item.quantity ? String(item.quantity) : undefined,
+                category: item.category || undefined,
             }));
 
             setReviewItems(itemsToReview);
@@ -230,7 +226,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
-    const handleReviewConfirm = async (feedback: ReviewItem[]) => {
+    const handleReviewConfirm = async ({
+        items: feedback,
+    }: ReviewSubmission) => {
         try {
             for (const item of feedback) {
                 const res = await fetch(
@@ -247,6 +245,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                             quantity: item.quantity?.trim()
                                 ? item.quantity.trim()
                                 : null,
+                            category: item.category || null,
                             timestamp: Date.now(),
                         }),
                         credentials: "include",
@@ -275,22 +274,48 @@ const useListItems = (effectiveListId: string | undefined) => {
         (message: { body: string }) => {
             try {
                 const payload = JSON.parse(message.body) as SyncPayload;
-                if (payload.action === "CHECK_OFF" && payload.itemId) {
-                    setItems((prev) =>
-                        prev.map((item) =>
+
+                setItems((prev) => {
+                    let next = prev;
+
+                    if (payload.action === "CHECK_OFF" && payload.itemId) {
+                        next = prev.map((item) =>
                             item.id === payload.itemId
                                 ? { ...item, checked: Boolean(payload.checked) }
                                 : item,
-                        ),
-                    );
-                } else if (payload.action === "ADD" && payload.itemId) {
-                    fetchListData();
-                }
+                        );
+                    } else if (payload.action === "DELETE" && payload.itemId) {
+                        next = prev.filter(
+                            (item) => item.id !== payload.itemId,
+                        );
+                    } else if (payload.action === "ADD" && payload.content) {
+                        try {
+                            const newItem = JSON.parse(payload.content) as Item;
+                            // Prevent duplicates if the creator receives their own echo
+                            if (!prev.some((i) => i.id === newItem.id)) {
+                                next = [...prev, newItem];
+                            }
+                        } catch (e) {
+                            console.error(
+                                "Failed to parse incoming ADD item JSON",
+                                e,
+                            );
+                        }
+                    }
+
+                    // CRITICAL FIX: Synchronize the new local state up to the global Zustand store
+                    // This prevents the global store from overriding our real-time WebSocket updates
+                    if (next !== prev) {
+                        syncListItemsInStore(next);
+                    }
+
+                    return next;
+                });
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [fetchListData],
+        [syncListItemsInStore], // Stable dependency prevents STOMP subscription churn
     );
 
     useEffect(() => {
@@ -302,6 +327,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             return;
         }
 
+        console.debug("[ws] subscribing list sync", effectiveListId);
         const updateSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}`,
             handleSyncMessage,
@@ -403,7 +429,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 const syncPayload: SyncPayload = {
                     action: "ADD",
                     itemId: createdItem.id,
-                    content: createdItem.name,
+                    content: JSON.stringify(createdItem),
                     timestamp: Date.now(),
                 };
                 stompClient.publish({
@@ -412,6 +438,23 @@ const useListItems = (effectiveListId: string | undefined) => {
                 });
             }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "ADD_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId: newItem.id,
+                        name: newItem.name,
+                        brand: newItem.brand,
+                        quantity: newItem.quantity,
+                        price: newItem.price,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
             const errorMessage =
                 err instanceof Error
                     ? err.message
@@ -463,6 +506,26 @@ const useListItems = (effectiveListId: string | undefined) => {
                 });
             }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "TOGGLE_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId,
+                        checked: newChecked,
+                        name: currentItem.name,
+                        brand: currentItem.brand,
+                        quantity: currentItem.quantity,
+                        price: currentItem.price,
+                        category: currentItem.category,
+                        isRecurrent: currentItem.isRecurrent,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
             const errorMessage =
                 err instanceof Error
                     ? err.message
@@ -484,7 +547,31 @@ const useListItems = (effectiveListId: string | undefined) => {
 
         try {
             await api.delete(`/api/items/${itemId}`);
+
+            if (effectiveListId && stompClient.connected) {
+                stompClient.publish({
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify({
+                        action: "DELETE",
+                        itemId,
+                        timestamp: Date.now(),
+                    }),
+                });
+            }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "DELETE_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
             const errorMessage =
                 err instanceof Error
                     ? err.message
@@ -514,6 +601,7 @@ const useListItems = (effectiveListId: string | undefined) => {
 
 /**
  * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
+ * Migrated to a server-authoritative roster model to fix late-arrival sync issues.
  */
 const useListPresence = (effectiveListId: string | undefined) => {
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
@@ -525,24 +613,13 @@ const useListPresence = (effectiveListId: string | undefined) => {
         (message: { body: string }) => {
             try {
                 const event = JSON.parse(message.body);
+                console.debug("[ws] presence received", event);
                 handlePresenceEvent(event);
-
-                const username = user?.email || "Anonymous";
-                if (event.eventType === "SYNC" && event.username !== username) {
-                    stompClient.publish({
-                        destination: `/app/list/${effectiveListId}/presence`,
-                        body: JSON.stringify({
-                            eventType: "JOIN",
-                            username,
-                            listId: effectiveListId,
-                        }),
-                    });
-                }
             } catch (err) {
                 console.error("Failed to parse presence message:", err);
             }
         },
-        [effectiveListId, handlePresenceEvent, user?.email],
+        [handlePresenceEvent],
     );
 
     useEffect(() => {
@@ -555,6 +632,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
         }
         const username = user?.email || "Anonymous";
 
+        console.debug("[ws] subscribing list presence", effectiveListId);
         const presenceSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}/presence`,
             handlePresenceMessage,
@@ -566,20 +644,15 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 username,
                 listId: effectiveListId,
             };
+
+            // Notify server that we joined.
+            // The server will respond by broadcasting a ROSTER_UPDATE to all clients.
             stompClient.publish({
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
             });
-            // Also request a SYNC to find out who is already here
-            stompClient.publish({
-                destination: `/app/list/${effectiveListId}/presence`,
-                body: JSON.stringify({
-                    eventType: "SYNC",
-                    username,
-                    listId: effectiveListId,
-                }),
-            });
-            handlePresenceEvent(joinEvent);
+
+            console.debug("[ws] sent presence JOIN", joinEvent);
         }
 
         return () => {
@@ -592,17 +665,17 @@ const useListPresence = (effectiveListId: string | undefined) => {
                         listId: effectiveListId,
                     }),
                 });
+                console.debug("[ws] sent presence LEAVE", username);
             }
             presenceSubscription?.unsubscribe();
             clearPresence();
         };
     }, [
         effectiveListId,
-        handlePresenceEvent,
         clearPresence,
         user?.email,
-        isServerConnected,
         handlePresenceMessage,
+        isServerConnected,
     ]);
 
     /**
@@ -629,10 +702,9 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(typingEvent),
             });
-            handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, handlePresenceEvent, user?.email]);
+    }, [effectiveListId, user?.email]);
 
     return { sendTypingEvent };
 };
@@ -968,7 +1040,7 @@ const ListHeader = ({
             <button
                 type="button"
                 onClick={onSwitchList}
-                className="text-[10px] font-bold text-accent hover:underline uppercase"
+                className="text-xs font-bold text-accent hover:underline uppercase"
             >
                 Switch List
             </button>
@@ -1035,6 +1107,7 @@ const InlineAddForm = ({
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
+    onSwitchList,
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -1064,6 +1137,12 @@ const ListDetail = ({
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [selectedTargetListId, setSelectedTargetListId] = useState("");
+    const [selectedImportItemIds, setSelectedImportItemIds] = useState<
+        Set<string>
+    >(new Set());
+    const [isImportingItems, setIsImportingItems] = useState(false);
 
     const [detailName, setDetailName] = useState("");
     const [detailQuantity, setDetailQuantity] = useState("");
@@ -1081,9 +1160,26 @@ const ListDetail = ({
     const [showBanner, setShowBanner] = useState(true);
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
+    const activeList = useMemo(
+        () => lists.find((list) => list.id === effectiveListId) ?? null,
+        [effectiveListId, lists],
+    );
+    const normalLists = useMemo(
+        () =>
+            lists.filter(
+                (list) =>
+                    list.id !== effectiveListId &&
+                    (list.category ?? "NORMAL") === "NORMAL",
+            ),
+        [effectiveListId, lists],
+    );
+    const canImportIntoNormalList =
+        (activeList?.category === "RECIPE" ||
+            activeList?.category === "FREQUENT") &&
+        items.length > 0;
 
     const activeCollaborationUsers = useMemo(() => {
-        const current = lists.find((l) => l.id === effectiveListId);
+        const current = activeList;
         if (!current) return [];
 
         const users = new Set<string>();
@@ -1092,7 +1188,7 @@ const ListDetail = ({
             users.add(email);
         }
         return Array.from(users);
-    }, [effectiveListId, lists]);
+    }, [activeList]);
 
     const estimatedTotal = useMemo(() => {
         return items
@@ -1152,6 +1248,18 @@ const ListDetail = ({
         }
     }, [lists.length, fetchLists]);
 
+    useEffect(() => {
+        if (
+            !showImportModal ||
+            normalLists.length === 0 ||
+            normalLists.some((list) => list.id === selectedTargetListId)
+        ) {
+            return;
+        }
+
+        setSelectedTargetListId(normalLists[0].id);
+    }, [normalLists, selectedTargetListId, showImportModal]);
+
     const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
@@ -1205,6 +1313,106 @@ const ListDetail = ({
 
     const isReadOnly = syncFailed;
 
+    const openImportModal = async () => {
+        await fetchLists();
+        const refreshedLists = useListsStore.getState().lists;
+        const refreshedNormalLists = refreshedLists.filter(
+            (list) =>
+                list.id !== effectiveListId &&
+                (list.category ?? "NORMAL") === "NORMAL",
+        );
+
+        if (refreshedNormalLists.length === 0) {
+            setError("Create a normal list first, then try again.");
+            return;
+        }
+
+        setSelectedTargetListId((currentId) =>
+            refreshedNormalLists.some((list) => list.id === currentId)
+                ? currentId
+                : refreshedNormalLists[0].id,
+        );
+        setSelectedImportItemIds(new Set(items.map((item) => item.id)));
+        setShowImportModal(true);
+    };
+
+    const toggleImportSelection = (itemId: string) => {
+        setSelectedImportItemIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemId)) {
+                next.delete(itemId);
+            } else {
+                next.add(itemId);
+            }
+            return next;
+        });
+    };
+
+    const clearImportState = () => {
+        setShowImportModal(false);
+        setSelectedImportItemIds(new Set());
+        setIsImportingItems(false);
+    };
+
+    const handleImportIntoNormalList = async () => {
+        if (!selectedTargetListId) return;
+
+        const targetList = useListsStore
+            .getState()
+            .lists.find((list) => list.id === selectedTargetListId);
+        if (!targetList) {
+            setError("Target list could not be found.");
+            return;
+        }
+
+        const existingKeys = new Set(
+            targetList.items.map((item) => buildItemDuplicateKey(item)),
+        );
+        const itemsToImport = items.filter(
+            (item) =>
+                selectedImportItemIds.has(item.id) &&
+                !existingKeys.has(buildItemDuplicateKey(item)),
+        );
+
+        if (itemsToImport.length === 0) {
+            setError("All selected items already exist in the target list.");
+            return;
+        }
+
+        setIsImportingItems(true);
+        setError(null);
+
+        try {
+            for (const item of itemsToImport) {
+                const added = await useListsStore
+                    .getState()
+                    .addItem(selectedTargetListId, {
+                        name: item.name,
+                        checked: false,
+                        brand: item.brand,
+                        quantity: item.quantity,
+                        price: item.price,
+                        category: item.category,
+                        isRecurrent: targetList.category === "FREQUENT",
+                    });
+
+                if (!added) {
+                    throw new Error(`Failed to add ${item.name}`);
+                }
+            }
+
+            await fetchLists();
+            clearImportState();
+        } catch (importError) {
+            const errorMessage =
+                importError instanceof Error
+                    ? importError.message
+                    : "Failed to import the selected items.";
+            setError(errorMessage);
+            setIsImportingItems(false);
+        }
+    };
+
     return (
         <div
             className={
@@ -1219,7 +1427,9 @@ const ListDetail = ({
                 {isEmbedded && (
                     <ListHeader
                         effectiveListId={effectiveListId ?? "default"}
-                        onSwitchList={() => navigate("/nav/default")}
+                        onSwitchList={
+                            onSwitchList ?? (() => navigate("/nav/default"))
+                        }
                     />
                 )}
 
@@ -1268,14 +1478,28 @@ const ListDetail = ({
                                         />
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowShareModal(true)}
-                                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
-                                >
-                                    <UserPlus size={14} strokeWidth={2.5} />
-                                    Invite
-                                </button>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    {canImportIntoNormalList && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void openImportModal();
+                                            }}
+                                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                                        >
+                                            <Plus size={14} strokeWidth={2.5} />
+                                            Add to normal list
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowShareModal(true)}
+                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                                    >
+                                        <UserPlus size={14} strokeWidth={2.5} />
+                                        Invite
+                                    </button>
+                                </div>
                             </div>
 
                             <InlineAddForm
@@ -1311,7 +1535,7 @@ const ListDetail = ({
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
                                             <div className="flex justify-between items-center">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
                                                         Estimated Total
                                                     </span>
                                                     <span className="text-xs text-text-muted opacity-70">
@@ -1441,7 +1665,7 @@ const ListDetail = ({
                                         ? receiptImage.name
                                         : "TAKE PHOTO"}
                                 </span>
-                                <span className="text-[10px] uppercase font-bold opacity-50">
+                                <span className="text-xs uppercase font-bold opacity-50">
                                     Click to open camera
                                 </span>
                             </label>
@@ -1507,6 +1731,29 @@ const ListDetail = ({
                 onClose={() => setIsReviewModalOpen(false)}
                 items={reviewItems}
                 onConfirm={handleReviewConfirm}
+            />
+
+            <ImportItemsModal
+                isOpen={showImportModal}
+                onClose={clearImportState}
+                title="Add items to a normal list"
+                subtitle={`Copy items from "${activeList?.name || "Shopping List"}" without duplicating products that already exist.`}
+                sourceItems={items}
+                availableTargetLists={normalLists}
+                selectedTargetListId={selectedTargetListId}
+                onTargetListChange={setSelectedTargetListId}
+                selectedItemIds={selectedImportItemIds}
+                onToggleItem={toggleImportSelection}
+                onSelectAllEligible={(itemIds) =>
+                    setSelectedImportItemIds(new Set(itemIds))
+                }
+                onClearSelection={() => setSelectedImportItemIds(new Set())}
+                onConfirm={() => {
+                    void handleImportIntoNormalList();
+                }}
+                isSubmitting={isImportingItems}
+                submitLabel="Import selected"
+                submittingLabel="Importing..."
             />
 
             {showShareModal && (

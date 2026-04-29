@@ -4,8 +4,9 @@ import { type ReactNode, useEffect, useId, useRef } from "react";
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
-    title?: string;
+    title?: ReactNode;
     subtitle?: string;
+    icon?: ReactNode;
     children: ReactNode;
     footer?: ReactNode;
     maxWidth?: string;
@@ -18,6 +19,7 @@ export default function Modal({
     onClose,
     title,
     subtitle,
+    icon,
     children,
     footer,
     maxWidth = "440px",
@@ -99,33 +101,41 @@ export default function Modal({
     return (
         <dialog
             ref={dialogRef}
-            className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-xs border-none p-0 outline-none open:animate-in open:fade-in duration-200"
+            className="fixed inset-0 m-auto hidden open:flex items-center justify-center bg-transparent backdrop:bg-overlay backdrop:backdrop-blur-xs border-none p-4 sm:p-6 outline-none open:animate-in open:fade-in duration-200"
             onCancel={handleCancel}
             aria-labelledby={title ? modalTitleId : undefined}
             aria-describedby={subtitle ? modalSubtitleId : undefined}
         >
             <div
-                className="relative z-10 bg-surface border border-border rounded-xl shadow-xl flex flex-col w-full mx-4 animate-in zoom-in-95 fade-in duration-200"
-                style={{ maxWidth }}
+                className="relative z-10 bg-surface border border-border rounded-xl shadow-xl flex flex-col w-full animate-in zoom-in-95 fade-in duration-200 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]"
+                style={{
+                    width: `min(${maxWidth}, calc(100vw - 2rem))`,
+                    maxWidth,
+                }}
             >
                 <div className="flex items-start justify-between p-6 pb-2">
-                    <div className="flex flex-col gap-1">
-                        {title && (
-                            <h2
-                                id={modalTitleId}
-                                className="text-xl font-bold text-text-strong tracking-tight"
-                            >
-                                {title}
-                            </h2>
+                    <div className="flex items-center gap-3 min-w-0">
+                        {icon && (
+                            <span className="text-accent shrink-0">{icon}</span>
                         )}
-                        {subtitle && (
-                            <p
-                                id={modalSubtitleId}
-                                className="text-sm text-text-muted leading-relaxed"
-                            >
-                                {subtitle}
-                            </p>
-                        )}
+                        <div className="flex flex-col gap-1 min-w-0">
+                            {title && (
+                                <h2
+                                    id={modalTitleId}
+                                    className="text-xl font-bold text-text-strong tracking-tight truncate"
+                                >
+                                    {title}
+                                </h2>
+                            )}
+                            {subtitle && (
+                                <p
+                                    id={modalSubtitleId}
+                                    className="text-sm text-text-muted leading-relaxed truncate"
+                                >
+                                    {subtitle}
+                                </p>
+                            )}
+                        </div>
                     </div>
                     <button
                         type="button"

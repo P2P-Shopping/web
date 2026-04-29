@@ -65,8 +65,7 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
 
     if (variant === "avatars") {
         // Combine all users and active users to determine full list
-        // If allUsers is provided, we use it as the base.
-        const baseUsers = allUsers.length > 0 ? allUsers : activeArray;
+        const baseUsers = Array.from(new Set([...allUsers, ...activeArray]));
 
         if (baseUsers.length === 0) return null;
 
@@ -111,7 +110,7 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                 </div>
                 <div className="w-px h-6 bg-border/60" aria-hidden="true" />
                 <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-text-strong uppercase tracking-wider">
+                    <span className="text-xs font-black text-text-strong uppercase tracking-wider">
                         {activeArray.length} Active
                     </span>
                     <span className="text-[9px] font-bold text-text-muted uppercase tracking-tight">

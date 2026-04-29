@@ -6,6 +6,7 @@ const API_URL = import.meta.env.VITE_API_BASE_URL;
 const api = axios.create({
     baseURL: API_URL,
     withCredentials: true,
+    timeout: 10_000,
 });
 
 api.interceptors.request.use((config) => {
@@ -53,23 +54,31 @@ export const finishShoppingRequest = async (data: {
         formData.append("receipt", data.receiptImage);
     }
 
-    return api.post("/api/shopping/finish", formData);
+    return api.post("/api/shopping/finish", formData, { timeout: 60_000 });
 };
 
 /**
  * Task 4: API Request for Multimodal AI Input
  */
 export const aiMultimodalRequest = async (
-    prompt: string,
+    text: string,
     image: File | null,
+    lat?: number | null,
+    lng?: number | null,
 ) => {
     const formData = new FormData();
-    formData.append("prompt", prompt);
+    formData.append("text", text);
     if (image) {
         formData.append("image", image);
     }
+    if (lat !== undefined && lat !== null) {
+        formData.append("latitude", lat.toString());
+    }
+    if (lng !== undefined && lng !== null) {
+        formData.append("longitude", lng.toString());
+    }
 
-    return api.post("/api/ai/analyze", formData);
+    return api.post("/api/ai/generate", formData, { timeout: 60_000 });
 };
 
 export default api;
