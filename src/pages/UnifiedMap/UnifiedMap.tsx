@@ -487,11 +487,9 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleFetchStores = async (listIdOverride?: string) => {
-        const idToFetch =
-            typeof listIdOverride === "string"
-                ? listIdOverride
-                : selectedListId;
+        const idToFetch = listIdOverride ?? selectedListId;
         if (!idToFetch) return;
+
         const selectedList = lists.find((l) => l.id === idToFetch);
         if (!selectedList) return;
 
@@ -504,11 +502,11 @@ const UnifiedMap: React.FC = () => {
                 return;
             }
 
-            const baseUrlResolved =
+            const apiBase =
                 import.meta.env.VITE_API_URL ||
                 import.meta.env.VITE_API_BASE_URL ||
                 "http://localhost:8081";
-            const baseUrl = baseUrlResolved === "/" ? "" : baseUrlResolved;
+            const baseUrl = apiBase === "/" ? "" : apiBase;
 
             const response = await fetch(
                 `${baseUrl}/api/routing/stores-match`,
@@ -519,7 +517,7 @@ const UnifiedMap: React.FC = () => {
                         userLat: userLocation.lat,
                         userLng: userLocation.lng,
                         radiusInMeters: 5000,
-                        itemIds: itemIds,
+                        itemIds,
                     }),
                 },
             );
@@ -617,10 +615,8 @@ const UnifiedMap: React.FC = () => {
 
         setItems(demoItems);
         handleForceIndoor();
-        // Teleport to entrance (center of Palas Mall geofence)
         teleport(DEMO_STORE_LOCATION.lat, DEMO_STORE_LOCATION.lng);
 
-        // Compute and display the TSP route using frontend mock (Palas Mall data)
         await loadRoute(
             demoItems.map((i) => i.id),
             DEMO_STORE_LOCATION.lat,
@@ -658,6 +654,43 @@ const UnifiedMap: React.FC = () => {
         };
         fetchFootprint();
     }, [activeTarget]);
+
+    const renderSidebarContent = () => {
+        if (!selectedListId) {
+            return (
+                <ListSelectionView
+                    lists={lists}
+                    isMicroView={isMicroView}
+                    handleListSelect={handleListSelect}
+                />
+            );
+        }
+
+        if (isShowingStores && !isMicroView) {
+            return (
+                <StoreRecommendationView
+                    recommendedStores={recommendedStores}
+                    transportMode={transportMode}
+                    setTransportMode={setTransportMode}
+                    setSelectedListId={setSelectedListId}
+                    handleStartRoute={handleStartRoute}
+                />
+            );
+        }
+
+        return (
+            <ListDetailView
+                selectedListId={selectedListId}
+                lists={lists}
+                isMicroView={isMicroView}
+                setSelectedListId={setSelectedListId}
+                targetStoreLocation={targetStoreLocation}
+                setTargetStoreLocation={setTargetStoreLocation}
+                handleFetchStores={handleFetchStores}
+                isFetchingStores={isFetchingStores}
+            />
+        );
+    };
 
     return (
         <div className="flex flex-col h-full overflow-hidden bg-bg">
@@ -817,36 +850,7 @@ const UnifiedMap: React.FC = () => {
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
                     <div className="flex-1 overflow-y-auto p-6 pt-2">
-                        {selectedListId ? (
-                            isShowingStores && !isMicroView ? (
-                                <StoreRecommendationView
-                                    recommendedStores={recommendedStores}
-                                    transportMode={transportMode}
-                                    setTransportMode={setTransportMode}
-                                    setSelectedListId={setSelectedListId}
-                                    handleStartRoute={handleStartRoute}
-                                />
-                            ) : (
-                                <ListDetailView
-                                    selectedListId={selectedListId}
-                                    lists={lists}
-                                    isMicroView={isMicroView}
-                                    setSelectedListId={setSelectedListId}
-                                    targetStoreLocation={targetStoreLocation}
-                                    setTargetStoreLocation={
-                                        setTargetStoreLocation
-                                    }
-                                    handleFetchStores={handleFetchStores}
-                                    isFetchingStores={isFetchingStores}
-                                />
-                            )
-                        ) : (
-                            <ListSelectionView
-                                lists={lists}
-                                isMicroView={isMicroView}
-                                handleListSelect={handleListSelect}
-                            />
-                        )}
+                        {renderSidebarContent()}
                     </div>
                 </div>
 
