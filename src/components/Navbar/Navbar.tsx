@@ -1,9 +1,7 @@
 import {
     LayoutDashboard,
     Map as MapIcon,
-    MapPinned,
     MoreHorizontal,
-    Route as RouteIcon,
     X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -16,8 +14,6 @@ import ThemeSwitcher from "../ThemeSwitcher/ThemeSwitcher";
 const NAV_LINKS = [
     { to: "/dashboard", label: "My Lists", icon: LayoutDashboard },
     { to: "/map", label: "Map", icon: MapIcon },
-    { to: "/route", label: "Route", icon: RouteIcon },
-    { to: "/nav", label: "Store Map", icon: MapPinned },
 ];
 
 export default function Navbar() {
@@ -31,7 +27,7 @@ export default function Navbar() {
     const user = useStore((state) => state.user);
 
     // Dynamic priority count based on width
-    const priorityCount = isNarrow ? 2 : 3;
+    const priorityCount = isNarrow ? 3 : 4;
 
     const handleLogout = async () => {
         try {

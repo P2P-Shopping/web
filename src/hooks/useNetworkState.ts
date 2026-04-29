@@ -28,7 +28,6 @@ const getTelemetryDeviceId = (): string => {
  */
 export const useNetworkState = (): void => {
     const setOnlineStatus = useStore((state) => state.setOnlineStatus);
-    const setServerConnected = useStore((state) => state.setServerConnected);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const retryCountRef = useRef(0);
     const telemetryAuthInvalidRef = useRef(false);
@@ -43,13 +42,9 @@ export const useNetworkState = (): void => {
         };
 
         const ping = async () => {
-            if (telemetryAuthInvalidRef.current) {
-                setServerConnected(true);
-                return;
-            }
+            if (telemetryAuthInvalidRef.current) return;
 
             if (!navigator.onLine) {
-                setServerConnected(false);
                 // Pause the loop. It will be resumed by the 'online' event listener.
                 return;
             }
@@ -73,18 +68,15 @@ export const useNetworkState = (): void => {
                         console.error(
                             "Telemetry ping unauthorized. Check VITE_TELEMETRY_API_KEY and telemetry.api.key.",
                         );
-                        setServerConnected(true);
                         return;
                     }
 
-                    setServerConnected(true);
                     retryCountRef.current = 0;
                     schedulePing(BASE_DELAY);
                 } else {
                     throw new Error("Ping failed");
                 }
             } catch {
-                setServerConnected(false);
                 retryCountRef.current++;
                 const backoffDelay = Math.min(
                     BASE_DELAY * 2 ** retryCountRef.current,
@@ -102,7 +94,6 @@ export const useNetworkState = (): void => {
 
         const handleOffline = (): void => {
             setOnlineStatus(false);
-            setServerConnected(false);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
 
@@ -122,5 +113,5 @@ export const useNetworkState = (): void => {
             globalThis.removeEventListener("offline", handleOffline);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [setOnlineStatus, setServerConnected]);
+    }, [setOnlineStatus]);
 };

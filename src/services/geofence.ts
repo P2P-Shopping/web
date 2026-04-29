@@ -2,8 +2,8 @@ import type { Coordinate } from "../context/useStore";
 
 export const GEOFENCE_RADIUS_METERS = 150;
 export const DEMO_STORE_LOCATION: Coordinate = {
-    lat: 47.1532,
-    lng: 27.5891,
+    lat: 47.156,
+    lng: 27.587,
 };
 
 export function getDistanceMeters(a: Coordinate, b: Coordinate): number {

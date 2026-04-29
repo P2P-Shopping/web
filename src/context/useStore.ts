@@ -34,6 +34,10 @@ interface AppState {
     hasEnteredStore: boolean;
     /** Prevents duplicate geofence transitions while indoor route loads */
     isTransitioningToStore: boolean;
+    /** Whether the map should automatically center on the user's location */
+    isAutoCenterEnabled: boolean;
+    /** Whether to use mock GPS updates or real navigator.geolocation */
+    isMockGpsEnabled: boolean;
 
     route: RoutePoint[];
     status: string;
@@ -68,6 +72,12 @@ interface AppState {
     setHasEnteredStore: (value: boolean) => void;
     /** Locks or unlocks the geofence transition */
     setIsTransitioningToStore: (value: boolean) => void;
+    /** Toggles map auto-centering */
+    setIsAutoCenterEnabled: (value: boolean) => void;
+    /** Toggles between mock and real GPS */
+    setIsMockGpsEnabled: (value: boolean) => void;
+    /** Manually triggers indoor mode and cross-geofence logic */
+    forceIndoorMode: () => void;
 
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
@@ -103,6 +113,8 @@ export const useStore = create<AppState>()(
             navigationMode: "city",
             hasEnteredStore: false,
             isTransitioningToStore: false,
+            isAutoCenterEnabled: true,
+            isMockGpsEnabled: true,
             route: [],
             status: "idle",
             items: [],
@@ -122,6 +134,16 @@ export const useStore = create<AppState>()(
             setHasEnteredStore: (value) => set({ hasEnteredStore: value }),
             setIsTransitioningToStore: (value) =>
                 set({ isTransitioningToStore: value }),
+            setIsAutoCenterEnabled: (value) =>
+                set({ isAutoCenterEnabled: value }),
+            setIsMockGpsEnabled: (value) => set({ isMockGpsEnabled: value }),
+            forceIndoorMode: () => {
+                set({
+                    navigationMode: "indoor",
+                    hasEnteredStore: true,
+                    isTransitioningToStore: false,
+                });
+            },
             setRoute: (route) => set({ route }),
             setStatus: (status) => set({ status }),
             setOnlineStatus: (status) => set({ isOnline: status }),

@@ -273,6 +273,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         (message: { body: string }) => {
             try {
                 const payload = JSON.parse(message.body) as SyncPayload;
+                console.debug("[ws] list sync received", payload);
                 if (payload.action === "CHECK_OFF" && payload.itemId) {
                     setItems((prev) =>
                         prev.map((item) =>
@@ -300,6 +301,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             return;
         }
 
+        console.debug("[ws] subscribing list sync", effectiveListId);
         const updateSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}`,
             handleSyncMessage,
@@ -573,24 +575,13 @@ const useListPresence = (effectiveListId: string | undefined) => {
         (message: { body: string }) => {
             try {
                 const event = JSON.parse(message.body);
+                console.debug("[ws] presence received", event);
                 handlePresenceEvent(event);
-
-                const username = user?.email || "Anonymous";
-                if (event.eventType === "SYNC" && event.username !== username) {
-                    stompClient.publish({
-                        destination: `/app/list/${effectiveListId}/presence`,
-                        body: JSON.stringify({
-                            eventType: "JOIN",
-                            username,
-                            listId: effectiveListId,
-                        }),
-                    });
-                }
             } catch (err) {
                 console.error("Failed to parse presence message:", err);
             }
         },
-        [effectiveListId, handlePresenceEvent, user?.email],
+        [handlePresenceEvent],
     );
 
     useEffect(() => {
@@ -603,6 +594,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
         }
         const username = user?.email || "Anonymous";
 
+        console.debug("[ws] subscribing list presence", effectiveListId);
         const presenceSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}/presence`,
             handlePresenceMessage,
@@ -618,15 +610,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
             });
-            // Also request a SYNC to find out who is already here
-            stompClient.publish({
-                destination: `/app/list/${effectiveListId}/presence`,
-                body: JSON.stringify({
-                    eventType: "SYNC",
-                    username,
-                    listId: effectiveListId,
-                }),
-            });
+            console.debug("[ws] sent presence JOIN", joinEvent);
             handlePresenceEvent(joinEvent);
         }
 
@@ -640,6 +624,11 @@ const useListPresence = (effectiveListId: string | undefined) => {
                         listId: effectiveListId,
                     }),
                 });
+                console.debug("[ws] sent presence LEAVE", {
+                    eventType: "LEAVE",
+                    username,
+                    listId: effectiveListId,
+                });
             }
             presenceSubscription?.unsubscribe();
             clearPresence();
@@ -649,8 +638,8 @@ const useListPresence = (effectiveListId: string | undefined) => {
         handlePresenceEvent,
         clearPresence,
         user?.email,
-        isServerConnected,
         handlePresenceMessage,
+        isServerConnected,
     ]);
 
     /**
@@ -677,6 +666,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(typingEvent),
             });
+            console.debug("[ws] sent presence TYPING", typingEvent);
             handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }

@@ -15,10 +15,8 @@ import {
     Dashboard,
     ListDetail,
     LoginPage,
-    MapPage,
     RegistrationPage,
-    RoutePage,
-    StoreMap,
+    UnifiedMap,
 } from "./pages";
 import { checkAuthRequest } from "./services/authService";
 import { DEMO_STORE_LOCATION, isWithinGeofence } from "./services/geofence";
@@ -170,10 +168,39 @@ function App() {
         };
     }, [setAuth, authChecked]);
 
+    const isMockGpsEnabled = useStore((state) => state.isMockGpsEnabled);
+    const setUserLocation = useStore((state) => state.setUserLocation);
+
     useEffect(() => {
-        startMockEmitter();
-        return () => stopMockEmitter();
-    }, []);
+        if (isMockGpsEnabled) {
+            startMockEmitter();
+            return () => stopMockEmitter();
+        }
+
+        if (!navigator.geolocation) {
+            console.error("Geolocation is not supported by this browser.");
+            return;
+        }
+
+        const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                setUserLocation({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                });
+            },
+            (error) => {
+                console.error("Real GPS error:", error);
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 1000,
+                timeout: 5000,
+            },
+        );
+
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, [isMockGpsEnabled, setUserLocation]);
 
     useEffect(() => {
         if (
@@ -204,8 +231,8 @@ function App() {
             setHasEnteredStore(true);
             setStatus("Indoor canvas active.");
 
-            if (!location.pathname.startsWith("/nav")) {
-                navigate("/nav/default", { replace: true });
+            if (!location.pathname.startsWith("/map")) {
+                navigate("/map", { replace: true });
             }
         })()
             .catch((error) => {
@@ -251,6 +278,7 @@ function App() {
 
         stompClient.onConnect = () => {
             setServerConnected(true);
+            console.debug("[ws] connected");
 
             if (subscription) {
                 subscription.unsubscribe();
@@ -260,6 +288,7 @@ function App() {
                 "/topic/pong",
                 handlePongMessage,
             );
+            console.debug("[ws] subscribed /topic/pong");
         };
 
         stompClient.onStompError = (frame) => {
@@ -275,6 +304,7 @@ function App() {
 
         stompClient.onWebSocketClose = () => {
             setServerConnected(false);
+            console.debug("[ws] closed");
         };
 
         stompClient.activate();
@@ -344,7 +374,7 @@ function App() {
                         path="/map"
                         element={
                             <ProtectedRoute>
-                                <MapPage />
+                                <UnifiedMap />
                             </ProtectedRoute>
                         }
                     />
@@ -353,22 +383,6 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <Dashboard />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/nav/:id?"
-                        element={
-                            <ProtectedRoute>
-                                <StoreMap />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/route"
-                        element={
-                            <ProtectedRoute>
-                                <RoutePage />
                             </ProtectedRoute>
                         }
                     />

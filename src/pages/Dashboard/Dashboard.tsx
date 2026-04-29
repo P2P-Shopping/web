@@ -1,4 +1,12 @@
-import { ChevronLeft, Plus, Sparkles } from "lucide-react";
+import {
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Columns,
+    Layout,
+    Plus,
+    Sparkles,
+} from "lucide-react";
 import {
     type MouseEvent,
     type ReactNode,
@@ -44,11 +52,42 @@ const Dashboard = () => {
         isModalOpen,
         deletingListId,
         fetchLists,
+        addList,
         deleteList,
         addItem,
         openModal,
         closeModal,
     } = useListsStore();
+
+    const [displayMode, setDisplayMode] = useState<"split" | "tabs">(() => {
+        return (
+            (localStorage.getItem("dashboard_display_mode") as
+                | "split"
+                | "tabs") || "split"
+        );
+    });
+    const [activeTab, setActiveTab] = useState<
+        "NORMAL" | "RECIPE" | "FREQUENT"
+    >("NORMAL");
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+        new Set(),
+    );
+
+    useEffect(() => {
+        localStorage.setItem("dashboard_display_mode", displayMode);
+    }, [displayMode]);
+
+    const toggleSection = (section: string) => {
+        setCollapsedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(section)) {
+                next.delete(section);
+            } else {
+                next.add(section);
+            }
+            return next;
+        });
+    };
 
     const showAiImport = searchParams.get("import") === "ai";
     const isOverlayOpen = isModalOpen || showAiImport;
@@ -170,8 +209,48 @@ const Dashboard = () => {
         resetDragState();
     };
 
-    const handleDragStart = (listId: string) => {
+    const handleDragStart = (e: React.DragEvent, listId: string) => {
         setDraggedListId(listId);
+
+        const list = lists.find((l) => l.id === listId);
+        if (list) {
+            // Create a simplified drag ghost element
+            const ghost = document.createElement("div");
+            ghost.style.position = "absolute";
+            ghost.style.top = "-1000px";
+            ghost.style.padding = "10px 20px";
+            ghost.style.background =
+                "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)";
+            ghost.style.color = "white";
+            ghost.style.borderRadius = "16px";
+            ghost.style.boxShadow =
+                "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)";
+            ghost.style.zIndex = "-1000";
+            ghost.style.pointerEvents = "none";
+            ghost.style.border = "1px solid rgba(255, 255, 255, 0.2)";
+
+            ghost.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 2px; font-family: sans-serif; padding-left: 12px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-weight: 800; font-size: 15px; white-space: nowrap; letter-spacing: -0.01em;">${list.name}</span>
+                    </div>
+                    <div style="font-size: 11px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.02em;">
+                        ${list.items.length} items • ${list.category || "NORMAL"}
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(ghost);
+            // Offset the ghost so it's to the right and slightly below the cursor
+            e.dataTransfer.setDragImage(ghost, -15, 25);
+
+            // Cleanup ghost element after the browser has taken the snapshot
+            setTimeout(() => {
+                if (document.body.contains(ghost)) {
+                    document.body.removeChild(ghost);
+                }
+            }, 0);
+        }
     };
 
     const handleDropOnNormalList = (targetListId: string) => {
@@ -262,6 +341,28 @@ const Dashboard = () => {
         }
     };
 
+    const handleCopyListToNormal = async (listId: string) => {
+        const sourceList = lists.find((l) => l.id === listId);
+        if (!sourceList) return;
+
+        const newList = await addList(`${sourceList.name} (Copy)`, "NORMAL");
+        if (newList) {
+            for (const item of sourceList.items) {
+                await addItem(newList.id, {
+                    name: item.name,
+                    checked: false,
+                    brand: item.brand,
+                    quantity: item.quantity,
+                    category: item.category,
+                    price: item.price,
+                    isRecurrent: false,
+                });
+            }
+            // Switch to normal tab if in tab mode
+            setActiveTab("NORMAL");
+        }
+    };
+
     let mainContent: ReactNode;
     if (isLoading && !isOverlayOpen) {
         mainContent = (
@@ -305,100 +406,227 @@ const Dashboard = () => {
             </div>
         );
     } else if (hasGroupedLists) {
-        mainContent = (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-                {sectionOrder.map((section) => {
-                    const sectionLists = groupedLists[section];
-                    if (sectionLists.length === 0) return null;
-
-                    return (
-                        <section
-                            key={section}
-                            className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-sm"
-                        >
-                            <div className="flex items-end justify-between gap-3">
-                                <div>
-                                    <h2 className="text-base font-extrabold text-text-strong tracking-tight">
-                                        {sectionLabels[section]}
-                                    </h2>
-                                    <p className="text-xs text-text-muted mt-0.5">
-                                        {`${sectionLists.length} ${sectionLists.length === 1 ? "list" : "lists"}`}
-                                    </p>
-                                </div>
-                                {section !== "NORMAL" && (
-                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-                                        Drag onto a normal list
-                                    </span>
-                                )}
-                            </div>
-
-                            <ul className="flex flex-col gap-4">
-                                {sectionLists.map((list) => (
-                                    <li
-                                        key={list.id}
-                                        draggable={
-                                            section !== "NORMAL" &&
-                                            list.items.length > 0
-                                        }
-                                        onDragStart={() =>
-                                            handleDragStart(list.id)
-                                        }
-                                        onDragEnd={resetDragState}
-                                        onDragOver={(e) => {
-                                            if (section !== "NORMAL") return;
-                                            if (
-                                                !draggedListId ||
-                                                draggedListId === list.id
-                                            )
-                                                return;
+        if (displayMode === "tabs") {
+            mainContent = (
+                <div className="flex flex-col gap-6">
+                    <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
+                        {sectionOrder.map((section) => (
+                            <button
+                                key={section}
+                                type="button"
+                                onClick={() => setActiveTab(section)}
+                                onDragOver={(e) => {
+                                    if (section === "NORMAL" && draggedListId) {
+                                        const draggedList = lists.find(
+                                            (l) => l.id === draggedListId,
+                                        );
+                                        if (
+                                            draggedList &&
+                                            (draggedList.category ===
+                                                "RECIPE" ||
+                                                draggedList.category ===
+                                                    "FREQUENT")
+                                        ) {
                                             e.preventDefault();
-                                            setDragOverListId(list.id);
-                                        }}
-                                        onDragLeave={() => {
-                                            if (dragOverListId === list.id) {
-                                                setDragOverListId(null);
-                                            }
-                                        }}
-                                        onDrop={(e) => {
-                                            if (section !== "NORMAL") return;
-                                            e.preventDefault();
-                                            handleDropOnNormalList(list.id);
-                                        }}
-                                        className={`rounded-xl transition-all ${
-                                            section !== "NORMAL" &&
-                                            list.items.length > 0
-                                                ? "cursor-grab active:cursor-grabbing"
-                                                : ""
-                                        } ${
-                                            dragOverListId === list.id
-                                                ? "scale-[1.01] ring-2 ring-accent ring-offset-2 ring-offset-bg"
-                                                : ""
-                                        }`}
-                                    >
-                                        <ListCard
-                                            list={list}
+                                            setDragOverListId("TAB_NORMAL");
+                                        }
+                                    }
+                                }}
+                                onDragLeave={() => {
+                                    if (dragOverListId === "TAB_NORMAL")
+                                        setDragOverListId(null);
+                                }}
+                                onDrop={(e) => {
+                                    if (section === "NORMAL" && draggedListId) {
+                                        e.preventDefault();
+                                        void handleCopyListToNormal(
+                                            draggedListId,
+                                        );
+                                        setDragOverListId(null);
+                                    }
+                                }}
+                                className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${
+                                    activeTab === section
+                                        ? "bg-accent text-text-on-accent shadow-md"
+                                        : dragOverListId === "TAB_NORMAL" &&
+                                            section === "NORMAL"
+                                          ? "bg-accent-subtle text-accent ring-2 ring-accent"
+                                          : "text-text-muted hover:text-text-strong hover:bg-bg-muted"
+                                }`}
+                            >
+                                {sectionLabels[section]}
+                                <span
+                                    className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                                        activeTab === section
+                                            ? "bg-white/20"
+                                            : "bg-bg-muted text-text-muted"
+                                    }`}
+                                >
+                                    {groupedLists[section].length}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                    <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
+                        {groupedLists[activeTab].map((list) => (
+                            <li
+                                key={list.id}
+                                draggable={
+                                    activeTab !== "NORMAL" &&
+                                    list.items.length > 0
+                                }
+                                onDragStart={(e) => handleDragStart(e, list.id)}
+                                onDragEnd={resetDragState}
+                                className={
+                                    activeTab !== "NORMAL" &&
+                                    list.items.length > 0
+                                        ? "cursor-grab active:cursor-grabbing"
+                                        : ""
+                                }
+                            >
+                                <ListCard
+                                    list={list}
+                                    onClick={() => handleCardClick(list.id)}
+                                    onDelete={(e) =>
+                                        handleDeleteList(e, list.id, list.name)
+                                    }
+                                    isDeleting={deletingListId === list.id}
+                                />
+                            </li>
+                        ))}
+                        {groupedLists[activeTab].length === 0 && (
+                            <li className="col-span-full py-20 text-center text-text-muted list-none">
+                                No lists in this category
+                            </li>
+                        )}
+                    </ul>
+                </div>
+            );
+        } else {
+            mainContent = (
+                <div className="flex flex-col gap-8 pb-4">
+                    {sectionOrder.map((section) => {
+                        const sectionLists = groupedLists[section];
+                        const isCollapsed = collapsedSections.has(section);
+
+                        return (
+                            <section
+                                key={section}
+                                className="flex flex-col gap-4"
+                            >
+                                <div className="flex items-center justify-between border-b border-border pb-3">
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            type="button"
                                             onClick={() =>
-                                                handleCardClick(list.id)
+                                                toggleSection(section)
                                             }
-                                            onDelete={(e) =>
-                                                handleDeleteList(
-                                                    e,
-                                                    list.id,
-                                                    list.name,
-                                                )
+                                            className="p-1 hover:bg-bg-muted rounded text-text-muted transition-colors"
+                                            title={
+                                                isCollapsed
+                                                    ? "Expand"
+                                                    : "Collapse"
                                             }
-                                            isDeleting={
-                                                deletingListId === list.id
-                                            }
-                                        />
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
-                    );
-                })}
-            </div>
-        );
+                                        >
+                                            {isCollapsed ? (
+                                                <ChevronRight size={20} />
+                                            ) : (
+                                                <ChevronDown size={20} />
+                                            )}
+                                        </button>
+                                        <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
+                                            {sectionLabels[section]}
+                                        </h2>
+                                        <span className="px-2 py-0.5 rounded-full bg-bg-muted text-text-muted text-xs font-bold">
+                                            {sectionLists.length}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {!isCollapsed && (
+                                    <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
+                                        {sectionLists.map((list) => (
+                                            <li
+                                                key={list.id}
+                                                draggable={
+                                                    section !== "NORMAL" &&
+                                                    list.items.length > 0
+                                                }
+                                                onDragStart={(e) =>
+                                                    handleDragStart(e, list.id)
+                                                }
+                                                onDragEnd={resetDragState}
+                                                onDragOver={(e) => {
+                                                    if (section !== "NORMAL")
+                                                        return;
+                                                    if (
+                                                        !draggedListId ||
+                                                        draggedListId ===
+                                                            list.id
+                                                    )
+                                                        return;
+                                                    e.preventDefault();
+                                                    setDragOverListId(list.id);
+                                                }}
+                                                onDragLeave={() => {
+                                                    if (
+                                                        dragOverListId ===
+                                                        list.id
+                                                    ) {
+                                                        setDragOverListId(null);
+                                                    }
+                                                }}
+                                                onDrop={(e) => {
+                                                    if (section !== "NORMAL")
+                                                        return;
+                                                    e.preventDefault();
+                                                    handleDropOnNormalList(
+                                                        list.id,
+                                                    );
+                                                }}
+                                                className={`w-[320px] shrink-0 rounded-xl transition-all ${
+                                                    section !== "NORMAL" &&
+                                                    list.items.length > 0
+                                                        ? "cursor-grab active:cursor-grabbing"
+                                                        : ""
+                                                } ${
+                                                    dragOverListId === list.id
+                                                        ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg"
+                                                        : ""
+                                                }`}
+                                            >
+                                                <ListCard
+                                                    list={list}
+                                                    onClick={() =>
+                                                        handleCardClick(list.id)
+                                                    }
+                                                    onDelete={(e) =>
+                                                        handleDeleteList(
+                                                            e,
+                                                            list.id,
+                                                            list.name,
+                                                        )
+                                                    }
+                                                    isDeleting={
+                                                        deletingListId ===
+                                                        list.id
+                                                    }
+                                                />
+                                            </li>
+                                        ))}
+                                        {sectionLists.length === 0 && (
+                                            <li className="w-full py-10 text-center text-text-muted border-2 border-dashed border-border rounded-xl list-none">
+                                                No lists in this category
+                                            </li>
+                                        )}
+                                    </ul>
+                                )}
+                            </section>
+                        );
+                    })}
+                </div>
+            );
+        }
     } else {
         mainContent = (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
@@ -419,7 +647,7 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="flex flex-col bg-bg">
+        <div className="flex flex-col bg-bg h-screen overflow-hidden">
             <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
                 {selectedList || showAiImport ? (
                     <>
@@ -450,6 +678,24 @@ const Dashboard = () => {
                             </p>
                         </div>
                         <div className="flex items-center gap-3 max-[600px]:w-full">
+                            <div className="flex items-center bg-bg-muted border border-border rounded-md p-1 mr-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setDisplayMode("split")}
+                                    className={`p-1.5 rounded transition-all ${displayMode === "split" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
+                                    title="Split View"
+                                >
+                                    <Columns size={18} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setDisplayMode("tabs")}
+                                    className={`p-1.5 rounded transition-all ${displayMode === "tabs" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
+                                    title="Tabbed View"
+                                >
+                                    <Layout size={18} />
+                                </button>
+                            </div>
                             <button
                                 type="button"
                                 className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
@@ -477,7 +723,7 @@ const Dashboard = () => {
                 )}
             </header>
 
-            <main className="flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4">
+            <main className="flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 overflow-y-auto scrollbar-thin">
                 {mainContent}
             </main>
 
