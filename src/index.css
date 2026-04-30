@@ -180,6 +180,7 @@
     }
 
     body {
+        padding-bottom: env(safe-area-inset-bottom);
         margin: 0;
         font-family: var(--font-sans);
         background: var(--color-bg);
