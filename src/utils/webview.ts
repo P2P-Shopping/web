@@ -17,7 +17,10 @@ type GlobalWithBridge = typeof globalThis & {
  */
 export const isWebView = (): boolean => {
     if (typeof globalThis === "undefined") return false;
-    return typeof (globalThis as GlobalWithBridge).P2PBridge?.getDeviceId === "function";
+    return (
+        typeof (globalThis as GlobalWithBridge).P2PBridge?.getDeviceId ===
+        "function"
+    );
 };
 
 /**

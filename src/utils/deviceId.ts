@@ -27,7 +27,8 @@ export const getDeviceId = (): string => {
 
     let existingId: string | null = null;
     try {
-        existingId = globalThis.localStorage?.getItem(TELEMETRY_DEVICE_ID_KEY) ?? null;
+        existingId =
+            globalThis.localStorage?.getItem(TELEMETRY_DEVICE_ID_KEY) ?? null;
     } catch {
         // storage unavailable; continue to generated fallback
     }
