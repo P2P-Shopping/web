@@ -12,7 +12,9 @@ export const getDeviceId = (): string => {
         return window.P2PBridge.getDeviceId();
     }
 
-    const existingId = globalThis.localStorage?.getItem(TELEMETRY_DEVICE_ID_KEY);
+    const existingId = globalThis.localStorage?.getItem(
+        TELEMETRY_DEVICE_ID_KEY,
+    );
     if (existingId) {
         return existingId;
     }

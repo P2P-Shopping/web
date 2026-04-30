@@ -13,7 +13,10 @@ declare global {
  */
 export const isWebView = (): boolean => {
     if (typeof window === "undefined") return false;
-    return "P2PBridge" in window && typeof window.P2PBridge?.getDeviceId === "function";
+    return (
+        "P2PBridge" in window &&
+        typeof window.P2PBridge?.getDeviceId === "function"
+    );
 };
 
 /**

@@ -135,7 +135,8 @@ export default function Navbar() {
                 {isMoreOpen && (
                     <div
                         ref={moreMenuRef}
-                        className="absolute bottom-[84px] right-4 bg-surface border border-border rounded-2xl p-2 shadow-2xl min-w-[180px] animate-in slide-in-from-bottom-4 fade-in duration-300"                    >
+                        className="absolute bottom-[84px] right-4 bg-surface border border-border rounded-2xl p-2 shadow-2xl min-w-[180px] animate-in slide-in-from-bottom-4 fade-in duration-300"
+                    >
                         <div className="flex flex-col gap-1">
                             {extraLinks.map(({ to, label, icon: Icon }) => (
                                 <Link
