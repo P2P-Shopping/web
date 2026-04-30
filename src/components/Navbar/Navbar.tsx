@@ -77,7 +77,7 @@ export default function Navbar() {
     const extraLinks = NAV_LINKS.slice(priorityCount);
 
     return (
-        <nav className="relative bg-surface/80 backdrop-blur-xl border-t border-border h-[72px] pb-safe flex items-center shadow-[0_-8px_30px_rgba(0,0,0,0.04)] z-50">
+        <nav className="relative bg-surface/80 backdrop-blur-xl border-t border-border h-[72px] pb-safe flex items-center shadow-[0_-8px_30px_rgba(0,0,0,0.04)] z-[3001]">
             <div className="max-w-[600px] w-full mx-auto px-4 flex items-center justify-around relative">
                 {priorityLinks.map(({ to, label, icon: Icon }) => (
                     <Link
@@ -135,8 +135,7 @@ export default function Navbar() {
                 {isMoreOpen && (
                     <div
                         ref={moreMenuRef}
-                        className="absolute bottom-[84px] right-4 bg-surface border border-border rounded-2xl p-2 shadow-2xl min-w-[180px] animate-in slide-in-from-bottom-4 fade-in duration-300"
-                    >
+                        className="absolute bottom-[84px] right-4 bg-surface border border-border rounded-2xl p-2 shadow-2xl min-w-[180px] animate-in slide-in-from-bottom-4 fade-in duration-300"                    >
                         <div className="flex flex-col gap-1">
                             {extraLinks.map(({ to, label, icon: Icon }) => (
                                 <Link
