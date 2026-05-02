@@ -1,8 +1,7 @@
 import {
     LayoutDashboard,
-    MapPinned,
+    Map as MapIcon,
     MoreHorizontal,
-    Route as RouteIcon,
     X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -14,8 +13,7 @@ import ThemeSwitcher from "../ThemeSwitcher/ThemeSwitcher";
 
 const NAV_LINKS = [
     { to: "/dashboard", label: "My Lists", icon: LayoutDashboard },
-    { to: "/route", label: "Route", icon: RouteIcon },
-    { to: "/nav", label: "Store Map", icon: MapPinned },
+    { to: "/map", label: "Map", icon: MapIcon },
 ];
 
 export default function Navbar() {
@@ -29,7 +27,7 @@ export default function Navbar() {
     const user = useStore((state) => state.user);
 
     // Dynamic priority count based on width
-    const priorityCount = isNarrow ? 2 : 3;
+    const priorityCount = isNarrow ? 3 : 4;
 
     const handleLogout = async () => {
         try {
@@ -103,7 +101,7 @@ export default function Navbar() {
                                 strokeWidth={pathname.startsWith(to) ? 2.5 : 2}
                             />
                         </div>
-                        <span className="text-[10px] font-bold">{label}</span>
+                        <span className="text-xs font-bold">{label}</span>
                     </Link>
                 ))}
 
@@ -130,7 +128,7 @@ export default function Navbar() {
                             <MoreHorizontal size={22} />
                         )}
                     </div>
-                    <span className="text-[10px] font-bold">More</span>
+                    <span className="text-xs font-bold">More</span>
                 </button>
 
                 {/* More Menu Content */}
@@ -166,7 +164,7 @@ export default function Navbar() {
                             <div className="h-px bg-border my-1" />
                             {user && (
                                 <div className="px-4 py-2 flex flex-col">
-                                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                    <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
                                         Account
                                     </span>
                                     <span className="text-xs font-semibold text-text-strong truncate">

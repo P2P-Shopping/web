@@ -1,12 +1,34 @@
-import { AlertCircle, ChevronDown, Plus, Settings } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    AlertCircle,
+    Camera,
+    ChevronDown,
+    Plus,
+    Settings,
+    UserPlus,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Modal, PresenceBar } from "../../components";
+import {
+    ImportItemsModal,
+    Modal,
+    PresenceBar,
+    type ReviewItem,
+    type ReviewSubmission,
+    SmartReviewModal,
+} from "../../components";
 import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
+import type { SyncPayload } from "../../dto/SyncPayload";
+import api, {
+    aiMultimodalRequest,
+    finishShoppingRequest,
+} from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
+import type { ListCategory } from "../../types";
+import { buildItemDuplicateKey } from "../../utils/listUtils";
+import ShareListModal from "../Dashboard/ShareListModal";
 
 interface Item {
     id: string;
@@ -32,26 +54,45 @@ interface ApiListItem {
 
 interface ApiShoppingList {
     id: string;
+    category?: ListCategory;
     items?: ApiListItem[];
 }
 
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
+    onSwitchList?: () => void;
 }
 
+/**
+ * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
+ * @param effectiveListId - The ID of the currently active list.
+ */
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
     const [items, setItems] = useState<Item[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [syncFailed, setSyncFailed] = useState(false);
+    const isServerConnected = useStore((state) => state.isServerConnected);
 
-    const getBaseUrl = useCallback(
-        () => import.meta.env.VITE_API_URL || "http://localhost:8081",
-        [],
-    );
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
+    /**
+     * Retrieves the base URL for API requests.
+     */
+    const getBaseUrl = useCallback(() => {
+        const base =
+            import.meta.env.VITE_API_URL ||
+            import.meta.env.VITE_API_BASE_URL ||
+            "http://localhost:8081";
+        return base === "/" ? "" : base;
+    }, []);
+
+    /**
+     * Constructs the necessary headers for authentication and content type.
+     */
     const getAuthHeaders = useCallback(
         (withContentType = false): HeadersInit => {
             return {
@@ -63,6 +104,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         [],
     );
 
+    /**
+     * Synchronizes the local item state with the global store state.
+     */
     const syncListItemsInStore = useCallback(
         (nextItems: Item[], targetListId = effectiveListId) => {
             if (!targetListId || targetListId === "default") return;
@@ -71,6 +115,14 @@ const useListItems = (effectiveListId: string | undefined) => {
         [effectiveListId, updateList],
     );
 
+    const handleUnauthorizedResponse = useCallback(() => {
+        useStore.getState().setAuth(null);
+        setSyncFailed(true);
+    }, []);
+
+    /**
+     * Fetches the complete data for a specific shopping list from the server.
+     */
     const fetchListData = useCallback(
         async (targetListId = effectiveListId) => {
             if (!targetListId || targetListId === "default") {
@@ -79,22 +131,18 @@ const useListItems = (effectiveListId: string | undefined) => {
                 return;
             }
             try {
-                const response = await fetch(
-                    `${getBaseUrl()}/api/lists/${targetListId}`,
-                    {
-                        headers: getAuthHeaders(),
-                        credentials: "include",
-                    },
+                const response = await api.get<ApiShoppingList>(
+                    `/api/lists/${targetListId}`,
                 );
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        useStore.getState().setAuth(null);
-                        setSyncFailed(true);
-                        throw new Error("Session expired.");
-                    }
-                    throw new Error("Failed to fetch list");
-                }
-                const currentList = (await response.json()) as ApiShoppingList;
+                // Note: api.get returns response.data directly in the feature branch implementation of 'api' service usually,
+                // but main seems to have switched to 'fetch' or a different api wrapper.
+                // Looking at the conflict:
+                // HEAD: const currentList = response.data;
+                // main: if (!response.ok) { ... } const currentList = (await response.json()) as ApiShoppingList;
+                // If 'api' is the axios-like wrapper from feature branch, it has .data.
+                // Let's check what 'api' is.
+
+                const currentList = response.data;
                 if (!currentList) {
                     setItems([]);
                     return;
@@ -110,16 +158,25 @@ const useListItems = (effectiveListId: string | undefined) => {
                     isRecurrent: item.isRecurrent,
                 }));
                 setItems(mappedItems);
+                if (currentList.category) {
+                    useListsStore.getState().updateList(targetListId, {
+                        category: currentList.category,
+                    });
+                }
                 syncListItemsInStore(mappedItems, targetListId);
             } catch (error) {
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to sync the list.";
                 console.error("fetchListData error:", error);
-                setError("Failed to sync the list.");
+                setError(errorMessage);
                 setSyncFailed(true);
             } finally {
                 setIsLoading(false);
             }
         },
-        [getBaseUrl, getAuthHeaders, syncListItemsInStore, effectiveListId],
+        [syncListItemsInStore, effectiveListId],
     );
 
     useEffect(() => {
@@ -127,6 +184,163 @@ const useListItems = (effectiveListId: string | undefined) => {
         fetchListData();
     }, [fetchListData]);
 
+    const handleAiImport = async (recipeText: string) => {
+        if (!recipeText.trim() || !effectiveListId) return;
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const response = await aiMultimodalRequest(recipeText, null);
+            const aiData = response.data;
+
+            let rawItems: {
+                specificName?: string;
+                genericName?: string;
+                name?: string;
+                brand?: string;
+                quantity?: number | string;
+                unit?: string;
+                category?: string;
+            }[] = [];
+            if (aiData && typeof aiData === "object" && "items" in aiData) {
+                rawItems = aiData.items ?? [];
+            } else if (Array.isArray(aiData)) {
+                rawItems = aiData;
+            }
+
+            const itemsToReview: ReviewItem[] = rawItems.map((item) => ({
+                id: crypto.randomUUID(),
+                name: item.genericName || item.specificName || item.name || "",
+                brand: item.brand || undefined,
+                quantity: item.quantity ? String(item.quantity) : undefined,
+                category: item.category || undefined,
+            }));
+
+            setReviewItems(itemsToReview);
+            setIsReviewModalOpen(true);
+        } catch (err) {
+            console.error("AI processing error:", err);
+            setError("AI processing error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleReviewConfirm = async ({
+        items: feedback,
+    }: ReviewSubmission) => {
+        try {
+            for (const item of feedback) {
+                const res = await fetch(
+                    `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
+                    {
+                        method: "POST",
+                        headers: getAuthHeaders(true),
+                        body: JSON.stringify({
+                            name: item.name,
+                            isChecked: false,
+                            brand: item.brand?.trim()
+                                ? item.brand.trim()
+                                : null,
+                            quantity: item.quantity?.trim()
+                                ? item.quantity.trim()
+                                : null,
+                            category: item.category || null,
+                            timestamp: Date.now(),
+                        }),
+                        credentials: "include",
+                    },
+                );
+
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        handleUnauthorizedResponse();
+                    }
+                    throw new Error(`Failed to save item: ${item.name}`);
+                }
+            }
+            await fetchListData(effectiveListId);
+            setIsReviewModalOpen(false);
+        } catch (err) {
+            console.error("handleReviewConfirm error:", err);
+            setError("Error saving some items. Please check your list.");
+
+            // NEW: Fetch the list anyway to show any items that successfully saved before the crash
+            await fetchListData(effectiveListId);
+        }
+    };
+
+    const handleSyncMessage = useCallback(
+        (message: { body: string }) => {
+            try {
+                const payload = JSON.parse(message.body) as SyncPayload;
+
+                setItems((prev) => {
+                    let next = prev;
+
+                    if (payload.action === "CHECK_OFF" && payload.itemId) {
+                        next = prev.map((item) =>
+                            item.id === payload.itemId
+                                ? { ...item, checked: Boolean(payload.checked) }
+                                : item,
+                        );
+                    } else if (payload.action === "DELETE" && payload.itemId) {
+                        next = prev.filter(
+                            (item) => item.id !== payload.itemId,
+                        );
+                    } else if (payload.action === "ADD" && payload.content) {
+                        try {
+                            const newItem = JSON.parse(payload.content) as Item;
+                            // Prevent duplicates if the creator receives their own echo
+                            if (!prev.some((i) => i.id === newItem.id)) {
+                                next = [...prev, newItem];
+                            }
+                        } catch (e) {
+                            console.error(
+                                "Failed to parse incoming ADD item JSON",
+                                e,
+                            );
+                        }
+                    }
+
+                    // CRITICAL FIX: Synchronize the new local state up to the global Zustand store
+                    // This prevents the global store from overriding our real-time WebSocket updates
+                    if (next !== prev) {
+                        syncListItemsInStore(next);
+                    }
+
+                    return next;
+                });
+            } catch (err) {
+                console.error("Failed to parse sync message:", err);
+            }
+        },
+        [syncListItemsInStore], // Stable dependency prevents STOMP subscription churn
+    );
+
+    useEffect(() => {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !isServerConnected
+        ) {
+            return;
+        }
+
+        console.debug("[ws] subscribing list sync", effectiveListId);
+        const updateSubscription = stompClient.subscribe(
+            `/topic/list/${effectiveListId}`,
+            handleSyncMessage,
+        );
+
+        return () => {
+            updateSubscription?.unsubscribe();
+        };
+    }, [effectiveListId, handleSyncMessage, isServerConnected]);
+
+    /**
+     * Reverts an item addition locally if the server request fails.
+     */
     const rollbackItem = useCallback(
         (itemId: string) => {
             setItems((prev) => {
@@ -138,6 +352,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
+    /**
+     * Reverts an item's checked status if the server request fails.
+     */
     const revertItemChecked = useCallback(
         (itemId: string, originalChecked: boolean) => {
             setItems((prev) => {
@@ -153,6 +370,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
+    /**
+     * Adds a new item to the current shopping list with optional details.
+     */
     const addItem = async (
         name: string,
         quantity?: string,
@@ -176,34 +396,22 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(optimisticItems);
 
         try {
-            const res = await fetch(
-                `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
-                {
-                    method: "POST",
-                    headers: getAuthHeaders(true),
-                    body: JSON.stringify({
-                        name: newItem.name,
-                        isChecked: false,
-                        brand: newItem.brand ?? null,
-                        quantity: newItem.quantity ?? null,
-                        price: newItem.price ?? null,
-                        category: null,
-                        isRecurrent: false,
-                        timestamp: Date.now(),
-                    }),
-                    credentials: "include",
-                },
+            const payload = {
+                name: newItem.name,
+                isChecked: false,
+                brand: newItem.brand ?? null,
+                quantity: newItem.quantity ?? null,
+                price: newItem.price ?? null,
+                category: null,
+                isRecurrent: false,
+                timestamp: Date.now(),
+            };
+            const res = await api.post<ApiListItem>(
+                `/api/lists/${effectiveListId}/items`,
+                payload,
             );
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    useStore.getState().setAuth(null);
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to add item");
-            }
-
-            const createdApiItem = (await res.json()) as ApiListItem;
+            const createdApiItem = res.data;
             const createdItem: Item = {
                 id: createdApiItem.id,
                 name: createdApiItem.name,
@@ -218,22 +426,48 @@ const useListItems = (effectiveListId: string | undefined) => {
             await fetchListData(effectiveListId);
 
             if (stompClient.connected) {
+                const syncPayload: SyncPayload = {
+                    action: "ADD",
+                    itemId: createdItem.id,
+                    content: JSON.stringify(createdItem),
+                    timestamp: Date.now(),
+                };
                 stompClient.publish({
-                    destination: "/app/sync",
-                    body: JSON.stringify({
-                        eventType: "ITEM_ADDED",
-                        listId: effectiveListId,
-                        item: createdItem,
-                    }),
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify(syncPayload),
                 });
             }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "ADD_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId: newItem.id,
+                        name: newItem.name,
+                        brand: newItem.brand,
+                        quantity: newItem.quantity,
+                        price: newItem.price,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to add the product.";
             console.error("addItem error:", err);
-            setError("Failed to add the product.");
+            setError(errorMessage);
             rollbackItem(newItem.id);
         }
     };
 
+    /**
+     * Toggles the checked status of an item and updates the server.
+     */
     const toggleItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const currentItem = items.find((item) => item.id === itemId);
@@ -247,47 +481,64 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
-            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "PUT",
-                headers: getAuthHeaders(true),
-                body: JSON.stringify({
-                    name: currentItem.name,
-                    isChecked: newChecked,
-                    brand: currentItem.brand ?? null,
-                    quantity: currentItem.quantity ?? null,
-                    price: currentItem.price ?? null,
-                    category: currentItem.category ?? null,
-                    isRecurrent: currentItem.isRecurrent ?? false,
-                    timestamp: Date.now(),
-                }),
-                credentials: "include",
-            });
+            const payload = {
+                name: currentItem.name,
+                isChecked: newChecked,
+                brand: currentItem.brand ?? null,
+                quantity: currentItem.quantity ?? null,
+                price: currentItem.price ?? null,
+                category: currentItem.category ?? null,
+                isRecurrent: currentItem.isRecurrent ?? false,
+                timestamp: Date.now(),
+            };
+            await api.put(`/api/items/${itemId}`, payload);
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    useStore.getState().setAuth(null);
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to update item");
-            }
             if (effectiveListId && stompClient.connected) {
+                const syncPayload: SyncPayload = {
+                    action: "CHECK_OFF",
+                    itemId,
+                    checked: newChecked,
+                    timestamp: Date.now(),
+                };
                 stompClient.publish({
-                    destination: "/app/sync",
-                    body: JSON.stringify({
-                        eventType: "ITEM_TOGGLED",
-                        listId: effectiveListId,
-                        itemId,
-                        checked: newChecked,
-                    }),
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify(syncPayload),
                 });
             }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "TOGGLE_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId,
+                        checked: newChecked,
+                        name: currentItem.name,
+                        brand: currentItem.brand,
+                        quantity: currentItem.quantity,
+                        price: currentItem.price,
+                        category: currentItem.category,
+                        isRecurrent: currentItem.isRecurrent,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update the product.";
             console.error("toggleItem error:", err);
-            setError("Failed to update the product.");
+            setError(errorMessage);
             revertItemChecked(itemId, currentItem.checked);
         }
     };
 
+    /**
+     * Deletes an item from the list and the server.
+     */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const nextItems = items.filter((item) => item.id !== itemId);
@@ -295,22 +546,38 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
-            const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                method: "DELETE",
-                headers: getAuthHeaders(),
-                credentials: "include",
-            });
+            await api.delete(`/api/items/${itemId}`);
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    useStore.getState().setAuth(null);
-                    throw new Error("Session expired.");
-                }
-                throw new Error("Failed to delete item");
+            if (effectiveListId && stompClient.connected) {
+                stompClient.publish({
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify({
+                        action: "DELETE",
+                        itemId,
+                        timestamp: Date.now(),
+                    }),
+                });
             }
         } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "DELETE_ITEM",
+                    payload: {
+                        listId: effectiveListId,
+                        itemId,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to delete the product.";
             console.error("deleteItem error:", err);
-            setError("Failed to delete the product.");
+            setError(errorMessage);
             fetchListData(effectiveListId);
         }
     };
@@ -324,14 +591,36 @@ const useListItems = (effectiveListId: string | undefined) => {
         toggleItem,
         deleteItem,
         setError,
+        handleAiImport,
+        isReviewModalOpen,
+        setIsReviewModalOpen,
+        reviewItems,
+        handleReviewConfirm,
     };
 };
 
+/**
+ * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
+ * Migrated to a server-authoritative roster model to fix late-arrival sync issues.
+ */
 const useListPresence = (effectiveListId: string | undefined) => {
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
     const user = useStore((state) => state.user);
     const isServerConnected = useStore((state) => state.isServerConnected);
     const lastTypingSentRef = useRef<number>(0);
+
+    const handlePresenceMessage = useCallback(
+        (message: { body: string }) => {
+            try {
+                const event = JSON.parse(message.body);
+                console.debug("[ws] presence received", event);
+                handlePresenceEvent(event);
+            } catch (err) {
+                console.error("Failed to parse presence message:", err);
+            }
+        },
+        [handlePresenceEvent],
+    );
 
     useEffect(() => {
         if (
@@ -341,15 +630,12 @@ const useListPresence = (effectiveListId: string | undefined) => {
         ) {
             return;
         }
+        const username = user?.email || "Anonymous";
 
-        const username = user?.firstName || user?.userId || "Anonymous";
-
-        const subscription = stompClient.subscribe(
-            `/topic/presence/${effectiveListId}`,
-            (message) => {
-                const event = JSON.parse(message.body);
-                handlePresenceEvent(event);
-            },
+        console.debug("[ws] subscribing list presence", effectiveListId);
+        const presenceSubscription = stompClient.subscribe(
+            `/topic/list/${effectiveListId}/presence`,
+            handlePresenceMessage,
         );
 
         if (stompClient.connected) {
@@ -358,36 +644,43 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 username,
                 listId: effectiveListId,
             };
+
+            // Notify server that we joined.
+            // The server will respond by broadcasting a ROSTER_UPDATE to all clients.
             stompClient.publish({
-                destination: `/app/presence/${effectiveListId}`,
+                destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
             });
-            handlePresenceEvent(joinEvent);
+
+            console.debug("[ws] sent presence JOIN", joinEvent);
         }
 
         return () => {
             if (stompClient.connected) {
                 stompClient.publish({
-                    destination: `/app/presence/${effectiveListId}`,
+                    destination: `/app/list/${effectiveListId}/presence`,
                     body: JSON.stringify({
                         eventType: "LEAVE",
                         username,
                         listId: effectiveListId,
                     }),
                 });
+                console.debug("[ws] sent presence LEAVE", username);
             }
-            subscription?.unsubscribe();
+            presenceSubscription?.unsubscribe();
             clearPresence();
         };
     }, [
         effectiveListId,
-        handlePresenceEvent,
         clearPresence,
-        user?.firstName,
-        user?.userId,
+        user?.email,
+        handlePresenceMessage,
         isServerConnected,
     ]);
 
+    /**
+     * Sends a typing event to the server to notify other connected users.
+     */
     const sendTypingEvent = useCallback(() => {
         if (
             !effectiveListId ||
@@ -398,7 +691,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
 
         const now = Date.now();
         if (now - lastTypingSentRef.current > 1500) {
-            const username = user?.firstName || user?.userId || "Anonymous";
+            const username = user?.email || "Anonymous";
 
             const typingEvent = {
                 eventType: "TYPING" as const,
@@ -406,17 +699,19 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 listId: effectiveListId,
             };
             stompClient.publish({
-                destination: `/app/presence/${effectiveListId}`,
+                destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(typingEvent),
             });
-            handlePresenceEvent(typingEvent);
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, handlePresenceEvent, user?.firstName, user?.userId]);
+    }, [effectiveListId, user?.email]);
 
     return { sendTypingEvent };
 };
 
+/**
+ * Renders a view for selecting a list when no specific list is active.
+ */
 const ListSelectionView = ({
     lists,
     isLoading,
@@ -484,6 +779,7 @@ interface AddItemModalProps {
     setShowExpanded?: (val: boolean) => void;
 }
 
+/** Component for the item name input field inside the add modal. */
 const ItemNameField = ({
     idPrefix,
     value,
@@ -519,6 +815,7 @@ const ItemNameField = ({
     </div>
 );
 
+/** Button to toggle the display of extra item details (price, brand, etc). */
 const ExpandDetailsButton = ({
     showExpanded,
     onClick,
@@ -542,6 +839,7 @@ const ExpandDetailsButton = ({
     </button>
 );
 
+/** Component containing the detailed input fields (quantity, price, brand). */
 const ItemDetailsFields = ({
     idPrefix,
     quantity,
@@ -623,6 +921,7 @@ const ItemDetailsFields = ({
     </div>
 );
 
+/** Modal component for adding an item with optional details. */
 const AddItemDetailsModal = ({
     isOpen,
     onClose,
@@ -706,6 +1005,7 @@ const AddItemDetailsModal = ({
     );
 };
 
+/** Component to display an error alert within the list detail view. */
 const ListErrorAlert = ({
     error,
     isEmbedded,
@@ -724,6 +1024,7 @@ const ListErrorAlert = ({
     </div>
 );
 
+/** Header component for the list detail view. */
 const ListHeader = ({
     effectiveListId,
     onSwitchList,
@@ -739,7 +1040,7 @@ const ListHeader = ({
             <button
                 type="button"
                 onClick={onSwitchList}
-                className="text-[10px] font-bold text-accent hover:underline uppercase"
+                className="text-xs font-bold text-accent hover:underline uppercase"
             >
                 Switch List
             </button>
@@ -747,6 +1048,7 @@ const ListHeader = ({
     </header>
 );
 
+/** Inline form component for quickly adding items without details. */
 const InlineAddForm = ({
     addInputRef,
     newItemName,
@@ -799,22 +1101,34 @@ const InlineAddForm = ({
     </form>
 );
 
+/**
+ * Main ListDetail component that orchestrates displaying items, managing presence, and handling item additions.
+ */
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
+    onSwitchList,
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
 
+    const [showShareModal, setShowShareModal] = useState(false);
+    const { lists, isLoading: listsLoading, fetchLists } = useListsStore();
+
     const {
         items,
-        isLoading,
+        isLoading: itemsLoading,
         error,
         syncFailed,
         addItem,
         toggleItem,
         deleteItem,
+        setError,
+        isReviewModalOpen,
+        setIsReviewModalOpen,
+        reviewItems,
+        handleReviewConfirm,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -823,27 +1137,130 @@ const ListDetail = ({
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [selectedTargetListId, setSelectedTargetListId] = useState("");
+    const [selectedImportItemIds, setSelectedImportItemIds] = useState<
+        Set<string>
+    >(new Set());
+    const [isImportingItems, setIsImportingItems] = useState(false);
 
     const [detailName, setDetailName] = useState("");
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
 
+    // Task 4 States
+    const [isFinishing, setIsFinishing] = useState(false);
+    const [showFinishModal, setShowFinishModal] = useState(false);
+    const [finishStoreName, setFinishStoreName] = useState("");
+    const [receiptImage, setReceiptImage] = useState<File | null>(null);
+
+    const [permissionStatus, setPermissionStatus] =
+        useState<PermissionState | null>(null);
+    const [showBanner, setShowBanner] = useState(true);
+
     const addInputRef = useRef<HTMLInputElement | null>(null);
-    const { lists, fetchLists } = useListsStore();
+    const activeList = useMemo(
+        () => lists.find((list) => list.id === effectiveListId) ?? null,
+        [effectiveListId, lists],
+    );
+    const normalLists = useMemo(
+        () =>
+            lists.filter(
+                (list) =>
+                    list.id !== effectiveListId &&
+                    (list.category ?? "NORMAL") === "NORMAL",
+            ),
+        [effectiveListId, lists],
+    );
+    const canImportIntoNormalList =
+        (activeList?.category === "RECIPE" ||
+            activeList?.category === "FREQUENT") &&
+        items.length > 0;
+
+    const activeCollaborationUsers = useMemo(() => {
+        const current = activeList;
+        if (!current) return [];
+
+        const users = new Set<string>();
+        if (current.ownerEmail) users.add(current.ownerEmail);
+        for (const email of current.collaboratorEmails || []) {
+            users.add(email);
+        }
+        return Array.from(users);
+    }, [activeList]);
+
+    const estimatedTotal = useMemo(() => {
+        return items
+            .reduce((sum, item) => {
+                /**
+                 * Task 4: Fix miscomputation for strings like "500g"
+                 * CodeRabbit: If the quantity is not purely numeric, count as 1.
+                 */
+                const qtyStr = (item.quantity || "1").trim();
+                const qty = /^\d+(?:\.\d+)?$/.test(qtyStr)
+                    ? Number.parseFloat(qtyStr)
+                    : 1;
+                return sum + (item.price || 0) * qty;
+            }, 0)
+            .toFixed(2);
+    }, [items]);
+
+    // Geolocation permission tracking
+    useEffect(() => {
+        let isMounted = true;
+        let permResult: PermissionStatus | null = null;
+
+        const handler = () => {
+            if (isMounted && permResult) setPermissionStatus(permResult.state);
+        };
+
+        if (navigator.permissions) {
+            navigator.permissions
+                .query({ name: "geolocation" as PermissionName })
+                .then((result) => {
+                    if (!isMounted) return;
+                    permResult = result;
+                    setPermissionStatus(result.state);
+                    result.addEventListener("change", handler);
+                })
+                .catch(() => {
+                    // Fail silently for browsers with limited support
+                });
+        }
+
+        return () => {
+            isMounted = false;
+            permResult?.removeEventListener("change", handler);
+        };
+    }, []);
+
+    // Re-show banner if permission transitions to denied
+    useEffect(() => {
+        if (permissionStatus === "denied") {
+            setShowBanner(true);
+        }
+    }, [permissionStatus]);
 
     useEffect(() => {
-        if (isEmbedded && lists.length === 0) {
+        if (lists.length === 0) {
             fetchLists();
         }
-    }, [isEmbedded, lists.length, fetchLists]);
+    }, [lists.length, fetchLists]);
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: reset on change
     useEffect(() => {
-        resetDetailFields();
-    }, [effectiveListId]);
+        if (
+            !showImportModal ||
+            normalLists.length === 0 ||
+            normalLists.some((list) => list.id === selectedTargetListId)
+        ) {
+            return;
+        }
 
-    const resetDetailFields = useCallback(() => {
+        setSelectedTargetListId(normalLists[0].id);
+    }, [normalLists, selectedTargetListId, showImportModal]);
+
+    const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
         setShowExpandedDetails(false);
@@ -853,6 +1270,10 @@ const ListDetail = ({
         setDetailBrand("");
         setDetailPrice("");
     }, []);
+
+    useEffect(() => {
+        resetDetailFields(effectiveListId);
+    }, [effectiveListId, resetDetailFields]);
 
     const handleNewItemNameChange = (name: string) => {
         setNewItemName(name);
@@ -892,6 +1313,106 @@ const ListDetail = ({
 
     const isReadOnly = syncFailed;
 
+    const openImportModal = async () => {
+        await fetchLists();
+        const refreshedLists = useListsStore.getState().lists;
+        const refreshedNormalLists = refreshedLists.filter(
+            (list) =>
+                list.id !== effectiveListId &&
+                (list.category ?? "NORMAL") === "NORMAL",
+        );
+
+        if (refreshedNormalLists.length === 0) {
+            setError("Create a normal list first, then try again.");
+            return;
+        }
+
+        setSelectedTargetListId((currentId) =>
+            refreshedNormalLists.some((list) => list.id === currentId)
+                ? currentId
+                : refreshedNormalLists[0].id,
+        );
+        setSelectedImportItemIds(new Set(items.map((item) => item.id)));
+        setShowImportModal(true);
+    };
+
+    const toggleImportSelection = (itemId: string) => {
+        setSelectedImportItemIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemId)) {
+                next.delete(itemId);
+            } else {
+                next.add(itemId);
+            }
+            return next;
+        });
+    };
+
+    const clearImportState = () => {
+        setShowImportModal(false);
+        setSelectedImportItemIds(new Set());
+        setIsImportingItems(false);
+    };
+
+    const handleImportIntoNormalList = async () => {
+        if (!selectedTargetListId) return;
+
+        const targetList = useListsStore
+            .getState()
+            .lists.find((list) => list.id === selectedTargetListId);
+        if (!targetList) {
+            setError("Target list could not be found.");
+            return;
+        }
+
+        const existingKeys = new Set(
+            targetList.items.map((item) => buildItemDuplicateKey(item)),
+        );
+        const itemsToImport = items.filter(
+            (item) =>
+                selectedImportItemIds.has(item.id) &&
+                !existingKeys.has(buildItemDuplicateKey(item)),
+        );
+
+        if (itemsToImport.length === 0) {
+            setError("All selected items already exist in the target list.");
+            return;
+        }
+
+        setIsImportingItems(true);
+        setError(null);
+
+        try {
+            for (const item of itemsToImport) {
+                const added = await useListsStore
+                    .getState()
+                    .addItem(selectedTargetListId, {
+                        name: item.name,
+                        checked: false,
+                        brand: item.brand,
+                        quantity: item.quantity,
+                        price: item.price,
+                        category: item.category,
+                        isRecurrent: targetList.category === "FREQUENT",
+                    });
+
+                if (!added) {
+                    throw new Error(`Failed to add ${item.name}`);
+                }
+            }
+
+            await fetchLists();
+            clearImportState();
+        } catch (importError) {
+            const errorMessage =
+                importError instanceof Error
+                    ? importError.message
+                    : "Failed to import the selected items.";
+            setError(errorMessage);
+            setIsImportingItems(false);
+        }
+    };
+
     return (
         <div
             className={
@@ -906,7 +1427,9 @@ const ListDetail = ({
                 {isEmbedded && (
                     <ListHeader
                         effectiveListId={effectiveListId ?? "default"}
-                        onSwitchList={() => navigate("/nav/default")}
+                        onSwitchList={
+                            onSwitchList ?? (() => navigate("/nav/default"))
+                        }
                     />
                 )}
 
@@ -914,15 +1437,71 @@ const ListDetail = ({
                     <ListErrorAlert error={error} isEmbedded={isEmbedded} />
                 )}
 
+                {showBanner && permissionStatus === "denied" && (
+                    <div className="bg-warning-subtle text-warning-strong border border-warning-border p-4 rounded-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-300 mb-2">
+                        <div className="flex items-center gap-3">
+                            <AlertCircle size={20} className="shrink-0" />
+                            <span className="text-sm font-medium">
+                                Location access is disabled. Some features may
+                                be limited.
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            className="text-text-muted hover:text-text-strong transition-colors p-1"
+                            onClick={() => setShowBanner(false)}
+                            aria-label="Close warning"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
                 {effectiveListId === "default" && isEmbedded ? (
                     <ListSelectionView
                         lists={lists}
-                        isLoading={isLoading}
+                        isLoading={listsLoading}
                         onSelect={(listId) => navigate(`/nav/${listId}`)}
                     />
                 ) : (
                     <>
-                        <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-col gap-3">
+                            <div className="flex justify-between items-end px-1">
+                                <div className="flex flex-col">
+                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                        Collaboration
+                                    </h2>
+                                    <div className="flex items-center gap-2">
+                                        <PresenceBar
+                                            variant="avatars"
+                                            allUsers={activeCollaborationUsers}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    {canImportIntoNormalList && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void openImportModal();
+                                            }}
+                                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                                        >
+                                            <Plus size={14} strokeWidth={2.5} />
+                                            Add to normal list
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowShareModal(true)}
+                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                                    >
+                                        <UserPlus size={14} strokeWidth={2.5} />
+                                        Invite
+                                    </button>
+                                </div>
+                            </div>
+
                             <InlineAddForm
                                 addInputRef={addInputRef}
                                 newItemName={newItemName}
@@ -933,19 +1512,19 @@ const ListDetail = ({
                                 isEmbedded={isEmbedded}
                             />
 
-                            <div className="min-h-[20px] px-2 flex items-center">
+                            <div className="min-h-[16px] px-2 flex items-center">
                                 <PresenceBar variant="typing" />
                             </div>
                         </div>
 
                         <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
-                            {isLoading ? (
+                            {itemsLoading ? (
                                 <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
                                     <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
                                     <p>Loading...</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4">
+                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}
@@ -953,39 +1532,29 @@ const ListDetail = ({
                                         disabled={isReadOnly}
                                     />
                                     {items.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
-                                                    Estimated Total
-                                                </span>
-                                                <span className="text-xs text-text-muted opacity-70">
-                                                    {items.length} items
+                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                                        Estimated Total
+                                                    </span>
+                                                    <span className="text-xs text-text-muted opacity-70">
+                                                        {items.length} items
+                                                    </span>
+                                                </div>
+                                                <span className="text-xl font-black text-accent tracking-tight">
+                                                    {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            <span className="text-xl font-black text-accent tracking-tight">
-                                                {items
-                                                    .reduce((sum, item) => {
-                                                        const qtyStr =
-                                                            item.quantity ||
-                                                            "1";
-                                                        const qtyMatch =
-                                                            qtyStr.match(
-                                                                /(\d+(?:\.\d+)?)/,
-                                                            );
-                                                        const qty = qtyMatch
-                                                            ? Number.parseFloat(
-                                                                  qtyMatch[1],
-                                                              )
-                                                            : 1;
-                                                        return (
-                                                            sum +
-                                                            (item.price || 0) *
-                                                                qty
-                                                        );
-                                                    }, 0)
-                                                    .toFixed(2)}{" "}
-                                                lei
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowFinishModal(true)
+                                                }
+                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                            >
+                                                Finish Shopping
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -1046,6 +1615,157 @@ const ListDetail = ({
                 setPrice={setDetailPrice}
                 onTyping={sendTypingEvent}
             />
+
+            {/* Finish Shopping Modal */}
+            <Modal
+                isOpen={showFinishModal}
+                onClose={() => setShowFinishModal(false)}
+                title="Finish Shopping"
+                subtitle="Enter store and take a photo of your receipt."
+            >
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-1.5">
+                        <label
+                            htmlFor="store-name-input"
+                            className="text-[11px] font-black uppercase text-text-strong tracking-wider"
+                        >
+                            Store Name
+                        </label>
+                        <input
+                            id="store-name-input"
+                            type="text"
+                            value={finishStoreName}
+                            onChange={(e) => setFinishStoreName(e.target.value)}
+                            placeholder="e.g. Lidl"
+                            className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                            Receipt Photo
+                        </span>
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                id="receipt-cam"
+                                className="hidden"
+                                onChange={(e) =>
+                                    setReceiptImage(e.target.files?.[0] || null)
+                                }
+                            />
+                            <label
+                                htmlFor="receipt-cam"
+                                className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
+                            >
+                                <Camera size={28} />
+                                <span className="text-sm font-black">
+                                    {receiptImage
+                                        ? receiptImage.name
+                                        : "TAKE PHOTO"}
+                                </span>
+                                <span className="text-xs uppercase font-bold opacity-50">
+                                    Click to open camera
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowFinishModal(false)}
+                            className="py-3 bg-bg-muted rounded-lg font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={
+                                !finishStoreName.trim() ||
+                                isFinishing ||
+                                !effectiveListId ||
+                                effectiveListId === "default"
+                            }
+                            onClick={async () => {
+                                if (
+                                    !effectiveListId ||
+                                    effectiveListId === "default"
+                                )
+                                    return;
+                                setIsFinishing(true);
+                                try {
+                                    await finishShoppingRequest({
+                                        storeName: finishStoreName.trim(),
+                                        receiptImage,
+                                        listId: effectiveListId,
+                                    });
+                                    setShowFinishModal(false);
+                                    setFinishStoreName("");
+                                    setReceiptImage(null);
+                                    navigate("/dashboard");
+                                } catch (_err) {
+                                    const errorMessage =
+                                        _err instanceof Error
+                                            ? _err.message
+                                            : "Failed to complete shopping.";
+                                    console.error(
+                                        "Failed to complete shopping:",
+                                        _err,
+                                    );
+                                    setError(errorMessage);
+                                } finally {
+                                    setIsFinishing(false);
+                                }
+                            }}
+                            className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
+                        >
+                            {isFinishing ? "Processing..." : "Complete"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <SmartReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                items={reviewItems}
+                onConfirm={handleReviewConfirm}
+            />
+
+            <ImportItemsModal
+                isOpen={showImportModal}
+                onClose={clearImportState}
+                title="Add items to a normal list"
+                subtitle={`Copy items from "${activeList?.name || "Shopping List"}" without duplicating products that already exist.`}
+                sourceItems={items}
+                availableTargetLists={normalLists}
+                selectedTargetListId={selectedTargetListId}
+                onTargetListChange={setSelectedTargetListId}
+                selectedItemIds={selectedImportItemIds}
+                onToggleItem={toggleImportSelection}
+                onSelectAllEligible={(itemIds) =>
+                    setSelectedImportItemIds(new Set(itemIds))
+                }
+                onClearSelection={() => setSelectedImportItemIds(new Set())}
+                onConfirm={() => {
+                    void handleImportIntoNormalList();
+                }}
+                isSubmitting={isImportingItems}
+                submitLabel="Import selected"
+                submittingLabel="Importing..."
+            />
+
+            {showShareModal && (
+                <ShareListModal
+                    listId={effectiveListId ?? ""}
+                    listName={
+                        lists.find((l) => l.id === effectiveListId)?.name ||
+                        "Shopping List"
+                    }
+                    onClose={() => setShowShareModal(false)}
+                />
+            )}
         </div>
     );
 };
