@@ -104,5 +104,5 @@ export const useNetworkState = (): void => {
             globalThis.removeEventListener("offline", handleOffline);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [setOnlineStatus]);
+    }, [setOnlineStatus, deviceId]);
 };

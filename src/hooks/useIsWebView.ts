@@ -8,7 +8,8 @@ export const useIsWebView = (): boolean => {
     }
 
     // Check if P2PBridge is exposed by the native Android app
-    const hasP2PBridge = (globalThis as any).P2PBridge !== undefined;
+    const hasP2PBridge =
+        (globalThis as unknown as Window).P2PBridge !== undefined;
 
     if (hasP2PBridge) {
         return true;

@@ -29,7 +29,7 @@ declare global {
  */
 export const usePlatform = (): string => {
     try {
-        const bridge = (globalThis as any).P2PBridge;
+        const bridge = (globalThis as unknown as Window).P2PBridge;
         if (bridge && typeof bridge.getPlatform === "function") {
             const platform = bridge.getPlatform();
             if (platform) {

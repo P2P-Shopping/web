@@ -1,5 +1,4 @@
 import { useIsWebView } from "./useIsWebView";
-import type { P2PBridge } from "../types/bridge";
 
 const TELEMETRY_DEVICE_ID_KEY = "p2ps.telemetry.device-id";
 
@@ -13,7 +12,7 @@ export const useDeviceId = (): string => {
 
     if (isWebView) {
         try {
-            const bridge = (globalThis as any).P2PBridge as P2PBridge;
+            const bridge = (globalThis as unknown as Window).P2PBridge;
             if (bridge && typeof bridge.getDeviceId === "function") {
                 const bridgeDeviceId = bridge.getDeviceId();
                 if (bridgeDeviceId) {
