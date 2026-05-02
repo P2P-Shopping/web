@@ -1,13 +1,15 @@
 import { useStore } from "../context/useStore";
 
+let currentLat = 47.151726;
+let currentLng = 27.587914;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 export const startMockEmitter = () => {
     if (intervalId) return;
 
     const state = useStore.getState();
-    let currentLat = state.userLocation?.lat ?? 47.151726;
-    let currentLng = state.userLocation?.lng ?? 27.587914;
+    currentLat = state.userLocation?.lat ?? 47.151726;
+    currentLng = state.userLocation?.lng ?? 27.587914;
 
     intervalId = setInterval(() => {
         // Secure pseudo-random location mock update
@@ -23,10 +25,13 @@ export const startMockEmitter = () => {
             lat: currentLat,
             lng: currentLng,
         });
-        if (import.meta.env.DEV) {
-            console.log("GPS Update:", currentLat, currentLng);
-        }
     }, 1000);
+};
+
+export const teleport = (lat: number, lng: number) => {
+    currentLat = lat;
+    currentLng = lng;
+    useStore.getState().setUserLocation({ lat, lng });
 };
 
 export const stopMockEmitter = () => {
