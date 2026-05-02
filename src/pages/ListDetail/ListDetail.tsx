@@ -1173,9 +1173,10 @@ const ListDetail = ({
             ),
         [effectiveListId, lists],
     );
+    const isRecipeList = activeList?.category === "RECIPE";
+
     const canImportIntoNormalList =
-        (activeList?.category === "RECIPE" ||
-            activeList?.category === "FREQUENT") &&
+        (isRecipeList || activeList?.category === "FREQUENT") &&
         items.length > 0;
 
     const activeCollaborationUsers = useMemo(() => {
@@ -1486,14 +1487,13 @@ const ListDetail = ({
                                                 void openImportModal();
                                             }}
                                             className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:translate-y-0 hover:-translate-y-px ${
-                                                activeList?.category ===
-                                                "RECIPE"
+                                                isRecipeList
                                                     ? "bg-accent text-white hover:opacity-90"
                                                     : "bg-bg-muted text-text-strong border border-border hover:border-accent hover:text-accent"
                                             }`}
                                         >
                                             <Plus size={14} strokeWidth={2.5} />
-                                            {activeList?.category === "RECIPE"
+                                            {isRecipeList
                                                 ? "Add all ingredients to list"
                                                 : "Add to normal list"}
                                         </button>
