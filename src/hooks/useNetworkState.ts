@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../context/useStore";
-import { useDeviceId } from '../hooks/useDeviceId';
+import { useDeviceId } from "../hooks/useDeviceId";
 /**
  * Custom React hook to monitor OS/browser network connectivity.
  * Attaches to the global window 'online' and 'offline' events.
@@ -51,12 +51,10 @@ export const useNetworkState = (): void => {
                 return;
             }
             try {
-                const payload = { ts: Date.now(), deviceId };
-                console.log('📡 Telemetry ping payload:', payload);
                 const res = await fetch("/api/v1/telemetry/ping", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify({ ts: Date.now(), deviceId }),
                     signal: AbortSignal.timeout(5000),
                 });
                 setServerConnected(res.ok || res.status === 202);
@@ -70,5 +68,5 @@ export const useNetworkState = (): void => {
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [setServerConnected]);
+    }, [setServerConnected, deviceId]);
 };
