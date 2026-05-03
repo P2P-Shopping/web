@@ -486,7 +486,7 @@ const UnifiedMap: React.FC = () => {
         setRecommendedStores([]);
     };
 
-  const handleFetchStores = async (listIdOverride?: string) => {
+    const handleFetchStores = async (listIdOverride?: string) => {
         const idToFetch = listIdOverride ?? selectedListId;
         if (!idToFetch) return;
 
@@ -494,12 +494,12 @@ const UnifiedMap: React.FC = () => {
         if (!selectedList) return;
 
         setIsFetchingStores(true); // START Pas 3: Activăm spinner-ul
-        
+
         try {
             const itemIds = selectedList.items.map((item) => item.id) || [];
             if (itemIds.length === 0) {
                 // Dacă lista e goală, putem ieși politicos, nu mai chemăm mock-urile.
-                setIsShowingStores(true); 
+                setIsShowingStores(true);
                 return;
             }
 
@@ -524,16 +524,21 @@ const UnifiedMap: React.FC = () => {
                 },
             );
 
-            if (!storesResponse.ok) throw new Error(`HTTP Error from stores-match: ${storesResponse.status}`);
+            if (!storesResponse.ok)
+                throw new Error(
+                    `HTTP Error from stores-match: ${storesResponse.status}`,
+                );
             const data = await storesResponse.json();
-            const storesArray: ApiStoreMatch[] = Array.isArray(data) ? data : [data];
+            const storesArray: ApiStoreMatch[] = Array.isArray(data)
+                ? data
+                : [data];
 
             // PASUL 1b: Apelăm Macro-Routing API pentru fiecare magazin găsit pentru a obține ETA-urile reale
             const finalStores: StoreRecommendation[] = await Promise.all(
                 storesArray.map(async (store) => {
-                    let realTransit = {
+                    const realTransit = {
                         driving: { timeMins: 10, distanceKm: "2.0" }, // Fallback-uri de siguranță
-                        walking: { timeMins: 30, distanceKm: "2.0" }
+                        walking: { timeMins: 30, distanceKm: "2.0" },
                     };
 
                     try {
@@ -542,27 +547,40 @@ const UnifiedMap: React.FC = () => {
                             userLng: String(userLocation.lng),
                             storeId: store.storeId,
                         });
-                        
-                        const macroRes = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+
+                        const macroRes = await fetch(
+                            `${baseUrl}/api/routing/macro?${params}`,
+                        );
                         if (macroRes.ok) {
                             const macroData = await macroRes.json();
-                            
+
                             // Mapăm JSON-ul de la OSRM. Conform MacroRoutingResponse.java, convertim din secunde/metri
                             if (macroData.driving) {
                                 realTransit.driving = {
-                                    timeMins: Math.round(macroData.driving.durationSeconds / 60),
-                                    distanceKm: (macroData.driving.distanceM / 1000).toFixed(1)
+                                    timeMins: Math.round(
+                                        macroData.driving.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.driving.distanceM / 1000
+                                    ).toFixed(1),
                                 };
                             }
                             if (macroData.walking) {
                                 realTransit.walking = {
-                                    timeMins: Math.round(macroData.walking.durationSeconds / 60),
-                                    distanceKm: (macroData.walking.distanceM / 1000).toFixed(1)
+                                    timeMins: Math.round(
+                                        macroData.walking.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.walking.distanceM / 1000
+                                    ).toFixed(1),
                                 };
                             }
                         }
                     } catch (err) {
-                        console.warn(`Nu am putut obține macro-routing pentru magazinul ${store.storeId}`, err);
+                        console.warn(
+                            `Nu am putut obține macro-routing pentru magazinul ${store.storeId}`,
+                            err,
+                        );
                     }
 
                     // PASUL 2: Mapăm răspunsul combinat pe structura pe care o așteaptă UI-ul (Zustand)
@@ -573,21 +591,24 @@ const UnifiedMap: React.FC = () => {
                         lat: store.lat || DEMO_STORE_LOCATION.lat,
                         lng: store.lng || DEMO_STORE_LOCATION.lng,
                         stockMatchPercentage: Math.round(
-                            (store.matchedItems / Math.max(itemIds.length, 1)) * 100,
+                            (store.matchedItems / Math.max(itemIds.length, 1)) *
+                                100,
                         ),
                         transit: realTransit, // Aici punem datele reale obținute mai sus!
                     };
-                })
+                }),
             );
 
             // Salvăm datele în state (Zustand)
             setRecommendedStores(finalStores);
             setIsShowingStores(true);
-
         } catch (error) {
-            console.error("Critical error during store match or macro-routing!", error);
+            console.error(
+                "Critical error during store match or macro-routing!",
+                error,
+            );
             // Am eliminat MOCK_STORES complet, așa cum ne-ai cerut! Dacă pică, lăsăm lista goală ca să vedem clar eroarea.
-            setRecommendedStores([]); 
+            setRecommendedStores([]);
             setIsShowingStores(true);
         } finally {
             setIsFetchingStores(false); // STOP Pas 3: Oprim spinner-ul
