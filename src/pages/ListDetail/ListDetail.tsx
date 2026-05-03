@@ -1491,6 +1491,7 @@ const ListDetail = ({
         deleteItem,
         isReadOnly,
         estimatedTotal,
+        setShowFinishModal,
     ]);
 
     return (
