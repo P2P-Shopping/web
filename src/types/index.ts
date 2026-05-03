@@ -12,6 +12,7 @@ export interface Item {
     category?: string;
     price?: number;
     isRecurrent?: boolean;
+    createdAt?: number;
 }
 
 export type ListCategory = "NORMAL" | "RECIPE" | "FREQUENT";

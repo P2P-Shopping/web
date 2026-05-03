@@ -6,6 +6,7 @@ import {
     Settings,
     UserPlus,
 } from "lucide-react";
+import type { IMessage } from "@stomp/stompjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -24,7 +25,7 @@ import api, {
     aiMultimodalRequest,
     finishShoppingRequest,
 } from "../../services/api";
-import stompClient from "../../services/socketService";
+import stompClient, { socketService, clientInstanceId } from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import type { ListCategory } from "../../types";
 import { buildItemDuplicateKey } from "../../utils/listUtils";
@@ -39,6 +40,7 @@ interface Item {
     price?: number;
     category?: string;
     isRecurrent?: boolean;
+    createdAt?: number;
 }
 
 interface ApiListItem {
@@ -50,6 +52,7 @@ interface ApiListItem {
     price?: number;
     category?: string;
     isRecurrent?: boolean;
+    createdAt?: number;
 }
 
 interface ApiShoppingList {
@@ -69,7 +72,13 @@ interface ListDetailProps {
  * @param effectiveListId - The ID of the currently active list.
  */
 const useListItems = (effectiveListId: string | undefined) => {
-    const { updateList } = useListsStore();
+    const {
+        updateList,
+        applyIncomingSync,
+        markPendingMutation,
+        clearPendingMutation,
+        syncListItemsFromServer,
+    } = useListsStore();
     const [items, setItems] = useState<Item[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -156,14 +165,33 @@ const useListItems = (effectiveListId: string | undefined) => {
                     quantity: item.quantity,
                     category: item.category,
                     isRecurrent: item.isRecurrent,
+                    createdAt: item.createdAt,
                 }));
-                setItems(mappedItems);
-                if (currentList.category) {
-                    useListsStore.getState().updateList(targetListId, {
-                        category: currentList.category,
-                    });
-                }
-                syncListItemsInStore(mappedItems, targetListId);
+
+                // Sort items: Unchecked first, then alphabetically
+                const sortedItems = [...mappedItems].sort((a, b) => {
+                    if (a.checked !== b.checked) {
+                        return a.checked ? 1 : -1;
+                    }
+                    return a.name.localeCompare(b.name);
+                });
+
+                syncListItemsFromServer(targetListId, sortedItems);
+
+                const reconciledItems =
+                    useListsStore.getState().getListById(targetListId)?.items ??
+                    sortedItems;
+
+                setItems(reconciledItems.map((item) => ({ ...item })));
+                
+                useListsStore.getState().updateList(targetListId, {
+                    category: currentList.category,
+                    subcategory: currentList.subcategory,
+                    finalStore: currentList.finalStore,
+                    ownerEmail: currentList.ownerEmail,
+                    ownerName: currentList.ownerName,
+                    collaboratorEmails: currentList.collaboratorEmails,
+                });
             } catch (error) {
                 const errorMessage =
                     error instanceof Error
@@ -176,7 +204,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 setIsLoading(false);
             }
         },
-        [syncListItemsInStore, effectiveListId],
+        [effectiveListId, syncListItemsFromServer],
     );
 
     useEffect(() => {
@@ -231,84 +259,86 @@ const useListItems = (effectiveListId: string | undefined) => {
     }: ReviewSubmission) => {
         try {
             for (const item of feedback) {
-                const res = await fetch(
-                    `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
-                    {
-                        method: "POST",
-                        headers: getAuthHeaders(true),
-                        body: JSON.stringify({
-                            name: item.name,
-                            isChecked: false,
-                            brand: item.brand?.trim()
-                                ? item.brand.trim()
-                                : null,
-                            quantity: item.quantity?.trim()
-                                ? item.quantity.trim()
-                                : null,
-                            category: item.category || null,
-                            timestamp: Date.now(),
-                        }),
-                        credentials: "include",
-                    },
+                const payload = {
+                    name: item.name,
+                    isChecked: false,
+                    brand: item.brand?.trim() ? item.brand.trim() : null,
+                    quantity: item.quantity?.trim() ? item.quantity.trim() : null,
+                    category: item.category || null,
+                    isRecurrent: false,
+                    timestamp: Date.now(),
+                };
+                
+                const res = await api.post<ApiListItem>(
+                    `/api/lists/${effectiveListId}/items`,
+                    payload
                 );
 
-                if (!res.ok) {
-                    if (res.status === 401) {
-                        handleUnauthorizedResponse();
-                    }
-                    throw new Error(`Failed to save item: ${item.name}`);
-                }
+                const createdItem = res.data;
+                
+                // Broadcast each new item to the room
+                const syncPayload: SyncPayload = {
+                    action: "ADD",
+                    itemId: createdItem.id,
+                    content: JSON.stringify({
+                        id: createdItem.id,
+                        name: createdItem.name,
+                        checked: Boolean(createdItem.isChecked),
+                        brand: createdItem.brand,
+                        price: createdItem.price,
+                        quantity: createdItem.quantity,
+                        category: createdItem.category,
+                        isRecurrent: createdItem.isRecurrent,
+                        createdAt: createdItem.createdAt,
+                    }),
+                    timestamp: Date.now(),
+                    senderId: clientInstanceId,
+                };
+
+                socketService.publish(
+                    "/app/list/" + effectiveListId + "/update",
+                    JSON.stringify(syncPayload)
+                );
             }
+            
             await fetchListData(effectiveListId);
             setIsReviewModalOpen(false);
         } catch (err) {
             console.error("handleReviewConfirm error:", err);
             setError("Error saving some items. Please check your list.");
-
-            // NEW: Fetch the list anyway to show any items that successfully saved before the crash
             await fetchListData(effectiveListId);
         }
     };
 
+    /**
+     * Handles incoming list synchronization frames from STOMP.
+     * @param message - STOMP message frame containing a serialized SyncPayload.
+     */
     const handleSyncMessage = useCallback(
-        (message: { body: string }) => {
+        (message: IMessage) => {
             try {
                 const payload = JSON.parse(message.body) as SyncPayload;
-                
-                setItems((prev) => {
-                    let next = prev;
-                    
-                    if (payload.action === "CHECK_OFF" && payload.itemId) {
-                        next = prev.map((item) =>
-                            item.id === payload.itemId ? { ...item, checked: Boolean(payload.checked) } : item
-                        );
-                    } else if (payload.action === "DELETE" && payload.itemId) {
-                        next = prev.filter((item) => item.id !== payload.itemId);
-                    } else if (payload.action === "ADD" && payload.content) {
-                        try {
-                            const newItem = JSON.parse(payload.content) as Item;
-                            // Prevent duplicates if the creator receives their own echo
-                            if (!prev.some((i) => i.id === newItem.id)) {
-                                next = [...prev, newItem];
-                            }
-                        } catch (e) {
-                            console.error("Failed to parse incoming ADD item JSON", e);
-                        }
-                    }
+                if (!effectiveListId || effectiveListId === "default") {
+                    return;
+                }
 
-                    // CRITICAL FIX: Synchronize the new local state up to the global Zustand store
-                    // This prevents the global store from overriding our real-time WebSocket updates
-                    if (next !== prev) {
-                        syncListItemsInStore(next);
-                    }
-                    
-                    return next;
-                });
+                // Ignore messages sent by ourselves to prevent duplicates with optimistic UI
+                if (payload.senderId === clientInstanceId) {
+                    console.debug("[ws] ignoring own broadcast", payload.action);
+                    return;
+                }
+
+                applyIncomingSync(effectiveListId, payload);
+
+                const nextItems =
+                    useListsStore.getState().getListById(effectiveListId)
+                        ?.items ?? [];
+                setItems(nextItems.map((item) => ({ ...item })));
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore] // Stable dependency prevents STOMP subscription churn
+        [applyIncomingSync, effectiveListId],
     );
 
     useEffect(() => {
@@ -321,8 +351,8 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
 
         console.debug("[ws] subscribing list sync", effectiveListId);
-        const updateSubscription = stompClient.subscribe(
-            `/topic/list/${effectiveListId}`,
+        const updateSubscription = socketService.subscribe(
+            "/topic/list/" + effectiveListId,
             handleSyncMessage,
         );
 
@@ -382,9 +412,24 @@ const useListItems = (effectiveListId: string | undefined) => {
             brand: brand || undefined,
             quantity: quantity || undefined,
             price: price ?? undefined,
+            createdAt: Date.now(),
         };
 
-        const optimisticItems = [...items, newItem];
+        markPendingMutation(newItem.id);
+        
+        // Find correct alphabetical position within unchecked section
+        const uncheckedItems = items.filter(item => !item.checked);
+        const checkedItems = items.filter(item => item.checked);
+        
+        // Find index in uncheckedItems
+        let insertIdx = uncheckedItems.findIndex(item => item.name.localeCompare(newItem.name) > 0);
+        if (insertIdx === -1) insertIdx = uncheckedItems.length;
+        
+        const nextUnchecked = [...uncheckedItems];
+        nextUnchecked.splice(insertIdx, 0, newItem);
+        
+        const optimisticItems = [...nextUnchecked, ...checkedItems];
+
         setItems(optimisticItems);
         syncListItemsInStore(optimisticItems);
 
@@ -414,22 +459,27 @@ const useListItems = (effectiveListId: string | undefined) => {
                 quantity: createdApiItem.quantity,
                 category: createdApiItem.category,
                 isRecurrent: createdApiItem.isRecurrent,
+                createdAt: createdApiItem.createdAt,
             };
 
+            clearPendingMutation(newItem.id);
             await fetchListData(effectiveListId);
 
-            if (stompClient.connected) {
-                const syncPayload: SyncPayload = {
-                    action: "ADD",
-                    itemId: createdItem.id,
-                    content: JSON.stringify(createdItem),
-                    timestamp: Date.now(),
-                };
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify(syncPayload),
-                });
-            }
+            const syncPayload: SyncPayload = {
+                action: "ADD",
+                itemId: createdItem.id,
+                content: JSON.stringify({
+                    ...createdItem,
+                    createdAt: createdItem.createdAt,
+                }),
+                timestamp: Date.now(),
+                senderId: clientInstanceId,
+            };
+
+            socketService.publish(
+                "/app/list/" + effectiveListId + "/update",
+                JSON.stringify(syncPayload),
+            );
         } catch (err) {
             if (!navigator.onLine) {
                 useStore.getState().enqueueAction({
@@ -448,6 +498,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 return;
             }
 
+            clearPendingMutation(newItem.id);
             const errorMessage =
                 err instanceof Error
                     ? err.message
@@ -467,6 +518,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         if (!currentItem) return;
 
         const newChecked = !currentItem.checked;
+        markPendingMutation(itemId);
         const nextItems = items.map((item) =>
             item.id === itemId ? { ...item, checked: newChecked } : item,
         );
@@ -486,18 +538,19 @@ const useListItems = (effectiveListId: string | undefined) => {
             };
             await api.put(`/api/items/${itemId}`, payload);
 
-            if (effectiveListId && stompClient.connected) {
-                const syncPayload: SyncPayload = {
-                    action: "CHECK_OFF",
-                    itemId,
-                    checked: newChecked,
-                    timestamp: Date.now(),
-                };
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify(syncPayload),
-                });
-            }
+            const syncPayload: SyncPayload = {
+                action: "CHECK_OFF",
+                itemId,
+                checked: newChecked,
+                timestamp: Date.now(),
+                senderId: clientInstanceId,
+            };
+
+            socketService.publish(
+                "/app/list/" + effectiveListId + "/update",
+                JSON.stringify(syncPayload),
+            );
+            clearPendingMutation(itemId);
         } catch (err) {
             if (!navigator.onLine) {
                 useStore.getState().enqueueAction({
@@ -519,6 +572,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 return;
             }
 
+            clearPendingMutation(itemId);
             const errorMessage =
                 err instanceof Error
                     ? err.message
@@ -534,6 +588,7 @@ const useListItems = (effectiveListId: string | undefined) => {
      */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
+        markPendingMutation(itemId);
         const nextItems = items.filter((item) => item.id !== itemId);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
@@ -541,12 +596,18 @@ const useListItems = (effectiveListId: string | undefined) => {
         try {
             await api.delete(`/api/items/${itemId}`);
 
-            if (effectiveListId && stompClient.connected) {
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify({ action: "DELETE", itemId, timestamp: Date.now() }),
-                });
-            }
+            const syncPayload: SyncPayload = {
+                action: "DELETE",
+                itemId,
+                timestamp: Date.now(),
+                senderId: clientInstanceId,
+            };
+
+            socketService.publish(
+                "/app/list/" + effectiveListId + "/update",
+                JSON.stringify(syncPayload),
+            );
+            clearPendingMutation(itemId);
         } catch (err) {
             if (!navigator.onLine) {
                 useStore.getState().enqueueAction({
@@ -561,6 +622,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 return;
             }
 
+            clearPendingMutation(itemId);
             const errorMessage =
                 err instanceof Error
                     ? err.message

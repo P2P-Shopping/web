@@ -34,6 +34,9 @@ export interface SyncPayload {
 
     /** Status of the operation, returned by the server. */
     status?: "Success" | "Rejection";
+
+    /** Unique identifier for the client instance that sent this message. */
+    senderId?: string;
 }
 
 /**

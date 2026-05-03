@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useStore } from "../context/useStore";
+import type { SyncPayload } from "../dto/SyncPayload";
 import type { Item, ListCategory, ShoppingList } from "../types";
 
 interface ApiItem {
@@ -31,6 +32,8 @@ interface ApiShoppingList {
 interface ListsState {
     lists: ShoppingList[];
     currentList: ShoppingList | null;
+    /** Tracks item IDs currently protected by optimistic local mutations. */
+    pendingMutations: Record<string, true>;
     isLoading: boolean;
     error: string | null;
     isModalOpen: boolean;
@@ -50,8 +53,71 @@ interface ListsState {
     openModal: () => void;
     closeModal: () => void;
     getListById: (id: string) => ShoppingList | undefined;
+    /** Marks an item as protected from stale remote overwrite while a local mutation is pending. */
+    markPendingMutation: (itemId: string) => void;
+    /** Clears optimistic protection for an item once local mutation is acknowledged. */
+    clearPendingMutation: (itemId: string) => void;
+    /** Applies a real-time sync payload immutably to a specific list. */
+    applyIncomingSync: (listId: string, payload: SyncPayload) => void;
+    /** Reconciles server-fetched items while preserving optimistic local locks. */
+    syncListItemsFromServer: (listId: string, serverItems: Item[]) => void;
     clearLists: () => void;
 }
+
+/**
+ * Builds a partial item patch from a sync payload.
+ * @param payload - Real-time payload delivered by STOMP.
+ * @returns Partial item fields that can be merged safely into an existing item.
+ */
+const getItemPatchFromSyncPayload = (payload: SyncPayload): Partial<Item> => {
+    const patch: Partial<Item> = {};
+
+    if (typeof payload.checked === "boolean") {
+        patch.checked = payload.checked;
+    }
+
+    if (typeof payload.content === "string" && payload.content.length > 0) {
+        try {
+            const parsed = JSON.parse(payload.content) as Partial<Item>;
+            return { ...patch, ...parsed };
+        } catch {
+            patch.name = payload.content;
+        }
+    }
+
+    return patch;
+};
+
+/**
+ * Merges a server snapshot with locally pending optimistic item changes.
+ * @param currentItems - Current local items.
+ * @param serverItems - Fresh server items from REST.
+ * @param pendingMutations - Pending optimistic lock map keyed by item ID.
+ * @returns A new immutable item array preserving locked local records.
+ */
+const mergeServerItemsWithPending = (
+    currentItems: Item[],
+    serverItems: Item[],
+    pendingMutations: Record<string, true>,
+): Item[] => {
+    const currentById = new Map(currentItems.map((item) => [item.id, item]));
+
+    const merged = serverItems.map((serverItem) => {
+        const localItem = currentById.get(serverItem.id);
+        if (pendingMutations[serverItem.id] && localItem) {
+            return { ...localItem };
+        }
+        return { ...serverItem };
+    });
+
+    const pendingOnlyLocal = currentItems.filter(
+        (localItem) =>
+            pendingMutations[localItem.id] &&
+            !serverItems.some((serverItem) => serverItem.id === localItem.id),
+    );
+
+    return [...merged, ...pendingOnlyLocal.map((item) => ({ ...item }))];
+};
 
 /**
  * Resolves the base URL for API requests from environment variables.
@@ -142,6 +208,7 @@ const buildItemRequest = (item: Partial<Item>) => ({
 export const useListsStore = create<ListsState>((set, get) => ({
     lists: [],
     currentList: null,
+    pendingMutations: {},
     isLoading: false,
     error: null,
     isModalOpen: false,
@@ -498,6 +565,141 @@ export const useListsStore = create<ListsState>((set, get) => ({
      */
     getListById: (id: string) => get().lists.find((list) => list.id === id),
 
+    /**
+     * Marks an item as pending to protect optimistic UI changes from stale snapshots.
+     * @param itemId - The item identifier to lock.
+     */
+    markPendingMutation: (itemId: string) =>
+        set((state) => ({
+            pendingMutations: {
+                ...state.pendingMutations,
+                [itemId]: true,
+            },
+        })),
+
+    /**
+     * Removes a pending optimistic lock for an item.
+     * @param itemId - The item identifier to unlock.
+     */
+    clearPendingMutation: (itemId: string) =>
+        set((state) => {
+            if (!state.pendingMutations[itemId]) {
+                return { pendingMutations: state.pendingMutations };
+            }
+            const nextPendingMutations = { ...state.pendingMutations };
+            delete nextPendingMutations[itemId];
+            return { pendingMutations: nextPendingMutations };
+        }),
+
+    /**
+     * Applies real-time updates from the broker with immutable array/object operations.
+     * @param listId - The target shopping list identifier.
+     * @param payload - Sync payload received from the STOMP subscription.
+     */
+    applyIncomingSync: (listId: string, payload: SyncPayload) =>
+        set((state) => ({
+            lists: state.lists.map((list) => {
+                if (list.id !== listId) {
+                    return list;
+                }
+
+                if (payload.action === "ADD" && payload.content) {
+                    try {
+                        const incomingItem = JSON.parse(payload.content) as Item;
+                        const alreadyExists = list.items.some(
+                            (item) => item.id === incomingItem.id,
+                        );
+                        if (alreadyExists) {
+                            return list;
+                        }
+                        
+                        // Insert at alphabetical position within unchecked section
+                        const uncheckedItems = list.items.filter(item => !item.checked);
+                        const checkedItems = list.items.filter(item => item.checked);
+                        
+                        let insertIdx = uncheckedItems.findIndex(item => item.name.localeCompare(incomingItem.name) > 0);
+                        if (insertIdx === -1) insertIdx = uncheckedItems.length;
+                        
+                        const nextUnchecked = [...uncheckedItems];
+                        nextUnchecked.splice(insertIdx, 0, { ...incomingItem });
+
+                        return {
+                            ...list,
+                            items: [...nextUnchecked, ...checkedItems],
+                        };
+                    } catch {
+                        return list;
+                    }
+                }
+
+                if (
+                    (payload.action === "CHECK_OFF" ||
+                        payload.action === "UPDATE") &&
+                    payload.itemId
+                ) {
+                    return {
+                        ...list,
+                        items: list.items.map((item) => {
+                            if (item.id !== payload.itemId) {
+                                return item;
+                            }
+                            if (state.pendingMutations[item.id]) {
+                                return item;
+                            }
+                            const patch = getItemPatchFromSyncPayload(payload);
+                            return {
+                                ...item,
+                                ...patch,
+                            };
+                        }),
+                    };
+                }
+
+                if (payload.action === "DELETE" && payload.itemId) {
+                    if (state.pendingMutations[payload.itemId]) {
+                        return list;
+                    }
+                    return {
+                        ...list,
+                        items: list.items.filter(
+                            (item) => item.id !== payload.itemId,
+                        ),
+                    };
+                }
+
+                return list;
+            }),
+        })),
+
+    /**
+     * Reconciles fetched REST items with optimistic locks to avoid stale overwrites.
+     * @param listId - The list identifier to update.
+     * @param serverItems - Items returned by the server.
+     */
+    syncListItemsFromServer: (listId: string, serverItems: Item[]) =>
+        set((state) => ({
+            lists: state.lists.map((list) => {
+                if (list.id !== listId) {
+                    return list;
+                }
+
+                return {
+                    ...list,
+                    items: mergeServerItemsWithPending(
+                        list.items,
+                        serverItems,
+                        state.pendingMutations,
+                    ),
+                };
+            }),
+        })),
+
     /** Clears all lists from the store and resets state. */
-    clearLists: () => set({ lists: [], currentList: null, error: null }),
+    clearLists: () =>
+        set({
+            lists: [],
+            currentList: null,
+            pendingMutations: {},
+            error: null,
+        }),
 }));

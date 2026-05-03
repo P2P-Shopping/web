@@ -1,5 +1,4 @@
-import { Client } from "@stomp/stompjs";
-import SockJS from "sockjs-client";
+import { Client, type IMessage, type StompSubscription } from "@stomp/stompjs";
 
 /**
  * Singleton service managing the STOMP WebSocket connection.
@@ -7,8 +6,17 @@ import SockJS from "sockjs-client";
  */
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "/ws";
 
+// In development, we bypass the Vite proxy for WebSockets to avoid connection abortion issues.
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const DEV_BACKEND_WS = "ws://localhost:8081/ws";
+
+/** Unique identifier for this specific browser tab/instance. */
+export const clientInstanceId = Math.random().toString(36).substring(2, 15);
+
 const stompClient = new Client({
-    webSocketFactory: () => new SockJS(SOCKET_URL),
+    brokerURL: isLocal 
+        ? DEV_BACKEND_WS 
+        : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}${SOCKET_URL}`,
     reconnectDelay: 3000,
     connectHeaders: {}, // Will be set dynamically
 
@@ -19,5 +27,43 @@ const stompClient = new Client({
         console.error(`Broker reported error: ${frame.headers.message}`);
     },
 });
+
+/**
+ * Convenience wrapper exposing a stable, typed API for list-level subscriptions and publishes.
+ */
+export const socketService = {
+    /**
+     * Subscribes to a STOMP destination when the socket is connected.
+     * @param destination - Topic destination to subscribe to.
+     * @param callback - Message handler called for each incoming frame.
+     * @returns Active subscription, or null when the socket is disconnected.
+     */
+    subscribe: (
+        destination: string,
+        callback: (message: IMessage) => void,
+    ): StompSubscription | null => {
+        if (!stompClient.connected) {
+            return null;
+        }
+        return stompClient.subscribe(destination, callback);
+    },
+
+    /**
+     * Publishes a message body to a STOMP destination when the socket is connected.
+     * @param destination - Application destination that receives updates.
+     * @param body - JSON payload serialized as a string.
+     */
+    publish: (destination: string, body: string): void => {
+        if (!stompClient.connected) {
+            console.warn("[ws] cannot publish, not connected", destination);
+            return;
+        }
+        stompClient.publish({
+            destination,
+            body,
+            headers: { "content-type": "application/json" },
+        });
+    },
+};
 
 export default stompClient;
