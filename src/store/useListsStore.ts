@@ -152,6 +152,64 @@ const handleAuthResponse = (response: Response) => {
     return response;
 };
 
+// ==========================================
+// SYNC HANDLERS (Private Helpers)
+// ==========================================
+
+function handleSyncAdd(list: ShoppingList, payload: SyncPayload): ShoppingList {
+    if (!payload.content) return list;
+    try {
+        const incomingItem = JSON.parse(payload.content) as Item;
+        const alreadyExists = list.items.some((item) => item.id === incomingItem.id);
+        if (alreadyExists) return list;
+
+        // Insert at alphabetical position within unchecked section
+        const unchecked = list.items.filter((i) => !i.checked);
+        const checked = list.items.filter((i) => i.checked);
+
+        let insertIdx = unchecked.findIndex(
+            (i) => i.name.localeCompare(incomingItem.name) > 0,
+        );
+        if (insertIdx === -1) insertIdx = unchecked.length;
+
+        const nextUnchecked = [...unchecked];
+        nextUnchecked.splice(insertIdx, 0, { ...incomingItem });
+
+        return { ...list, items: [...nextUnchecked, ...checked] };
+    } catch {
+        return list;
+    }
+}
+
+function handleSyncUpdate(
+    list: ShoppingList,
+    payload: SyncPayload,
+    pendingMutations: Record<string, true>,
+): ShoppingList {
+    if (!payload.itemId) return list;
+    return {
+        ...list,
+        items: list.items.map((item) => {
+            if (item.id !== payload.itemId) return item;
+            if (pendingMutations[item.id]) return item;
+
+            return { ...item, ...getItemPatchFromSyncPayload(payload) };
+        }),
+    };
+}
+
+function handleSyncDelete(
+    list: ShoppingList,
+    payload: SyncPayload,
+    pendingMutations: Record<string, true>,
+): ShoppingList {
+    if (!payload.itemId || pendingMutations[payload.itemId]) return list;
+    return {
+        ...list,
+        items: list.items.filter((item) => item.id !== payload.itemId),
+    };
+}
+
 /**
  * Converts an item from the API format to the internal application format.
  * @param item - The raw API item data.
@@ -596,78 +654,22 @@ export const useListsStore = create<ListsState>((set, get) => ({
      * @param listId - The target shopping list identifier.
      * @param payload - Sync payload received from the STOMP subscription.
      */
-    applyIncomingSync: (listId: string, payload: SyncPayload) =>
+    applyIncomingSync: (listId, payload) =>
         set((state) => ({
             lists: state.lists.map((list) => {
-                if (list.id !== listId) {
-                    return list;
-                }
+                if (list.id !== listId) return list;
 
-                if (payload.action === "ADD" && payload.content) {
-                    try {
-                        const incomingItem = JSON.parse(payload.content) as Item;
-                        const alreadyExists = list.items.some(
-                            (item) => item.id === incomingItem.id,
-                        );
-                        if (alreadyExists) {
-                            return list;
-                        }
-                        
-                        // Insert at alphabetical position within unchecked section
-                        const uncheckedItems = list.items.filter(item => !item.checked);
-                        const checkedItems = list.items.filter(item => item.checked);
-                        
-                        let insertIdx = uncheckedItems.findIndex(item => item.name.localeCompare(incomingItem.name) > 0);
-                        if (insertIdx === -1) insertIdx = uncheckedItems.length;
-                        
-                        const nextUnchecked = [...uncheckedItems];
-                        nextUnchecked.splice(insertIdx, 0, { ...incomingItem });
-
-                        return {
-                            ...list,
-                            items: [...nextUnchecked, ...checkedItems],
-                        };
-                    } catch {
+                switch (payload.action) {
+                    case "ADD":
+                        return handleSyncAdd(list, payload);
+                    case "CHECK_OFF":
+                    case "UPDATE":
+                        return handleSyncUpdate(list, payload, state.pendingMutations);
+                    case "DELETE":
+                        return handleSyncDelete(list, payload, state.pendingMutations);
+                    default:
                         return list;
-                    }
                 }
-
-                if (
-                    (payload.action === "CHECK_OFF" ||
-                        payload.action === "UPDATE") &&
-                    payload.itemId
-                ) {
-                    return {
-                        ...list,
-                        items: list.items.map((item) => {
-                            if (item.id !== payload.itemId) {
-                                return item;
-                            }
-                            if (state.pendingMutations[item.id]) {
-                                return item;
-                            }
-                            const patch = getItemPatchFromSyncPayload(payload);
-                            return {
-                                ...item,
-                                ...patch,
-                            };
-                        }),
-                    };
-                }
-
-                if (payload.action === "DELETE" && payload.itemId) {
-                    if (state.pendingMutations[payload.itemId]) {
-                        return list;
-                    }
-                    return {
-                        ...list,
-                        items: list.items.filter(
-                            (item) => item.id !== payload.itemId,
-                        ),
-                    };
-                }
-
-                return list;
             }),
         })),
 

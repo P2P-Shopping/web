@@ -7,16 +7,17 @@ import { Client, type IMessage, type StompSubscription } from "@stomp/stompjs";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "/ws";
 
 // In development, we bypass the Vite proxy for WebSockets to avoid connection abortion issues.
-const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const isLocal = globalThis.location.hostname === "localhost" || globalThis.location.hostname === "127.0.0.1";
 const DEV_BACKEND_WS = "ws://localhost:8081/ws";
+
+const protocol = globalThis.location.protocol === "https:" ? "wss" : "ws";
+const PRODUCTION_WS = `${protocol}://${globalThis.location.host}${SOCKET_URL}`;
 
 /** Unique identifier for this specific browser tab/instance. */
 export const clientInstanceId = Math.random().toString(36).substring(2, 15);
 
 const stompClient = new Client({
-    brokerURL: isLocal 
-        ? DEV_BACKEND_WS 
-        : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}${SOCKET_URL}`,
+    brokerURL: isLocal ? DEV_BACKEND_WS : PRODUCTION_WS,
     reconnectDelay: 3000,
     connectHeaders: {}, // Will be set dynamically
 

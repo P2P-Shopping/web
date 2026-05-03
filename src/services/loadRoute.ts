@@ -85,8 +85,7 @@ export const loadRoute = async (
         });
 
         if (
-            serverData &&
-            serverData.status === "success" &&
+            serverData?.status === "success" &&
             serverData.route.length > 0
         ) {
             console.log(

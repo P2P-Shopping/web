@@ -58,6 +58,11 @@ interface ApiListItem {
 interface ApiShoppingList {
     id: string;
     category?: ListCategory;
+    subcategory?: string;
+    finalStore?: string;
+    ownerEmail?: string;
+    ownerName?: string;
+    collaboratorEmails?: string[];
     items?: ApiListItem[];
 }
 
@@ -89,31 +94,6 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
     /**
-     * Retrieves the base URL for API requests.
-     */
-    const getBaseUrl = useCallback(() => {
-        const base =
-            import.meta.env.VITE_API_URL ||
-            import.meta.env.VITE_API_BASE_URL ||
-            "http://localhost:8081";
-        return base === "/" ? "" : base;
-    }, []);
-
-    /**
-     * Constructs the necessary headers for authentication and content type.
-     */
-    const getAuthHeaders = useCallback(
-        (withContentType = false): HeadersInit => {
-            return {
-                ...(withContentType
-                    ? { "Content-Type": "application/json" }
-                    : {}),
-            };
-        },
-        [],
-    );
-
-    /**
      * Synchronizes the local item state with the global store state.
      */
     const syncListItemsInStore = useCallback(
@@ -123,11 +103,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         },
         [effectiveListId, updateList],
     );
-
-    const handleUnauthorizedResponse = useCallback(() => {
-        useStore.getState().setAuth(null);
-        setSyncFailed(true);
-    }, []);
 
     /**
      * Fetches the complete data for a specific shopping list from the server.
@@ -1465,6 +1440,59 @@ const ListDetail = ({
         }
     };
 
+    const listContent = useMemo(() => {
+        if (itemsLoading) {
+            return (
+                <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
+                    <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
+                    <p>Loading...</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
+                <ShoppingListItems
+                    items={items}
+                    onCheck={toggleItem}
+                    onDelete={deleteItem}
+                    disabled={isReadOnly}
+                />
+                {items.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                        <div className="flex justify-between items-center">
+                            <div className="flex flex-col">
+                                <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                    Estimated Total
+                                </span>
+                                <span className="text-xs text-text-muted opacity-70">
+                                    {items.length} items
+                                </span>
+                            </div>
+                            <span className="text-xl font-black text-accent tracking-tight">
+                                {estimatedTotal} lei
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowFinishModal(true)}
+                            className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                        >
+                            Finish Shopping
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }, [
+        itemsLoading,
+        items,
+        toggleItem,
+        deleteItem,
+        isReadOnly,
+        estimatedTotal,
+    ]);
+
     return (
         <div
             className={
@@ -1570,47 +1598,7 @@ const ListDetail = ({
                         </div>
 
                         <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
-                            {itemsLoading ? (
-                                <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
-                                    <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
-                                    <p>Loading...</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
-                                    <ShoppingListItems
-                                        items={items}
-                                        onCheck={toggleItem}
-                                        onDelete={deleteItem}
-                                        disabled={isReadOnly}
-                                    />
-                                    {items.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
-                                            <div className="flex justify-between items-center">
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-                                                        Estimated Total
-                                                    </span>
-                                                    <span className="text-xs text-text-muted opacity-70">
-                                                        {items.length} items
-                                                    </span>
-                                                </div>
-                                                <span className="text-xl font-black text-accent tracking-tight">
-                                                    {estimatedTotal} lei
-                                                </span>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setShowFinishModal(true)
-                                                }
-                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                            >
-                                                Finish Shopping
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                            {listContent}
                         </div>
                     </>
                 )}

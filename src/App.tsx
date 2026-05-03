@@ -318,7 +318,7 @@ function App() {
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
             stompClient.onStompError = () => {};
-            void stompClient.deactivate();
+            stompClient.deactivate();
         };
     }, [handlePongMessage, setServerConnected, clearToastTimeout, token]);
 
