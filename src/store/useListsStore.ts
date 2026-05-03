@@ -53,6 +53,15 @@ interface ListsState {
     clearLists: () => void;
 }
 
+const pickCurrentNormalList = (lists: ShoppingList[]) =>
+    [...lists]
+        .filter((list) => (list.category ?? "NORMAL") === "NORMAL")
+        .sort(
+            (left, right) =>
+                new Date(right.updatedAt).getTime() -
+                new Date(left.updatedAt).getTime(),
+        )[0] ?? null;
+
 /**
  * Resolves the base URL for API requests from environment variables.
  * @returns The base URL string.
@@ -165,10 +174,12 @@ export const useListsStore = create<ListsState>((set, get) => ({
             }
 
             const data = (await response.json()) as ApiShoppingList[];
+            const normalizedLists = Array.isArray(data)
+                ? data.map(normalizeListFromApi)
+                : [];
             set({
-                lists: Array.isArray(data)
-                    ? data.map(normalizeListFromApi)
-                    : [],
+                lists: normalizedLists,
+                currentList: pickCurrentNormalList(normalizedLists),
                 isLoading: false,
             });
         } catch (error) {
@@ -195,6 +206,20 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 throw new Error("List name cannot be empty");
             }
 
+            // Prevent creating multiple NORMAL lists (only one "Your basket" allowed)
+            if (category === "NORMAL") {
+                const state = get();
+                const hasNormalList = state.lists.some(
+                    (list) => (list.category ?? "NORMAL") === "NORMAL",
+                );
+                if (hasNormalList) {
+                    set({ isLoading: false });
+                    throw new Error(
+                        "You can only have one shopping list. Use 'Your basket' or create a Recipe/Frequent list.",
+                    );
+                }
+            }
+
             const response = await fetch(`${getBaseUrl()}/api/lists`, {
                 method: "POST",
                 headers: jsonHeaders(true),
@@ -214,6 +239,10 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
             set((state) => ({
                 lists: [createdList, ...state.lists],
+                currentList:
+                    (createdList.category ?? "NORMAL") === "NORMAL"
+                        ? createdList
+                        : state.currentList,
                 isLoading: false,
                 isModalOpen: false,
             }));
@@ -236,11 +265,15 @@ export const useListsStore = create<ListsState>((set, get) => ({
      * @param updates - The partial data to update.
      */
     updateList: (id: string, updates: Partial<ShoppingList>) => {
-        set((state) => ({
-            lists: state.lists.map((list) =>
+        set((state) => {
+            const nextLists = state.lists.map((list) =>
                 list.id === id ? { ...list, ...updates } : list,
-            ),
-        }));
+            );
+            return {
+                lists: nextLists,
+                currentList: pickCurrentNormalList(nextLists),
+            };
+        });
     },
 
     /**
@@ -265,8 +298,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
             set((state) => ({
                 lists: state.lists.filter((list) => list.id !== id),
-                currentList:
-                    state.currentList?.id === id ? null : state.currentList,
+                currentList: pickCurrentNormalList(
+                    state.lists.filter((list) => list.id !== id),
+                ),
                 error: null,
                 isLoading: false,
                 deletingListId: null,

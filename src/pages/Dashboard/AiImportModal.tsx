@@ -439,6 +439,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         <input
                             type="file"
                             accept="image/*"
+                            capture="environment"
                             ref={fileInputRef}
                             className="hidden"
                             onChange={handleImageChange}

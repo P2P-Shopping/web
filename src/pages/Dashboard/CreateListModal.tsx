@@ -15,11 +15,6 @@ const LIST_CATEGORY_OPTIONS: Array<{
     description: string;
 }> = [
     {
-        value: "NORMAL",
-        title: "Normal list",
-        description: "A standard shopping list.",
-    },
-    {
         value: "RECIPE",
         title: "Recipe list",
         description: "Built around ingredients for a recipe.",
@@ -33,9 +28,9 @@ const LIST_CATEGORY_OPTIONS: Array<{
 
 const CreateListModal = ({ onClose }: CreateListModalProps) => {
     const [listName, setListName] = useState("");
-    const [listCategory, setListCategory] = useState<ListCategory>("NORMAL");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { addList } = useListsStore();
+    const [listCategory, setListCategory] = useState<ListCategory>("RECIPE");
     const categoryButtonId = useId();
     const categoryListId = useId();
 
@@ -67,7 +62,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
             isOpen={true}
             onClose={handleClose}
             title="Create New List"
-            subtitle="Choose a list type and give it a name."
+            subtitle="Choose a list type and give it a name. Your primary shopping list is 'Your basket'."
             initialFocusSelector="#list-name"
             maxWidth="760px"
             footer={
@@ -137,7 +132,10 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                             aria-labelledby={categoryButtonId}
                         >
                             {LIST_CATEGORY_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
+                                <option
+                                    key={option.value}
+                                    value={option.value}
+                                >
                                     {option.title} - {option.description}
                                 </option>
                             ))}
