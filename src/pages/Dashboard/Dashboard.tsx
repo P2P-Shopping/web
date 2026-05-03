@@ -335,6 +335,28 @@ const Dashboard = () => {
         }
     };
 
+    const handleDragOverTab = (e: React.DragEvent, section: string) => {
+        if (section === "NORMAL" && draggedListId) {
+            const draggedList = lists.find((l) => l.id === draggedListId);
+            if (
+                draggedList &&
+                (draggedList.category === "RECIPE" ||
+                    draggedList.category === "FREQUENT")
+            ) {
+                e.preventDefault();
+                setDragOverListId("TAB_NORMAL");
+            }
+        }
+    };
+
+    const handleDropOnTab = (e: React.DragEvent, section: string) => {
+        if (section === "NORMAL" && draggedListId) {
+            e.preventDefault();
+            void handleCopyListToNormal(draggedListId);
+            setDragOverListId(null);
+        }
+    };
+
     const renderEmptyState = () => (
         <div className="flex flex-col items-center justify-center py-20 text-center gap-2.5">
             <span className="text-5xl mb-2 opacity-60" aria-hidden="true">
@@ -365,32 +387,12 @@ const Dashboard = () => {
                         label={sectionLabels[section]}
                         isActive={activeTab === section}
                         onClick={() => setActiveTab(section)}
-                        onDragOver={(e) => {
-                            if (section === "NORMAL" && draggedListId) {
-                                const draggedList = lists.find(
-                                    (l) => l.id === draggedListId,
-                                );
-                                if (
-                                    draggedList &&
-                                    (draggedList.category === "RECIPE" ||
-                                        draggedList.category === "FREQUENT")
-                                ) {
-                                    e.preventDefault();
-                                    setDragOverListId("TAB_NORMAL");
-                                }
-                            }
-                        }}
+                        onDragOver={(e) => handleDragOverTab(e, section)}
                         onDragLeave={() => {
                             if (dragOverListId === "TAB_NORMAL")
                                 setDragOverListId(null);
                         }}
-                        onDrop={(e) => {
-                            if (section === "NORMAL" && draggedListId) {
-                                e.preventDefault();
-                                void handleCopyListToNormal(draggedListId);
-                                setDragOverListId(null);
-                            }
-                        }}
+                        onDrop={(e) => handleDropOnTab(e, section)}
                         isDragOver={
                             dragOverListId === "TAB_NORMAL" &&
                             section === "NORMAL"
