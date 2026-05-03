@@ -68,34 +68,6 @@ interface ApiStoreMatch {
     };
 }
 
-const MOCK_STORES: StoreRecommendation[] = [
-    {
-        id: "store-1",
-        name: "Kaufland Tudor Vladimirescu",
-        address: "Strada Theodor Pallady",
-        lat: 47.1532,
-        lng: 27.5891,
-        stockMatchPercentage: 98,
-        transit: {
-            driving: { timeMins: 5, distanceKm: 1.2 },
-            walking: { timeMins: 15, distanceKm: 1.2 },
-        },
-    },
-    {
-        id: "store-2",
-        name: "Carrefour Felicia",
-        address: "Strada Bucium",
-        lat: 47.1495,
-        lng: 27.592,
-        stockMatchPercentage: 95,
-        transit: {
-            driving: { timeMins: 8, distanceKm: 2.5 },
-            walking: { timeMins: 30, distanceKm: 2.2 },
-        },
-    },
-];
-
-// Fix Leaflet marker icons
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
@@ -493,11 +465,12 @@ const UnifiedMap: React.FC = () => {
         const selectedList = lists.find((l) => l.id === idToFetch);
         if (!selectedList) return;
 
-        setIsFetchingStores(true);
+        setIsFetchingStores(true); // START Pas 3: Activăm spinner-ul
+
         try {
             const itemIds = selectedList.items.map((item) => item.id) || [];
             if (itemIds.length === 0) {
-                setRecommendedStores(MOCK_STORES);
+                // Dacă lista e goală, putem ieși politicos, nu mai chemăm mock-urile.
                 setIsShowingStores(true);
                 return;
             }
@@ -508,7 +481,8 @@ const UnifiedMap: React.FC = () => {
                 "http://localhost:8081";
             const baseUrl = apiBase === "/" ? "" : apiBase;
 
-            const response = await fetch(
+            // PASUL 1a: Chemăm Store Matcher-ul
+            const storesResponse = await fetch(
                 `${baseUrl}/api/routing/stores-match`,
                 {
                     method: "POST",
@@ -522,44 +496,94 @@ const UnifiedMap: React.FC = () => {
                 },
             );
 
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-            const data = await response.json();
-            const storesArray = Array.isArray(data) ? data : [data];
+            if (!storesResponse.ok)
+                throw new Error(
+                    `HTTP Error from stores-match: ${storesResponse.status}`,
+                );
+            const data = await storesResponse.json();
+            const storesArray: ApiStoreMatch[] = Array.isArray(data)
+                ? data
+                : [data];
 
-            const mappedStores: StoreRecommendation[] = storesArray.map(
-                (store: ApiStoreMatch) => ({
-                    id: store.storeId,
-                    name: store.storeName,
-                    address: store.address || "Address unavailable",
-                    lat: store.lat || DEMO_STORE_LOCATION.lat,
-                    lng: store.lng || DEMO_STORE_LOCATION.lng,
-                    stockMatchPercentage: Math.round(
-                        (store.matchedItems / Math.max(itemIds.length, 1)) *
-                            100,
-                    ),
-                    transit: {
-                        driving: store.transit?.driving || {
-                            timeMins: 10,
-                            distanceKm: 2,
-                        },
-                        walking: store.transit?.walking || {
-                            timeMins: 30,
-                            distanceKm: 2,
-                        },
-                    },
+            // PASUL 1b: Apelăm Macro-Routing API pentru fiecare magazin găsit pentru a obține ETA-urile reale
+            const finalStores: StoreRecommendation[] = await Promise.all(
+                storesArray.map(async (store) => {
+                    const realTransit = {
+                        driving: { timeMins: 10, distanceKm: "2.0" }, // Fallback-uri de siguranță
+                        walking: { timeMins: 30, distanceKm: "2.0" },
+                    };
+
+                    try {
+                        const params = new URLSearchParams({
+                            userLat: String(userLocation.lat),
+                            userLng: String(userLocation.lng),
+                            storeId: store.storeId,
+                        });
+
+                        const macroRes = await fetch(
+                            `${baseUrl}/api/routing/macro?${params}`,
+                        );
+                        if (macroRes.ok) {
+                            const macroData = await macroRes.json();
+
+                            // Mapăm JSON-ul de la OSRM. Conform MacroRoutingResponse.java, convertim din secunde/metri
+                            if (macroData.driving) {
+                                realTransit.driving = {
+                                    timeMins: Math.round(
+                                        macroData.driving.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.driving.distanceM / 1000
+                                    ).toFixed(1),
+                                };
+                            }
+                            if (macroData.walking) {
+                                realTransit.walking = {
+                                    timeMins: Math.round(
+                                        macroData.walking.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.walking.distanceM / 1000
+                                    ).toFixed(1),
+                                };
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(
+                            `Nu am putut obține macro-routing pentru magazinul ${store.storeId}`,
+                            err,
+                        );
+                    }
+
+                    // PASUL 2: Mapăm răspunsul combinat pe structura pe care o așteaptă UI-ul (Zustand)
+                    return {
+                        id: store.storeId,
+                        name: store.storeName,
+                        address: store.address || "Address unavailable",
+                        lat: store.lat || DEMO_STORE_LOCATION.lat,
+                        lng: store.lng || DEMO_STORE_LOCATION.lng,
+                        stockMatchPercentage: Math.round(
+                            (store.matchedItems / Math.max(itemIds.length, 1)) *
+                                100,
+                        ),
+                        transit: realTransit, // Aici punem datele reale obținute mai sus!
+                    };
                 }),
             );
 
-            setRecommendedStores(
-                mappedStores.length > 0 ? mappedStores : MOCK_STORES,
-            );
+            // Salvăm datele în state (Zustand)
+            setRecommendedStores(finalStores);
             setIsShowingStores(true);
         } catch (error) {
-            console.warn("Backend match failed, using mock stores", error);
-            setRecommendedStores(MOCK_STORES);
+            console.error(
+                "Critical error during store match or macro-routing!",
+                error,
+            );
+            // Am eliminat MOCK_STORES complet, așa cum ne-ai cerut! Dacă pică, lăsăm lista goală ca să vedem clar eroarea.
+            setRecommendedStores([]);
             setIsShowingStores(true);
         } finally {
-            setIsFetchingStores(false);
+            setIsFetchingStores(false); // STOP Pas 3: Oprim spinner-ul
         }
     };
 
