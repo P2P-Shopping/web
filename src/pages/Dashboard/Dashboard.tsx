@@ -137,8 +137,7 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
                             onClick={() => onCardClick(list.id)}
                             onDelete={
                                 section !== "NORMAL"
-                                    ? (e) =>
-                                          onDeleteList(e, list.id, list.name)
+                                    ? (e) => onDeleteList(e, list.id, list.name)
                                     : undefined
                             }
                             isDeleting={deletingListId === list.id}
@@ -629,12 +628,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                         onClick={() => onCardClick(list.id)}
                         onDelete={
                             activeTab !== "NORMAL"
-                                ? (e) =>
-                                      onDeleteList(
-                                          e,
-                                          list.id,
-                                          list.name,
-                                      )
+                                ? (e) => onDeleteList(e, list.id, list.name)
                                 : undefined
                         }
                         isDeleting={deletingListId === list.id}
@@ -821,9 +815,6 @@ const Dashboard = () => {
         }),
         [currentList, lists],
     );
-    const hiddenNormalListsCount =
-        lists.filter((list) => (list.category ?? "NORMAL") === "NORMAL")
-            .length - groupedLists.NORMAL.length;
 
     const sectionOrder = ["NORMAL", "RECIPE", "FREQUENT"] as const;
     const sectionLabels: Record<(typeof sectionOrder)[number], string> = {

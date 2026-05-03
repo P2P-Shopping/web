@@ -132,10 +132,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                             aria-labelledby={categoryButtonId}
                         >
                             {LIST_CATEGORY_OPTIONS.map((option) => (
-                                <option
-                                    key={option.value}
-                                    value={option.value}
-                                >
+                                <option key={option.value} value={option.value}>
                                     {option.title} - {option.description}
                                 </option>
                             ))}
