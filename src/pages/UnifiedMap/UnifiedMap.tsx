@@ -68,34 +68,6 @@ interface ApiStoreMatch {
     };
 }
 
-const MOCK_STORES: StoreRecommendation[] = [
-    {
-        id: "store-1",
-        name: "Kaufland Tudor Vladimirescu",
-        address: "Strada Theodor Pallady",
-        lat: 47.1532,
-        lng: 27.5891,
-        stockMatchPercentage: 98,
-        transit: {
-            driving: { timeMins: 5, distanceKm: 1.2 },
-            walking: { timeMins: 15, distanceKm: 1.2 },
-        },
-    },
-    {
-        id: "store-2",
-        name: "Carrefour Felicia",
-        address: "Strada Bucium",
-        lat: 47.1495,
-        lng: 27.592,
-        stockMatchPercentage: 95,
-        transit: {
-            driving: { timeMins: 8, distanceKm: 2.5 },
-            walking: { timeMins: 30, distanceKm: 2.2 },
-        },
-    },
-];
-
-// Fix Leaflet marker icons
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
