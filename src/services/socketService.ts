@@ -14,7 +14,7 @@ const protocol = globalThis.location.protocol === "https:" ? "wss" : "ws";
 const PRODUCTION_WS = `${protocol}://${globalThis.location.host}${SOCKET_URL}`;
 
 /** Unique identifier for this specific browser tab/instance. */
-export const clientInstanceId = Math.random().toString(36).substring(2, 15);
+export const clientInstanceId = crypto.randomUUID();
 
 const stompClient = new Client({
     brokerURL: isLocal ? DEV_BACKEND_WS : PRODUCTION_WS,
