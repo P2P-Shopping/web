@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import {
     type MouseEvent,
-    type ReactNode,
     useEffect,
     useMemo,
     useState,
@@ -22,7 +21,6 @@ import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
-import type { ShoppingList } from "../../types";
 
 const Dashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -360,69 +358,68 @@ const Dashboard = () => {
     const renderTabsView = () => (
         <div className="flex flex-col gap-6">
             <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
-                {sectionOrder.map((section) => {
-                    let className = "px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ";
-                    if (activeTab === section) {
-                        className += "bg-accent text-text-on-accent shadow-md";
-                    } else if (dragOverListId === "TAB_NORMAL" && section === "NORMAL") {
-                        className += "bg-accent-subtle text-accent ring-2 ring-accent";
-                    } else {
-                        className += "text-text-muted hover:text-text-strong hover:bg-bg-muted";
-                    }
-
-                    return (
-                        <button
-                            key={section}
-                            type="button"
-                            onClick={() => setActiveTab(section)}
-                            onDragOver={(e) => {
-                                if (section === "NORMAL" && draggedListId) {
-                                    const draggedList = lists.find((l) => l.id === draggedListId);
-                                    if (draggedList && (draggedList.category === "RECIPE" || draggedList.category === "FREQUENT")) {
-                                        e.preventDefault();
-                                        setDragOverListId("TAB_NORMAL");
-                                    }
-                                }
-                            }}
-                            onDragLeave={() => {
-                                if (dragOverListId === "TAB_NORMAL") setDragOverListId(null);
-                            }}
-                            onDrop={(e) => {
-                                if (section === "NORMAL" && draggedListId) {
+                {sectionOrder.map((section) => (
+                    <TabButton
+                        key={section}
+                        section={section}
+                        label={sectionLabels[section]}
+                        isActive={activeTab === section}
+                        onClick={() => setActiveTab(section)}
+                        onDragOver={(e) => {
+                            if (section === "NORMAL" && draggedListId) {
+                                const draggedList = lists.find(
+                                    (l) => l.id === draggedListId,
+                                );
+                                if (
+                                    draggedList &&
+                                    (draggedList.category === "RECIPE" ||
+                                        draggedList.category === "FREQUENT")
+                                ) {
                                     e.preventDefault();
-                                    void handleCopyListToNormal(draggedListId);
-                                    setDragOverListId(null);
+                                    setDragOverListId("TAB_NORMAL");
                                 }
-                            }}
-                            className={className}
-                        >
-                            {sectionLabels[section]}
-                            <span
-                                className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                                    activeTab === section
-                                        ? "bg-white/20"
-                                        : "bg-bg-muted text-text-muted"
-                                }`}
-                            >
-                                {groupedLists[section].length}
-                            </span>
-                        </button>
-                    );
-                })}
+                            }
+                        }}
+                        onDragLeave={() => {
+                            if (dragOverListId === "TAB_NORMAL")
+                                setDragOverListId(null);
+                        }}
+                        onDrop={(e) => {
+                            if (section === "NORMAL" && draggedListId) {
+                                e.preventDefault();
+                                void handleCopyListToNormal(draggedListId);
+                                setDragOverListId(null);
+                            }
+                        }}
+                        isDragOver={
+                            dragOverListId === "TAB_NORMAL" &&
+                            section === "NORMAL"
+                        }
+                        count={groupedLists[section].length}
+                    />
+                ))}
             </div>
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
                 {groupedLists[activeTab].map((list) => (
                     <li
                         key={list.id}
-                        draggable={activeTab !== "NORMAL" && list.items.length > 0}
+                        draggable={
+                            activeTab !== "NORMAL" && list.items.length > 0
+                        }
                         onDragStart={(e) => handleDragStart(e, list.id)}
                         onDragEnd={resetDragState}
-                        className={activeTab !== "NORMAL" && list.items.length > 0 ? "cursor-grab active:cursor-grabbing" : ""}
+                        className={
+                            activeTab !== "NORMAL" && list.items.length > 0
+                                ? "cursor-grab active:cursor-grabbing"
+                                : ""
+                        }
                     >
                         <ListCard
                             list={list}
                             onClick={() => handleCardClick(list.id)}
-                            onDelete={(e) => handleDeleteList(e, list.id, list.name)}
+                            onDelete={(e) =>
+                                handleDeleteList(e, list.id, list.name)
+                            }
                             isDeleting={deletingListId === list.id}
                         />
                     </li>
@@ -438,75 +435,25 @@ const Dashboard = () => {
 
     const renderSplitView = () => (
         <div className="flex flex-col gap-8 pb-4">
-            {sectionOrder.map((section) => {
-                const sectionLists = groupedLists[section];
-                const isCollapsed = collapsedSections.has(section);
-
-                return (
-                    <section key={section} className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between border-b border-border pb-3">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => toggleSection(section)}
-                                    className="p-1 hover:bg-bg-muted rounded text-text-muted transition-colors"
-                                    title={isCollapsed ? "Expand" : "Collapse"}
-                                >
-                                    {isCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
-                                </button>
-                                <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
-                                    {sectionLabels[section]}
-                                </h2>
-                                <span className="px-2 py-0.5 rounded-full bg-bg-muted text-text-muted text-xs font-bold">
-                                    {sectionLists.length}
-                                </span>
-                            </div>
-                        </div>
-
-                        {!isCollapsed && (
-                            <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
-                                {sectionLists.map((list) => (
-                                    <li
-                                        key={list.id}
-                                        draggable={section !== "NORMAL" && list.items.length > 0}
-                                        onDragStart={(e) => handleDragStart(e, list.id)}
-                                        onDragEnd={resetDragState}
-                                        onDragOver={(e) => {
-                                            if (section !== "NORMAL") return;
-                                            if (!draggedListId || draggedListId === list.id) return;
-                                            e.preventDefault();
-                                            setDragOverListId(list.id);
-                                        }}
-                                        onDragLeave={() => {
-                                            if (dragOverListId === list.id) setDragOverListId(null);
-                                        }}
-                                        onDrop={(e) => {
-                                            if (section !== "NORMAL") return;
-                                            e.preventDefault();
-                                            handleDropOnNormalList(list.id);
-                                        }}
-                                        className={`w-[320px] shrink-0 rounded-xl transition-all ${
-                                            section !== "NORMAL" && list.items.length > 0 ? "cursor-grab active:cursor-grabbing" : ""
-                                        } ${dragOverListId === list.id ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg" : ""}`}
-                                    >
-                                        <ListCard
-                                            list={list}
-                                            onClick={() => handleCardClick(list.id)}
-                                            onDelete={(e) => handleDeleteList(e, list.id, list.name)}
-                                            isDeleting={deletingListId === list.id}
-                                        />
-                                    </li>
-                                ))}
-                                {sectionLists.length === 0 && (
-                                    <li className="w-full py-10 text-center text-text-muted border-2 border-dashed border-border rounded-xl list-none">
-                                        No lists in this category
-                                    </li>
-                                )}
-                            </ul>
-                        )}
-                    </section>
-                );
-            })}
+            {sectionOrder.map((section) => (
+                <SplitViewSection
+                    key={section}
+                    section={section}
+                    label={sectionLabels[section]}
+                    lists={groupedLists[section]}
+                    isCollapsed={collapsedSections.has(section)}
+                    onToggle={() => toggleSection(section)}
+                    draggedListId={draggedListId}
+                    dragOverListId={dragOverListId}
+                    onDragStart={handleDragStart}
+                    onDragEnd={resetDragState}
+                    onDragOver={setDragOverListId}
+                    onDrop={handleDropOnNormalList}
+                    onCardClick={handleCardClick}
+                    onDeleteList={handleDeleteList}
+                    deletingListId={deletingListId}
+                />
+            ))}
         </div>
     );
 
@@ -667,6 +614,173 @@ const Dashboard = () => {
                 isSubmitting={isImportingItems}
             />
         </div>
+    );
+};
+
+interface SplitViewSectionProps {
+    section: string;
+    label: string;
+    lists: any[];
+    isCollapsed: boolean;
+    onToggle: () => void;
+    draggedListId: string | null;
+    dragOverListId: string | null;
+    onDragStart: (e: React.DragEvent, id: string) => void;
+    onDragEnd: () => void;
+    onDragOver: (id: string | null) => void;
+    onDrop: (id: string) => void;
+    onCardClick: (id: string) => void;
+    onDeleteList: (
+        e: MouseEvent<HTMLButtonElement>,
+        id: string,
+        name: string,
+    ) => void;
+    deletingListId: string | null;
+}
+
+const SplitViewSection: React.FC<SplitViewSectionProps> = ({
+    section,
+    label,
+    lists,
+    isCollapsed,
+    onToggle,
+    draggedListId,
+    dragOverListId,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDrop,
+    onCardClick,
+    onDeleteList,
+    deletingListId,
+}) => {
+    return (
+        <section className="flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={onToggle}
+                        className="p-1 hover:bg-bg-muted rounded text-text-muted transition-colors"
+                        title={isCollapsed ? "Expand" : "Collapse"}
+                    >
+                        {isCollapsed ? (
+                            <ChevronRight size={20} />
+                        ) : (
+                            <ChevronDown size={20} />
+                        )}
+                    </button>
+                    <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
+                        {label}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-bg-muted text-text-muted text-xs font-bold">
+                        {lists.length}
+                    </span>
+                </div>
+            </div>
+
+            {!isCollapsed && (
+                <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
+                    {lists.map((list) => (
+                        <li
+                            key={list.id}
+                            draggable={section !== "NORMAL" && list.items.length > 0}
+                            onDragStart={(e) => onDragStart(e, list.id)}
+                            onDragEnd={onDragEnd}
+                            onDragOver={(e) => {
+                                if (section !== "NORMAL") return;
+                                if (!draggedListId || draggedListId === list.id) return;
+                                e.preventDefault();
+                                onDragOver(list.id);
+                            }}
+                            onDragLeave={() => {
+                                if (dragOverListId === list.id) onDragOver(null);
+                            }}
+                            onDrop={(e) => {
+                                if (section !== "NORMAL") return;
+                                e.preventDefault();
+                                onDrop(list.id);
+                            }}
+                            className={`w-[320px] shrink-0 rounded-xl transition-all ${
+                                section !== "NORMAL" && list.items.length > 0
+                                    ? "cursor-grab active:cursor-grabbing"
+                                    : ""
+                            } ${
+                                dragOverListId === list.id
+                                    ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg"
+                                    : ""
+                            }`}
+                        >
+                            <ListCard
+                                list={list}
+                                onClick={() => onCardClick(list.id)}
+                                onDelete={(e) => onDeleteList(e, list.id, list.name)}
+                                isDeleting={deletingListId === list.id}
+                            />
+                        </li>
+                    ))}
+                    {lists.length === 0 && (
+                        <li className="w-full py-10 text-center text-text-muted border-2 border-dashed border-border rounded-xl list-none">
+                            No lists in this category
+                        </li>
+                    )}
+                </ul>
+            )}
+        </section>
+    );
+};
+
+interface TabButtonProps {
+    section: string;
+    label: string;
+    isActive: boolean;
+    onClick: () => void;
+    onDragOver: (e: React.DragEvent) => void;
+    onDragLeave: () => void;
+    onDrop: (e: React.DragEvent) => void;
+    isDragOver: boolean;
+    count: number;
+}
+
+const TabButton: React.FC<TabButtonProps> = ({
+    section,
+    label,
+    isActive,
+    onClick,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    isDragOver,
+    count,
+}) => {
+    let className =
+        "px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ";
+    if (isActive) {
+        className += "bg-accent text-text-on-accent shadow-md";
+    } else if (isDragOver) {
+        className += "bg-accent-subtle text-accent ring-2 ring-accent";
+    } else {
+        className += "text-text-muted hover:text-text-strong hover:bg-bg-muted";
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            className={className}
+        >
+            {label}
+            <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                    isActive ? "bg-white/20" : "bg-bg-muted text-text-muted"
+                }`}
+            >
+                {count}
+            </span>
+        </button>
     );
 };
 
