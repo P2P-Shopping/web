@@ -109,9 +109,9 @@ const DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 const MapController = ({
-    center,
-    isMicroView,
-}: {
+                           center,
+                           isMicroView,
+                       }: {
     center: [number, number];
     isMicroView: boolean;
 }) => {
@@ -161,10 +161,10 @@ interface ListSelectionViewProps {
 }
 
 const ListSelectionView: React.FC<ListSelectionViewProps> = ({
-    lists,
-    isMicroView,
-    handleListSelect,
-}) => (
+                                                                 lists,
+                                                                 isMicroView,
+                                                                 handleListSelect,
+                                                             }) => (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
         <header>
             <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
@@ -233,12 +233,12 @@ interface StoreRecommendationViewProps {
 }
 
 const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
-    recommendedStores,
-    transportMode,
-    setTransportMode,
-    setSelectedListId,
-    handleStartRoute,
-}) => (
+                                                                             recommendedStores,
+                                                                             transportMode,
+                                                                             setTransportMode,
+                                                                             setSelectedListId,
+                                                                             handleStartRoute,
+                                                                         }) => (
     <div className="flex flex-col gap-6 animate-in slide-in-from-right-4">
         <header className="flex flex-col gap-4">
             <button
@@ -353,15 +353,15 @@ interface ListDetailViewProps {
 }
 
 const ListDetailView: React.FC<ListDetailViewProps> = ({
-    selectedListId,
-    lists,
-    isMicroView,
-    setSelectedListId,
-    targetStoreLocation,
-    setTargetStoreLocation,
-    handleFetchStores,
-    isFetchingStores,
-}) => (
+                                                           selectedListId,
+                                                           lists,
+                                                           isMicroView,
+                                                           setSelectedListId,
+                                                           targetStoreLocation,
+                                                           setTargetStoreLocation,
+                                                           handleFetchStores,
+                                                           isFetchingStores,
+                                                       }) => (
     <div className="relative animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col">
         <header className="flex items-center justify-between mb-4 shrink-0">
             <div className="flex items-center gap-4 min-w-0">
@@ -405,7 +405,6 @@ const ListDetailView: React.FC<ListDetailViewProps> = ({
                 <ListDetail
                     isEmbedded={true}
                     listIdOverride={selectedListId}
-                    onSwitchList={() => setSelectedListId(null)}
                 />
             </div>
 
@@ -535,7 +534,7 @@ const UnifiedMap: React.FC = () => {
                     lng: store.lng || DEMO_STORE_LOCATION.lng,
                     stockMatchPercentage: Math.round(
                         (store.matchedItems / Math.max(itemIds.length, 1)) *
-                            100,
+                        100,
                     ),
                     transit: {
                         driving: store.transit?.driving || {
@@ -713,8 +712,8 @@ const UnifiedMap: React.FC = () => {
                         }}
                         zoomControl={false}
                     >
-                        {/* 
-                      NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request. 
+                        {/*
+                      NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request.
                       Re-enable the TileLayer below to show the real-world map again.
                     */}
                         {/* <TileLayer
@@ -854,57 +853,56 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
-                    <div
-                        className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
-                    >
-                        {isMicroView
-                            ? "Micro View: Indoor"
-                            : "Macro View: City"}
+                <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <div
+                            className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md shrink-0 ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
+                        >
+                            {isMicroView
+                                ? "Micro View: Indoor"
+                                : "Macro View: City"}
+                        </div>
+                        {!isMicroView && (
+                            <button
+                                type="button"
+                                onClick={handleForceIndoor}
+                                className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95 shrink-0"
+                            >
+                                <Maximize2 size={14} className="text-green-500" />
+                                Force Indoor
+                            </button>
+                        )}
                     </div>
-                </div>
-
-                <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-                    <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
+                    <div className="flex items-center gap-2">
+                        <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
+                            <button
+                                type="button"
+                                onClick={() => setIsMockGpsEnabled(true)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
+                                title="Use Mock GPS (Drift)"
+                            >
+                                <Cpu size={12} />
+                                Mock
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsMockGpsEnabled(false)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "text-text-muted hover:text-text-strong" : "bg-blue-600 text-white"}`}
+                                title="Use Real Device GPS"
+                            >
+                                <Satellite size={12} />
+                                Real
+                            </button>
+                        </div>
                         <button
                             type="button"
-                            onClick={() => setIsMockGpsEnabled(true)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
-                            title="Use Mock GPS (Drift)"
+                            onClick={handleDemoTSP}
+                            className="flex items-center gap-2 px-4 py-2 bg-accent text-white border border-accent/20 rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all active:scale-95"
                         >
-                            <Cpu size={12} />
-                            Mock
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsMockGpsEnabled(false)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "text-text-muted hover:text-text-strong" : "bg-blue-600 text-white"}`}
-                            title="Use Real Device GPS"
-                        >
-                            <Satellite size={12} />
-                            Real
+                            <Zap size={14} fill="currentColor" />
+                            Demo TSP Route
                         </button>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={handleDemoTSP}
-                        className="flex items-center gap-2 px-4 py-2 bg-accent text-white border border-accent/20 rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all active:scale-95"
-                    >
-                        <Zap size={14} fill="currentColor" />
-                        Demo TSP Route
-                    </button>
-
-                    {!isMicroView && (
-                        <button
-                            type="button"
-                            onClick={handleForceIndoor}
-                            className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95"
-                        >
-                            <Maximize2 size={14} className="text-green-500" />
-                            Force Indoor
-                        </button>
-                    )}
                 </div>
             </div>
 
