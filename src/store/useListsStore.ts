@@ -205,6 +205,77 @@ const buildItemRequest = (item: Partial<Item>) => ({
     timestamp: Date.now(),
 });
 
+const applySyncToList = (
+    list: ShoppingList,
+    payload: SyncPayload,
+    pendingMutations: Record<string, boolean>
+): ShoppingList => {
+    if (payload.action === "ADD" && payload.content) {
+        try {
+            const incomingItem = JSON.parse(payload.content) as Item;
+            const alreadyExists = list.items.some(
+                (item) => item.id === incomingItem.id,
+            );
+            if (alreadyExists) {
+                return list;
+            }
+            
+            // Insert at alphabetical position within unchecked section
+            const uncheckedItems = list.items.filter((item) => !item.checked);
+            const checkedItems = list.items.filter((item) => item.checked);
+            
+            let insertIdx = uncheckedItems.findIndex(
+                (item) => item.name.localeCompare(incomingItem.name) > 0,
+            );
+            if (insertIdx === -1) insertIdx = uncheckedItems.length;
+            
+            const nextUnchecked = [...uncheckedItems];
+            nextUnchecked.splice(insertIdx, 0, { ...incomingItem });
+
+            return {
+                ...list,
+                items: [...nextUnchecked, ...checkedItems],
+            };
+        } catch {
+            return list;
+        }
+    }
+
+    if (
+        (payload.action === "CHECK_OFF" || payload.action === "UPDATE") &&
+        payload.itemId
+    ) {
+        return {
+            ...list,
+            items: list.items.map((item) => {
+                if (item.id !== payload.itemId) {
+                    return item;
+                }
+                if (pendingMutations[item.id]) {
+                    return item;
+                }
+                const patch = getItemPatchFromSyncPayload(payload);
+                return {
+                    ...item,
+                    ...patch,
+                };
+            }),
+        };
+    }
+
+    if (payload.action === "DELETE" && payload.itemId) {
+        if (pendingMutations[payload.itemId]) {
+            return list;
+        }
+        return {
+            ...list,
+            items: list.items.filter((item) => item.id !== payload.itemId),
+        };
+    }
+
+    return list;
+};
+
 export const useListsStore = create<ListsState>((set, get) => ({
     lists: [],
     currentList: null,
@@ -602,72 +673,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 if (list.id !== listId) {
                     return list;
                 }
-
-                if (payload.action === "ADD" && payload.content) {
-                    try {
-                        const incomingItem = JSON.parse(payload.content) as Item;
-                        const alreadyExists = list.items.some(
-                            (item) => item.id === incomingItem.id,
-                        );
-                        if (alreadyExists) {
-                            return list;
-                        }
-                        
-                        // Insert at alphabetical position within unchecked section
-                        const uncheckedItems = list.items.filter(item => !item.checked);
-                        const checkedItems = list.items.filter(item => item.checked);
-                        
-                        let insertIdx = uncheckedItems.findIndex(item => item.name.localeCompare(incomingItem.name) > 0);
-                        if (insertIdx === -1) insertIdx = uncheckedItems.length;
-                        
-                        const nextUnchecked = [...uncheckedItems];
-                        nextUnchecked.splice(insertIdx, 0, { ...incomingItem });
-
-                        return {
-                            ...list,
-                            items: [...nextUnchecked, ...checkedItems],
-                        };
-                    } catch {
-                        return list;
-                    }
-                }
-
-                if (
-                    (payload.action === "CHECK_OFF" ||
-                        payload.action === "UPDATE") &&
-                    payload.itemId
-                ) {
-                    return {
-                        ...list,
-                        items: list.items.map((item) => {
-                            if (item.id !== payload.itemId) {
-                                return item;
-                            }
-                            if (state.pendingMutations[item.id]) {
-                                return item;
-                            }
-                            const patch = getItemPatchFromSyncPayload(payload);
-                            return {
-                                ...item,
-                                ...patch,
-                            };
-                        }),
-                    };
-                }
-
-                if (payload.action === "DELETE" && payload.itemId) {
-                    if (state.pendingMutations[payload.itemId]) {
-                        return list;
-                    }
-                    return {
-                        ...list,
-                        items: list.items.filter(
-                            (item) => item.id !== payload.itemId,
-                        ),
-                    };
-                }
-
-                return list;
+                return applySyncToList(list, payload, state.pendingMutations);
             }),
         })),
 

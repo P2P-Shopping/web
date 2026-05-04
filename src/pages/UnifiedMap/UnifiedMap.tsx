@@ -151,6 +151,76 @@ const MapEvents = () => {
     return null;
 };
 
+const fetchStoresData = async (
+    selectedListId: string | null,
+    lists: any[],
+    userLocation: { lat: number; lng: number }
+): Promise<StoreRecommendation[] | null> => {
+    if (!selectedListId) return null;
+    const selectedList = lists.find((l) => l.id === selectedListId);
+    if (!selectedList) return null;
+
+    try {
+        const itemIds = selectedList.items.map((item: any) => item.id) || [];
+        if (itemIds.length === 0) {
+            return MOCK_STORES;
+        }
+
+        const baseUrlResolved =
+            import.meta.env.VITE_API_URL ||
+            import.meta.env.VITE_API_BASE_URL ||
+            "http://localhost:8081";
+        const baseUrl = baseUrlResolved === "/" ? "" : baseUrlResolved;
+
+        const response = await fetch(
+            `${baseUrl}/api/routing/stores-match`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userLat: userLocation.lat,
+                    userLng: userLocation.lng,
+                    radiusInMeters: 5000,
+                    itemIds: itemIds,
+                }),
+            },
+        );
+
+        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+        const data = await response.json();
+        const storesArray = Array.isArray(data) ? data : [data];
+
+        const mappedStores: StoreRecommendation[] = storesArray.map(
+            (store: ApiStoreMatch) => ({
+                id: store.storeId,
+                name: store.storeName,
+                address: store.address || "Address unavailable",
+                lat: store.lat || DEMO_STORE_LOCATION.lat,
+                lng: store.lng || DEMO_STORE_LOCATION.lng,
+                stockMatchPercentage: Math.round(
+                    (store.matchedItems / Math.max(itemIds.length, 1)) *
+                        100,
+                ),
+                transit: {
+                    driving: store.transit?.driving || {
+                        timeMins: 10,
+                        distanceKm: 2,
+                    },
+                    walking: store.transit?.walking || {
+                        timeMins: 30,
+                        distanceKm: 2,
+                    },
+                },
+            }),
+        );
+
+        return mappedStores.length > 0 ? mappedStores : MOCK_STORES;
+    } catch (error) {
+        console.warn("Backend match failed, using mock stores", error);
+        return MOCK_STORES;
+    }
+};
+
 const UnifiedMap: React.FC = () => {
     const userLocation = useStore((state) => state.userLocation);
     const setUserLocation = useStore((state) => state.setUserLocation);
@@ -200,78 +270,13 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleFetchStores = async () => {
-        if (!selectedListId) return;
-        const selectedList = lists.find((l) => l.id === selectedListId);
-        if (!selectedList) return;
-
         setIsFetchingStores(true);
-        try {
-            const itemIds = selectedList.items.map((item) => item.id) || [];
-            if (itemIds.length === 0) {
-                setRecommendedStores(MOCK_STORES);
-                setIsShowingStores(true);
-                return;
-            }
-
-            const baseUrlResolved =
-                import.meta.env.VITE_API_URL ||
-                import.meta.env.VITE_API_BASE_URL ||
-                "http://localhost:8081";
-            const baseUrl = baseUrlResolved === "/" ? "" : baseUrlResolved;
-
-            const response = await fetch(
-                `${baseUrl}/api/routing/stores-match`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        userLat: userLocation.lat,
-                        userLng: userLocation.lng,
-                        radiusInMeters: 5000,
-                        itemIds: itemIds,
-                    }),
-                },
-            );
-
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-            const data = await response.json();
-            const storesArray = Array.isArray(data) ? data : [data];
-
-            const mappedStores: StoreRecommendation[] = storesArray.map(
-                (store: ApiStoreMatch) => ({
-                    id: store.storeId,
-                    name: store.storeName,
-                    address: store.address || "Address unavailable",
-                    lat: store.lat || DEMO_STORE_LOCATION.lat,
-                    lng: store.lng || DEMO_STORE_LOCATION.lng,
-                    stockMatchPercentage: Math.round(
-                        (store.matchedItems / Math.max(itemIds.length, 1)) *
-                            100,
-                    ),
-                    transit: {
-                        driving: store.transit?.driving || {
-                            timeMins: 10,
-                            distanceKm: 2,
-                        },
-                        walking: store.transit?.walking || {
-                            timeMins: 30,
-                            distanceKm: 2,
-                        },
-                    },
-                }),
-            );
-
-            setRecommendedStores(
-                mappedStores.length > 0 ? mappedStores : MOCK_STORES,
-            );
+        const stores = await fetchStoresData(selectedListId, lists, userLocation);
+        if (stores) {
+            setRecommendedStores(stores);
             setIsShowingStores(true);
-        } catch (error) {
-            console.warn("Backend match failed, using mock stores", error);
-            setRecommendedStores(MOCK_STORES);
-            setIsShowingStores(true);
-        } finally {
-            setIsFetchingStores(false);
         }
+        setIsFetchingStores(false);
     };
 
     const handleStartRoute = (store: StoreRecommendation) => {
