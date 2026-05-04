@@ -7,7 +7,7 @@ import { useStore } from "../../context/useStore";
  * when the device loses its internet connection or when the backend server is unreachable.
  *
  * Positioning adapts based on whether the Navbar is visible:
- * - Auth pages (login/register): bottom-6 — no Navbar
+ * - Auth pages (login/register): bottom-1 — no Navbar
  * - All other pages: bottom-24 — above the Navbar
  */
 export const OfflineBanner: React.FC<{ isAuthPage?: boolean }> = ({
