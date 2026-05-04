@@ -135,8 +135,10 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
                         <ListCard
                             list={list}
                             onClick={() => onCardClick(list.id)}
-                            onDelete={(e) =>
-                                onDeleteList(e, list.id, list.name)
+                            onDelete={
+                                section !== "NORMAL"
+                                    ? (e) => onDeleteList(e, list.id, list.name)
+                                    : undefined
                             }
                             isDeleting={deletingListId === list.id}
                         />
@@ -457,6 +459,7 @@ interface DashboardHeaderProps {
     selectedList: ShoppingList | null;
     showAiImport: boolean;
     listsCount: number;
+    currentListName?: string | null;
     displayMode: "split" | "tabs";
     setDisplayMode: (mode: "split" | "tabs") => void;
     onBack: () => void;
@@ -468,6 +471,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     selectedList,
     showAiImport,
     listsCount,
+    currentListName,
     displayMode,
     setDisplayMode,
     onBack,
@@ -495,10 +499,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             <>
                 <div className="flex flex-col">
                     <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
-                        My Lists
+                        Current List
                     </h1>
                     <p className="text-[13px] text-text-muted mt-0.5">
-                        {`${listsCount} ${listsCount === 1 ? "list" : "lists"}`}
+                        {currentListName
+                            ? `${currentListName} • ${listsCount} total`
+                            : `${listsCount} ${listsCount === 1 ? "list" : "lists"}`}
                     </p>
                 </div>
                 <div className="flex items-center gap-3 max-[600px]:w-full">
@@ -620,7 +626,11 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                     <ListCard
                         list={list}
                         onClick={() => onCardClick(list.id)}
-                        onDelete={(e) => onDeleteList(e, list.id, list.name)}
+                        onDelete={
+                            activeTab !== "NORMAL"
+                                ? (e) => onDeleteList(e, list.id, list.name)
+                                : undefined
+                        }
                         isDeleting={deletingListId === list.id}
                     />
                 </li>
@@ -716,6 +726,7 @@ const Dashboard = () => {
 
     const {
         lists,
+        currentList,
         isLoading,
         isModalOpen,
         deletingListId,
@@ -795,18 +806,19 @@ const Dashboard = () => {
 
     const groupedLists = useMemo(
         () => ({
-            NORMAL: lists.filter(
-                (list) => (list.category ?? "NORMAL") === "NORMAL",
-            ),
+            NORMAL:
+                currentList && (currentList.category ?? "NORMAL") === "NORMAL"
+                    ? [currentList]
+                    : [],
             RECIPE: lists.filter((list) => list.category === "RECIPE"),
             FREQUENT: lists.filter((list) => list.category === "FREQUENT"),
         }),
-        [lists],
+        [currentList, lists],
     );
 
     const sectionOrder = ["NORMAL", "RECIPE", "FREQUENT"] as const;
     const sectionLabels: Record<(typeof sectionOrder)[number], string> = {
-        NORMAL: "Normal lists",
+        NORMAL: "Your basket",
         RECIPE: "Recipe lists",
         FREQUENT: "Frequent lists",
     };
@@ -864,40 +876,44 @@ const Dashboard = () => {
         }
 
         if (hasGroupedLists) {
-            return displayMode === "tabs" ? (
-                <DashboardTabsView
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    groupedLists={groupedLists}
-                    sectionOrder={sectionOrder}
-                    sectionLabels={sectionLabels}
-                    onCardClick={handleCardClick}
-                    onDeleteList={handleDeleteList}
-                    deletingListId={deletingListId}
-                    handleDragStart={handleDragStart}
-                    resetDragState={resetDragState}
-                    handleTabDragOver={handleTabDragOver}
-                    handleTabDragLeave={handleTabDragLeave}
-                    handleTabDrop={handleTabDrop}
-                    getTabClassName={getTabClassName}
-                />
-            ) : (
-                <DashboardSplitView
-                    groupedLists={groupedLists}
-                    sectionOrder={sectionOrder}
-                    sectionLabels={sectionLabels}
-                    collapsedSections={collapsedSections}
-                    toggleSection={toggleSection}
-                    draggedListId={draggedListId}
-                    dragOverListId={dragOverListId}
-                    setDragOverListId={setDragOverListId}
-                    handleDragStart={handleDragStart}
-                    resetDragState={resetDragState}
-                    handleDropOnNormalList={handleDropOnNormalList}
-                    onCardClick={handleCardClick}
-                    onDeleteList={handleDeleteList}
-                    deletingListId={deletingListId}
-                />
+            return (
+                <div className="flex flex-col gap-5">
+                    {displayMode === "tabs" ? (
+                        <DashboardTabsView
+                            activeTab={activeTab}
+                            setActiveTab={setActiveTab}
+                            groupedLists={groupedLists}
+                            sectionOrder={sectionOrder}
+                            sectionLabels={sectionLabels}
+                            onCardClick={handleCardClick}
+                            onDeleteList={handleDeleteList}
+                            deletingListId={deletingListId}
+                            handleDragStart={handleDragStart}
+                            resetDragState={resetDragState}
+                            handleTabDragOver={handleTabDragOver}
+                            handleTabDragLeave={handleTabDragLeave}
+                            handleTabDrop={handleTabDrop}
+                            getTabClassName={getTabClassName}
+                        />
+                    ) : (
+                        <DashboardSplitView
+                            groupedLists={groupedLists}
+                            sectionOrder={sectionOrder}
+                            sectionLabels={sectionLabels}
+                            collapsedSections={collapsedSections}
+                            toggleSection={toggleSection}
+                            draggedListId={draggedListId}
+                            dragOverListId={dragOverListId}
+                            setDragOverListId={setDragOverListId}
+                            handleDragStart={handleDragStart}
+                            resetDragState={resetDragState}
+                            handleDropOnNormalList={handleDropOnNormalList}
+                            onCardClick={handleCardClick}
+                            onDeleteList={handleDeleteList}
+                            deletingListId={deletingListId}
+                        />
+                    )}
+                </div>
             );
         }
 
@@ -908,8 +924,15 @@ const Dashboard = () => {
                         <ListCard
                             list={list}
                             onClick={() => handleCardClick(list.id)}
-                            onDelete={(e) =>
-                                handleDeleteList(e, list.id, list.name)
+                            onDelete={
+                                (list.category ?? "NORMAL") !== "NORMAL"
+                                    ? (e) =>
+                                          handleDeleteList(
+                                              e,
+                                              list.id,
+                                              list.name,
+                                          )
+                                    : undefined
                             }
                             isDeleting={deletingListId === list.id}
                         />
@@ -925,6 +948,7 @@ const Dashboard = () => {
                 selectedList={selectedList}
                 showAiImport={showAiImport}
                 listsCount={lists.length}
+                currentListName={currentList?.name}
                 displayMode={displayMode}
                 setDisplayMode={setDisplayMode}
                 onBack={showAiImport ? clearImport : () => setSearchParams({})}
