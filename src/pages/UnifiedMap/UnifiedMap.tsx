@@ -251,11 +251,11 @@ const UnifiedMap: React.FC = () => {
                     transit: {
                         driving: store.transit?.driving || {
                             timeMins: 10,
-                            distanceKm: 2.0,
+                            distanceKm: 2,
                         },
                         walking: store.transit?.walking || {
                             timeMins: 30,
-                            distanceKm: 2.0,
+                            distanceKm: 2,
                         },
                     },
                 }),

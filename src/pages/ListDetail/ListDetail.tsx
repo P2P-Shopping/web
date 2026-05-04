@@ -57,7 +57,15 @@ interface ApiListItem {
 
 interface ApiShoppingList {
     id: string;
+    title?: string;
     category?: ListCategory;
+    subcategory?: string;
+    finalStore?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    ownerName?: string;
+    ownerEmail?: string;
+    collaboratorEmails?: string[];
     items?: ApiListItem[];
 }
 
@@ -88,30 +96,7 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
-    /**
-     * Retrieves the base URL for API requests.
-     */
-    const getBaseUrl = useCallback(() => {
-        const base =
-            import.meta.env.VITE_API_URL ||
-            import.meta.env.VITE_API_BASE_URL ||
-            "http://localhost:8081";
-        return base === "/" ? "" : base;
-    }, []);
-
-    /**
-     * Constructs the necessary headers for authentication and content type.
-     */
-    const getAuthHeaders = useCallback(
-        (withContentType = false): HeadersInit => {
-            return {
-                ...(withContentType
-                    ? { "Content-Type": "application/json" }
-                    : {}),
-            };
-        },
-        [],
-    );
+    // Note: network requests in this hook use the shared `api` client.
 
     /**
      * Synchronizes the local item state with the global store state.
@@ -124,10 +109,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         [effectiveListId, updateList],
     );
 
-    const handleUnauthorizedResponse = useCallback(() => {
-        useStore.getState().setAuth(null);
-        setSyncFailed(true);
-    }, []);
+    // Authentication handling is centralized in App; individual hooks update state as needed.
 
     /**
      * Fetches the complete data for a specific shopping list from the server.

@@ -247,7 +247,7 @@ const Dashboard = () => {
             // Cleanup ghost element after the browser has taken the snapshot
             setTimeout(() => {
                 if (document.body.contains(ghost)) {
-                    document.body.removeChild(ghost);
+                    ghost.remove();
                 }
             }, 0);
         }
