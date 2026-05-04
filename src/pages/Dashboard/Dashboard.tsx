@@ -407,6 +407,16 @@ const Dashboard = () => {
         }
     };
 
+    const getTabClass = (section: string) => {
+        if (activeTab === section) {
+            return "bg-accent text-text-on-accent shadow-md";
+        }
+        if (dragOverListId === "TAB_NORMAL" && section === "NORMAL") {
+            return "bg-accent-subtle text-accent ring-2 ring-accent";
+        }
+        return "text-text-muted hover:text-text-strong hover:bg-bg-muted";
+    };
+
     const renderTabMode = () => (
         <div className="flex flex-col gap-6">
             <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
@@ -418,14 +428,7 @@ const Dashboard = () => {
                         onDragOver={(e) => handleTabDragOver(e, section)}
                         onDragLeave={handleTabDragLeave}
                         onDrop={(e) => handleTabDrop(e, section)}
-                        className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${
-                            activeTab === section
-                                ? "bg-accent text-text-on-accent shadow-md"
-                                : dragOverListId === "TAB_NORMAL" &&
-                                    section === "NORMAL"
-                                  ? "bg-accent-subtle text-accent ring-2 ring-accent"
-                                  : "text-text-muted hover:text-text-strong hover:bg-bg-muted"
-                        }`}
+                        className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${getTabClass(section)}`}
                     >
                         {sectionLabels[section]}
                         <span
@@ -476,102 +479,87 @@ const Dashboard = () => {
         </div>
     );
 
+    const renderSplitModeSection = (section: (typeof sectionOrder)[number]) => {
+        const sectionLists = groupedLists[section];
+        const isCollapsed = collapsedSections.has(section);
+
+        return (
+            <section
+                key={section}
+                className="flex flex-col gap-4"
+            >
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => toggleSection(section)}
+                            className="p-1 hover:bg-bg-muted rounded text-text-muted transition-colors"
+                            title={isCollapsed ? "Expand" : "Collapse"}
+                        >
+                            {isCollapsed ? (
+                                <ChevronRight size={20} />
+                            ) : (
+                                <ChevronDown size={20} />
+                            )}
+                        </button>
+                        <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
+                            {sectionLabels[section]}
+                        </h2>
+                        <span className="px-2 py-0.5 rounded-full bg-bg-muted text-text-muted text-xs font-bold">
+                            {sectionLists.length}
+                        </span>
+                    </div>
+                </div>
+
+                {!isCollapsed && (
+                    <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
+                        {sectionLists.map((list) => (
+                            <li
+                                key={list.id}
+                                draggable={
+                                    section !== "NORMAL" &&
+                                    list.items.length > 0
+                                }
+                                onDragStart={(e) => handleDragStart(e, list.id)}
+                                onDragEnd={resetDragState}
+                                onDragOver={(e) => handleSectionDragOver(e, section, list.id)}
+                                onDragLeave={() => handleSectionDragLeave(list.id)}
+                                onDrop={(e) => handleSectionDrop(e, section, list.id)}
+                                className={`w-[320px] shrink-0 rounded-xl transition-all ${
+                                    section !== "NORMAL" &&
+                                    list.items.length > 0
+                                        ? "cursor-grab active:cursor-grabbing"
+                                        : ""
+                                } ${
+                                    dragOverListId === list.id
+                                        ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg"
+                                        : ""
+                                }`}
+                            >
+                                <ListCard
+                                    list={list}
+                                    onClick={() => handleCardClick(list.id)}
+                                    onDelete={(e) =>
+                                        handleDeleteList(e, list.id, list.name)
+                                    }
+                                    isDeleting={deletingListId === list.id}
+                                />
+                            </li>
+                        ))}
+                        {sectionLists.length === 0 && (
+                            <li className="w-full py-10 text-center text-text-muted border-2 border-dashed border-border rounded-xl list-none">
+                                No lists in this category
+                            </li>
+                        )}
+                    </ul>
+                )}
+            </section>
+        );
+    };
+
     const renderSplitMode = () => (
         <div className="flex flex-col gap-8 pb-4">
-            {sectionOrder.map((section) => {
-                const sectionLists = groupedLists[section];
-                const isCollapsed = collapsedSections.has(section);
-
-                return (
-                    <section
-                        key={section}
-                        className="flex flex-col gap-4"
-                    >
-                        <div className="flex items-center justify-between border-b border-border pb-3">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        toggleSection(section)
-                                    }
-                                    className="p-1 hover:bg-bg-muted rounded text-text-muted transition-colors"
-                                    title={
-                                        isCollapsed
-                                            ? "Expand"
-                                            : "Collapse"
-                                    }
-                                >
-                                    {isCollapsed ? (
-                                        <ChevronRight size={20} />
-                                    ) : (
-                                        <ChevronDown size={20} />
-                                    )}
-                                </button>
-                                <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
-                                    {sectionLabels[section]}
-                                </h2>
-                                <span className="px-2 py-0.5 rounded-full bg-bg-muted text-text-muted text-xs font-bold">
-                                    {sectionLists.length}
-                                </span>
-                            </div>
-                        </div>
-
-                        {!isCollapsed && (
-                            <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
-                                {sectionLists.map((list) => (
-                                    <li
-                                        key={list.id}
-                                        draggable={
-                                            section !== "NORMAL" &&
-                                            list.items.length > 0
-                                        }
-                                        onDragStart={(e) =>
-                                            handleDragStart(e, list.id)
-                                        }
-                                        onDragEnd={resetDragState}
-                                        onDragOver={(e) => handleSectionDragOver(e, section, list.id)}
-                                        onDragLeave={() => handleSectionDragLeave(list.id)}
-                                        onDrop={(e) => handleSectionDrop(e, section, list.id)}
-                                        className={`w-[320px] shrink-0 rounded-xl transition-all ${
-                                            section !== "NORMAL" &&
-                                            list.items.length > 0
-                                                ? "cursor-grab active:cursor-grabbing"
-                                                : ""
-                                        } ${
-                                            dragOverListId === list.id
-                                                ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg"
-                                                : ""
-                                        }`}
-                                    >
-                                        <ListCard
-                                            list={list}
-                                            onClick={() =>
-                                                handleCardClick(list.id)
-                                            }
-                                            onDelete={(e) =>
-                                                handleDeleteList(
-                                                    e,
-                                                    list.id,
-                                                    list.name,
-                                                )
-                                            }
-                                            isDeleting={
-                                                deletingListId ===
-                                                list.id
-                                            }
-                                        />
-                                    </li>
-                                ))}
-                                {sectionLists.length === 0 && (
-                                    <li className="w-full py-10 text-center text-text-muted border-2 border-dashed border-border rounded-xl list-none">
-                                        No lists in this category
-                                    </li>
-                                )}
-                            </ul>
-                        )}
-                    </section>
-                );
-            })}
+            {sectionOrder.map(renderSplitModeSection)}
         </div>
     );
 
