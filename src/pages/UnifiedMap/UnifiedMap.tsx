@@ -307,44 +307,18 @@ const UnifiedMap: React.FC = () => {
 
     const handleDemoTSP = async () => {
         const demoItems = [
-            {
-                id: "11111111-a1b2-c3d4-e5f6-1234567890ab",
-                name: "Produs 1",
-                checked: false,
-            },
-            {
-                id: "22222222-b2c3-d4e5-f6a7-2345678901bc",
-                name: "Produs 2",
-                checked: false,
-            },
-            {
-                id: "33333333-c3d4-e5f6-a7b8-3456789012cd",
-                name: "Produs 3",
-                checked: false,
-            },
-            {
-                id: "44444444-d4e5-f6a7-b8c9-4567890123de",
-                name: "Produs 4",
-                checked: false,
-            },
-            {
-                id: "55555555-e5f6-a7b8-c9d0-5678901234ef",
-                name: "Produs 5",
-                checked: false,
-            },
-            {
-                id: "66666666-f6a7-b8c9-d0e1-6789012345f0",
-                name: "Produs 6",
-                checked: false,
-            },
+            { id: "11111111-a1b2-c3d4-e5f6-1234567890ab", name: "Produs 1", checked: false },
+            { id: "22222222-b2c3-d4e5-f6a7-2345678901bc", name: "Produs 2", checked: false },
+            { id: "33333333-c3d4-e5f6-a7b8-3456789012cd", name: "Produs 3", checked: false },
+            { id: "44444444-d4e5-f6a7-b8c9-4567890123de", name: "Produs 4", checked: false },
+            { id: "55555555-e5f6-a7b8-c9d0-5678901234ef", name: "Produs 5", checked: false },
+            { id: "66666666-f6a7-b8c9-d0e1-6789012345f0", name: "Produs 6", checked: false },
         ];
 
         setItems(demoItems);
         handleForceIndoor();
-        // Teleport to entrance (center of Palas Mall geofence)
         teleport(DEMO_STORE_LOCATION.lat, DEMO_STORE_LOCATION.lng);
 
-        // Compute and display the TSP route using frontend mock (Palas Mall data)
         await loadRoute(
             demoItems.map((i) => i.id),
             DEMO_STORE_LOCATION.lat,
@@ -633,29 +607,27 @@ const UnifiedMap: React.FC = () => {
         [activeTarget.lat - 0.0005, activeTarget.lng - 0.0008],
     ]);
 
-    useEffect(() => {
-        const fetchFootprint = async () => {
-            try {
-                const query = `[out:json];way(around:150, ${activeTarget.lat}, ${activeTarget.lng})[building];out geom;`;
-                const response = await fetch(
-                    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+    const fetchFootprint = async (lat: number, lng: number) => {
+        try {
+            const query = `[out:json];way(around:150, ${lat}, ${lng})[building];out geom;`;
+            const response = await fetch(
+                `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+            );
+            const data = await response.json();
+            if (data.elements?.[0]?.geometry) {
+                const coords: [number, number][] = data.elements[0].geometry.map(
+                    (p: { lat: number; lon: number }) => [p.lat, p.lon],
                 );
-                const data = await response.json();
-                if (data.elements && data.elements.length > 0) {
-                    const way = data.elements[0];
-                    if (way.geometry) {
-                        const coords: [number, number][] = way.geometry.map(
-                            (p: { lat: number; lon: number }) => [p.lat, p.lon],
-                        );
-                        setFootprint(coords);
-                    }
-                }
-            } catch (err) {
-                console.warn("Could not fetch OSM footprint", err);
+                setFootprint(coords);
             }
-        };
-        fetchFootprint();
-    }, [activeTarget]);
+        } catch (err) {
+            console.warn("Could not fetch OSM footprint", err);
+        }
+    };
+
+    useEffect(() => {
+        void fetchFootprint(activeTarget.lat, activeTarget.lng);
+    }, [activeTarget.lat, activeTarget.lng]);
 
     return (
         <div className="flex flex-col h-full overflow-hidden bg-bg">

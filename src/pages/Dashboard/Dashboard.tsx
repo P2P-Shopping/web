@@ -208,47 +208,40 @@ const Dashboard = () => {
         resetDragState();
     };
 
+    const createDragGhost = (list: any) => {
+        const ghost = document.createElement("div");
+        ghost.style.position = "absolute";
+        ghost.style.top = "-1000px";
+        ghost.style.padding = "10px 20px";
+        ghost.style.background = "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)";
+        ghost.style.color = "white";
+        ghost.style.borderRadius = "16px";
+        ghost.style.boxShadow = "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)";
+        ghost.style.zIndex = "-1000";
+        ghost.style.pointerEvents = "none";
+        ghost.style.border = "1px solid rgba(255, 255, 255, 0.2)";
+
+        ghost.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 2px; font-family: sans-serif; padding-left: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-weight: 800; font-size: 15px; white-space: nowrap; letter-spacing: -0.01em;">${list.name}</span>
+                </div>
+                <div style="font-size: 11px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.02em;">
+                    ${list.items.length} items • ${list.category || "NORMAL"}
+                </div>
+            </div>
+        `;
+        return ghost;
+    };
+
     const handleDragStart = (e: React.DragEvent, listId: string) => {
         setDraggedListId(listId);
-
         const list = lists.find((l) => l.id === listId);
         if (list) {
-            // Create a simplified drag ghost element
-            const ghost = document.createElement("div");
-            ghost.style.position = "absolute";
-            ghost.style.top = "-1000px";
-            ghost.style.padding = "10px 20px";
-            ghost.style.background =
-                "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)";
-            ghost.style.color = "white";
-            ghost.style.borderRadius = "16px";
-            ghost.style.boxShadow =
-                "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)";
-            ghost.style.zIndex = "-1000";
-            ghost.style.pointerEvents = "none";
-            ghost.style.border = "1px solid rgba(255, 255, 255, 0.2)";
-
-            ghost.innerHTML = `
-                <div style="display: flex; flex-direction: column; gap: 2px; font-family: sans-serif; padding-left: 12px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-weight: 800; font-size: 15px; white-space: nowrap; letter-spacing: -0.01em;">${list.name}</span>
-                    </div>
-                    <div style="font-size: 11px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.02em;">
-                        ${list.items.length} items • ${list.category || "NORMAL"}
-                    </div>
-                </div>
-            `;
-
+            const ghost = createDragGhost(list);
             document.body.appendChild(ghost);
-            // Offset the ghost so it's to the right and slightly below the cursor
             e.dataTransfer.setDragImage(ghost, -15, 25);
-
-            // Cleanup ghost element after the browser has taken the snapshot
-            setTimeout(() => {
-                if (document.body.contains(ghost)) {
-                    ghost.remove();
-                }
-            }, 0);
+            setTimeout(() => ghost.remove(), 0);
         }
     };
 
@@ -315,10 +308,9 @@ const Dashboard = () => {
         }
 
         setIsImportingItems(true);
-
         try {
-            for (const item of itemsToImport) {
-                const added = await addItem(importTargetList.id, {
+            await Promise.all(itemsToImport.map(item => 
+                addItem(importTargetList.id, {
                     name: item.name,
                     checked: false,
                     brand: item.brand,
@@ -326,13 +318,8 @@ const Dashboard = () => {
                     category: item.category,
                     price: item.price,
                     isRecurrent: false,
-                });
-
-                if (!added) {
-                    throw new Error(`Failed to add ${item.name}`);
-                }
-            }
-
+                })
+            ));
             clearImportSelection();
         } catch (error) {
             console.error("Bulk add failed:", error);
@@ -563,72 +550,63 @@ const Dashboard = () => {
         </div>
     );
 
-    let mainContent: React.ReactNode;
-    if (isLoading && !isOverlayOpen) {
-        mainContent = (
-            <div className="flex flex-col items-center justify-center gap-4 py-20 text-text-muted text-sm">
-                <div className="w-9 h-9 border-[3px] border-border border-t-accent rounded-full animate-spin" />
-                <p>Loading lists...</p>
-            </div>
-        );
-    } else if (showAiImport) {
-        mainContent = (
-            <div className="max-w-[800px] mx-auto w-full flex-1 flex flex-col min-h-0">
-                <AiImportModal onClose={clearImport} />
-            </div>
-        );
-    } else if (lists.length === 0) {
-        mainContent = (
-            <div className="flex flex-col items-center justify-center py-20 text-center gap-2.5">
-                <span className="text-5xl mb-2 opacity-60" aria-hidden="true">
-                    🛒
-                </span>
-                <h2 className="text-xl text-text-strong font-bold">
-                    No lists yet
-                </h2>
-                <p className="text-sm text-text-muted mb-4">
-                    Create your first shared shopping list!
-                </p>
-                <button
-                    type="button"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
-                    onClick={openModal}
-                >
-                    <Plus size={20} />
-                    Create a List
-                </button>
-            </div>
-        );
-    } else if (selectedList) {
-        mainContent = (
-            <div className="max-w-[860px] mx-auto w-full">
-                <ListDetail listIdOverride={selectedList.id} />
-            </div>
-        );
-    } else if (hasGroupedLists) {
-        if (displayMode === "tabs") {
-            mainContent = renderTabMode();
-        } else {
-            mainContent = renderSplitMode();
+    const renderMainContent = () => {
+        if (isLoading && !isOverlayOpen) {
+            return (
+                <div className="flex flex-col items-center justify-center gap-4 py-20 text-text-muted text-sm">
+                    <div className="w-9 h-9 border-[3px] border-border border-t-accent rounded-full animate-spin" />
+                    <p>Loading lists...</p>
+                </div>
+            );
         }
-    } else {
-        mainContent = (
+        if (showAiImport) {
+            return (
+                <div className="max-w-[800px] mx-auto w-full flex-1 flex flex-col min-h-0">
+                    <AiImportModal onClose={clearImport} />
+                </div>
+            );
+        }
+        if (lists.length === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center py-20 text-center gap-2.5">
+                    <span className="text-5xl mb-2 opacity-60" aria-hidden="true">🛒</span>
+                    <h2 className="text-xl text-text-strong font-bold">No lists yet</h2>
+                    <p className="text-sm text-text-muted mb-4">Create your first shared shopping list!</p>
+                    <button
+                        type="button"
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
+                        onClick={openModal}
+                    >
+                        <Plus size={20} /> Create a List
+                    </button>
+                </div>
+            );
+        }
+        if (selectedList) {
+            return (
+                <div className="max-w-[860px] mx-auto w-full">
+                    <ListDetail listIdOverride={selectedList.id} />
+                </div>
+            );
+        }
+        if (hasGroupedLists) {
+            return displayMode === "tabs" ? renderTabMode() : renderSplitMode();
+        }
+        return (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
                 {lists.map((list) => (
                     <div key={list.id}>
                         <ListCard
                             list={list}
                             onClick={() => handleCardClick(list.id)}
-                            onDelete={(e) =>
-                                handleDeleteList(e, list.id, list.name)
-                            }
+                            onDelete={(e) => handleDeleteList(e, list.id, list.name)}
                             isDeleting={deletingListId === list.id}
                         />
                     </div>
                 ))}
             </div>
         );
-    }
+    };
 
     return (
         <div className="flex flex-col bg-bg h-full overflow-hidden">
@@ -710,7 +688,7 @@ const Dashboard = () => {
             <main
                 className={`flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 ${showAiImport ? "overflow-hidden flex flex-col" : "overflow-y-auto scrollbar-thin"}`}
             >
-                {mainContent}
+                {renderMainContent()}
             </main>
 
             {isModalOpen && <CreateListModal onClose={closeModal} />}
