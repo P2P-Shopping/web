@@ -25,6 +25,7 @@ export interface CalculateRouteResponse {
 export interface MacroEstimate {
     distanceM: number;
     durationSeconds: number;
+    geometry?: [number, number][]; // [lat, lng]
 }
 
 export interface MacroRoutingResponse {

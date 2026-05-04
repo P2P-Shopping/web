@@ -40,6 +40,7 @@ interface AppState {
     isMockGpsEnabled: boolean;
 
     route: RoutePoint[];
+    macroRouteGeometry: [number, number][];
     status: string;
     /** Current list of items */
     items: Item[];
@@ -81,6 +82,7 @@ interface AppState {
 
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
+    setMacroRouteGeometry: (geometry: [number, number][]) => void;
     /** Sets application status */
     setStatus: (status: string) => void;
     /** Sets the online status of the application */
@@ -116,6 +118,7 @@ export const useStore = create<AppState>()(
             isAutoCenterEnabled: true,
             isMockGpsEnabled: true,
             route: [],
+            macroRouteGeometry: [],
             status: "idle",
             items: [],
             backupItems: {},
@@ -143,8 +146,9 @@ export const useStore = create<AppState>()(
                     hasEnteredStore: true,
                     isTransitioningToStore: false,
                 });
-            },
+                },
             setRoute: (route) => set({ route }),
+            setMacroRouteGeometry: (geometry) => set({ macroRouteGeometry: geometry }),
             setStatus: (status) => set({ status }),
             setOnlineStatus: (status) => set({ isOnline: status }),
             setServerConnected: (status) => set({ isServerConnected: status }),

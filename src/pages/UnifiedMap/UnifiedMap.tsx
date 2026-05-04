@@ -8,7 +8,7 @@ import {
     Polygon,
     Polyline,
     Popup,
-    // TileLayer,
+    TileLayer,
     useMap,
     useMapEvents,
 } from "react-leaflet";
@@ -448,6 +448,7 @@ const UnifiedMap: React.FC = () => {
     const navigationMode = useStore((state) => state.navigationMode);
     const setNavigationMode = useStore((state) => state.setNavigationMode);
     const route = useStore((state) => state.route);
+    const macroRouteGeometry = useStore((state) => state.macroRouteGeometry);
     const setItems = useStore((state) => state.setItems);
     const isAutoCenterEnabled = useStore((state) => state.isAutoCenterEnabled);
     const setIsAutoCenterEnabled = useStore(
@@ -563,8 +564,36 @@ const UnifiedMap: React.FC = () => {
         }
     };
 
-    const handleStartRoute = (store: StoreRecommendation) => {
+    const handleStartRoute = async (store: StoreRecommendation) => {
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
+
+        try {
+            const apiBase =
+                import.meta.env.VITE_API_URL ||
+                import.meta.env.VITE_API_BASE_URL ||
+                "http://localhost:8081";
+            const baseUrl = apiBase === "/" ? "" : apiBase;
+            const params = new URLSearchParams({
+                userLat: String(userLocation.lat),
+                userLng: String(userLocation.lng),
+                storeId: store.id,
+            });
+            const response = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+            if (response.ok) {
+                const data = await response.json();
+                const geo = data[transportMode]?.geometry;
+                if (geo && Array.isArray(geo)) {
+                    useStore.getState().setMacroRouteGeometry(geo);
+                } else {
+                    useStore.getState().setMacroRouteGeometry([]);
+                }
+            } else {
+                useStore.getState().setMacroRouteGeometry([]);
+            }
+        } catch (e) {
+            useStore.getState().setMacroRouteGeometry([]);
+        }
+
         setNavigationMode("city");
     };
 
@@ -717,10 +746,10 @@ const UnifiedMap: React.FC = () => {
                       NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request. 
                       Re-enable the TileLayer below to show the real-world map again.
                     */}
-                        {/* <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    /> */}
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
                         <MapEvents />
                         <MapController
                             center={[userLocation.lat, userLocation.lng]}
@@ -785,13 +814,17 @@ const UnifiedMap: React.FC = () => {
 
                         {targetStoreLocation && !isMicroView && (
                             <Polyline
-                                positions={[
-                                    [userLocation.lat, userLocation.lng],
-                                    [activeTarget.lat, activeTarget.lng],
-                                ]}
+                                positions={
+                                    macroRouteGeometry.length > 0
+                                        ? macroRouteGeometry
+                                        : [
+                                              [userLocation.lat, userLocation.lng],
+                                              [activeTarget.lat, activeTarget.lng],
+                                          ]
+                                }
                                 pathOptions={{
                                     color: "var(--color-blue-neon)",
-                                    weight: 3,
+                                    weight: 4,
                                     dashArray: "10, 10",
                                 }}
                             />
