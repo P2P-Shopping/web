@@ -42,6 +42,7 @@ interface ListsState {
     ) => Promise<ShoppingList | null>;
     updateList: (id: string, updates: Partial<ShoppingList>) => void;
     deleteList: (id: string) => Promise<boolean>;
+    renameList: (id: string, newName: string) => Promise<boolean>;
     setCurrentList: (list: ShoppingList | null) => void;
     addItem: (listId: string, item: Omit<Item, "id">) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
@@ -314,6 +315,56 @@ export const useListsStore = create<ListsState>((set, get) => ({
                         : "Failed to delete list",
                 isLoading: false,
                 deletingListId: null,
+            });
+            return false;
+        }
+    },
+
+    /**
+     * Renames a shopping list via the API and updates the local store.
+     * @param id - The ID of the list to rename.
+     * @param newName - The new name for the list.
+     * @returns True if successful, false otherwise.
+     */
+    renameList: async (id: string, newName: string) => {
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            set({ error: "List name cannot be empty" });
+            return false;
+        }
+
+        set({ error: null });
+        try {
+            const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
+                method: "PUT",
+                headers: jsonHeaders(true),
+                body: JSON.stringify({ title: trimmedName }),
+                credentials: "include",
+            });
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(`Failed to rename list (${response.status})`);
+            }
+
+            set((state) => ({
+                lists: state.lists.map((list) =>
+                    list.id === id ? { ...list, name: trimmedName } : list,
+                ),
+                currentList:
+                    state.currentList?.id === id
+                        ? { ...state.currentList, name: trimmedName }
+                        : state.currentList,
+                error: null,
+            }));
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to rename list",
             });
             return false;
         }
