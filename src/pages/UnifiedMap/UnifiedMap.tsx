@@ -9,6 +9,7 @@ import {
     Polyline,
     Popup,
     TileLayer,
+    ZoomControl,
     useMap,
     useMapEvents,
 } from "react-leaflet";
@@ -445,6 +446,8 @@ const UnifiedMap: React.FC = () => {
     const setTargetStoreLocation = useStore(
         (state) => state.setTargetStoreLocation,
     );
+    const targetStoreTransit = useStore((state) => state.targetStoreTransit);
+    const setTargetStoreTransit = useStore((state) => state.setTargetStoreTransit);
     const navigationMode = useStore((state) => state.navigationMode);
     const setNavigationMode = useStore((state) => state.setNavigationMode);
     const route = useStore((state) => state.route);
@@ -566,6 +569,7 @@ const UnifiedMap: React.FC = () => {
 
     const handleStartRoute = async (store: StoreRecommendation) => {
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
+        setTargetStoreTransit(store.transit);
 
         try {
             const apiBase =
@@ -578,7 +582,9 @@ const UnifiedMap: React.FC = () => {
                 userLng: String(userLocation.lng),
                 storeId: store.id,
             });
-            const response = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+            const response = await fetch(
+                `${baseUrl}/api/routing/macro?${params}`,
+            );
             if (response.ok) {
                 const data = await response.json();
                 const geo = data[transportMode]?.geometry;
@@ -742,7 +748,10 @@ const UnifiedMap: React.FC = () => {
                         }}
                         zoomControl={false}
                     >
-                        {/* 
+                        <style>{`\n                            .leaflet-top.leaflet-left {\n                                margin-top: 60px;\n                            }\n                        `}</style>
+                        <ZoomControl position="topleft" />
+
+                        {/*
                       NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request. 
                       Re-enable the TileLayer below to show the real-world map again.
                     */}
@@ -941,8 +950,69 @@ const UnifiedMap: React.FC = () => {
                 </div>
             </div>
 
+            {!isMicroView && targetStoreLocation && targetStoreTransit && (
+                <div
+                    className={`absolute bottom-28 left-6 z-[2000] rounded-3xl border border-border bg-surface/95 p-5 shadow-2xl backdrop-blur-xl transition-all duration-500 ${isSidebarExpanded ? "right-6 min-[1000px]:right-[424px]" : "right-6"}`}
+                >
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-black uppercase tracking-tight text-text-strong">
+                                Route Active
+                            </h3>
+                            <p className="text-xs font-medium text-text-muted">
+                                Head to the store entrance
+                            </p>
+                        </div>
+                        <div className="flex rounded-xl border border-border bg-bg-muted p-1 shadow-inner">
+                            <button
+                                type="button"
+                                onClick={() => setTransportMode("driving")}
+                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all ${transportMode === "driving" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
+                            >
+                                <Car size={14} />
+                                <span className="text-[10px] font-black uppercase tracking-widest">
+                                    {targetStoreTransit.driving.timeMins}m
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTransportMode("walking")}
+                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all ${transportMode === "walking" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
+                            >
+                                <Footprints size={14} />
+                                <span className="text-[10px] font-black uppercase tracking-widest">
+                                    {targetStoreTransit.walking.timeMins}m
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTargetStoreLocation(null);
+                                setTargetStoreTransit(null);
+                                useStore.getState().setMacroRouteGeometry([]);
+                            }}
+                            className="flex-1 rounded-2xl border border-border bg-bg-muted py-3 text-xs font-black text-text-strong transition-colors hover:bg-bg"
+                        >
+                            CANCEL
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleForceIndoor}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-xs font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            <CheckCircle2 size={16} />
+                            ARRIVED
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {!isMicroView && (
-                <div className="relative z-[3000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+                <div className="relative z-[3000] flex h-[84px] items-center justify-between border-t border-border bg-surface/80 px-6 shadow-[0_-8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl">
                     <div className="flex items-center gap-4">
                         <button
                             type="button"

@@ -26,9 +26,17 @@ export interface Item {
 
 interface AppState {
     userLocation: Coordinate;
-    // 👇 ADDED: To pass the store location to the canvas
+    setUserLocation: (loc: Coordinate) => void;
+
     targetStoreLocation: Coordinate | null;
-    /** Current navigation stage for macro to micro transition */
+    setTargetStoreLocation: (loc: Coordinate | null) => void;
+
+    targetStoreTransit: {
+        driving: { timeMins: number; distanceKm: string | number };
+        walking: { timeMins: number; distanceKm: string | number };
+    } | null;
+    setTargetStoreTransit: (transit: AppState["targetStoreTransit"]) => void;
+
     navigationMode: "city" | "indoor";
     /** Whether the app already crossed the geofence into the store */
     hasEnteredStore: boolean;
@@ -62,11 +70,6 @@ interface AppState {
     token: string | null;
     /** Queue of actions to be synced when back online */
     offlineQueue: QueuedAction[];
-    /** Updates user location */
-    setUserLocation: (loc: Coordinate) => void;
-
-    // 👇 ADDED: Setter for target store
-    setTargetStoreLocation: (loc: Coordinate | null) => void;
     /** Switches between city map and indoor canvas */
     setNavigationMode: (mode: "city" | "indoor") => void;
     /** Marks the geofence transition as completed */
@@ -110,8 +113,15 @@ interface AppState {
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
-            userLocation: { lat: 47.151726, lng: 27.587914 },
+            userLocation: { lat: 47.155, lng: 27.585 },
+            setUserLocation: (loc) => set({ userLocation: loc }),
+
             targetStoreLocation: null,
+            setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
+
+            targetStoreTransit: null,
+            setTargetStoreTransit: (transit) => set({ targetStoreTransit: transit }),
+
             navigationMode: "city",
             hasEnteredStore: false,
             isTransitioningToStore: false,
@@ -131,8 +141,6 @@ export const useStore = create<AppState>()(
             token: null,
             offlineQueue: [],
 
-            setUserLocation: (loc) => set({ userLocation: loc }),
-            setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
             setNavigationMode: (mode) => set({ navigationMode: mode }),
             setHasEnteredStore: (value) => set({ hasEnteredStore: value }),
             setIsTransitioningToStore: (value) =>
