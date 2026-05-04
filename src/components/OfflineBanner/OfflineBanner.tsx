@@ -11,8 +11,8 @@ import { useStore } from "../../context/useStore";
  * - All other pages: bottom-24 — above the Navbar
  */
 export const OfflineBanner: React.FC<{ isAuthPage?: boolean }> = ({
-                                                                      isAuthPage = false,
-                                                                  }) => {
+    isAuthPage = false,
+}) => {
     const isOnline = useStore((state) => state.isOnline);
     const isServerConnected = useStore((state) => state.isServerConnected);
 

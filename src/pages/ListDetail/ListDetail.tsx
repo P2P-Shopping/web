@@ -226,8 +226,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     };
 
     const handleReviewConfirm = async ({
-                                           items: feedback,
-                                       }: ReviewSubmission) => {
+        items: feedback,
+    }: ReviewSubmission) => {
         try {
             for (const item of feedback) {
                 const res = await fetch(
@@ -712,10 +712,10 @@ const useListPresence = (effectiveListId: string | undefined) => {
  * Renders a view for selecting a list when no specific list is active.
  */
 const ListSelectionView = ({
-                               lists,
-                               isLoading,
-                               onSelect,
-                           }: {
+    lists,
+    isLoading,
+    onSelect,
+}: {
     lists: { id: string; name: string; items: Item[] }[];
     isLoading: boolean;
     onSelect: (id: string) => void;
@@ -780,12 +780,12 @@ interface AddItemModalProps {
 
 /** Component for the item name input field inside the add modal. */
 const ItemNameField = ({
-                           idPrefix,
-                           value,
-                           onChange,
-                           onTyping,
-                           isMobile,
-                       }: {
+    idPrefix,
+    value,
+    onChange,
+    onTyping,
+    isMobile,
+}: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
@@ -816,9 +816,9 @@ const ItemNameField = ({
 
 /** Button to toggle the display of extra item details (price, brand, etc). */
 const ExpandDetailsButton = ({
-                                 showExpanded,
-                                 onClick,
-                             }: {
+    showExpanded,
+    onClick,
+}: {
     showExpanded: boolean;
     onClick: () => void;
 }) => (
@@ -840,15 +840,15 @@ const ExpandDetailsButton = ({
 
 /** Component containing the detailed input fields (quantity, price, brand). */
 const ItemDetailsFields = ({
-                               idPrefix,
-                               quantity,
-                               setQuantity,
-                               price,
-                               setPrice,
-                               brand,
-                               setBrand,
-                               isMobile,
-                           }: {
+    idPrefix,
+    quantity,
+    setQuantity,
+    price,
+    setPrice,
+    brand,
+    setBrand,
+    isMobile,
+}: {
     idPrefix: string;
     quantity: string;
     setQuantity: (val: string) => void;
@@ -922,25 +922,25 @@ const ItemDetailsFields = ({
 
 /** Modal component for adding an item with optional details. */
 const AddItemDetailsModal = ({
-                                 isOpen,
-                                 onClose,
-                                 onSubmit,
-                                 title,
-                                 subtitle,
-                                 idPrefix,
-                                 itemName,
-                                 setItemName,
-                                 quantity,
-                                 setQuantity,
-                                 brand,
-                                 setBrand,
-                                 price,
-                                 setPrice,
-                                 onTyping,
-                                 isMobile = false,
-                                 showExpanded = true,
-                                 setShowExpanded,
-                             }: AddItemModalProps) => {
+    isOpen,
+    onClose,
+    onSubmit,
+    title,
+    subtitle,
+    idPrefix,
+    itemName,
+    setItemName,
+    quantity,
+    setQuantity,
+    brand,
+    setBrand,
+    price,
+    setPrice,
+    onTyping,
+    isMobile = false,
+    showExpanded = true,
+    setShowExpanded,
+}: AddItemModalProps) => {
     return (
         <Modal
             isOpen={isOpen}
@@ -1006,9 +1006,9 @@ const AddItemDetailsModal = ({
 
 /** Component to display an error alert within the list detail view. */
 const ListErrorAlert = ({
-                            error,
-                            isEmbedded,
-                        }: {
+    error,
+    isEmbedded,
+}: {
     error: string;
     isEmbedded: boolean;
 }) => (
@@ -1023,18 +1023,16 @@ const ListErrorAlert = ({
     </div>
 );
 
-
-
 /** Inline form component for quickly adding items without details. */
 const InlineAddForm = ({
-                           addInputRef,
-                           newItemName,
-                           onNameChange,
-                           onSubmit,
-                           onOpenDetails,
-                           isReadOnly,
-                           isEmbedded,
-                       }: {
+    addInputRef,
+    newItemName,
+    onNameChange,
+    onSubmit,
+    onOpenDetails,
+    isReadOnly,
+    isEmbedded,
+}: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
@@ -1082,9 +1080,9 @@ const InlineAddForm = ({
  * Main ListDetail component that orchestrates displaying items, managing presence, and handling item additions.
  */
 const ListDetail = ({
-                        isEmbedded = false,
-                        listIdOverride
-                    }: ListDetailProps) => {
+    isEmbedded = false,
+    listIdOverride,
+}: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
@@ -1400,7 +1398,6 @@ const ListDetail = ({
             <div
                 className={`w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`}
             >
-
                 {error && (
                     <ListErrorAlert error={error} isEmbedded={isEmbedded} />
                 )}

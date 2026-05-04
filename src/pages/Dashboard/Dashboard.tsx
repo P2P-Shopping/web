@@ -27,8 +27,8 @@ interface DashboardEmptyStateProps {
 }
 
 const DashboardEmptyState: React.FC<DashboardEmptyStateProps> = ({
-                                                                     openModal,
-                                                                 }) => (
+    openModal,
+}) => (
     <div className="flex flex-col items-center justify-center py-20 text-center gap-2.5">
         <span className="text-5xl mb-2 opacity-60" aria-hidden="true">
             🛒
@@ -70,21 +70,21 @@ interface ListCategorySectionProps {
 }
 
 const ListCategorySection: React.FC<ListCategorySectionProps> = ({
-                                                                     section,
-                                                                     label,
-                                                                     lists,
-                                                                     isCollapsed,
-                                                                     onToggle,
-                                                                     onDragStart,
-                                                                     onDragEnd,
-                                                                     onDragOver,
-                                                                     onDragLeave,
-                                                                     onDrop,
-                                                                     dragOverListId,
-                                                                     onCardClick,
-                                                                     onDeleteList,
-                                                                     deletingListId,
-                                                                 }) => (
+    section,
+    label,
+    lists,
+    isCollapsed,
+    onToggle,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    dragOverListId,
+    onCardClick,
+    onDeleteList,
+    deletingListId,
+}) => (
     <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-border pb-3">
             <div className="flex items-center gap-3">
@@ -465,15 +465,15 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
-                                                             selectedList,
-                                                             showAiImport,
-                                                             listsCount,
-                                                             displayMode,
-                                                             setDisplayMode,
-                                                             onBack,
-                                                             onAiImport,
-                                                             onNewList,
-                                                         }) => (
+    selectedList,
+    showAiImport,
+    listsCount,
+    displayMode,
+    setDisplayMode,
+    onBack,
+    onAiImport,
+    onNewList,
+}) => (
     <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
         {selectedList || showAiImport ? (
             <>
@@ -564,21 +564,21 @@ interface DashboardTabsViewProps {
 }
 
 const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
-                                                                 activeTab,
-                                                                 setActiveTab,
-                                                                 groupedLists,
-                                                                 sectionOrder,
-                                                                 sectionLabels,
-                                                                 onCardClick,
-                                                                 onDeleteList,
-                                                                 deletingListId,
-                                                                 handleDragStart,
-                                                                 resetDragState,
-                                                                 handleTabDragOver,
-                                                                 handleTabDragLeave,
-                                                                 handleTabDrop,
-                                                                 getTabClassName,
-                                                             }) => (
+    activeTab,
+    setActiveTab,
+    groupedLists,
+    sectionOrder,
+    sectionLabels,
+    onCardClick,
+    onDeleteList,
+    deletingListId,
+    handleDragStart,
+    resetDragState,
+    handleTabDragOver,
+    handleTabDragLeave,
+    handleTabDrop,
+    getTabClassName,
+}) => (
     <div className="flex flex-col gap-6">
         <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm overflow-x-auto scrollbar-none w-fit mx-auto">
             {sectionOrder.map((section) => (
@@ -589,7 +589,8 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                     onDragOver={(e) => handleTabDragOver(e, section)}
                     onDragLeave={handleTabDragLeave}
                     onDrop={(e) => handleTabDrop(e, section)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 shrink-0 ${getTabClassName(section)}`}                >
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 shrink-0 ${getTabClassName(section)}`}
+                >
                     {sectionLabels[section]}
                     <span
                         className={`px-1.5 py-0.5 rounded-full text-[10px] ${
@@ -658,21 +659,21 @@ interface DashboardSplitViewProps {
 }
 
 const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
-                                                                   groupedLists,
-                                                                   sectionOrder,
-                                                                   sectionLabels,
-                                                                   collapsedSections,
-                                                                   toggleSection,
-                                                                   draggedListId,
-                                                                   dragOverListId,
-                                                                   setDragOverListId,
-                                                                   handleDragStart,
-                                                                   resetDragState,
-                                                                   handleDropOnNormalList,
-                                                                   onCardClick,
-                                                                   onDeleteList,
-                                                                   deletingListId,
-                                                               }) => (
+    groupedLists,
+    sectionOrder,
+    sectionLabels,
+    collapsedSections,
+    toggleSection,
+    draggedListId,
+    dragOverListId,
+    setDragOverListId,
+    handleDragStart,
+    resetDragState,
+    handleDropOnNormalList,
+    onCardClick,
+    onDeleteList,
+    deletingListId,
+}) => (
     <div className="flex flex-col gap-8 pb-4">
         {sectionOrder.map((section) => (
             <ListCategorySection

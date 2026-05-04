@@ -109,9 +109,9 @@ const DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 const MapController = ({
-                           center,
-                           isMicroView,
-                       }: {
+    center,
+    isMicroView,
+}: {
     center: [number, number];
     isMicroView: boolean;
 }) => {
@@ -161,10 +161,10 @@ interface ListSelectionViewProps {
 }
 
 const ListSelectionView: React.FC<ListSelectionViewProps> = ({
-                                                                 lists,
-                                                                 isMicroView,
-                                                                 handleListSelect,
-                                                             }) => (
+    lists,
+    isMicroView,
+    handleListSelect,
+}) => (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-300">
         <header>
             <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
@@ -233,12 +233,12 @@ interface StoreRecommendationViewProps {
 }
 
 const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
-                                                                             recommendedStores,
-                                                                             transportMode,
-                                                                             setTransportMode,
-                                                                             setSelectedListId,
-                                                                             handleStartRoute,
-                                                                         }) => (
+    recommendedStores,
+    transportMode,
+    setTransportMode,
+    setSelectedListId,
+    handleStartRoute,
+}) => (
     <div className="flex flex-col gap-6 animate-in slide-in-from-right-4">
         <header className="flex flex-col gap-4">
             <button
@@ -353,15 +353,15 @@ interface ListDetailViewProps {
 }
 
 const ListDetailView: React.FC<ListDetailViewProps> = ({
-                                                           selectedListId,
-                                                           lists,
-                                                           isMicroView,
-                                                           setSelectedListId,
-                                                           targetStoreLocation,
-                                                           setTargetStoreLocation,
-                                                           handleFetchStores,
-                                                           isFetchingStores,
-                                                       }) => (
+    selectedListId,
+    lists,
+    isMicroView,
+    setSelectedListId,
+    targetStoreLocation,
+    setTargetStoreLocation,
+    handleFetchStores,
+    isFetchingStores,
+}) => (
     <div className="relative animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col">
         <header className="flex items-center justify-between mb-4 shrink-0">
             <div className="flex items-center gap-4 min-w-0">
@@ -402,10 +402,7 @@ const ListDetailView: React.FC<ListDetailViewProps> = ({
                 </button>
             )}
             <div className="flex-1 overflow-y-auto scrollbar-thin">
-                <ListDetail
-                    isEmbedded={true}
-                    listIdOverride={selectedListId}
-                />
+                <ListDetail isEmbedded={true} listIdOverride={selectedListId} />
             </div>
 
             {!targetStoreLocation && !isMicroView && (
@@ -534,7 +531,7 @@ const UnifiedMap: React.FC = () => {
                     lng: store.lng || DEMO_STORE_LOCATION.lng,
                     stockMatchPercentage: Math.round(
                         (store.matchedItems / Math.max(itemIds.length, 1)) *
-                        100,
+                            100,
                     ),
                     transit: {
                         driving: store.transit?.driving || {
@@ -868,7 +865,10 @@ const UnifiedMap: React.FC = () => {
                                 onClick={handleForceIndoor}
                                 className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95 shrink-0"
                             >
-                                <Maximize2 size={14} className="text-green-500" />
+                                <Maximize2
+                                    size={14}
+                                    className="text-green-500"
+                                />
                                 Force Indoor
                             </button>
                         )}
