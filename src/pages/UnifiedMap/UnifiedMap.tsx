@@ -69,32 +69,6 @@ interface ApiStoreMatch {
     };
 }
 
-const MOCK_STORES: StoreRecommendation[] = [
-    {
-        id: "store-1",
-        name: "Kaufland Tudor Vladimirescu",
-        address: "Strada Theodor Pallady",
-        lat: 47.1532,
-        lng: 27.5891,
-        stockMatchPercentage: 98,
-        transit: {
-            driving: { timeMins: 5, distanceKm: 1.2 },
-            walking: { timeMins: 15, distanceKm: 1.2 },
-        },
-    },
-    {
-        id: "store-2",
-        name: "Carrefour Felicia",
-        address: "Strada Bucium",
-        lat: 47.1495,
-        lng: 27.592,
-        stockMatchPercentage: 95,
-        transit: {
-            driving: { timeMins: 8, distanceKm: 2.5 },
-            walking: { timeMins: 30, distanceKm: 2.2 },
-        },
-    },
-];
 
 // Fix Leaflet marker icons
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -452,6 +426,7 @@ const UnifiedMap: React.FC = () => {
     const setNavigationMode = useStore((state) => state.setNavigationMode);
     const route = useStore((state) => state.route);
     const macroRouteGeometry = useStore((state) => state.macroRouteGeometry);
+    const items = useStore((state) => state.items);
     const setItems = useStore((state) => state.setItems);
     const isAutoCenterEnabled = useStore((state) => state.isAutoCenterEnabled);
     const setIsAutoCenterEnabled = useStore(
@@ -480,6 +455,28 @@ const UnifiedMap: React.FC = () => {
         // Automatic geofence transitions disabled per user request
     }, []);
 
+    // Task FE: Tranziție Automată Interior-Exterior (Sincronizare Closed-Loop)
+    useEffect(() => {
+        if (navigationMode === "indoor" && route.length > 0 && selectedListId) {
+            const activeList = lists.find((l) => l.id === selectedListId);
+            if (!activeList) return;
+
+            const lastRoutePoint = route[route.length - 1];
+            const lastItemState = activeList.items.find(item => item.id === lastRoutePoint.itemId);
+            
+            if (lastItemState?.checked) {
+                const transitionTimer = setTimeout(() => {
+                    setNavigationMode("city"); 
+                    setTargetStoreLocation(null); 
+                    setTargetStoreTransit(null); 
+                    useStore.getState().setMacroRouteGeometry([]); 
+                }, 1000);
+
+                return () => clearTimeout(transitionTimer);
+            }
+        }
+    }, [lists, selectedListId, route, navigationMode, setNavigationMode, setTargetStoreLocation, setTargetStoreTransit]);
+
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
         if (!selectedList) return;
@@ -501,7 +498,7 @@ const UnifiedMap: React.FC = () => {
         try {
             const itemIds = selectedList.items.map((item) => item.id) || [];
             if (itemIds.length === 0) {
-                setRecommendedStores(MOCK_STORES);
+                setRecommendedStores([]);
                 setIsShowingStores(true);
                 return;
             }
@@ -530,37 +527,58 @@ const UnifiedMap: React.FC = () => {
             const data = await response.json();
             const storesArray = Array.isArray(data) ? data : [data];
 
-            const mappedStores: StoreRecommendation[] = storesArray.map(
-                (store: ApiStoreMatch) => ({
-                    id: store.storeId,
-                    name: store.storeName,
-                    address: store.address || "Address unavailable",
-                    lat: store.lat || DEMO_STORE_LOCATION.lat,
-                    lng: store.lng || DEMO_STORE_LOCATION.lng,
-                    stockMatchPercentage: Math.round(
-                        (store.matchedItems / Math.max(itemIds.length, 1)) *
-                            100,
-                    ),
-                    transit: {
-                        driving: store.transit?.driving || {
-                            timeMins: 10,
-                            distanceKm: 2,
-                        },
-                        walking: store.transit?.walking || {
-                            timeMins: 30,
-                            distanceKm: 2,
-                        },
-                    },
-                }),
+            const mappedStores: StoreRecommendation[] = await Promise.all(
+                storesArray.map(async (store: ApiStoreMatch) => {
+                    let realTransit = {
+                        driving: { timeMins: 10, distanceKm: "2.0" },
+                        walking: { timeMins: 30, distanceKm: "2.0" }
+                    };
+
+                    try {
+                        const params = new URLSearchParams({
+                            userLat: String(userLocation.lat),
+                            userLng: String(userLocation.lng),
+                            storeId: store.storeId,
+                        });
+                        const macroRes = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+                        if (macroRes.ok) {
+                            const macroData = await macroRes.json();
+                            if (macroData.driving) {
+                                realTransit.driving = {
+                                    timeMins: Math.round(macroData.driving.durationSeconds / 60),
+                                    distanceKm: (macroData.driving.distanceM / 1000).toFixed(1)
+                                };
+                            }
+                            if (macroData.walking) {
+                                realTransit.walking = {
+                                    timeMins: Math.round(macroData.walking.durationSeconds / 60),
+                                    distanceKm: (macroData.walking.distanceM / 1000).toFixed(1)
+                                };
+                            }
+                        }
+                    } catch (err) {
+                        console.warn("Could not fetch macro-routing", err);
+                    }
+
+                    return {
+                        id: store.storeId,
+                        name: store.storeName,
+                        address: store.address || "Address unavailable",
+                        lat: store.lat || DEMO_STORE_LOCATION.lat,
+                        lng: store.lng || DEMO_STORE_LOCATION.lng,
+                        stockMatchPercentage: Math.round(
+                            (store.matchedItems / Math.max(itemIds.length, 1)) * 100,
+                        ),
+                        transit: realTransit,
+                    };
+                })
             );
 
-            setRecommendedStores(
-                mappedStores.length > 0 ? mappedStores : MOCK_STORES,
-            );
+            setRecommendedStores(mappedStores);
             setIsShowingStores(true);
         } catch (error) {
-            console.warn("Backend match failed, using mock stores", error);
-            setRecommendedStores(MOCK_STORES);
+            console.error("Backend match failed", error);
+            setRecommendedStores([]);
             setIsShowingStores(true);
         } finally {
             setIsFetchingStores(false);
@@ -615,48 +633,30 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleDemoTSP = async () => {
-        const demoItems = [
-            {
-                id: "11111111-a1b2-c3d4-e5f6-1234567890ab",
-                name: "Produs 1",
-                checked: false,
-            },
-            {
-                id: "22222222-b2c3-d4e5-f6a7-2345678901bc",
-                name: "Produs 2",
-                checked: false,
-            },
-            {
-                id: "33333333-c3d4-e5f6-a7b8-3456789012cd",
-                name: "Produs 3",
-                checked: false,
-            },
-            {
-                id: "44444444-d4e5-f6a7-b8c9-4567890123de",
-                name: "Produs 4",
-                checked: false,
-            },
-            {
-                id: "55555555-e5f6-a7b8-c9d0-5678901234ef",
-                name: "Produs 5",
-                checked: false,
-            },
-            {
-                id: "66666666-f6a7-b8c9-d0e1-6789012345f0",
-                name: "Produs 6",
-                checked: false,
-            },
-        ];
+        const activeList = lists.find((l) => l.id === selectedListId);
+        const currentItems = activeList?.items || [];
 
-        setItems(demoItems);
+        if (currentItems.length === 0) {
+            alert("Te rog selectează o listă care conține măcar un produs!");
+            return;
+        }
+
         handleForceIndoor();
         teleport(DEMO_STORE_LOCATION.lat, DEMO_STORE_LOCATION.lng);
 
-        await loadRoute(
-            demoItems.map((i) => i.id),
-            DEMO_STORE_LOCATION.lat,
-            DEMO_STORE_LOCATION.lng,
-        );
+        const customRoute = currentItems.map((item, index) => {
+            const latOffset = 0.00015 * (index + 1);
+            const lngOffset = 0.00015 * (index % 2 === 0 ? 1 : -1);
+            
+            return {
+                itemId: item.id, 
+                name: item.name,
+                lat: DEMO_STORE_LOCATION.lat + latOffset,
+                lng: DEMO_STORE_LOCATION.lng + lngOffset,
+            };
+        });
+
+        useStore.getState().setRoute(customRoute);
     };
 
     const [footprint, setFootprint] = useState<[number, number][]>([
@@ -751,10 +751,6 @@ const UnifiedMap: React.FC = () => {
                         <style>{`\n                            .leaflet-top.leaflet-left {\n                                margin-top: 60px;\n                            }\n                        `}</style>
                         <ZoomControl position="topleft" />
 
-                        {/*
-                      NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request. 
-                      Re-enable the TileLayer below to show the real-world map again.
-                    */}
                         <TileLayer
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
