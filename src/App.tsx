@@ -321,7 +321,7 @@ function App() {
                 }
             })();
         };
-    }, [handlePongMessage, setServerConnected, clearToastTimeout, token]);
+    }, [handlePongMessage, setServerConnected, token]);
 
     // Determine if Navbar should be shown
     const searchParams = new URLSearchParams(location.search);
