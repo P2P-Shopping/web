@@ -93,7 +93,6 @@ const RenameListModal = ({
                         placeholder="Enter new list name"
                         maxLength={100}
                         className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong transition-all focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] outline-none"
-                        autoFocus
                     />
                 </div>
 
