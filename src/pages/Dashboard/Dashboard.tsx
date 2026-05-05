@@ -135,10 +135,8 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
                         <ListCard
                             list={list}
                             onClick={() => onCardClick(list.id)}
-                            onDelete={
-                                section !== "NORMAL"
-                                    ? (e) => onDeleteList(e, list.id, list.name)
-                                    : undefined
+                            onDelete={(e) =>
+                                onDeleteList(e, list.id, list.name)
                             }
                             isDeleting={deletingListId === list.id}
                         />
@@ -499,7 +497,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             <>
                 <div className="flex flex-col">
                     <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
-                        Current List
+                        My Lists
                     </h1>
                     <p className="text-[13px] text-text-muted mt-0.5">
                         {currentListName
@@ -626,11 +624,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                     <ListCard
                         list={list}
                         onClick={() => onCardClick(list.id)}
-                        onDelete={
-                            activeTab !== "NORMAL"
-                                ? (e) => onDeleteList(e, list.id, list.name)
-                                : undefined
-                        }
+                        onDelete={(e) => onDeleteList(e, list.id, list.name)}
                         isDeleting={deletingListId === list.id}
                     />
                 </li>
@@ -806,14 +800,13 @@ const Dashboard = () => {
 
     const groupedLists = useMemo(
         () => ({
-            NORMAL:
-                currentList && (currentList.category ?? "NORMAL") === "NORMAL"
-                    ? [currentList]
-                    : [],
+            NORMAL: lists.filter(
+                (list) => (list.category ?? "NORMAL") === "NORMAL",
+            ),
             RECIPE: lists.filter((list) => list.category === "RECIPE"),
             FREQUENT: lists.filter((list) => list.category === "FREQUENT"),
         }),
-        [currentList, lists],
+        [lists],
     );
 
     const sectionOrder = ["NORMAL", "RECIPE", "FREQUENT"] as const;
@@ -924,15 +917,8 @@ const Dashboard = () => {
                         <ListCard
                             list={list}
                             onClick={() => handleCardClick(list.id)}
-                            onDelete={
-                                (list.category ?? "NORMAL") !== "NORMAL"
-                                    ? (e) =>
-                                          handleDeleteList(
-                                              e,
-                                              list.id,
-                                              list.name,
-                                          )
-                                    : undefined
+                            onDelete={(e) =>
+                                handleDeleteList(e, list.id, list.name)
                             }
                             isDeleting={deletingListId === list.id}
                         />

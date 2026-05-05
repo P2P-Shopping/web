@@ -207,20 +207,6 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 throw new Error("List name cannot be empty");
             }
 
-            // Prevent creating multiple NORMAL lists (only one "Your basket" allowed)
-            if (category === "NORMAL") {
-                const state = get();
-                const hasNormalList = state.lists.some(
-                    (list) => (list.category ?? "NORMAL") === "NORMAL",
-                );
-                if (hasNormalList) {
-                    set({ isLoading: false });
-                    throw new Error(
-                        "You can only have one shopping list. Use 'Your basket' or create a Recipe/Frequent list.",
-                    );
-                }
-            }
-
             const response = await fetch(`${getBaseUrl()}/api/lists`, {
                 method: "POST",
                 headers: jsonHeaders(true),

@@ -185,15 +185,27 @@ export default function ListCard({
                         })()}
                     </div>
 
-                    {/* Progress Bar Integration */}
-                    <div className="pt-1">
-                        <div className="w-full bg-bg-muted rounded-full h-1 overflow-hidden">
-                            <div
-                                className="bg-accent h-full rounded-full transition-all duration-500 ease-out"
-                                style={{ width: `${progress}%` }}
-                            />
+                    {/* Progress Bar — only meaningful for NORMAL (basket) lists */}
+                    {(list.category ?? "NORMAL") === "NORMAL" ? (
+                        <div className="pt-1">
+                            <div className="w-full bg-bg-muted rounded-full h-1 overflow-hidden">
+                                <div
+                                    className="bg-accent h-full rounded-full transition-all duration-500 ease-out"
+                                    style={{ width: `${progress}%` }}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="pt-1 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                                Template
+                            </span>
+                            <span className="text-[10px] font-bold text-text-muted">
+                                {totalItems}{" "}
+                                {totalItems === 1 ? "item" : "items"}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </button>
 

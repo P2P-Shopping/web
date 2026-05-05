@@ -1124,7 +1124,6 @@ const ListDetail = ({
         items,
         isLoading: itemsLoading,
         error,
-        syncFailed,
         authFailed,
         addItem,
         toggleItem,
@@ -1317,6 +1316,9 @@ const ListDetail = ({
     };
 
     const isReadOnly = authFailed;
+    const isTemplate =
+        activeList?.category === "RECIPE" ||
+        activeList?.category === "FREQUENT";
 
     const openImportModal = async () => {
         await fetchLists();
@@ -1559,8 +1561,9 @@ const ListDetail = ({
                                             onCheck={toggleItem}
                                             onDelete={deleteItem}
                                             disabled={isReadOnly}
+                                            checkable={!isTemplate}
                                         />
-                                        {items.length > 0 && (
+                                        {items.length > 0 && !isTemplate && (
                                             <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex flex-col">
@@ -1584,6 +1587,19 @@ const ListDetail = ({
                                                 >
                                                     Finish Shopping
                                                 </button>
+                                            </div>
+                                        )}
+                                        {items.length > 0 && isTemplate && (
+                                            <div className="mt-4 pt-4 border-t border-border flex items-center justify-between bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
+                                                <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                                    Template
+                                                </span>
+                                                <span className="text-xs font-bold text-text-muted">
+                                                    {items.length}{" "}
+                                                    {items.length === 1
+                                                        ? "item"
+                                                        : "items"}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
@@ -1678,7 +1694,6 @@ const ListDetail = ({
                             <input
                                 type="file"
                                 accept="image/*"
-                                capture="environment"
                                 id="receipt-cam"
                                 className="hidden"
                                 onChange={(e) =>

@@ -15,14 +15,19 @@ const LIST_CATEGORY_OPTIONS: Array<{
     description: string;
 }> = [
     {
+        value: "NORMAL",
+        title: "Your basket",
+        description: "A shopping list you can check off and finish.",
+    },
+    {
         value: "RECIPE",
         title: "Recipe list",
-        description: "Built around ingredients for a recipe.",
+        description: "A template built around recipe ingredients.",
     },
     {
         value: "FREQUENT",
         title: "Frequent list",
-        description: "Items you buy again and again.",
+        description: "A template for items you buy again and again.",
     },
 ];
 
@@ -30,7 +35,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
     const [listName, setListName] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { addList } = useListsStore();
-    const [listCategory, setListCategory] = useState<ListCategory>("RECIPE");
+    const [listCategory, setListCategory] = useState<ListCategory>("NORMAL");
     const categoryButtonId = useId();
     const categoryListId = useId();
 
