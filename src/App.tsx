@@ -295,12 +295,6 @@ function App() {
         stompClient.onStompError = (frame) => {
             console.error("Broker error:", frame.headers.message);
             setServerConnected(false);
-            setToastMessage("Connection lost. Retrying...");
-            clearToastTimeout();
-            toastTimeoutRef.current = setTimeout(() => {
-                setToastMessage(null);
-                toastTimeoutRef.current = null;
-            }, 3000);
         };
 
         stompClient.onWebSocketClose = () => {
