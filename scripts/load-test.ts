@@ -24,9 +24,47 @@ function secureRandom(): number {
     return array[0] / (0xffffffff + 1);
 }
 
+function generateEventPayload() {
+    const createItem = () => ({
+        action: "CHECK_OFF",
+        itemId: `load-item-${Math.floor(secureRandom() * 20)}`,
+        checked: secureRandom() > 0.5,
+        timestamp: Date.now(),
+    });
+
+    return secureRandom() > 0.7
+        ? Array.from({ length: 3 }).map(createItem)
+        : createItem();
+}
+
+function startUserActivity(client: Client, onComplete: () => void) {
+    let eventsSent = 0;
+    const interval = setInterval(
+        () => {
+            const payload = generateEventPayload();
+            const destination = Array.isArray(payload)
+                ? `/app/list/${LIST_ID}/batch-update`
+                : `/app/list/${LIST_ID}/update`;
+
+            client.publish({
+                destination,
+                body: JSON.stringify(payload),
+            });
+
+            eventsSent++;
+            if (eventsSent >= EVENTS_PER_USER) {
+                clearInterval(interval);
+                setTimeout(onComplete, 1000);
+            }
+        },
+        500 + secureRandom() * 1000,
+    );
+    return interval;
+}
+
 async function simulateUser(userId: number) {
     return new Promise((resolve, reject) => {
-        let interval: any;
+        let interval: ReturnType<typeof setInterval> | undefined;
         let settled = false;
 
         const cleanup = () => {
@@ -46,47 +84,10 @@ async function simulateUser(userId: number) {
             },
             onConnect: () => {
                 if (userId % 10 === 0) console.log(`User ${userId} connected`);
-
-                let eventsSent = 0;
-                interval = setInterval(
-                    () => {
-                        const isBatch = secureRandom() > 0.7;
-
-                        if (isBatch) {
-                            const batch = Array.from({ length: 3 }).map(() => ({
-                                action: "CHECK_OFF",
-                                itemId: `load-item-${Math.floor(secureRandom() * 20)}`,
-                                checked: secureRandom() > 0.5,
-                                timestamp: Date.now(),
-                            }));
-                            client.publish({
-                                destination: `/app/list/${LIST_ID}/batch-update`,
-                                body: JSON.stringify(batch),
-                            });
-                        } else {
-                            const payload = {
-                                action: "CHECK_OFF",
-                                itemId: `load-item-${Math.floor(secureRandom() * 20)}`,
-                                checked: secureRandom() > 0.5,
-                                timestamp: Date.now(),
-                            };
-                            client.publish({
-                                destination: `/app/list/${LIST_ID}/update`,
-                                body: JSON.stringify(payload),
-                            });
-                        }
-
-                        eventsSent++;
-                        if (eventsSent >= EVENTS_PER_USER) {
-                            // Stay connected a bit then disconnect
-                            setTimeout(() => {
-                                cleanup();
-                                resolve(true);
-                            }, 1000);
-                        }
-                    },
-                    500 + secureRandom() * 1000,
-                );
+                interval = startUserActivity(client, () => {
+                    cleanup();
+                    resolve(true);
+                });
             },
             onStompError: (frame) => {
                 console.error(
@@ -100,7 +101,6 @@ async function simulateUser(userId: number) {
                 if (userId % 10 === 0)
                     console.log(`User ${userId} connection closed`);
                 cleanup();
-                // If it closed before finishing events, consider it an error for the test
                 reject(new Error("WebSocket closed unexpectedly"));
             },
         });
@@ -111,7 +111,7 @@ async function simulateUser(userId: number) {
                 cleanup();
                 reject(new Error("Simulation timeout"));
             }
-        }, 20000); // 20s safety timeout
+        }, 20000);
 
         client.activate();
     });
@@ -127,7 +127,6 @@ async function runTest() {
 
     const startTime = Date.now();
 
-    // Run users in chunks to avoid overwhelming the local machine's FD limit
     const CHUNK_SIZE = 20;
     for (let i = 0; i < USER_COUNT; i += CHUNK_SIZE) {
         const chunk = [];
@@ -147,6 +146,9 @@ async function runTest() {
     console.log("==========================================");
 }
 
-runTest().catch((err) => {
+try {
+    await runTest();
+} catch (err) {
     console.error("Test failed:", err);
-});
+    process.exit(1);
+}
