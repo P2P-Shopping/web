@@ -18,11 +18,27 @@ if (typeof WebSocket === "undefined") {
     process.exit(1);
 }
 
+function secureRandom(): number {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return array[0] / (0xffffffff + 1);
+}
+
 async function simulateUser(userId: number) {
     return new Promise((resolve, reject) => {
+        let interval: any;
+        let settled = false;
+
+        const cleanup = () => {
+            if (settled) return;
+            settled = true;
+            if (interval) clearInterval(interval);
+            if (safetyTimeout) clearTimeout(safetyTimeout);
+            client.deactivate();
+        };
+
         const client = new Client({
             brokerURL: SOCKET_URL,
-            // Bun's WebSocket is global and compatible
             webSocketFactory: () => new WebSocket(SOCKET_URL),
             reconnectDelay: 0,
             debug: (str) => {
@@ -32,15 +48,15 @@ async function simulateUser(userId: number) {
                 if (userId % 10 === 0) console.log(`User ${userId} connected`);
 
                 let eventsSent = 0;
-                const interval = setInterval(
+                interval = setInterval(
                     () => {
-                        const isBatch = Math.random() > 0.7;
+                        const isBatch = secureRandom() > 0.7;
 
                         if (isBatch) {
                             const batch = Array.from({ length: 3 }).map(() => ({
                                 action: "CHECK_OFF",
-                                itemId: `load-item-${Math.floor(Math.random() * 20)}`,
-                                checked: Math.random() > 0.5,
+                                itemId: `load-item-${Math.floor(secureRandom() * 20)}`,
+                                checked: secureRandom() > 0.5,
                                 timestamp: Date.now(),
                             }));
                             client.publish({
@@ -50,8 +66,8 @@ async function simulateUser(userId: number) {
                         } else {
                             const payload = {
                                 action: "CHECK_OFF",
-                                itemId: `load-item-${Math.floor(Math.random() * 20)}`,
-                                checked: Math.random() > 0.5,
+                                itemId: `load-item-${Math.floor(secureRandom() * 20)}`,
+                                checked: secureRandom() > 0.5,
                                 timestamp: Date.now(),
                             };
                             client.publish({
@@ -62,15 +78,14 @@ async function simulateUser(userId: number) {
 
                         eventsSent++;
                         if (eventsSent >= EVENTS_PER_USER) {
-                            clearInterval(interval);
                             // Stay connected a bit then disconnect
                             setTimeout(() => {
-                                client.deactivate();
+                                cleanup();
                                 resolve(true);
-                            }, 2000);
+                            }, 1000);
                         }
                     },
-                    500 + Math.random() * 1000,
+                    500 + secureRandom() * 1000,
                 );
             },
             onStompError: (frame) => {
@@ -78,13 +93,25 @@ async function simulateUser(userId: number) {
                     `User ${userId} STOMP error:`,
                     frame.headers.message,
                 );
+                cleanup();
                 reject(frame);
             },
             onWebSocketClose: () => {
                 if (userId % 10 === 0)
                     console.log(`User ${userId} connection closed`);
+                cleanup();
+                // If it closed before finishing events, consider it an error for the test
+                reject(new Error("WebSocket closed unexpectedly"));
             },
         });
+
+        const safetyTimeout = setTimeout(() => {
+            if (!settled) {
+                console.error(`User ${userId} simulation timed out`);
+                cleanup();
+                reject(new Error("Simulation timeout"));
+            }
+        }, 20000); // 20s safety timeout
 
         client.activate();
     });

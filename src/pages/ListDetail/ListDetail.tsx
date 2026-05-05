@@ -76,6 +76,11 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [syncFailed, setSyncFailed] = useState(false);
     const isServerConnected = useStore((state) => state.isServerConnected);
 
+    const itemsRef = useRef(items);
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
@@ -276,7 +281,9 @@ const useListItems = (effectiveListId: string | undefined) => {
                 const payload = JSON.parse(message.body) as SyncPayload;
 
                 if (payload.status === "Rejection") {
-                    const item = items.find((i) => i.id === payload.itemId);
+                    const item = itemsRef.current.find(
+                        (i) => i.id === payload.itemId,
+                    );
                     toast.error("Conflict Warning", {
                         description: `Conflict detected for "${item?.name || "an item"}". Your change was reverted because another user made a more recent update.`,
                         duration: 4000,
@@ -323,7 +330,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore, items], // items dependency is needed for the toast description
+        [syncListItemsInStore], // items removed to prevent subscription churn
     );
 
     useEffect(() => {
