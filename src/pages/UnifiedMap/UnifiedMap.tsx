@@ -448,6 +448,10 @@ const UnifiedMap: React.FC = () => {
     const isMicroView = navigationMode === "indoor";
 
     const activeTarget = targetStoreLocation || DEMO_STORE_LOCATION;
+    const activeTransit = targetStoreTransit ?? {
+        driving: { timeMins: 0, distanceKm: "0.0" },
+        walking: { timeMins: 0, distanceKm: "0.0" },
+    };
 
     useEffect(() => {
         // Automatic geofence transitions disabled per user request
@@ -521,7 +525,12 @@ const UnifiedMap: React.FC = () => {
                 },
             );
 
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            if (!response.ok) {
+                console.error(`HTTP Error: ${response.status}`);
+                setRecommendedStores([]);
+                setIsShowingStores(true);
+                return;
+            }
             const data = await response.json();
             const storesArray = Array.isArray(data) ? data : [data];
 
@@ -887,14 +896,14 @@ const UnifiedMap: React.FC = () => {
                 {isSidebarExpanded && (
                     <button
                         type="button"
-                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-[2400] min-[1000px]:hidden animate-fade-in"
+                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-2400 min-[1000px]:hidden animate-fade-in"
                         onClick={() => setIsSidebarExpanded(false)}
                         aria-label="Close List"
                     />
                 )}
 
                 <div
-                    className={`absolute z-[2500] transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
+                    className={`absolute z-2500 transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-100 min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-4xl max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
                 >
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
@@ -903,7 +912,7 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+                <div className="absolute top-4 left-4 z-1000 flex flex-col gap-2">
                     <div
                         className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
                     >
@@ -913,7 +922,7 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                <div className="absolute top-4 right-4 z-1000 flex flex-col gap-2">
                     <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
                         <button
                             type="button"
@@ -939,9 +948,9 @@ const UnifiedMap: React.FC = () => {
                 </div>
             </div>
 
-            {!isMicroView && targetStoreLocation && targetStoreTransit && (
+            {!isMicroView && targetStoreLocation && (
                 <div
-                    className={`absolute bottom-28 left-6 z-[2000] rounded-3xl border border-border bg-surface/95 p-5 shadow-2xl backdrop-blur-xl transition-all duration-500 ${isSidebarExpanded ? "right-6 min-[1000px]:right-[424px]" : "right-6"}`}
+                    className={`absolute bottom-28 left-6 z-2000 rounded-3xl border border-border bg-surface/95 p-5 shadow-2xl backdrop-blur-xl transition-all duration-500 ${isSidebarExpanded ? "right-6 min-[1000px]:right-106" : "right-6"}`}
                 >
                     <div className="flex items-start justify-between gap-4">
                         <div>
@@ -960,7 +969,7 @@ const UnifiedMap: React.FC = () => {
                             >
                                 <Car size={14} />
                                 <span className="text-[10px] font-black uppercase tracking-widest">
-                                    {targetStoreTransit.driving.timeMins}m
+                                    {activeTransit.driving.timeMins}m
                                 </span>
                             </button>
                             <button
@@ -970,7 +979,7 @@ const UnifiedMap: React.FC = () => {
                             >
                                 <Footprints size={14} />
                                 <span className="text-[10px] font-black uppercase tracking-widest">
-                                    {targetStoreTransit.walking.timeMins}m
+                                    {activeTransit.walking.timeMins}m
                                 </span>
                             </button>
                         </div>
@@ -1038,7 +1047,7 @@ const UnifiedMap: React.FC = () => {
             )}
 
             {!isMicroView && (
-                <div className="relative z-[3000] flex h-[84px] items-center justify-between border-t border-border bg-surface/80 px-6 shadow-[0_-8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+                <div className="relative z-3000 flex h-21 items-center justify-between border-t border-border bg-surface/80 px-6 shadow-[0_-8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl">
                     <div className="flex items-center gap-4">
                         <button
                             type="button"
@@ -1081,3 +1090,6 @@ const UnifiedMap: React.FC = () => {
 };
 
 export default UnifiedMap;
+
+
+
