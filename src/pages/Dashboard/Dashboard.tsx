@@ -480,9 +480,10 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     const detailTitle = showAiImport
         ? "AI Shopping Assistant"
         : selectedList?.name;
+    const listCountLabel = listsCount === 1 ? "list" : "lists";
     const listSummary = currentListName
         ? `${currentListName} • ${listsCount} total`
-        : `${listsCount} ${listsCount === 1 ? "list" : "lists"}`;
+        : `${listsCount} ${listCountLabel}`;
 
     return (
         <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">

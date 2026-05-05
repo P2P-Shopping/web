@@ -174,7 +174,7 @@ const ListDetailMainContent = ({
                                 className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
                             >
                                 <Plus size={14} strokeWidth={2.5} />
-                                Add to normal list
+                                Add to your cart
                             </button>
                         )}
                         <button
@@ -1250,7 +1250,9 @@ const InlineAddForm = ({
             value={newItemName}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder={
-                isReadOnly ? "List is read-only (sync failed)" : "Add item..."
+                isReadOnly
+                    ? "List is read-only. Please sign in again."
+                    : "Add item..."
             }
             disabled={isReadOnly}
             className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
