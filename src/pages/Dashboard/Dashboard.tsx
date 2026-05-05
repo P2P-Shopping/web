@@ -475,76 +475,82 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     onBack,
     onAiImport,
     onNewList,
-}) => (
-    <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
-        {selectedList || showAiImport ? (
-            <>
-                <button
-                    type="button"
-                    className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-                    onClick={onBack}
-                    aria-label="Back"
-                >
-                    <ChevronLeft size={20} />
-                </button>
-                <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
-                    {showAiImport
-                        ? "AI Shopping Assistant"
-                        : selectedList?.name}
-                </h1>
-            </>
-        ) : (
-            <>
-                <div className="flex flex-col">
-                    <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
-                        My Lists
+}) => {
+    const showDetailHeader = Boolean(selectedList) || showAiImport;
+    const detailTitle = showAiImport
+        ? "AI Shopping Assistant"
+        : selectedList?.name;
+    const listSummary = currentListName
+        ? `${currentListName} • ${listsCount} total`
+        : `${listsCount} ${listsCount === 1 ? "list" : "lists"}`;
+
+    return (
+        <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
+            {showDetailHeader ? (
+                <>
+                    <button
+                        type="button"
+                        className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                        onClick={onBack}
+                        aria-label="Back"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
+                        {detailTitle}
                     </h1>
-                    <p className="text-[13px] text-text-muted mt-0.5">
-                        {currentListName
-                            ? `${currentListName} • ${listsCount} total`
-                            : `${listsCount} ${listsCount === 1 ? "list" : "lists"}`}
-                    </p>
-                </div>
-                <div className="flex items-center gap-3 max-[600px]:w-full">
-                    <div className="flex items-center bg-bg-muted border border-border rounded-md p-1 mr-2">
+                </>
+            ) : (
+                <>
+                    <div className="flex flex-col">
+                        <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
+                            My Lists
+                        </h1>
+                        <p className="text-[13px] text-text-muted mt-0.5">
+                            {listSummary}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3 max-[600px]:w-full">
+                        <div className="flex items-center bg-bg-muted border border-border rounded-md p-1 mr-2">
+                            <button
+                                type="button"
+                                onClick={() => setDisplayMode("split")}
+                                className={`p-1.5 rounded transition-all ${displayMode === "split" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
+                                title="Split View"
+                            >
+                                <Columns size={18} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDisplayMode("tabs")}
+                                className={`p-1.5 rounded transition-all ${displayMode === "tabs" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
+                                title="Tabbed View"
+                            >
+                                <Layout size={18} />
+                            </button>
+                        </div>
                         <button
                             type="button"
-                            onClick={() => setDisplayMode("split")}
-                            className={`p-1.5 rounded transition-all ${displayMode === "split" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
-                            title="Split View"
+                            className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
+                            onClick={onAiImport}
                         >
-                            <Columns size={18} />
+                            <Sparkles size={18} className="text-accent" />
+                            AI Import
                         </button>
                         <button
                             type="button"
-                            onClick={() => setDisplayMode("tabs")}
-                            className={`p-1.5 rounded transition-all ${displayMode === "tabs" ? "bg-surface shadow-sm text-accent" : "text-text-muted hover:text-text-strong"}`}
-                            title="Tabbed View"
+                            className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:flex-1 max-[600px]:justify-center"
+                            onClick={onNewList}
                         >
-                            <Layout size={18} />
+                            <Plus size={20} />
+                            New List
                         </button>
                     </div>
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
-                        onClick={onAiImport}
-                    >
-                        <Sparkles size={18} className="text-accent" />
-                        AI Import
-                    </button>
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:flex-1 max-[600px]:justify-center"
-                        onClick={onNewList}
-                    >
-                        <Plus size={20} />
-                        New List
-                    </button>
-                </div>
-            </>
-        )}
-    </header>
-);
+                </>
+            )}
+        </header>
+    );
+};
 
 interface DashboardTabsViewProps {
     activeTab: TabType;
@@ -811,7 +817,7 @@ const Dashboard = () => {
 
     const sectionOrder = ["NORMAL", "RECIPE", "FREQUENT"] as const;
     const sectionLabels: Record<(typeof sectionOrder)[number], string> = {
-        NORMAL: "Your basket",
+        NORMAL: "Your cart",
         RECIPE: "Recipe lists",
         FREQUENT: "Frequent lists",
     };

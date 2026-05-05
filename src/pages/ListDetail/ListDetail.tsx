@@ -6,7 +6,14 @@ import {
     Settings,
     UserPlus,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    type RefObject,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
     ImportItemsModal,
@@ -63,6 +70,195 @@ interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
 }
+
+interface ListDetailMainContentProps {
+    showListSelection: boolean;
+    lists: ReturnType<typeof useListsStore.getState>["lists"];
+    listsLoading: boolean;
+    onSelectList: (listId: string) => void;
+    itemsLoading: boolean;
+    activeList: { name: string; category?: ListCategory } | null;
+    activeCollaborationUsers: string[];
+    canImportIntoNormalList: boolean;
+    onOpenImportModal: () => void;
+    onOpenRenameModal: () => void;
+    onOpenShareModal: () => void;
+    addInputRef: RefObject<HTMLInputElement | null>;
+    newItemName: string;
+    onNameChange: (name: string) => void;
+    onInlineAdd: (e: React.FormEvent) => void;
+    onOpenDetails: () => void;
+    isReadOnly: boolean;
+    isEmbedded: boolean;
+    items: Item[];
+    onToggleItem: (itemId: string) => void;
+    onDeleteItem: (itemId: string) => void;
+    isTemplate: boolean;
+    estimatedTotal: string;
+    onFinishShopping: () => void;
+}
+
+const ListDetailMainContent = ({
+    showListSelection,
+    lists,
+    listsLoading,
+    onSelectList,
+    itemsLoading,
+    activeList,
+    activeCollaborationUsers,
+    canImportIntoNormalList,
+    onOpenImportModal,
+    onOpenRenameModal,
+    onOpenShareModal,
+    addInputRef,
+    newItemName,
+    onNameChange,
+    onInlineAdd,
+    onOpenDetails,
+    isReadOnly,
+    isEmbedded,
+    items,
+    onToggleItem,
+    onDeleteItem,
+    isTemplate,
+    estimatedTotal,
+    onFinishShopping,
+}: ListDetailMainContentProps) => {
+    if (showListSelection) {
+        return (
+            <ListSelectionView
+                lists={lists}
+                isLoading={listsLoading}
+                onSelect={onSelectList}
+            />
+        );
+    }
+
+    if (itemsLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
+                <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
+                <p>Loading list...</p>
+            </div>
+        );
+    }
+
+    if (activeList === null) {
+        return (
+            <p className="text-center py-10 text-text-muted italic text-sm">
+                List not found or could not be loaded.
+            </p>
+        );
+    }
+
+    return (
+        <>
+            <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-end px-1">
+                    <div className="flex flex-col">
+                        <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                            Collaboration
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <PresenceBar
+                                variant="avatars"
+                                allUsers={activeCollaborationUsers}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                        {canImportIntoNormalList && (
+                            <button
+                                type="button"
+                                onClick={onOpenImportModal}
+                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                            >
+                                <Plus size={14} strokeWidth={2.5} />
+                                Add to normal list
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={onOpenRenameModal}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                        >
+                            Edit
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onOpenShareModal}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                        >
+                            <UserPlus size={14} strokeWidth={2.5} />
+                            Invite
+                        </button>
+                    </div>
+                </div>
+
+                <InlineAddForm
+                    addInputRef={addInputRef}
+                    newItemName={newItemName}
+                    onNameChange={onNameChange}
+                    onSubmit={onInlineAdd}
+                    onOpenDetails={onOpenDetails}
+                    isReadOnly={isReadOnly}
+                    isEmbedded={isEmbedded}
+                />
+
+                <div className="min-h-[16px] px-2 flex items-center">
+                    <PresenceBar variant="typing" />
+                </div>
+            </div>
+
+            <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
+                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
+                    <ShoppingListItems
+                        items={items}
+                        onCheck={onToggleItem}
+                        onDelete={onDeleteItem}
+                        disabled={isReadOnly}
+                        checkable={!isTemplate}
+                    />
+                    {items.length > 0 && !isTemplate && (
+                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                            <div className="flex justify-between items-center">
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                        Estimated Total
+                                    </span>
+                                    <span className="text-xs text-text-muted opacity-70">
+                                        {items.length} items
+                                    </span>
+                                </div>
+                                <span className="text-xl font-black text-accent tracking-tight">
+                                    {estimatedTotal} lei
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onFinishShopping}
+                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                            >
+                                Finish Shopping
+                            </button>
+                        </div>
+                    )}
+                    {items.length > 0 && isTemplate && (
+                        <div className="mt-4 pt-4 border-t border-border flex items-center justify-between bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
+                            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                Template
+                            </span>
+                            <span className="text-xs font-bold text-text-muted">
+                                {items.length}{" "}
+                                {items.length === 1 ? "item" : "items"}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+};
 
 /**
  * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
@@ -1293,6 +1489,11 @@ const ListDetail = ({
     const isTemplate =
         activeList?.category === "RECIPE" ||
         activeList?.category === "FREQUENT";
+    const showListSelection = effectiveListId === "default" && isEmbedded;
+    const wrapperClassName = isEmbedded
+        ? "w-full flex flex-col h-full bg-surface/50"
+        : "flex justify-center items-start p-20px bg-bg";
+    const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`;
 
     const openImportModal = async () => {
         await fetchLists();
@@ -1395,16 +1596,8 @@ const ListDetail = ({
     };
 
     return (
-        <div
-            className={
-                isEmbedded
-                    ? "w-full flex flex-col h-full bg-surface/50"
-                    : "flex justify-center items-start p-20px bg-bg"
-            }
-        >
-            <div
-                className={`w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`}
-            >
+        <div className={wrapperClassName}>
+            <div className={contentClassName}>
                 {error && (
                     <ListErrorAlert error={error} isEmbedded={isEmbedded} />
                 )}
@@ -1429,134 +1622,34 @@ const ListDetail = ({
                     </div>
                 )}
 
-                {effectiveListId === "default" && isEmbedded ? (
-                    <ListSelectionView
-                        lists={lists}
-                        isLoading={listsLoading}
-                        onSelect={(listId) => navigate(`/nav/${listId}`)}
-                    />
-                ) : itemsLoading ? (
-                    <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
-                        <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
-                        <p>Loading list...</p>
-                    </div>
-                ) : !activeList ? (
-                    <p className="text-center py-10 text-text-muted italic text-sm">
-                        List not found or could not be loaded.
-                    </p>
-                ) : (
-                    <>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex justify-between items-end px-1">
-                                <div className="flex flex-col">
-                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                                        Collaboration
-                                    </h2>
-                                    <div className="flex items-center gap-2">
-                                        <PresenceBar
-                                            variant="avatars"
-                                            allUsers={activeCollaborationUsers}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap justify-end gap-2">
-                                    {canImportIntoNormalList && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                void openImportModal();
-                                            }}
-                                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
-                                        >
-                                            <Plus size={14} strokeWidth={2.5} />
-                                            Add to normal list
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowRenameModal(true)}
-                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowShareModal(true)}
-                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
-                                    >
-                                        <UserPlus size={14} strokeWidth={2.5} />
-                                        Invite
-                                    </button>
-                                </div>
-                            </div>
-
-                            <InlineAddForm
-                                addInputRef={addInputRef}
-                                newItemName={newItemName}
-                                onNameChange={handleNewItemNameChange}
-                                onSubmit={handleInlineAdd}
-                                onOpenDetails={openDetailsModal}
-                                isReadOnly={isReadOnly}
-                                isEmbedded={isEmbedded}
-                            />
-
-                            <div className="min-h-[16px] px-2 flex items-center">
-                                <PresenceBar variant="typing" />
-                            </div>
-                        </div>
-
-                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
-                            <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
-                                <ShoppingListItems
-                                    items={items}
-                                    onCheck={toggleItem}
-                                    onDelete={deleteItem}
-                                    disabled={isReadOnly}
-                                    checkable={!isTemplate}
-                                />
-                                {items.length > 0 && !isTemplate && (
-                                    <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-                                                    Estimated Total
-                                                </span>
-                                                <span className="text-xs text-text-muted opacity-70">
-                                                    {items.length} items
-                                                </span>
-                                            </div>
-                                            <span className="text-xl font-black text-accent tracking-tight">
-                                                {estimatedTotal} lei
-                                            </span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setShowFinishModal(true)
-                                            }
-                                            className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                        >
-                                            Finish Shopping
-                                        </button>
-                                    </div>
-                                )}
-                                {items.length > 0 && isTemplate && (
-                                    <div className="mt-4 pt-4 border-t border-border flex items-center justify-between bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
-                                        <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-                                            Template
-                                        </span>
-                                        <span className="text-xs font-bold text-text-muted">
-                                            {items.length}{" "}
-                                            {items.length === 1
-                                                ? "item"
-                                                : "items"}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </>
-                )}
+                <ListDetailMainContent
+                    showListSelection={showListSelection}
+                    lists={lists}
+                    listsLoading={listsLoading}
+                    onSelectList={(listId) => navigate(`/nav/${listId}`)}
+                    itemsLoading={itemsLoading}
+                    activeList={activeList}
+                    activeCollaborationUsers={activeCollaborationUsers}
+                    canImportIntoNormalList={canImportIntoNormalList}
+                    onOpenImportModal={() => {
+                        void openImportModal();
+                    }}
+                    onOpenRenameModal={() => setShowRenameModal(true)}
+                    onOpenShareModal={() => setShowShareModal(true)}
+                    addInputRef={addInputRef}
+                    newItemName={newItemName}
+                    onNameChange={handleNewItemNameChange}
+                    onInlineAdd={handleInlineAdd}
+                    onOpenDetails={openDetailsModal}
+                    isReadOnly={isReadOnly}
+                    isEmbedded={isEmbedded}
+                    items={items}
+                    onToggleItem={toggleItem}
+                    onDeleteItem={deleteItem}
+                    isTemplate={isTemplate}
+                    estimatedTotal={estimatedTotal}
+                    onFinishShopping={() => setShowFinishModal(true)}
+                />
             </div>
 
             {!isReadOnly && (

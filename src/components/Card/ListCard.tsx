@@ -57,7 +57,7 @@ export default function ListCard({
             case "FREQUENT":
                 return "Frequent";
             default:
-                return "Your basket";
+                return "Your cart";
         }
     };
 

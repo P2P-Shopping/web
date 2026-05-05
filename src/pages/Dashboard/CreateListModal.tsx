@@ -16,7 +16,7 @@ const LIST_CATEGORY_OPTIONS: Array<{
 }> = [
     {
         value: "NORMAL",
-        title: "Your basket",
+        title: "Your cart",
         description: "A shopping list you can check off and finish.",
     },
     {
@@ -67,7 +67,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
             isOpen={true}
             onClose={handleClose}
             title="Create New List"
-            subtitle="Choose a list type and give it a name. Your primary shopping list is 'Your basket'."
+            subtitle="Choose a list type and give it a name. Your primary shopping list is 'Your cart'."
             initialFocusSelector="#list-name"
             maxWidth="760px"
             footer={
