@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
     ImportItemsModal,
     Modal,
@@ -274,6 +275,14 @@ const useListItems = (effectiveListId: string | undefined) => {
             try {
                 const payload = JSON.parse(message.body) as SyncPayload;
 
+                if (payload.status === "Rejection") {
+                    const item = items.find((i) => i.id === payload.itemId);
+                    toast.error("Conflict Warning", {
+                        description: `Conflict detected for "${item?.name || "an item"}". Your change was reverted because another user made a more recent update.`,
+                        duration: 4000,
+                    });
+                }
+
                 setItems((prev) => {
                     let next = prev;
 
@@ -314,7 +323,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore], // Stable dependency prevents STOMP subscription churn
+        [syncListItemsInStore, items], // items dependency is needed for the toast description
     );
 
     useEffect(() => {

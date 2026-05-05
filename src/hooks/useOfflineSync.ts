@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { useStore } from "../context/useStore";
 import api from "../services/api";
 import { useListsStore } from "../store/useListsStore";
@@ -93,6 +94,11 @@ export const useOfflineSync = () => {
                     if (itemId) {
                         rollbackItemState(itemId);
                         setItemConflict(itemId, true);
+
+                        toast.error("Conflict Warning", {
+                            description: `Your edit to "${action.payload.name || "item"}" was rejected due to a newer update from another user. Reverting to server state.`,
+                            duration: 5000,
+                        });
 
                         // Clear conflict flag after 5 seconds
                         setTimeout(() => {
