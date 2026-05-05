@@ -580,7 +580,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
     getTabClassName,
 }) => (
     <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm">
+        <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm overflow-x-auto scrollbar-none w-fit mx-auto">
             {sectionOrder.map((section) => (
                 <button
                     key={section}
@@ -589,7 +589,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                     onDragOver={(e) => handleTabDragOver(e, section)}
                     onDragLeave={handleTabDragLeave}
                     onDrop={(e) => handleTabDrop(e, section)}
-                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all flex items-center gap-2 ${getTabClassName(section)}`}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 shrink-0 ${getTabClassName(section)}`}
                 >
                     {sectionLabels[section]}
                     <span

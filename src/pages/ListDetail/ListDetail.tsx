@@ -61,7 +61,6 @@ interface ApiShoppingList {
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
-    onSwitchList?: () => void;
 }
 
 /**
@@ -1024,30 +1023,6 @@ const ListErrorAlert = ({
     </div>
 );
 
-/** Header component for the list detail view. */
-const ListHeader = ({
-    effectiveListId,
-    onSwitchList,
-}: {
-    effectiveListId: string;
-    onSwitchList: () => void;
-}) => (
-    <header className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-black text-text-strong tracking-tighter uppercase italic">
-            {effectiveListId === "default" ? "Select a List" : "Shopping List"}
-        </h2>
-        {effectiveListId !== "default" && (
-            <button
-                type="button"
-                onClick={onSwitchList}
-                className="text-xs font-bold text-accent hover:underline uppercase"
-            >
-                Switch List
-            </button>
-        )}
-    </header>
-);
-
 /** Inline form component for quickly adding items without details. */
 const InlineAddForm = ({
     addInputRef,
@@ -1107,7 +1082,6 @@ const InlineAddForm = ({
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
-    onSwitchList,
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -1424,15 +1398,6 @@ const ListDetail = ({
             <div
                 className={`w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`}
             >
-                {isEmbedded && (
-                    <ListHeader
-                        effectiveListId={effectiveListId ?? "default"}
-                        onSwitchList={
-                            onSwitchList ?? (() => navigate("/nav/default"))
-                        }
-                    />
-                )}
-
                 {error && (
                     <ListErrorAlert error={error} isEmbedded={isEmbedded} />
                 )}

@@ -77,7 +77,7 @@ export default function Navbar() {
     const extraLinks = NAV_LINKS.slice(priorityCount);
 
     return (
-        <nav className="relative bg-surface/80 backdrop-blur-xl border-t border-border h-[72px] pb-safe flex items-center shadow-[0_-8px_30px_rgba(0,0,0,0.04)] z-50">
+        <nav className="relative bg-surface/80 backdrop-blur-xl border-t border-border h-[72px] pb-safe flex items-center shadow-[0_-8px_30px_rgba(0,0,0,0.04)] z-[3001]">
             <div className="max-w-[600px] w-full mx-auto px-4 flex items-center justify-around relative">
                 {priorityLinks.map(({ to, label, icon: Icon }) => (
                     <Link
