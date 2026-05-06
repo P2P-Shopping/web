@@ -505,51 +505,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
     toggleItem: async (listId: string, itemId: string) => {
         const list = get().lists.find((entry) => entry.id === listId);
         const item = list?.items.find((entry) => entry.id === itemId);
-        if (!item) {
-            return false;
-        }
+        if (!item) return false;
 
-        const nextChecked = !item.checked;
-        try {
-            const response = await fetch(
-                `${getBaseUrl()}/api/items/${itemId}`,
-                {
-                    method: "PUT",
-                    headers: jsonHeaders(true),
-                    body: JSON.stringify(
-                        buildItemRequest({ ...item, checked: nextChecked }),
-                    ),
-                    credentials: "include",
-                },
-            );
-
-            handleAuthResponse(response);
-
-            if (!response.ok) {
-                throw new Error(`Failed to update item (${response.status})`);
-            }
-
-            const updatedItem = normalizeItem(
-                (await response.json()) as ApiItem,
-            );
-            set((state) => ({
-                lists: updateItemInList(
-                    state.lists,
-                    listId,
-                    itemId,
-                    updatedItem,
-                ),
-            }));
-            return true;
-        } catch (error) {
-            set({
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to update item",
-            });
-            return false;
-        }
+        return get().updateItem(listId, itemId, { checked: !item.checked });
     },
 
     /**
