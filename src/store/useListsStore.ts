@@ -42,6 +42,7 @@ interface ListsState {
     ) => Promise<ShoppingList | null>;
     updateList: (id: string, updates: Partial<ShoppingList>) => void;
     deleteList: (id: string) => Promise<boolean>;
+    renameList: (id: string, newName: string) => Promise<boolean>;
     setCurrentList: (list: ShoppingList | null) => void;
     addItem: (listId: string, item: Omit<Item, "id">) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
@@ -52,6 +53,15 @@ interface ListsState {
     getListById: (id: string) => ShoppingList | undefined;
     clearLists: () => void;
 }
+
+const pickCurrentNormalList = (lists: ShoppingList[]) =>
+    [...lists]
+        .filter((list) => (list.category ?? "NORMAL") === "NORMAL")
+        .sort(
+            (left, right) =>
+                new Date(right.updatedAt).getTime() -
+                new Date(left.updatedAt).getTime(),
+        )[0] ?? null;
 
 /**
  * Resolves the base URL for API requests from environment variables.
@@ -165,10 +175,12 @@ export const useListsStore = create<ListsState>((set, get) => ({
             }
 
             const data = (await response.json()) as ApiShoppingList[];
+            const normalizedLists = Array.isArray(data)
+                ? data.map(normalizeListFromApi)
+                : [];
             set({
-                lists: Array.isArray(data)
-                    ? data.map(normalizeListFromApi)
-                    : [],
+                lists: normalizedLists,
+                currentList: pickCurrentNormalList(normalizedLists),
                 isLoading: false,
             });
         } catch (error) {
@@ -214,6 +226,10 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
             set((state) => ({
                 lists: [createdList, ...state.lists],
+                currentList:
+                    (createdList.category ?? "NORMAL") === "NORMAL"
+                        ? createdList
+                        : state.currentList,
                 isLoading: false,
                 isModalOpen: false,
             }));
@@ -236,11 +252,15 @@ export const useListsStore = create<ListsState>((set, get) => ({
      * @param updates - The partial data to update.
      */
     updateList: (id: string, updates: Partial<ShoppingList>) => {
-        set((state) => ({
-            lists: state.lists.map((list) =>
+        set((state) => {
+            const nextLists = state.lists.map((list) =>
                 list.id === id ? { ...list, ...updates } : list,
-            ),
-        }));
+            );
+            return {
+                lists: nextLists,
+                currentList: pickCurrentNormalList(nextLists),
+            };
+        });
     },
 
     /**
@@ -265,8 +285,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
             set((state) => ({
                 lists: state.lists.filter((list) => list.id !== id),
-                currentList:
-                    state.currentList?.id === id ? null : state.currentList,
+                currentList: pickCurrentNormalList(
+                    state.lists.filter((list) => list.id !== id),
+                ),
                 error: null,
                 isLoading: false,
                 deletingListId: null,
@@ -280,6 +301,56 @@ export const useListsStore = create<ListsState>((set, get) => ({
                         : "Failed to delete list",
                 isLoading: false,
                 deletingListId: null,
+            });
+            return false;
+        }
+    },
+
+    /**
+     * Renames a shopping list via the API and updates the local store.
+     * @param id - The ID of the list to rename.
+     * @param newName - The new name for the list.
+     * @returns True if successful, false otherwise.
+     */
+    renameList: async (id: string, newName: string) => {
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            set({ error: "List name cannot be empty" });
+            return false;
+        }
+
+        set({ error: null });
+        try {
+            const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
+                method: "PUT",
+                headers: jsonHeaders(true),
+                body: JSON.stringify({ title: trimmedName }),
+                credentials: "include",
+            });
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(`Failed to rename list (${response.status})`);
+            }
+
+            set((state) => ({
+                lists: state.lists.map((list) =>
+                    list.id === id ? { ...list, name: trimmedName } : list,
+                ),
+                currentList:
+                    state.currentList?.id === id
+                        ? { ...state.currentList, name: trimmedName }
+                        : state.currentList,
+                error: null,
+            }));
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to rename list",
             });
             return false;
         }
