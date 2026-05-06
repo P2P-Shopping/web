@@ -16,6 +16,8 @@ interface Props {
     onCheck: (id: string) => void;
     onDelete?: (id: string) => void;
     disabled?: boolean;
+    /** When false, hides checkboxes (template mode). Defaults to true. */
+    checkable?: boolean;
 }
 
 const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
@@ -59,6 +61,7 @@ const ShoppingListItems: React.FC<Props> = ({
     onCheck,
     onDelete,
     disabled = false,
+    checkable = true,
 }) => {
     if (items.length === 0) {
         return (
@@ -97,38 +100,52 @@ const ShoppingListItems: React.FC<Props> = ({
                         {groupedItems[category].map((item) => (
                             <li
                                 key={item.id}
-                                className={`flex items-center justify-between p-4 bg-bg-subtle border border-border rounded-xl transition-all duration-200 hover:bg-surface hover:shadow-md group ${item.checked ? "opacity-60" : ""}`}
+                                className={`flex items-center justify-between p-4 bg-bg-subtle border border-border rounded-xl transition-all duration-200 hover:bg-surface hover:shadow-md group ${checkable && item.checked ? "opacity-60" : ""}`}
                             >
-                                <label
-                                    className={`flex items-center gap-4 flex-1 min-w-0 ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        className="sr-only"
-                                        checked={item.checked}
-                                        onChange={() => onCheck(item.id)}
-                                        disabled={disabled}
-                                    />
-                                    <div
-                                        className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all shrink-0 ${item.checked ? "bg-success border-success" : "bg-surface border-border-strong group-hover:border-accent"}`}
+                                {checkable ? (
+                                    <label
+                                        className={`flex items-center gap-4 flex-1 min-w-0 ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
                                     >
-                                        {item.checked && (
-                                            <Check
-                                                size={14}
-                                                strokeWidth={4}
-                                                className="text-white"
-                                            />
-                                        )}
-                                    </div>
-                                    <div className="flex flex-col min-w-0 flex-1">
-                                        <span
-                                            className={`text-base font-medium text-text-strong wrap-break-word transition-all ${item.checked ? "line-through opacity-60" : ""}`}
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={item.checked}
+                                            onChange={() => onCheck(item.id)}
+                                            disabled={disabled}
+                                        />
+                                        <div
+                                            className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all shrink-0 ${item.checked ? "bg-success border-success" : "bg-surface border-border-strong group-hover:border-accent"}`}
                                         >
-                                            {item.name}
-                                        </span>
-                                        <ItemMetadata item={item} />
+                                            {item.checked && (
+                                                <Check
+                                                    size={14}
+                                                    strokeWidth={4}
+                                                    className="text-white"
+                                                />
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            <span
+                                                className={`text-base font-medium text-text-strong wrap-break-word transition-all ${item.checked ? "line-through opacity-60" : ""}`}
+                                            >
+                                                {item.name}
+                                            </span>
+                                            <ItemMetadata item={item} />
+                                        </div>
+                                    </label>
+                                ) : (
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        <div className="relative flex items-center justify-center w-6 h-6 rounded-md bg-bg-muted border border-border shrink-0">
+                                            <div className="w-2 h-2 rounded-full bg-text-muted" />
+                                        </div>
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            <span className="text-base font-medium text-text-strong wrap-break-word">
+                                                {item.name}
+                                            </span>
+                                            <ItemMetadata item={item} />
+                                        </div>
                                     </div>
-                                </label>
+                                )}
                                 {onDelete && (
                                     <button
                                         type="button"

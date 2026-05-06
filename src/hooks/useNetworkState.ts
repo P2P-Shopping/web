@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../context/useStore";
-import { getDeviceId } from "../utils/deviceId";
+import { useDeviceId } from "./useDeviceId";
 
 const TELEMETRY_API_KEY = import.meta.env.VITE_TELEMETRY_API_KEY;
 
@@ -13,6 +13,7 @@ const TELEMETRY_API_KEY = import.meta.env.VITE_TELEMETRY_API_KEY;
  */
 export const useNetworkState = (): void => {
     const setOnlineStatus = useStore((state) => state.setOnlineStatus);
+    const deviceId = useDeviceId();
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const retryCountRef = useRef(0);
     const telemetryAuthInvalidRef = useRef(false);
@@ -41,7 +42,6 @@ export const useNetworkState = (): void => {
             }
 
             try {
-                const deviceId = getDeviceId();
                 const res = await fetch("/api/v1/telemetry/ping", {
                     method: "POST",
                     headers: {
@@ -104,5 +104,5 @@ export const useNetworkState = (): void => {
             globalThis.removeEventListener("offline", handleOffline);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [setOnlineStatus]);
+    }, [setOnlineStatus, deviceId]);
 };
