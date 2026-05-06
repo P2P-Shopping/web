@@ -34,7 +34,7 @@ import type {
     ListCategory,
     ShoppingList,
 } from "../../types";
-import { buildItemDuplicateKey } from "../../utils/listUtils";
+import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 import RenameListModal from "../Dashboard/RenameListModal";
 import ShareListModal from "../Dashboard/ShareListModal";
 
@@ -64,6 +64,8 @@ interface ApiShoppingList {
     id: string;
     category?: ListCategory;
     items?: ApiListItem[];
+    ownerEmail?: string;
+    collaboratorEmails?: string[];
 }
 
 interface ListDetailProps {
@@ -84,6 +86,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     useEffect(() => {
         itemsRef.current = items;
     }, [items]);
+
+    const pendingSyncItems = useRef(new Set<string>());
 
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
@@ -160,9 +164,15 @@ const useListItems = (effectiveListId: string | undefined) => {
                     isRecurrent: item.isRecurrent,
                 }));
                 setItems(mappedItems);
-                if (currentList.category) {
+                if (
+                    currentList.category ||
+                    currentList.ownerEmail ||
+                    currentList.collaboratorEmails
+                ) {
                     useListsStore.getState().updateList(targetListId, {
                         category: currentList.category,
+                        ownerEmail: currentList.ownerEmail,
+                        collaboratorEmails: currentList.collaboratorEmails,
                     });
                 }
                 syncListItemsInStore(mappedItems, targetListId);
@@ -276,13 +286,17 @@ const useListItems = (effectiveListId: string | undefined) => {
                 const payload = JSON.parse(message.body) as SyncPayload;
 
                 if (payload.status === "Rejection") {
-                    const item = itemsRef.current.find(
-                        (i) => i.id === payload.itemId,
-                    );
-                    toast.error("Conflict Warning", {
-                        description: `Conflict detected for "${item?.name || "an item"}". Your change was reverted because another user made a more recent update.`,
-                        duration: 4000,
-                    });
+                    const itemId = payload.itemId;
+                    if (itemId && pendingSyncItems.current.has(itemId)) {
+                        pendingSyncItems.current.delete(itemId);
+                        const item = itemsRef.current.find(
+                            (i) => i.id === itemId,
+                        );
+                        toast.error("Conflict Warning", {
+                            description: `Conflict detected for "${item?.name || "an item"}". Your change was reverted because another user made a more recent update.`,
+                            duration: 4000,
+                        });
+                    }
                 }
 
                 setItems((prev) => {
@@ -294,6 +308,24 @@ const useListItems = (effectiveListId: string | undefined) => {
                                 ? { ...item, checked: Boolean(payload.checked) }
                                 : item,
                         );
+                    } else if (
+                        payload.action === "UPDATE" &&
+                        payload.itemId &&
+                        payload.content
+                    ) {
+                        try {
+                            const updated = JSON.parse(payload.content) as Item;
+                            next = prev.map((item) =>
+                                item.id === payload.itemId
+                                    ? { ...item, ...updated }
+                                    : item,
+                            );
+                        } catch (e) {
+                            console.error(
+                                "Failed to parse incoming UPDATE item JSON",
+                                e,
+                            );
+                        }
                     } else if (payload.action === "DELETE" && payload.itemId) {
                         next = prev.filter(
                             (item) => item.id !== payload.itemId,
@@ -371,15 +403,87 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
-    const addItem = async (
+    const buildItemPayload = (item: Item, overrides?: Partial<Item>) => ({
+        name: overrides?.name ?? item.name,
+        isChecked: overrides?.checked ?? item.checked,
+        brand: overrides?.brand ?? item.brand ?? null,
+        quantity: overrides?.quantity ?? item.quantity ?? null,
+        price: overrides?.price ?? item.price ?? null,
+        category: overrides?.category ?? item.category ?? null,
+        isRecurrent: overrides?.isRecurrent ?? item.isRecurrent ?? false,
+        timestamp: Date.now(),
+    });
+
+    const publishSync = (action: SyncPayload["action"], item: Item) => {
+        if (!effectiveListId || !stompClient.connected) return;
+        pendingSyncItems.current.add(item.id);
+        stompClient.publish({
+            destination: `/app/list/${effectiveListId}/update`,
+            body: JSON.stringify({
+                action,
+                itemId: item.id,
+                content: JSON.stringify(item),
+                timestamp: Date.now(),
+            } as SyncPayload),
+        });
+    };
+
+    const mergeExistingItem = async (
+        listId: string,
+        existingItem: Item,
+        quantity?: string,
+    ) => {
+        const mergedQty = mergeQuantities(existingItem.quantity, quantity);
+        const previousItems = items;
+        const updated = { ...existingItem, quantity: mergedQty };
+        const nextItems = items.map((it) =>
+            it.id === existingItem.id ? updated : it,
+        );
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        try {
+            await api.put(
+                `/api/items/${existingItem.id}`,
+                buildItemPayload(existingItem, { quantity: mergedQty }),
+            );
+            await fetchListData(listId);
+            publishSync("UPDATE", updated);
+        } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "ADD_ITEM",
+                    payload: {
+                        listId,
+                        itemId: existingItem.id,
+                        name: existingItem.name,
+                        brand: existingItem.brand,
+                        quantity: mergedQty,
+                        price: existingItem.price,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+            console.error("addItem merge error:", err);
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update the product.",
+            );
+            setItems(previousItems);
+            syncListItemsInStore(previousItems);
+        }
+    };
+
+    const createNewItem = async (
+        listId: string,
         name: string,
         quantity?: string,
         brand?: string,
         price?: number,
     ) => {
-        if (!effectiveListId || effectiveListId === "default") return;
-        if (!name.trim()) return;
-
         const newItem: Item = {
             id: crypto.randomUUID(),
             name: name.trim(),
@@ -394,19 +498,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(optimisticItems);
 
         try {
-            const payload = {
-                name: newItem.name,
-                isChecked: false,
-                brand: newItem.brand ?? null,
-                quantity: newItem.quantity ?? null,
-                price: newItem.price ?? null,
-                category: null,
-                isRecurrent: false,
-                timestamp: Date.now(),
-            };
             const res = await api.post<ApiListItem>(
-                `/api/lists/${effectiveListId}/items`,
-                payload,
+                `/api/lists/${listId}/items`,
+                buildItemPayload(newItem),
             );
 
             const createdApiItem = res.data;
@@ -421,27 +515,15 @@ const useListItems = (effectiveListId: string | undefined) => {
                 isRecurrent: createdApiItem.isRecurrent,
             };
 
-            await fetchListData(effectiveListId);
-
-            if (stompClient.connected) {
-                const syncPayload: SyncPayload = {
-                    action: "ADD",
-                    itemId: createdItem.id,
-                    content: JSON.stringify(createdItem),
-                    timestamp: Date.now(),
-                };
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify(syncPayload),
-                });
-            }
+            await fetchListData(listId);
+            publishSync("ADD", createdItem);
         } catch (err) {
             if (!navigator.onLine) {
                 useStore.getState().enqueueAction({
                     id: crypto.randomUUID(),
                     type: "ADD_ITEM",
                     payload: {
-                        listId: effectiveListId,
+                        listId,
                         itemId: newItem.id,
                         name: newItem.name,
                         brand: newItem.brand,
@@ -452,15 +534,36 @@ const useListItems = (effectiveListId: string | undefined) => {
                 });
                 return;
             }
-
-            const errorMessage =
+            console.error("addItem error:", err);
+            setError(
                 err instanceof Error
                     ? err.message
-                    : "Failed to add the product.";
-            console.error("addItem error:", err);
-            setError(errorMessage);
+                    : "Failed to add the product.",
+            );
             rollbackItem(newItem.id);
         }
+    };
+
+    const addItem = async (
+        name: string,
+        quantity?: string,
+        brand?: string,
+        price?: number,
+    ) => {
+        if (!effectiveListId || effectiveListId === "default") return;
+        if (!name.trim()) return;
+
+        const dupKey = buildItemDuplicateKey({ name, brand });
+        const existingItem = items.find(
+            (it) => buildItemDuplicateKey(it) === dupKey,
+        );
+
+        if (existingItem) {
+            await mergeExistingItem(effectiveListId, existingItem, quantity);
+            return;
+        }
+
+        await createNewItem(effectiveListId, name, quantity, brand, price);
     };
 
     const toggleItem = async (itemId: string) => {
@@ -489,6 +592,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             await api.put(`/api/items/${itemId}`, payload);
 
             if (effectiveListId && stompClient.connected) {
+                pendingSyncItems.current.add(itemId);
                 const syncPayload: SyncPayload = {
                     action: "CHECK_OFF",
                     itemId,
@@ -541,6 +645,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             await api.delete(`/api/items/${itemId}`);
 
             if (effectiveListId && stompClient.connected) {
+                pendingSyncItems.current.add(itemId);
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/update`,
                     body: JSON.stringify({
@@ -1375,6 +1480,9 @@ const ListDetail = ({
         [effectiveListId, lists],
     );
     const isRecipeList = activeList?.category === "RECIPE";
+    const isTemplateList =
+        activeList?.category === "RECIPE" ||
+        activeList?.category === "FREQUENT";
 
     const canImportIntoNormalList =
         (isRecipeList || activeList?.category === "FREQUENT") &&
@@ -1619,38 +1727,48 @@ const ListDetail = ({
     };
 
     const performItemsImport = async (targetList: ShoppingList) => {
-        const existingKeys = new Set(
-            targetList.items.map((item: GlobalItem) =>
+        const existingMap = new Map(
+            targetList.items.map((item: GlobalItem) => [
                 buildItemDuplicateKey(item),
-            ),
-        );
-        const itemsToImport = items.filter(
-            (item) =>
-                selectedImportItemIds.has(item.id) &&
-                !existingKeys.has(buildItemDuplicateKey(item)),
+                item,
+            ]),
         );
 
-        if (itemsToImport.length === 0 && selectedTargetListId !== "NEW_LIST") {
-            throw new Error(
-                "All selected items already exist in the target list.",
-            );
-        }
+        for (const item of items) {
+            if (!selectedImportItemIds.has(item.id)) continue;
 
-        for (const item of itemsToImport) {
-            const added = await useListsStore
-                .getState()
-                .addItem(targetList.id, {
-                    name: item.name,
-                    checked: false,
-                    brand: item.brand,
-                    quantity: item.quantity,
-                    price: item.price,
-                    category: item.category,
-                    isRecurrent: targetList.category === "FREQUENT",
-                });
+            const dupKey = buildItemDuplicateKey(item);
+            const existingItem = existingMap.get(dupKey);
 
-            if (!added) {
-                throw new Error(`Failed to add ${item.name}`);
+            if (existingItem) {
+                const mergedQty = mergeQuantities(
+                    existingItem.quantity,
+                    item.quantity,
+                );
+                const updated = await useListsStore
+                    .getState()
+                    .updateItem(targetList.id, existingItem.id, {
+                        quantity: mergedQty,
+                    });
+                if (!updated) {
+                    throw new Error(`Failed to update ${item.name}`);
+                }
+            } else {
+                const added = await useListsStore
+                    .getState()
+                    .addItem(targetList.id, {
+                        name: item.name,
+                        checked: false,
+                        brand: item.brand,
+                        quantity: item.quantity,
+                        price: item.price,
+                        category: item.category,
+                        isRecurrent: targetList.category === "FREQUENT",
+                    });
+
+                if (!added) {
+                    throw new Error(`Failed to add ${item.name}`);
+                }
             }
         }
     };
@@ -1772,6 +1890,7 @@ const ListDetail = ({
                                         onCheck={toggleItem}
                                         onDelete={deleteItem}
                                         disabled={isReadOnly}
+                                        checkable={!isTemplateList}
                                     />
                                     {items.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
@@ -1788,15 +1907,17 @@ const ListDetail = ({
                                                     {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setShowFinishModal(true)
-                                                }
-                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                            >
-                                                Finish Shopping
-                                            </button>
+                                            {!isTemplateList && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setShowFinishModal(true)
+                                                    }
+                                                    className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                                >
+                                                    Finish Shopping
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1977,7 +2098,7 @@ const ListDetail = ({
                 isOpen={showImportModal}
                 onClose={clearImportState}
                 title="Add items to a normal list"
-                subtitle={`Copy items from "${activeList?.name || "Shopping List"}" without duplicating products that already exist.`}
+                subtitle={`Copy items from "${activeList?.name || "Shopping List"}". Duplicate items will have their quantities merged.`}
                 sourceItems={items}
                 availableTargetLists={normalLists}
                 selectedTargetListId={selectedTargetListId}

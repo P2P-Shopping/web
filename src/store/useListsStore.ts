@@ -45,6 +45,11 @@ interface ListsState {
     renameList: (id: string, newName: string) => Promise<boolean>;
     setCurrentList: (list: ShoppingList | null) => void;
     addItem: (listId: string, item: Omit<Item, "id">) => Promise<boolean>;
+    updateItem: (
+        listId: string,
+        itemId: string,
+        updates: Partial<Item>,
+    ) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
     shareList: (listId: string, email: string) => Promise<boolean>;
@@ -441,29 +446,23 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
-    /**
-     * Toggles the checked status of a specific item via the API.
-     * @param listId - The ID of the list containing the item.
-     * @param itemId - The ID of the item to toggle.
-     * @returns True if successful, false otherwise.
-     */
-    toggleItem: async (listId: string, itemId: string) => {
+    updateItem: async (
+        listId: string,
+        itemId: string,
+        updates: Partial<Item>,
+    ) => {
         const list = get().lists.find((entry) => entry.id === listId);
         const item = list?.items.find((entry) => entry.id === itemId);
-        if (!item) {
-            return false;
-        }
+        if (!item) return false;
 
-        const nextChecked = !item.checked;
+        const merged = { ...item, ...updates };
         try {
             const response = await fetch(
                 `${getBaseUrl()}/api/items/${itemId}`,
                 {
                     method: "PUT",
                     headers: jsonHeaders(true),
-                    body: JSON.stringify(
-                        buildItemRequest({ ...item, checked: nextChecked }),
-                    ),
+                    body: JSON.stringify(buildItemRequest(merged)),
                     credentials: "include",
                 },
             );
@@ -495,6 +494,20 @@ export const useListsStore = create<ListsState>((set, get) => ({
             });
             return false;
         }
+    },
+
+    /**
+     * Toggles the checked status of a specific item via the API.
+     * @param listId - The ID of the list containing the item.
+     * @param itemId - The ID of the item to toggle.
+     * @returns True if successful, false otherwise.
+     */
+    toggleItem: async (listId: string, itemId: string) => {
+        const list = get().lists.find((entry) => entry.id === listId);
+        const item = list?.items.find((entry) => entry.id === itemId);
+        if (!item) return false;
+
+        return get().updateItem(listId, itemId, { checked: !item.checked });
     },
 
     /**
