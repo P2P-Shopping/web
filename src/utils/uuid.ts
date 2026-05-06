@@ -1,4 +1,13 @@
-export const uuid = () =>
-    globalThis.crypto && "randomUUID" in globalThis.crypto
-        ? globalThis.crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+export const uuid = () => {
+    const crypto = globalThis.crypto as any;
+    if (crypto?.randomUUID) {
+        return crypto.randomUUID();
+    }
+    if (crypto?.getRandomValues) {
+        const array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        return `${Date.now()}-${array[0].toString(36)}`;
+    }
+    // Fallback for environments without crypto
+    return `${Date.now()}-${Date.now().toString(36)}`;
+};

@@ -26,9 +26,17 @@ export interface Item {
 
 interface AppState {
     userLocation: Coordinate;
-    // 👇 ADDED: To pass the store location to the canvas
+    setUserLocation: (loc: Coordinate) => void;
+
     targetStoreLocation: Coordinate | null;
-    /** Current navigation stage for macro to micro transition */
+    setTargetStoreLocation: (loc: Coordinate | null) => void;
+
+    targetStoreTransit: {
+        driving: { timeMins: number; distanceKm: string | number };
+        walking: { timeMins: number; distanceKm: string | number };
+    } | null;
+    setTargetStoreTransit: (transit: AppState["targetStoreTransit"]) => void;
+
     navigationMode: "city" | "indoor";
     /** Whether the app already crossed the geofence into the store */
     hasEnteredStore: boolean;
@@ -40,6 +48,7 @@ interface AppState {
     isMockGpsEnabled: boolean;
 
     route: RoutePoint[];
+    macroRouteGeometry: [number, number][];
     status: string;
     /** Current list of items */
     items: Item[];
@@ -61,11 +70,6 @@ interface AppState {
     token: string | null;
     /** Queue of actions to be synced when back online */
     offlineQueue: QueuedAction[];
-    /** Updates user location */
-    setUserLocation: (loc: Coordinate) => void;
-
-    // 👇 ADDED: Setter for target store
-    setTargetStoreLocation: (loc: Coordinate | null) => void;
     /** Switches between city map and indoor canvas */
     setNavigationMode: (mode: "city" | "indoor") => void;
     /** Marks the geofence transition as completed */
@@ -81,6 +85,7 @@ interface AppState {
 
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
+    setMacroRouteGeometry: (geometry: [number, number][]) => void;
     /** Sets application status */
     setStatus: (status: string) => void;
     /** Sets the online status of the application */
@@ -108,14 +113,23 @@ interface AppState {
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
-            userLocation: { lat: 47.151726, lng: 27.587914 },
+            userLocation: { lat: 47.155, lng: 27.585 },
+            setUserLocation: (loc) => set({ userLocation: loc }),
+
             targetStoreLocation: null,
+            setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
+
+            targetStoreTransit: null,
+            setTargetStoreTransit: (transit) =>
+                set({ targetStoreTransit: transit }),
+
             navigationMode: "city",
             hasEnteredStore: false,
             isTransitioningToStore: false,
             isAutoCenterEnabled: true,
             isMockGpsEnabled: true,
             route: [],
+            macroRouteGeometry: [],
             status: "idle",
             items: [],
             backupItems: {},
@@ -128,8 +142,6 @@ export const useStore = create<AppState>()(
             token: null,
             offlineQueue: [],
 
-            setUserLocation: (loc) => set({ userLocation: loc }),
-            setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
             setNavigationMode: (mode) => set({ navigationMode: mode }),
             setHasEnteredStore: (value) => set({ hasEnteredStore: value }),
             setIsTransitioningToStore: (value) =>
@@ -145,6 +157,8 @@ export const useStore = create<AppState>()(
                 });
             },
             setRoute: (route) => set({ route }),
+            setMacroRouteGeometry: (geometry) =>
+                set({ macroRouteGeometry: geometry }),
             setStatus: (status) => set({ status }),
             setOnlineStatus: (status) => set({ isOnline: status }),
             setServerConnected: (status) => set({ isServerConnected: status }),
