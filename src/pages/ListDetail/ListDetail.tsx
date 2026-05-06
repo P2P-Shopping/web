@@ -1117,6 +1117,7 @@ const ListDetail = ({
         Set<string>
     >(new Set());
     const [isImportingItems, setIsImportingItems] = useState(false);
+    const [importNewListName, setImportNewListName] = useState("");
 
     const [detailName, setDetailName] = useState("");
     const [detailQuantity, setDetailQuantity] = useState("");
@@ -1297,16 +1298,17 @@ const ListDetail = ({
                 (list.category ?? "NORMAL") === "NORMAL",
         );
 
-        if (refreshedNormalLists.length === 0) {
-            setError("Create a normal list first, then try again.");
-            return;
-        }
+        setSelectedTargetListId((currentId) => {
+            if (isRecipeList) return "NEW_LIST";
+            if (refreshedNormalLists.some((list) => list.id === currentId)) {
+                return currentId;
+            }
+            return refreshedNormalLists.length > 0
+                ? refreshedNormalLists[0].id
+                : "NEW_LIST";
+        });
 
-        setSelectedTargetListId((currentId) =>
-            refreshedNormalLists.some((list) => list.id === currentId)
-                ? currentId
-                : refreshedNormalLists[0].id,
-        );
+        setImportNewListName(activeList?.name ? `${activeList.name}` : "");
         setSelectedImportItemIds(new Set(items.map((item) => item.id)));
         setShowImportModal(true);
     };
@@ -1327,41 +1329,61 @@ const ListDetail = ({
         setShowImportModal(false);
         setSelectedImportItemIds(new Set());
         setIsImportingItems(false);
+        setImportNewListName("");
     };
 
     const handleImportIntoNormalList = async () => {
         if (!selectedTargetListId) return;
 
-        const targetList = useListsStore
-            .getState()
-            .lists.find((list) => list.id === selectedTargetListId);
-        if (!targetList) {
-            setError("Target list could not be found.");
-            return;
-        }
-
-        const existingKeys = new Set(
-            targetList.items.map((item) => buildItemDuplicateKey(item)),
-        );
-        const itemsToImport = items.filter(
-            (item) =>
-                selectedImportItemIds.has(item.id) &&
-                !existingKeys.has(buildItemDuplicateKey(item)),
-        );
-
-        if (itemsToImport.length === 0) {
-            setError("All selected items already exist in the target list.");
-            return;
-        }
+        let targetListId = selectedTargetListId;
 
         setIsImportingItems(true);
         setError(null);
 
         try {
+            // Create a new list if requested
+            if (selectedTargetListId === "NEW_LIST") {
+                if (!importNewListName.trim()) {
+                    throw new Error("Please enter a name for the new list.");
+                }
+                const newList = await useListsStore
+                    .getState()
+                    .addList(importNewListName.trim(), "NORMAL");
+                if (!newList) {
+                    throw new Error("Failed to create the new list.");
+                }
+                targetListId = newList.id;
+            }
+
+            const targetList = useListsStore
+                .getState()
+                .lists.find((list) => list.id === targetListId);
+            if (!targetList) {
+                throw new Error("Target list could not be found.");
+            }
+
+            const existingKeys = new Set(
+                targetList.items.map((item) => buildItemDuplicateKey(item)),
+            );
+            const itemsToImport = items.filter(
+                (item) =>
+                    selectedImportItemIds.has(item.id) &&
+                    !existingKeys.has(buildItemDuplicateKey(item)),
+            );
+
+            if (itemsToImport.length === 0) {
+                if (selectedTargetListId !== "NEW_LIST") {
+                    throw new Error(
+                        "All selected items already exist in the target list.",
+                    );
+                }
+                // If it's a new list, we don't expect duplicates, but just in case
+            }
+
             for (const item of itemsToImport) {
                 const added = await useListsStore
                     .getState()
-                    .addItem(selectedTargetListId, {
+                    .addItem(targetListId, {
                         name: item.name,
                         checked: false,
                         brand: item.brand,
@@ -1378,6 +1400,11 @@ const ListDetail = ({
 
             await fetchLists();
             clearImportState();
+
+            // Optionally navigate to the new list
+            if (selectedTargetListId === "NEW_LIST") {
+                navigate(`/nav/${targetListId}`);
+            }
         } catch (importError) {
             const errorMessage =
                 importError instanceof Error
@@ -1726,6 +1753,9 @@ const ListDetail = ({
                 isSubmitting={isImportingItems}
                 submitLabel="Import selected"
                 submittingLabel="Importing..."
+                allowNewList={true}
+                newListName={importNewListName}
+                onNewListNameChange={setImportNewListName}
             />
 
             {showShareModal && (
