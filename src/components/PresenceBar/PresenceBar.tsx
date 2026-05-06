@@ -66,8 +66,10 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
     const typingUsernames = new Set(typingArray.map(normalizeUsername));
 
     if (variant === "avatars") {
-        const currentEmailClean = currentUserEmail ? normalizeUsername(currentUserEmail) : null;
-        
+        const currentEmailClean = currentUserEmail
+            ? normalizeUsername(currentUserEmail)
+            : null;
+
         const maskEmail = (email: string) => {
             // Replicates the backend masking: charlie@example.com -> c***@example.com
             return email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
@@ -79,29 +81,35 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
             new Set(
                 allPotentialUsers.map((u) => {
                     let clean = normalizeUsername(u);
-                    
+
                     // Treat "Anonymous" as the current user's email for merging
                     if (clean === "anonymous" && currentEmailClean) {
                         clean = currentEmailClean;
                     }
-                    
+
                     // If the database gave us a masked email, try to find its real equivalent
                     // in the active connections so we don't duplicate them.
                     if (clean.includes("***")) {
-                        const unmaskedMatch = activeArray.find(active => {
+                        const unmaskedMatch = activeArray.find((active) => {
                             let activeClean = normalizeUsername(active);
-                            if (activeClean === "anonymous" && currentEmailClean) {
+                            if (
+                                activeClean === "anonymous" &&
+                                currentEmailClean
+                            ) {
                                 activeClean = currentEmailClean;
                             }
                             return clean === maskEmail(activeClean);
                         });
-                        
+
                         if (unmaskedMatch) {
-                            let matchClean = normalizeUsername(unmaskedMatch);
-                            return matchClean === "anonymous" && currentEmailClean ? currentEmailClean : matchClean;
+                            const matchClean = normalizeUsername(unmaskedMatch);
+                            return matchClean === "anonymous" &&
+                                currentEmailClean
+                                ? currentEmailClean
+                                : matchClean;
                         }
                     }
-                    
+
                     return clean;
                 }),
             ),
@@ -110,21 +118,32 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
         // 2. For each unique normalized name, pick the best display string (prefer active)
         const baseUsers = uniqueCleanUsernames.map((clean) => {
             // Find if this user is active (we use the activeUsernames set which is already normalized)
-            const isActive = activeUsernames.has(clean) || (clean === currentEmailClean && activeUsernames.has("anonymous"));
-            
+            const isActive =
+                activeUsernames.has(clean) ||
+                (clean === currentEmailClean &&
+                    activeUsernames.has("anonymous"));
+
             if (isActive) {
                 // Return the string from the active array (or "Anonymous" if it was merged)
-                return activeArray.find((u) => {
-                    const uClean = normalizeUsername(u);
-                    return uClean === clean || (uClean === "anonymous" && clean === currentEmailClean);
-                }) || clean;
+                return (
+                    activeArray.find((u) => {
+                        const uClean = normalizeUsername(u);
+                        return (
+                            uClean === clean ||
+                            (uClean === "anonymous" &&
+                                clean === currentEmailClean)
+                        );
+                    }) || clean
+                );
             }
-            
+
             // Otherwise return the one from allUsers, accounting for the fact that it might be masked
-            return allUsers.find((u) => {
-                const uClean = normalizeUsername(u);
-                return uClean === clean || uClean === maskEmail(clean);
-            }) || clean;
+            return (
+                allUsers.find((u) => {
+                    const uClean = normalizeUsername(u);
+                    return uClean === clean || uClean === maskEmail(clean);
+                }) || clean
+            );
         });
 
         if (baseUsers.length === 0) return null;
