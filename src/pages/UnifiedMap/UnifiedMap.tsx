@@ -561,7 +561,8 @@ const useIndoorCityTransition = (
             const activeList = lists.find((l) => l.id === selectedListId);
             if (!activeList) return;
 
-            const lastRoutePoint = route[route.length - 1];
+            const lastRoutePoint = route.at(-1);
+            if (!lastRoutePoint) return;
             const lastItemState = activeList.items.find(
                 (item) => item.id === lastRoutePoint.itemId,
             );
