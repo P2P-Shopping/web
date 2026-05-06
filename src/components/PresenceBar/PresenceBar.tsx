@@ -133,7 +133,7 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                             (uClean === "anonymous" &&
                                 clean === currentEmailClean)
                         );
-                    }) || clean
+                    }) ?? clean
                 );
             }
 
@@ -142,7 +142,7 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                 allUsers.find((u) => {
                     const uClean = normalizeUsername(u);
                     return uClean === clean || uClean === maskEmail(clean);
-                }) || clean
+                }) ?? clean
             );
         });
 
