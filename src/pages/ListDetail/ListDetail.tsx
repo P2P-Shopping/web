@@ -162,7 +162,11 @@ const useListItems = (effectiveListId: string | undefined) => {
                     isRecurrent: item.isRecurrent,
                 }));
                 setItems(mappedItems);
-                if (currentList.category || currentList.ownerEmail || currentList.collaboratorEmails) {
+                if (
+                    currentList.category ||
+                    currentList.ownerEmail ||
+                    currentList.collaboratorEmails
+                ) {
                     useListsStore.getState().updateList(targetListId, {
                         category: currentList.category,
                         ownerEmail: currentList.ownerEmail,
@@ -1894,15 +1898,17 @@ const ListDetail = ({
                                                     {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setShowFinishModal(true)
-                                                }
-                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                            >
-                                                Finish Shopping
-                                            </button>
+                                            {!isTemplateList && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setShowFinishModal(true)
+                                                    }
+                                                    className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                                >
+                                                    Finish Shopping
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
