@@ -15,6 +15,7 @@ import {
     useState,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
     ImportItemsModal,
     Modal,
@@ -273,6 +274,11 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [authFailed, setAuthFailed] = useState(false);
     const isServerConnected = useStore((state) => state.isServerConnected);
 
+    const itemsRef = useRef(items);
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
@@ -472,6 +478,16 @@ const useListItems = (effectiveListId: string | undefined) => {
             try {
                 const payload = JSON.parse(message.body) as SyncPayload;
 
+                if (payload.status === "Rejection") {
+                    const item = itemsRef.current.find(
+                        (i) => i.id === payload.itemId,
+                    );
+                    toast.error("Conflict Warning", {
+                        description: `Conflict detected for "${item?.name || "an item"}". Your change was reverted because another user made a more recent update.`,
+                        duration: 4000,
+                    });
+                }
+
                 setItems((prev) => {
                     let next = prev;
 
@@ -512,7 +528,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore], // Stable dependency prevents STOMP subscription churn
+        [syncListItemsInStore], // items removed to prevent subscription churn
     );
 
     useEffect(() => {
