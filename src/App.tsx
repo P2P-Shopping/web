@@ -24,6 +24,7 @@ import { loadRoute } from "./services/loadRoute";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
+import { isWebView } from "./utils/webview";
 
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     const authChecked = useStore((state) => state.authChecked);
@@ -294,12 +295,6 @@ function App() {
         stompClient.onStompError = (frame) => {
             console.error("Broker error:", frame.headers.message);
             setServerConnected(false);
-            setToastMessage("Connection lost. Retrying...");
-            clearToastTimeout();
-            toastTimeoutRef.current = setTimeout(() => {
-                setToastMessage(null);
-                toastTimeoutRef.current = null;
-            }, 3000);
         };
 
         stompClient.onWebSocketClose = () => {
@@ -326,18 +321,19 @@ function App() {
                 }
             })();
         };
-    }, [handlePongMessage, setServerConnected, clearToastTimeout, token]);
+    }, [handlePongMessage, setServerConnected, token]);
 
     // Determine if Navbar should be shown
     const searchParams = new URLSearchParams(location.search);
     const isAiImport = searchParams.get("import") === "ai";
     const isAuthPage =
         location.pathname === "/login" || location.pathname === "/register";
-    const showNavbar = isAuthenticated && !isAuthPage && !isAiImport;
+    const showNavbar =
+        isAuthenticated && !isAuthPage && !isAiImport && !isWebView();
 
     return (
         <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">
-            <OfflineBanner />
+            <OfflineBanner isAuthPage={isAuthPage || isWebView()} />
 
             <main
                 className={`flex-1 flex flex-col ${isAiImport ? "overflow-hidden" : "overflow-y-auto"} min-h-0 relative`}

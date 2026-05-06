@@ -222,8 +222,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     };
 
     const handleReviewConfirm = async ({
-        items: feedback,
-    }: ReviewSubmission) => {
+                                           items: feedback,
+                                       }: ReviewSubmission) => {
         try {
             for (const item of feedback) {
                 const res = await fetch(
@@ -259,8 +259,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         } catch (err) {
             console.error("handleReviewConfirm error:", err);
             setError("Error saving some items. Please check your list.");
-
-            // NEW: Fetch the list anyway to show any items that successfully saved before the crash
             await fetchListData(effectiveListId);
         }
     };
@@ -286,7 +284,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                     } else if (payload.action === "ADD" && payload.content) {
                         try {
                             const newItem = JSON.parse(payload.content) as Item;
-                            // Prevent duplicates if the creator receives their own echo
                             if (!prev.some((i) => i.id === newItem.id)) {
                                 next = [...prev, newItem];
                             }
@@ -298,8 +295,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                         }
                     }
 
-                    // CRITICAL FIX: Synchronize the new local state up to the global Zustand store
-                    // This prevents the global store from overriding our real-time WebSocket updates
                     if (next !== prev) {
                         syncListItemsInStore(next);
                     }
@@ -310,7 +305,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore], // Stable dependency prevents STOMP subscription churn
+        [syncListItemsInStore],
     );
 
     useEffect(() => {
@@ -333,9 +328,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         };
     }, [effectiveListId, handleSyncMessage, isServerConnected]);
 
-    /**
-     * Reverts an item addition locally if the server request fails.
-     */
     const rollbackItem = useCallback(
         (itemId: string) => {
             setItems((prev) => {
@@ -347,9 +339,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
-    /**
-     * Reverts an item's checked status if the server request fails.
-     */
     const revertItemChecked = useCallback(
         (itemId: string, originalChecked: boolean) => {
             setItems((prev) => {
@@ -365,9 +354,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
-    /**
-     * Adds a new item to the current shopping list with optional details.
-     */
     const addItem = async (
         name: string,
         quantity?: string,
@@ -383,7 +369,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             checked: false,
             brand: brand || undefined,
             quantity: quantity || undefined,
-            price: price,
+            price: price ?? undefined,
         };
 
         const optimisticItems = [...items, newItem];
@@ -460,9 +446,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
-    /**
-     * Toggles the checked status of an item and updates the server.
-     */
     const toggleItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const currentItem = items.find((item) => item.id === itemId);
@@ -531,9 +514,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
-    /**
-     * Deletes an item from the list and the server.
-     */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const nextItems = items.filter((item) => item.id !== itemId);
@@ -596,7 +576,6 @@ const useListItems = (effectiveListId: string | undefined) => {
 
 /**
  * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
- * Migrated to a server-authoritative roster model to fix late-arrival sync issues.
  */
 const useListPresence = (effectiveListId: string | undefined) => {
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
@@ -640,8 +619,6 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 listId: effectiveListId,
             };
 
-            // Notify server that we joined.
-            // The server will respond by broadcasting a ROSTER_UPDATE to all clients.
             stompClient.publish({
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
@@ -673,9 +650,6 @@ const useListPresence = (effectiveListId: string | undefined) => {
         isServerConnected,
     ]);
 
-    /**
-     * Sends a typing event to the server to notify other connected users.
-     */
     const sendTypingEvent = useCallback(() => {
         if (
             !effectiveListId ||
@@ -704,14 +678,11 @@ const useListPresence = (effectiveListId: string | undefined) => {
     return { sendTypingEvent };
 };
 
-/**
- * Renders a view for selecting a list when no specific list is active.
- */
 const ListSelectionView = ({
-    lists,
-    isLoading,
-    onSelect,
-}: {
+                               lists,
+                               isLoading,
+                               onSelect,
+                           }: {
     lists: { id: string; name: string; items: Item[] }[];
     isLoading: boolean;
     onSelect: (id: string) => void;
@@ -773,6 +744,7 @@ interface AddItemModalProps {
     showExpanded?: boolean;
     setShowExpanded?: (val: boolean) => void;
 }
+
 /**
  * Custom hook to extract duplicate Autocomplete logic.
  */
@@ -792,13 +764,12 @@ const useProductAutocomplete = (
             return;
         }
 
-        let isMounted = true; // Flag for preventing race conditions
+        let isMounted = true;
 
         const timerId = setTimeout(async () => {
             try {
                 const results = await fetchProductSuggestions(inputValue);
                 if (isMounted) {
-                    // Only update UI if this is still the active request
                     setSuggestions(results);
                     setShowSuggestions(true);
                     setActiveIndex(-1);
@@ -810,7 +781,7 @@ const useProductAutocomplete = (
         }, 300);
 
         return () => {
-            isMounted = false; // Invalidate stale requests when input changes
+            isMounted = false;
             clearTimeout(timerId);
         };
     }, [inputValue, isDisabled]);
@@ -859,14 +830,13 @@ const useProductAutocomplete = (
 
 /**
  * Shared Dropdown Component to fix Code Duplication
- * FIX (Biome): Used div/button combo for perfect ARIA a11y without overwriting native ul/li roles.
  */
 const SuggestionsDropdown = ({
-    showSuggestions,
-    suggestions,
-    activeIndex,
-    onSelect,
-}: {
+                                 showSuggestions,
+                                 suggestions,
+                                 activeIndex,
+                                 onSelect,
+                             }: {
     showSuggestions: boolean;
     suggestions: ProductSuggestion[];
     activeIndex: number;
@@ -914,17 +884,18 @@ const SuggestionsDropdown = ({
         </div>
     );
 };
+
 /** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
-    idPrefix,
-    value,
-    onChange,
-    onTyping,
-    isMobile,
-    setQuantity,
-    setBrand,
-    setPrice,
-}: {
+                           idPrefix,
+                           value,
+                           onChange,
+                           onTyping,
+                           isMobile,
+                           setQuantity,
+                           setBrand,
+                           setPrice,
+                       }: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
@@ -998,11 +969,10 @@ const ItemNameField = ({
     );
 };
 
-/** Button to toggle the display of extra item details (price, brand, etc). */
 const ExpandDetailsButton = ({
-    showExpanded,
-    onClick,
-}: {
+                                 showExpanded,
+                                 onClick,
+                             }: {
     showExpanded: boolean;
     onClick: () => void;
 }) => (
@@ -1022,17 +992,16 @@ const ExpandDetailsButton = ({
     </button>
 );
 
-/** Component containing the detailed input fields (quantity, price, brand). */
 const ItemDetailsFields = ({
-    idPrefix,
-    quantity,
-    setQuantity,
-    price,
-    setPrice,
-    brand,
-    setBrand,
-    isMobile,
-}: {
+                               idPrefix,
+                               quantity,
+                               setQuantity,
+                               price,
+                               setPrice,
+                               brand,
+                               setBrand,
+                               isMobile,
+                           }: {
     idPrefix: string;
     quantity: string;
     setQuantity: (val: string) => void;
@@ -1104,27 +1073,26 @@ const ItemDetailsFields = ({
     </div>
 );
 
-/** Modal component for adding an item with optional details. */
 const AddItemDetailsModal = ({
-    isOpen,
-    onClose,
-    onSubmit,
-    title,
-    subtitle,
-    idPrefix,
-    itemName,
-    setItemName,
-    quantity,
-    setQuantity,
-    brand,
-    setBrand,
-    price,
-    setPrice,
-    onTyping,
-    isMobile = false,
-    showExpanded = true,
-    setShowExpanded,
-}: AddItemModalProps) => {
+                                 isOpen,
+                                 onClose,
+                                 onSubmit,
+                                 title,
+                                 subtitle,
+                                 idPrefix,
+                                 itemName,
+                                 setItemName,
+                                 quantity,
+                                 setQuantity,
+                                 brand,
+                                 setBrand,
+                                 price,
+                                 setPrice,
+                                 onTyping,
+                                 isMobile = false,
+                                 showExpanded = true,
+                                 setShowExpanded,
+                             }: AddItemModalProps) => {
     return (
         <Modal
             isOpen={isOpen}
@@ -1191,11 +1159,10 @@ const AddItemDetailsModal = ({
     );
 };
 
-/** Component to display an error alert within the list detail view. */
 const ListErrorAlert = ({
-    error,
-    isEmbedded,
-}: {
+                            error,
+                            isEmbedded,
+                        }: {
     error: string;
     isEmbedded: boolean;
 }) => (
@@ -1210,19 +1177,18 @@ const ListErrorAlert = ({
     </div>
 );
 
-/** Header component for the list detail view. */
 const ListHeader = ({
-    effectiveListId,
-    onSwitchList,
-}: {
+                        effectiveListId,
+                        onSwitchList,
+                    }: {
     effectiveListId: string;
-    onSwitchList: () => void;
+    onSwitchList?: () => void;
 }) => (
     <header className="flex items-center justify-between mb-2">
         <h2 className="text-xl font-black text-text-strong tracking-tighter uppercase italic">
             {effectiveListId === "default" ? "Select a List" : "Shopping List"}
         </h2>
-        {effectiveListId !== "default" && (
+        {effectiveListId !== "default" && onSwitchList && (
             <button
                 type="button"
                 onClick={onSwitchList}
@@ -1236,15 +1202,15 @@ const ListHeader = ({
 
 /** Inline form component for quickly adding items without details. ACUM CU MEMORIE PENTRU AUTO-FILL! */
 const InlineAddForm = ({
-    addInputRef,
-    newItemName,
-    onNameChange,
-    onSubmit,
-    onOpenDetails,
-    isReadOnly,
-    isEmbedded,
-    onAddFullItem,
-}: {
+                           addInputRef,
+                           newItemName,
+                           onNameChange,
+                           onSubmit,
+                           onOpenDetails,
+                           isReadOnly,
+                           isEmbedded,
+                           onAddFullItem,
+                       }: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
@@ -1347,14 +1313,12 @@ const InlineAddForm = ({
         </form>
     );
 };
-/**
- * Main ListDetail component that orchestrates displaying items, managing presence, and handling item additions.
- */
+
 const ListDetail = ({
-    isEmbedded = false,
-    listIdOverride,
-    onSwitchList,
-}: ListDetailProps) => {
+                        isEmbedded = false,
+                        listIdOverride,
+                        onSwitchList,
+                    }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
@@ -1395,7 +1359,6 @@ const ListDetail = ({
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
 
-    // Task 4 States
     const [isFinishing, setIsFinishing] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
     const [finishStoreName, setFinishStoreName] = useState("");
@@ -1439,10 +1402,6 @@ const ListDetail = ({
     const estimatedTotal = useMemo(() => {
         return items
             .reduce((sum, item) => {
-                /**
-                 * Task 4: Fix miscomputation for strings like "500g"
-                 * CodeRabbit: If the quantity is not purely numeric, count as 1.
-                 */
                 const qtyStr = (item.quantity || "1").trim();
                 const qty = /^\d+(?:\.\d+)?$/.test(qtyStr)
                     ? Number.parseFloat(qtyStr)
@@ -1452,7 +1411,6 @@ const ListDetail = ({
             .toFixed(2);
     }, [items]);
 
-    // Geolocation permission tracking
     useEffect(() => {
         let isMounted = true;
         let permResult: PermissionStatus | null = null;
@@ -1470,9 +1428,7 @@ const ListDetail = ({
                     setPermissionStatus(result.state);
                     result.addEventListener("change", handler);
                 })
-                .catch(() => {
-                    // Fail silently for browsers with limited support
-                });
+                .catch(() => {});
         }
 
         return () => {
@@ -1481,7 +1437,6 @@ const ListDetail = ({
         };
     }, []);
 
-    // Re-show banner if permission transitions to denied
     useEffect(() => {
         if (permissionStatus === "denied") {
             setShowBanner(true);
@@ -1536,7 +1491,6 @@ const ListDetail = ({
     const openDetailsModal = (suggestion?: ProductSuggestion | null) => {
         setDetailName(newItemName);
 
-        // FIX (CodeRabbit): Propagate selected suggestion metadata into modal
         if (suggestion) {
             setDetailQuantity(suggestion.quantity || "1");
             setDetailBrand(suggestion.brand || "");
@@ -1545,7 +1499,6 @@ const ListDetail = ({
                     ? String(suggestion.price)
                     : "",
             );
-            // Show expanded section automatically if we have metadata
             if (suggestion.brand || suggestion.price) {
                 setShowExpandedDetails(true);
             }
@@ -1896,7 +1849,6 @@ const ListDetail = ({
                 onTyping={sendTypingEvent}
             />
 
-            {/* Finish Shopping Modal */}
             <Modal
                 isOpen={showFinishModal}
                 onClose={() => setShowFinishModal(false)}
