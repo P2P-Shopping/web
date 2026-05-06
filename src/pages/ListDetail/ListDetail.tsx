@@ -389,6 +389,146 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
+    const buildItemPayload = (item: Item, overrides?: Partial<Item>) => ({
+        name: overrides?.name ?? item.name,
+        isChecked: overrides?.checked ?? item.checked,
+        brand: overrides?.brand ?? item.brand ?? null,
+        quantity: overrides?.quantity ?? item.quantity ?? null,
+        price: overrides?.price ?? item.price ?? null,
+        category: overrides?.category ?? item.category ?? null,
+        isRecurrent: overrides?.isRecurrent ?? item.isRecurrent ?? false,
+        timestamp: Date.now(),
+    });
+
+    const publishSync = (action: SyncPayload["action"], item: Item) => {
+        if (!effectiveListId || !stompClient.connected) return;
+        stompClient.publish({
+            destination: `/app/list/${effectiveListId}/update`,
+            body: JSON.stringify({
+                action,
+                itemId: item.id,
+                content: JSON.stringify(item),
+                timestamp: Date.now(),
+            } as SyncPayload),
+        });
+    };
+
+    const mergeExistingItem = async (
+        listId: string,
+        existingItem: Item,
+        quantity?: string,
+    ) => {
+        const mergedQty = mergeQuantities(existingItem.quantity, quantity);
+        const previousItems = items;
+        const updated = { ...existingItem, quantity: mergedQty };
+        const nextItems = items.map((it) =>
+            it.id === existingItem.id ? updated : it,
+        );
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        try {
+            await api.put(
+                `/api/items/${existingItem.id}`,
+                buildItemPayload(existingItem, { quantity: mergedQty }),
+            );
+            await fetchListData(listId);
+            publishSync("UPDATE", updated);
+        } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "ADD_ITEM",
+                    payload: {
+                        listId,
+                        itemId: existingItem.id,
+                        name: existingItem.name,
+                        brand: existingItem.brand,
+                        quantity: mergedQty,
+                        price: existingItem.price,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+            console.error("addItem merge error:", err);
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to update the product.",
+            );
+            setItems(previousItems);
+            syncListItemsInStore(previousItems);
+        }
+    };
+
+    const createNewItem = async (
+        listId: string,
+        name: string,
+        quantity?: string,
+        brand?: string,
+        price?: number,
+    ) => {
+        const newItem: Item = {
+            id: crypto.randomUUID(),
+            name: name.trim(),
+            checked: false,
+            brand: brand || undefined,
+            quantity: quantity || undefined,
+            price: price ?? undefined,
+        };
+
+        const optimisticItems = [...items, newItem];
+        setItems(optimisticItems);
+        syncListItemsInStore(optimisticItems);
+
+        try {
+            const res = await api.post<ApiListItem>(
+                `/api/lists/${listId}/items`,
+                buildItemPayload(newItem),
+            );
+
+            const createdApiItem = res.data;
+            const createdItem: Item = {
+                id: createdApiItem.id,
+                name: createdApiItem.name,
+                checked: Boolean(createdApiItem.isChecked),
+                brand: createdApiItem.brand,
+                price: createdApiItem.price,
+                quantity: createdApiItem.quantity,
+                category: createdApiItem.category,
+                isRecurrent: createdApiItem.isRecurrent,
+            };
+
+            await fetchListData(listId);
+            publishSync("ADD", createdItem);
+        } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "ADD_ITEM",
+                    payload: {
+                        listId,
+                        itemId: newItem.id,
+                        name: newItem.name,
+                        brand: newItem.brand,
+                        quantity: newItem.quantity,
+                        price: newItem.price,
+                    },
+                    timestamp: Date.now(),
+                });
+                return;
+            }
+            console.error("addItem error:", err);
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to add the product.",
+            );
+            rollbackItem(newItem.id);
+        }
+    };
+
     const addItem = async (
         name: string,
         quantity?: string,
@@ -404,154 +544,11 @@ const useListItems = (effectiveListId: string | undefined) => {
         );
 
         if (existingItem) {
-            const mergedQty = mergeQuantities(existingItem.quantity, quantity);
-            const previousItems = items;
-            const nextItems = items.map((it) =>
-                it.id === existingItem.id ? { ...it, quantity: mergedQty } : it,
-            );
-            setItems(nextItems);
-            syncListItemsInStore(nextItems);
-
-            try {
-                const payload = {
-                    name: existingItem.name,
-                    isChecked: existingItem.checked,
-                    brand: existingItem.brand ?? null,
-                    quantity: mergedQty,
-                    price: existingItem.price ?? null,
-                    category: existingItem.category ?? null,
-                    isRecurrent: existingItem.isRecurrent ?? false,
-                    timestamp: Date.now(),
-                };
-                await api.put(`/api/items/${existingItem.id}`, payload);
-                await fetchListData(effectiveListId);
-
-                if (stompClient.connected) {
-                    const syncPayload: SyncPayload = {
-                        action: "UPDATE",
-                        itemId: existingItem.id,
-                        content: JSON.stringify({
-                            ...existingItem,
-                            quantity: mergedQty,
-                        }),
-                        timestamp: Date.now(),
-                    };
-                    stompClient.publish({
-                        destination: `/app/list/${effectiveListId}/update`,
-                        body: JSON.stringify(syncPayload),
-                    });
-                }
-            } catch (err) {
-                if (!navigator.onLine) {
-                    useStore.getState().enqueueAction({
-                        id: crypto.randomUUID(),
-                        type: "ADD_ITEM",
-                        payload: {
-                            listId: effectiveListId,
-                            itemId: existingItem.id,
-                            name: existingItem.name,
-                            brand: existingItem.brand,
-                            quantity: mergedQty,
-                            price: existingItem.price,
-                        },
-                        timestamp: Date.now(),
-                    });
-                    return;
-                }
-
-                const errorMessage =
-                    err instanceof Error
-                        ? err.message
-                        : "Failed to update the product.";
-                console.error("addItem merge error:", err);
-                setError(errorMessage);
-                setItems(previousItems);
-                syncListItemsInStore(previousItems);
-            }
+            await mergeExistingItem(effectiveListId, existingItem, quantity);
             return;
         }
 
-        const newItem: Item = {
-            id: crypto.randomUUID(),
-            name: name.trim(),
-            checked: false,
-            brand: brand || undefined,
-            quantity: quantity || undefined,
-            price: price ?? undefined,
-        };
-
-        const optimisticItems = [...items, newItem];
-        setItems(optimisticItems);
-        syncListItemsInStore(optimisticItems);
-
-        try {
-            const payload = {
-                name: newItem.name,
-                isChecked: false,
-                brand: newItem.brand ?? null,
-                quantity: newItem.quantity ?? null,
-                price: newItem.price ?? null,
-                category: null,
-                isRecurrent: false,
-                timestamp: Date.now(),
-            };
-            const res = await api.post<ApiListItem>(
-                `/api/lists/${effectiveListId}/items`,
-                payload,
-            );
-
-            const createdApiItem = res.data;
-            const createdItem: Item = {
-                id: createdApiItem.id,
-                name: createdApiItem.name,
-                checked: Boolean(createdApiItem.isChecked),
-                brand: createdApiItem.brand,
-                price: createdApiItem.price,
-                quantity: createdApiItem.quantity,
-                category: createdApiItem.category,
-                isRecurrent: createdApiItem.isRecurrent,
-            };
-
-            await fetchListData(effectiveListId);
-
-            if (stompClient.connected) {
-                const syncPayload: SyncPayload = {
-                    action: "ADD",
-                    itemId: createdItem.id,
-                    content: JSON.stringify(createdItem),
-                    timestamp: Date.now(),
-                };
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify(syncPayload),
-                });
-            }
-        } catch (err) {
-            if (!navigator.onLine) {
-                useStore.getState().enqueueAction({
-                    id: crypto.randomUUID(),
-                    type: "ADD_ITEM",
-                    payload: {
-                        listId: effectiveListId,
-                        itemId: newItem.id,
-                        name: newItem.name,
-                        brand: newItem.brand,
-                        quantity: newItem.quantity,
-                        price: newItem.price,
-                    },
-                    timestamp: Date.now(),
-                });
-                return;
-            }
-
-            const errorMessage =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to add the product.";
-            console.error("addItem error:", err);
-            setError(errorMessage);
-            rollbackItem(newItem.id);
-        }
+        await createNewItem(effectiveListId, name, quantity, brand, price);
     };
 
     const toggleItem = async (itemId: string) => {

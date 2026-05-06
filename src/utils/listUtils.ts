@@ -10,10 +10,12 @@ export const buildItemDuplicateKey = (item: {
 }) =>
     `${item.name?.trim().toLowerCase() ?? ""}::${item.brand?.trim().toLowerCase() ?? ""}`;
 
+const NUMERIC_QTY_RE = /^(\d+(?:\.\d+)?)/;
+
 const parseNumericQuantity = (qty?: string): number | null => {
     if (!qty) return null;
     const trimmed = qty.trim();
-    const match = trimmed.match(/^(\d+(?:\.\d+)?)/);
+    const match = NUMERIC_QTY_RE.exec(trimmed);
     if (!match) return null;
     const num = Number.parseFloat(match[1]);
     return Number.isNaN(num) ? null : num;
