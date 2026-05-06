@@ -45,6 +45,11 @@ interface ListsState {
     renameList: (id: string, newName: string) => Promise<boolean>;
     setCurrentList: (list: ShoppingList | null) => void;
     addItem: (listId: string, item: Omit<Item, "id">) => Promise<boolean>;
+    updateItem: (
+        listId: string,
+        itemId: string,
+        updates: Partial<Item>,
+    ) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
     shareList: (listId: string, email: string) => Promise<boolean>;
@@ -436,6 +441,56 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     error instanceof Error
                         ? error.message
                         : "Failed to add item",
+            });
+            return false;
+        }
+    },
+
+    updateItem: async (
+        listId: string,
+        itemId: string,
+        updates: Partial<Item>,
+    ) => {
+        const list = get().lists.find((entry) => entry.id === listId);
+        const item = list?.items.find((entry) => entry.id === itemId);
+        if (!item) return false;
+
+        const merged = { ...item, ...updates };
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/items/${itemId}`,
+                {
+                    method: "PUT",
+                    headers: jsonHeaders(true),
+                    body: JSON.stringify(buildItemRequest(merged)),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(`Failed to update item (${response.status})`);
+            }
+
+            const updatedItem = normalizeItem(
+                (await response.json()) as ApiItem,
+            );
+            set((state) => ({
+                lists: updateItemInList(
+                    state.lists,
+                    listId,
+                    itemId,
+                    updatedItem,
+                ),
+            }));
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to update item",
             });
             return false;
         }

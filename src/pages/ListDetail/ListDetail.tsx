@@ -34,7 +34,7 @@ import type {
     ListCategory,
     ShoppingList,
 } from "../../types";
-import { buildItemDuplicateKey } from "../../utils/listUtils";
+import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 import RenameListModal from "../Dashboard/RenameListModal";
 import ShareListModal from "../Dashboard/ShareListModal";
 
@@ -294,6 +294,24 @@ const useListItems = (effectiveListId: string | undefined) => {
                                 ? { ...item, checked: Boolean(payload.checked) }
                                 : item,
                         );
+                    } else if (
+                        payload.action === "UPDATE" &&
+                        payload.itemId &&
+                        payload.content
+                    ) {
+                        try {
+                            const updated = JSON.parse(payload.content) as Item;
+                            next = prev.map((item) =>
+                                item.id === payload.itemId
+                                    ? { ...item, ...updated }
+                                    : item,
+                            );
+                        } catch (e) {
+                            console.error(
+                                "Failed to parse incoming UPDATE item JSON",
+                                e,
+                            );
+                        }
                     } else if (payload.action === "DELETE" && payload.itemId) {
                         next = prev.filter(
                             (item) => item.id !== payload.itemId,
@@ -379,6 +397,78 @@ const useListItems = (effectiveListId: string | undefined) => {
     ) => {
         if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
+
+        const dupKey = buildItemDuplicateKey({ name, brand });
+        const existingItem = items.find(
+            (it) => buildItemDuplicateKey(it) === dupKey,
+        );
+
+        if (existingItem) {
+            const mergedQty = mergeQuantities(existingItem.quantity, quantity);
+            const nextItems = items.map((it) =>
+                it.id === existingItem.id ? { ...it, quantity: mergedQty } : it,
+            );
+            setItems(nextItems);
+            syncListItemsInStore(nextItems);
+
+            try {
+                const payload = {
+                    name: existingItem.name,
+                    isChecked: existingItem.checked,
+                    brand: existingItem.brand ?? null,
+                    quantity: mergedQty,
+                    price: existingItem.price ?? null,
+                    category: existingItem.category ?? null,
+                    isRecurrent: existingItem.isRecurrent ?? false,
+                    timestamp: Date.now(),
+                };
+                await api.put(`/api/items/${existingItem.id}`, payload);
+                await fetchListData(effectiveListId);
+
+                if (stompClient.connected) {
+                    const syncPayload: SyncPayload = {
+                        action: "UPDATE",
+                        itemId: existingItem.id,
+                        content: JSON.stringify({
+                            ...existingItem,
+                            quantity: mergedQty,
+                        }),
+                        timestamp: Date.now(),
+                    };
+                    stompClient.publish({
+                        destination: `/app/list/${effectiveListId}/update`,
+                        body: JSON.stringify(syncPayload),
+                    });
+                }
+            } catch (err) {
+                if (!navigator.onLine) {
+                    useStore.getState().enqueueAction({
+                        id: crypto.randomUUID(),
+                        type: "ADD_ITEM",
+                        payload: {
+                            listId: effectiveListId,
+                            itemId: existingItem.id,
+                            name: existingItem.name,
+                            brand: existingItem.brand,
+                            quantity: mergedQty,
+                            price: existingItem.price,
+                        },
+                        timestamp: Date.now(),
+                    });
+                    return;
+                }
+
+                const errorMessage =
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to update the product.";
+                console.error("addItem merge error:", err);
+                setError(errorMessage);
+                setItems(items);
+                syncListItemsInStore(items);
+            }
+            return;
+        }
 
         const newItem: Item = {
             id: crypto.randomUUID(),
@@ -1375,6 +1465,9 @@ const ListDetail = ({
         [effectiveListId, lists],
     );
     const isRecipeList = activeList?.category === "RECIPE";
+    const isTemplateList =
+        activeList?.category === "RECIPE" ||
+        activeList?.category === "FREQUENT";
 
     const canImportIntoNormalList =
         (isRecipeList || activeList?.category === "FREQUENT") &&
@@ -1619,38 +1712,48 @@ const ListDetail = ({
     };
 
     const performItemsImport = async (targetList: ShoppingList) => {
-        const existingKeys = new Set(
-            targetList.items.map((item: GlobalItem) =>
+        const existingMap = new Map(
+            targetList.items.map((item: GlobalItem) => [
                 buildItemDuplicateKey(item),
-            ),
-        );
-        const itemsToImport = items.filter(
-            (item) =>
-                selectedImportItemIds.has(item.id) &&
-                !existingKeys.has(buildItemDuplicateKey(item)),
+                item,
+            ]),
         );
 
-        if (itemsToImport.length === 0 && selectedTargetListId !== "NEW_LIST") {
-            throw new Error(
-                "All selected items already exist in the target list.",
-            );
-        }
+        for (const item of items) {
+            if (!selectedImportItemIds.has(item.id)) continue;
 
-        for (const item of itemsToImport) {
-            const added = await useListsStore
-                .getState()
-                .addItem(targetList.id, {
-                    name: item.name,
-                    checked: false,
-                    brand: item.brand,
-                    quantity: item.quantity,
-                    price: item.price,
-                    category: item.category,
-                    isRecurrent: targetList.category === "FREQUENT",
-                });
+            const dupKey = buildItemDuplicateKey(item);
+            const existingItem = existingMap.get(dupKey);
 
-            if (!added) {
-                throw new Error(`Failed to add ${item.name}`);
+            if (existingItem) {
+                const mergedQty = mergeQuantities(
+                    existingItem.quantity,
+                    item.quantity,
+                );
+                const updated = await useListsStore
+                    .getState()
+                    .updateItem(targetList.id, existingItem.id, {
+                        quantity: mergedQty,
+                    });
+                if (!updated) {
+                    throw new Error(`Failed to update ${item.name}`);
+                }
+            } else {
+                const added = await useListsStore
+                    .getState()
+                    .addItem(targetList.id, {
+                        name: item.name,
+                        checked: false,
+                        brand: item.brand,
+                        quantity: item.quantity,
+                        price: item.price,
+                        category: item.category,
+                        isRecurrent: targetList.category === "FREQUENT",
+                    });
+
+                if (!added) {
+                    throw new Error(`Failed to add ${item.name}`);
+                }
             }
         }
     };
@@ -1772,6 +1875,7 @@ const ListDetail = ({
                                         onCheck={toggleItem}
                                         onDelete={deleteItem}
                                         disabled={isReadOnly}
+                                        checkable={!isTemplateList}
                                     />
                                     {items.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
@@ -1977,7 +2081,7 @@ const ListDetail = ({
                 isOpen={showImportModal}
                 onClose={clearImportState}
                 title="Add items to a normal list"
-                subtitle={`Copy items from "${activeList?.name || "Shopping List"}" without duplicating products that already exist.`}
+                subtitle={`Copy items from "${activeList?.name || "Shopping List"}". Duplicate items will have their quantities merged.`}
                 sourceItems={items}
                 availableTargetLists={normalLists}
                 selectedTargetListId={selectedTargetListId}

@@ -64,11 +64,11 @@ const ImportItemsModal = ({
         ),
     );
 
-    const eligibleItems = sourceItems.filter(
-        (item) => !existingKeys.has(buildItemDuplicateKey(item)),
-    );
+    const duplicateCount = sourceItems.filter((item) =>
+        existingKeys.has(buildItemDuplicateKey(item)),
+    ).length;
 
-    const selectedCount = eligibleItems.filter((item) =>
+    const selectedCount = sourceItems.filter((item) =>
         selectedItemIds.has(item.id),
     ).length;
 
@@ -144,13 +144,17 @@ const ImportItemsModal = ({
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-bg-subtle px-4 py-3">
                     <p className="text-sm text-text-muted">
                         <span className="font-semibold text-text-strong">
-                            {eligibleItems.length}
+                            {sourceItems.length}
                         </span>{" "}
-                        available to add.{" "}
-                        <span className="font-semibold text-text-strong">
-                            {sourceItems.length - eligibleItems.length}
-                        </span>{" "}
-                        already exist in the target list.
+                        items to add.{" "}
+                        {duplicateCount > 0 && (
+                            <>
+                                <span className="font-semibold text-text-strong">
+                                    {duplicateCount}
+                                </span>{" "}
+                                will have quantities merged.
+                            </>
+                        )}
                     </p>
                     {(onSelectAllEligible || onClearSelection) && (
                         <div className="flex flex-wrap gap-2">
@@ -160,13 +164,11 @@ const ImportItemsModal = ({
                                     className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-strong transition-all hover:border-accent hover:text-accent"
                                     onClick={() =>
                                         onSelectAllEligible(
-                                            eligibleItems.map(
-                                                (item) => item.id,
-                                            ),
+                                            sourceItems.map((item) => item.id),
                                         )
                                     }
                                 >
-                                    Select all available
+                                    Select all
                                 </button>
                             )}
                             {onClearSelection && (
@@ -194,18 +196,17 @@ const ImportItemsModal = ({
                                 <label
                                     key={item.id}
                                     htmlFor={`import-item-${item.id}`}
-                                    className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition-all ${
+                                    className={`flex items-start gap-3 rounded-xl border px-3 py-3 transition-all cursor-pointer ${
                                         isDuplicate
-                                            ? "cursor-not-allowed border-border bg-bg-muted opacity-60"
-                                            : "cursor-pointer border-border bg-surface hover:border-accent"
+                                            ? "border-accent/30 bg-accent-subtle/30 hover:border-accent"
+                                            : "border-border bg-surface hover:border-accent"
                                     }`}
                                 >
                                     <input
                                         id={`import-item-${item.id}`}
                                         type="checkbox"
-                                        checked={isSelected && !isDuplicate}
+                                        checked={isSelected}
                                         onChange={() => onToggleItem(item.id)}
-                                        disabled={isDuplicate}
                                         className="mt-1 h-4 w-4 rounded border-border"
                                         aria-label={`Select ${item.name}`}
                                     />
@@ -220,8 +221,8 @@ const ImportItemsModal = ({
                                                 </span>
                                             )}
                                             {isDuplicate && (
-                                                <span className="rounded-full bg-bg-muted px-2 py-0.5 text-[11px] font-semibold text-text-muted">
-                                                    Already in list
+                                                <span className="rounded-full bg-warning-subtle px-2 py-0.5 text-[11px] font-semibold text-warning-strong">
+                                                    Will merge qty
                                                 </span>
                                             )}
                                         </div>
