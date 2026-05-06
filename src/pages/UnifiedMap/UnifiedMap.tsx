@@ -9,9 +9,9 @@ import {
     Polyline,
     Popup,
     TileLayer,
-    ZoomControl,
     useMap,
     useMapEvents,
+    ZoomControl,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -67,7 +67,6 @@ interface ApiStoreMatch {
         walking?: { timeMins: number; distanceKm: string | number };
     };
 }
-
 
 // Fix Leaflet marker icons
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -420,7 +419,9 @@ const UnifiedMap: React.FC = () => {
         (state) => state.setTargetStoreLocation,
     );
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
-    const setTargetStoreTransit = useStore((state) => state.setTargetStoreTransit);
+    const setTargetStoreTransit = useStore(
+        (state) => state.setTargetStoreTransit,
+    );
     const navigationMode = useStore((state) => state.navigationMode);
     const setNavigationMode = useStore((state) => state.setNavigationMode);
     const route = useStore((state) => state.route);
@@ -464,20 +465,30 @@ const UnifiedMap: React.FC = () => {
             if (!activeList) return;
 
             const lastRoutePoint = route[route.length - 1];
-            const lastItemState = activeList.items.find(item => item.id === lastRoutePoint.itemId);
-            
+            const lastItemState = activeList.items.find(
+                (item) => item.id === lastRoutePoint.itemId,
+            );
+
             if (lastItemState?.checked) {
                 const transitionTimer = setTimeout(() => {
-                    setNavigationMode("city"); 
-                    setTargetStoreLocation(null); 
-                    setTargetStoreTransit(null); 
-                    useStore.getState().setMacroRouteGeometry([]); 
+                    setNavigationMode("city");
+                    setTargetStoreLocation(null);
+                    setTargetStoreTransit(null);
+                    useStore.getState().setMacroRouteGeometry([]);
                 }, 1000);
 
                 return () => clearTimeout(transitionTimer);
             }
         }
-    }, [lists, selectedListId, route, navigationMode, setNavigationMode, setTargetStoreLocation, setTargetStoreTransit]);
+    }, [
+        lists,
+        selectedListId,
+        route,
+        navigationMode,
+        setNavigationMode,
+        setTargetStoreLocation,
+        setTargetStoreTransit,
+    ]);
 
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
@@ -536,7 +547,7 @@ const UnifiedMap: React.FC = () => {
 
             const mappedStores: StoreRecommendation[] = await Promise.all(
                 storesArray.map(async (store: ApiStoreMatch) => {
-                    let realTransit = {
+                    const realTransit = {
                         driving: { timeMins: 10, distanceKm: "2.0" },
                         walking: { timeMins: 30, distanceKm: "2.0" },
                     };
@@ -547,19 +558,29 @@ const UnifiedMap: React.FC = () => {
                             userLng: String(userLocation.lng),
                             storeId: store.storeId,
                         });
-                        const macroRes = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+                        const macroRes = await fetch(
+                            `${baseUrl}/api/routing/macro?${params}`,
+                        );
                         if (macroRes.ok) {
                             const macroData = await macroRes.json();
                             if (macroData.driving) {
                                 realTransit.driving = {
-                                    timeMins: Math.round(macroData.driving.durationSeconds / 60),
-                                    distanceKm: (macroData.driving.distanceM / 1000).toFixed(1),
+                                    timeMins: Math.round(
+                                        macroData.driving.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.driving.distanceM / 1000
+                                    ).toFixed(1),
                                 };
                             }
                             if (macroData.walking) {
                                 realTransit.walking = {
-                                    timeMins: Math.round(macroData.walking.durationSeconds / 60),
-                                    distanceKm: (macroData.walking.distanceM / 1000).toFixed(1),
+                                    timeMins: Math.round(
+                                        macroData.walking.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.walking.distanceM / 1000
+                                    ).toFixed(1),
                                 };
                             }
                         }
@@ -571,12 +592,30 @@ const UnifiedMap: React.FC = () => {
                     // lat/lng, try a light geocoding lookup using Nominatim (OSM) before
                     // falling back to DEMO_STORE_LOCATION. This prevents every store
                     // defaulting to the demo (Palas) location when coords are missing.
-                    const parseNumber = (v: any) => (v != null && v !== "" ? Number(v) : NaN);
+                    const parseNumber = (v: any) =>
+                        v != null && v !== "" ? Number(v) : NaN;
 
                     // Support multiple possible coordinate field names the backend
                     // might return (lat/lng, latitude/longitude, nested location, etc.).
-                    const rawLat = (store as any).lat ?? (store as any).latitude ?? (store as any).location?.lat ?? (store as any).coords?.lat ?? (store as any).point?.lat ?? (store as any).y ?? (store as any).py;
-                    const rawLng = (store as any).lng ?? (store as any).longitude ?? (store as any).location?.lng ?? (store as any).coords?.lon ?? (store as any).coords?.lng ?? (store as any).point?.lng ?? (store as any).point?.lon ?? (store as any).x ?? (store as any).px ?? (store as any).lon;
+                    const rawLat =
+                        (store as any).lat ??
+                        (store as any).latitude ??
+                        (store as any).location?.lat ??
+                        (store as any).coords?.lat ??
+                        (store as any).point?.lat ??
+                        (store as any).y ??
+                        (store as any).py;
+                    const rawLng =
+                        (store as any).lng ??
+                        (store as any).longitude ??
+                        (store as any).location?.lng ??
+                        (store as any).coords?.lon ??
+                        (store as any).coords?.lng ??
+                        (store as any).point?.lng ??
+                        (store as any).point?.lon ??
+                        (store as any).x ??
+                        (store as any).px ??
+                        (store as any).lon;
 
                     let lat = parseNumber(rawLat);
                     let lng = parseNumber(rawLng);
@@ -584,7 +623,9 @@ const UnifiedMap: React.FC = () => {
                     const hasCoords = !isNaN(lat) && !isNaN(lng);
                     if (!hasCoords) {
                         try {
-                            const query = encodeURIComponent(`${store.storeName} ${store.address || ""}`);
+                            const query = encodeURIComponent(
+                                `${store.storeName} ${store.address || ""}`,
+                            );
                             // Bias geocoding to the user's area so results don't resolve to
                             // cities elsewhere in Romania (e.g., Cluj, Târgu Mureș).
                             const delta = 0.25; // ~25-30km box
@@ -600,13 +641,20 @@ const UnifiedMap: React.FC = () => {
                             });
                             if (nomRes.ok) {
                                 const nomData = await nomRes.json();
-                                if (Array.isArray(nomData) && nomData.length > 0) {
+                                if (
+                                    Array.isArray(nomData) &&
+                                    nomData.length > 0
+                                ) {
                                     lat = Number(nomData[0].lat);
                                     lng = Number(nomData[0].lon);
                                 }
                             }
                         } catch (err) {
-                            console.warn("Geocoding failed for store", store.storeName, err);
+                            console.warn(
+                                "Geocoding failed for store",
+                                store.storeName,
+                                err,
+                            );
                         }
                     }
 
@@ -621,10 +669,13 @@ const UnifiedMap: React.FC = () => {
                         address: store.address || "Address unavailable",
                         lat,
                         lng,
-                        stockMatchPercentage: Math.round((store.matchedItems / Math.max(itemIds.length, 1)) * 100),
+                        stockMatchPercentage: Math.round(
+                            (store.matchedItems / Math.max(itemIds.length, 1)) *
+                                100,
+                        ),
                         transit: realTransit,
                     };
-                })
+                }),
             );
 
             setRecommendedStores(mappedStores);
@@ -843,8 +894,14 @@ const UnifiedMap: React.FC = () => {
                                     macroRouteGeometry.length > 0
                                         ? macroRouteGeometry
                                         : [
-                                              [userLocation.lat, userLocation.lng],
-                                              [activeTarget.lat, activeTarget.lng],
+                                              [
+                                                  userLocation.lat,
+                                                  userLocation.lng,
+                                              ],
+                                              [
+                                                  activeTarget.lat,
+                                                  activeTarget.lng,
+                                              ],
                                           ]
                                 }
                                 pathOptions={{
@@ -1003,15 +1060,20 @@ const UnifiedMap: React.FC = () => {
                                 // When the user taps ARRIVED, switch to indoor/store map
                                 // and populate the indoor route with the selected list items
                                 // (same behavior as Demo TSP but using the real target store).
-                                const activeList = lists.find((l) => l.id === selectedListId);
+                                const activeList = lists.find(
+                                    (l) => l.id === selectedListId,
+                                );
                                 const currentItems = activeList?.items || [];
 
                                 if (currentItems.length === 0) {
-                                    alert("Te rog selectează o listă care conține măcar un produs!");
+                                    alert(
+                                        "Te rog selectează o listă care conține măcar un produs!",
+                                    );
                                     return;
                                 }
 
-                                const loc = targetStoreLocation || DEMO_STORE_LOCATION;
+                                const loc =
+                                    targetStoreLocation || DEMO_STORE_LOCATION;
 
                                 // Enable auto-center and enter indoor mode
                                 setIsAutoCenterEnabled(true);
@@ -1022,16 +1084,20 @@ const UnifiedMap: React.FC = () => {
                                 teleport(loc.lat, loc.lng);
 
                                 // Create a simple synthetic indoor route around the store entrance
-                                const customRoute = currentItems.map((item, index) => {
-                                    const latOffset = 0.00015 * (index + 1);
-                                    const lngOffset = 0.00015 * (index % 2 === 0 ? 1 : -1);
-                                    return {
-                                        itemId: item.id,
-                                        name: item.name,
-                                        lat: loc.lat + latOffset,
-                                        lng: loc.lng + lngOffset,
-                                    };
-                                });
+                                const customRoute = currentItems.map(
+                                    (item, index) => {
+                                        const latOffset = 0.00015 * (index + 1);
+                                        const lngOffset =
+                                            0.00015 *
+                                            (index % 2 === 0 ? 1 : -1);
+                                        return {
+                                            itemId: item.id,
+                                            name: item.name,
+                                            lat: loc.lat + latOffset,
+                                            lng: loc.lng + lngOffset,
+                                        };
+                                    },
+                                );
 
                                 // Set route and items into global state so StoreMap shows them
                                 useStore.getState().setRoute(customRoute);
@@ -1090,6 +1156,3 @@ const UnifiedMap: React.FC = () => {
 };
 
 export default UnifiedMap;
-
-
-

@@ -120,7 +120,8 @@ export const useStore = create<AppState>()(
             setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
 
             targetStoreTransit: null,
-            setTargetStoreTransit: (transit) => set({ targetStoreTransit: transit }),
+            setTargetStoreTransit: (transit) =>
+                set({ targetStoreTransit: transit }),
 
             navigationMode: "city",
             hasEnteredStore: false,
@@ -154,9 +155,10 @@ export const useStore = create<AppState>()(
                     hasEnteredStore: true,
                     isTransitioningToStore: false,
                 });
-                },
+            },
             setRoute: (route) => set({ route }),
-            setMacroRouteGeometry: (geometry) => set({ macroRouteGeometry: geometry }),
+            setMacroRouteGeometry: (geometry) =>
+                set({ macroRouteGeometry: geometry }),
             setStatus: (status) => set({ status }),
             setOnlineStatus: (status) => set({ isOnline: status }),
             setServerConnected: (status) => set({ isServerConnected: status }),
