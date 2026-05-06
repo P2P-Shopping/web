@@ -1,8 +1,8 @@
 import type React from "react";
 
 interface CardProps {
-    title?: string;
-    children: React.ReactNode;
+    readonly title?: string;
+    readonly children: React.ReactNode;
 }
 
 export default function Card({ title, children }: CardProps) {

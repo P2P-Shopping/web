@@ -149,6 +149,37 @@ const buildItemRequest = (item: Partial<Item>) => ({
     timestamp: Date.now(),
 });
 
+const updateItemInList = (
+    lists: ShoppingList[],
+    listId: string,
+    itemId: string,
+    updatedItem: Item,
+): ShoppingList[] => {
+    return lists.map((list) => {
+        if (list.id !== listId) return list;
+        return {
+            ...list,
+            items: list.items.map((item) =>
+                item.id === itemId ? updatedItem : item,
+            ),
+        };
+    });
+};
+
+const removeItemFromList = (
+    lists: ShoppingList[],
+    listId: string,
+    itemId: string,
+): ShoppingList[] => {
+    return lists.map((list) => {
+        if (list.id !== listId) return list;
+        return {
+            ...list,
+            items: list.items.filter((item) => item.id !== itemId),
+        };
+    });
+};
+
 export const useListsStore = create<ListsState>((set, get) => ({
     lists: [],
     currentList: null,
@@ -447,15 +478,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 (await response.json()) as ApiItem,
             );
             set((state) => ({
-                lists: state.lists.map((entry) =>
-                    entry.id === listId
-                        ? {
-                              ...entry,
-                              items: entry.items.map((current) =>
-                                  current.id === itemId ? updatedItem : current,
-                              ),
-                          }
-                        : entry,
+                lists: updateItemInList(
+                    state.lists,
+                    listId,
+                    itemId,
+                    updatedItem,
                 ),
             }));
             return true;
@@ -494,16 +521,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
             }
 
             set((state) => ({
-                lists: state.lists.map((entry) =>
-                    entry.id === listId
-                        ? {
-                              ...entry,
-                              items: entry.items.filter(
-                                  (current) => current.id !== itemId,
-                              ),
-                          }
-                        : entry,
-                ),
+                lists: removeItemFromList(state.lists, listId, itemId),
             }));
             return true;
         } catch (error) {

@@ -28,6 +28,7 @@ import {
     X,
     Zap,
 } from "lucide-react";
+import type { AppState, Coordinate, RoutePoint } from "../../context/useStore";
 import { useStore } from "../../context/useStore";
 import {
     DEMO_STORE_LOCATION,
@@ -76,6 +77,136 @@ interface ApiStoreMatch {
         walking?: { timeMins?: number; distanceKm?: string | number };
     };
 }
+
+const geocodeStore = async (
+    storeName: string,
+    address: string,
+    userLocation: { lat: number; lng: number },
+): Promise<{ lat: number; lng: number } | null> => {
+    try {
+        const query = encodeURIComponent(`${storeName} ${address || ""}`);
+        const delta = 0.25;
+        const left = userLocation.lng - delta;
+        const right = userLocation.lng + delta;
+        const top = userLocation.lat + delta;
+        const bottom = userLocation.lat - delta;
+        const nomUrl = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&viewbox=${left},${top},${right},${bottom}&bounded=1`;
+        const nomRes = await fetch(nomUrl, {
+            headers: {
+                Accept: "application/json",
+            },
+        });
+        if (nomRes.ok) {
+            const nomData = await nomRes.json();
+            if (Array.isArray(nomData) && nomData.length > 0) {
+                return {
+                    lat: Number(nomData[0].lat),
+                    lng: Number(nomData[0].lon),
+                };
+            }
+        }
+    } catch (err) {
+        console.warn("Geocoding failed for store", storeName, err);
+    }
+    return null;
+};
+
+const mapApiStoreToRecommendation = async (
+    store: ApiStoreMatch,
+    userLocation: { lat: number; lng: number },
+    baseUrl: string,
+    itemCount: number,
+): Promise<StoreRecommendation> => {
+    const realTransit = {
+        driving: { timeMins: 10, distanceKm: "2.0" },
+        walking: { timeMins: 30, distanceKm: "2.0" },
+    };
+
+    try {
+        const params = new URLSearchParams({
+            userLat: String(userLocation.lat),
+            userLng: String(userLocation.lng),
+            storeId: store.storeId,
+        });
+        const macroRes = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+        if (macroRes.ok) {
+            const macroData = await macroRes.json();
+            if (macroData.driving) {
+                realTransit.driving = {
+                    timeMins: Math.round(
+                        macroData.driving.durationSeconds / 60,
+                    ),
+                    distanceKm: (macroData.driving.distanceM / 1000).toFixed(1),
+                };
+            }
+            if (macroData.walking) {
+                realTransit.walking = {
+                    timeMins: Math.round(
+                        macroData.walking.durationSeconds / 60,
+                    ),
+                    distanceKm: (macroData.walking.distanceM / 1000).toFixed(1),
+                };
+            }
+        }
+    } catch (err) {
+        console.warn("Could not fetch macro-routing", err);
+    }
+
+    const parseNumber = (v: unknown) =>
+        v != null && v !== "" ? Number(v) : Number.NaN;
+
+    const rawLat =
+        store.lat ??
+        store.latitude ??
+        store.location?.lat ??
+        store.coords?.lat ??
+        store.point?.lat ??
+        store.y ??
+        store.py;
+    const rawLng =
+        store.lng ??
+        store.longitude ??
+        store.location?.lng ??
+        store.coords?.lon ??
+        store.coords?.lng ??
+        store.point?.lng ??
+        store.point?.lon ??
+        store.x ??
+        store.px ??
+        store.lon;
+
+    let lat = parseNumber(rawLat);
+    let lng = parseNumber(rawLng);
+
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        const coords = await geocodeStore(
+            store.storeName,
+            store.address || "",
+            userLocation,
+        );
+        if (coords) {
+            lat = coords.lat;
+            lng = coords.lng;
+        }
+    }
+
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        lat = DEMO_STORE_LOCATION.lat;
+        lng = DEMO_STORE_LOCATION.lng;
+    }
+
+    return {
+        id: store.storeId,
+        name: store.storeName,
+        address: store.address || "Address unavailable",
+        lat,
+        lng,
+        stockMatchPercentage: Math.round(
+            (store.matchedItems / Math.max(itemCount, 1)) * 100,
+        ),
+        transit: realTransit,
+    };
+};
 
 // Fix Leaflet marker icons
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -384,11 +515,7 @@ const ListDetailView: React.FC<ListDetailViewProps> = ({
                 </button>
             )}
             <div className="flex-1 overflow-y-auto scrollbar-thin">
-                <ListDetail
-                    isEmbedded={true}
-                    listIdOverride={selectedListId}
-                    onSwitchList={() => setSelectedListId(null)}
-                />
+                <ListDetail isEmbedded={true} listIdOverride={selectedListId} />
             </div>
 
             {!targetStoreLocation && !isMicroView && (
@@ -419,6 +546,83 @@ const ListDetailView: React.FC<ListDetailViewProps> = ({
         </div>
     </div>
 );
+
+const useIndoorCityTransition = (
+    navigationMode: "city" | "indoor",
+    route: RoutePoint[],
+    selectedListId: string | null,
+    lists: ShoppingList[],
+    setNavigationMode: (mode: "city" | "indoor") => void,
+    setTargetStoreLocation: (loc: Coordinate | null) => void,
+    setTargetStoreTransit: (transit: AppState["targetStoreTransit"]) => void,
+) => {
+    useEffect(() => {
+        if (navigationMode === "indoor" && route.length > 0 && selectedListId) {
+            const activeList = lists.find((l) => l.id === selectedListId);
+            if (!activeList) return;
+
+            const lastRoutePoint = route.at(-1);
+            if (!lastRoutePoint) return;
+            const lastItemState = activeList.items.find(
+                (item) => item.id === lastRoutePoint.itemId,
+            );
+
+            if (lastItemState?.checked) {
+                const transitionTimer = setTimeout(() => {
+                    setNavigationMode("city");
+                    setTargetStoreLocation(null);
+                    setTargetStoreTransit(null);
+                    useStore.getState().setMacroRouteGeometry([]);
+                }, 1000);
+
+                return () => clearTimeout(transitionTimer);
+            }
+        }
+    }, [
+        lists,
+        selectedListId,
+        route,
+        navigationMode,
+        setNavigationMode,
+        setTargetStoreLocation,
+        setTargetStoreTransit,
+    ]);
+};
+
+const useStoreFootprint = (activeTarget: { lat: number; lng: number }) => {
+    const [footprint, setFootprint] = useState<[number, number][]>([
+        [activeTarget.lat + 0.0005, activeTarget.lng - 0.0008],
+        [activeTarget.lat + 0.0005, activeTarget.lng + 0.0008],
+        [activeTarget.lat - 0.0005, activeTarget.lng + 0.0008],
+        [activeTarget.lat - 0.0005, activeTarget.lng - 0.0008],
+    ]);
+
+    useEffect(() => {
+        const fetchFootprint = async () => {
+            try {
+                const query = `[out:json];way(around:150, ${activeTarget.lat}, ${activeTarget.lng})[building];out geom;`;
+                const response = await fetch(
+                    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+                );
+                const data = await response.json();
+                if (data.elements && data.elements.length > 0) {
+                    const way = data.elements[0];
+                    if (way.geometry) {
+                        const coords: [number, number][] = way.geometry.map(
+                            (p: { lat: number; lon: number }) => [p.lat, p.lon],
+                        );
+                        setFootprint(coords);
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not fetch OSM footprint", err);
+            }
+        };
+        fetchFootprint();
+    }, [activeTarget]);
+
+    return footprint;
+};
 
 const UnifiedMap: React.FC = () => {
     const userLocation = useStore((state) => state.userLocation);
@@ -467,37 +671,15 @@ const UnifiedMap: React.FC = () => {
         // Automatic geofence transitions disabled per user request
     }, []);
 
-    // Task FE: Tranziție Automată Interior-Exterior (Sincronizare Closed-Loop)
-    useEffect(() => {
-        if (navigationMode === "indoor" && route.length > 0 && selectedListId) {
-            const activeList = lists.find((l) => l.id === selectedListId);
-            if (!activeList) return;
-
-            const lastRoutePoint = route[route.length - 1];
-            const lastItemState = activeList.items.find(
-                (item) => item.id === lastRoutePoint.itemId,
-            );
-
-            if (lastItemState?.checked) {
-                const transitionTimer = setTimeout(() => {
-                    setNavigationMode("city");
-                    setTargetStoreLocation(null);
-                    setTargetStoreTransit(null);
-                    useStore.getState().setMacroRouteGeometry([]);
-                }, 1000);
-
-                return () => clearTimeout(transitionTimer);
-            }
-        }
-    }, [
-        lists,
-        selectedListId,
-        route,
+    useIndoorCityTransition(
         navigationMode,
+        route,
+        selectedListId,
+        lists,
         setNavigationMode,
         setTargetStoreLocation,
         setTargetStoreTransit,
-    ]);
+    );
 
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
@@ -555,136 +737,14 @@ const UnifiedMap: React.FC = () => {
             const storesArray = Array.isArray(data) ? data : [data];
 
             const mappedStores: StoreRecommendation[] = await Promise.all(
-                storesArray.map(async (store: ApiStoreMatch) => {
-                    const realTransit = {
-                        driving: { timeMins: 10, distanceKm: "2.0" },
-                        walking: { timeMins: 30, distanceKm: "2.0" },
-                    };
-
-                    try {
-                        const params = new URLSearchParams({
-                            userLat: String(userLocation.lat),
-                            userLng: String(userLocation.lng),
-                            storeId: store.storeId,
-                        });
-                        const macroRes = await fetch(
-                            `${baseUrl}/api/routing/macro?${params}`,
-                        );
-                        if (macroRes.ok) {
-                            const macroData = await macroRes.json();
-                            if (macroData.driving) {
-                                realTransit.driving = {
-                                    timeMins: Math.round(
-                                        macroData.driving.durationSeconds / 60,
-                                    ),
-                                    distanceKm: (
-                                        macroData.driving.distanceM / 1000
-                                    ).toFixed(1),
-                                };
-                            }
-                            if (macroData.walking) {
-                                realTransit.walking = {
-                                    timeMins: Math.round(
-                                        macroData.walking.durationSeconds / 60,
-                                    ),
-                                    distanceKm: (
-                                        macroData.walking.distanceM / 1000
-                                    ).toFixed(1),
-                                };
-                            }
-                        }
-                    } catch (err) {
-                        console.warn("Could not fetch macro-routing", err);
-                    }
-
-                    // Ensure we have usable coordinates. If the backend didn't provide
-                    // lat/lng, try a light geocoding lookup using Nominatim (OSM) before
-                    // falling back to DEMO_STORE_LOCATION. This prevents every store
-                    // defaulting to the demo (Palas) location when coords are missing.
-                    const parseNumber = (v: unknown) =>
-                        v != null && v !== "" ? Number(v) : NaN;
-
-                    // Support multiple possible coordinate field names the backend
-                    // might return (lat/lng, latitude/longitude, nested location, etc.).
-                    const rawLat =
-                        store.lat ??
-                        store.latitude ??
-                        store.location?.lat ??
-                        store.coords?.lat ??
-                        store.point?.lat ??
-                        store.y ??
-                        store.py;
-                    const rawLng =
-                        store.lng ??
-                        store.longitude ??
-                        store.location?.lng ??
-                        store.coords?.lon ??
-                        store.coords?.lng ??
-                        store.point?.lng ??
-                        store.point?.lon ??
-                        store.x ??
-                        store.px ??
-                        store.lon;
-
-                    let lat = parseNumber(rawLat);
-                    let lng = parseNumber(rawLng);
-
-                    const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
-                    if (!hasCoords) {
-                        try {
-                            const query = encodeURIComponent(
-                                `${store.storeName} ${store.address || ""}`,
-                            );
-                            // Bias geocoding to the user's area so results don't resolve to
-                            // cities elsewhere in Romania (e.g., Cluj, Târgu Mureș).
-                            const delta = 0.25; // ~25-30km box
-                            const left = userLocation.lng - delta;
-                            const right = userLocation.lng + delta;
-                            const top = userLocation.lat + delta;
-                            const bottom = userLocation.lat - delta;
-                            const nomUrl = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&viewbox=${left},${top},${right},${bottom}&bounded=1`;
-                            const nomRes = await fetch(nomUrl, {
-                                headers: {
-                                    Accept: "application/json",
-                                },
-                            });
-                            if (nomRes.ok) {
-                                const nomData = await nomRes.json();
-                                if (
-                                    Array.isArray(nomData) &&
-                                    nomData.length > 0
-                                ) {
-                                    lat = Number(nomData[0].lat);
-                                    lng = Number(nomData[0].lon);
-                                }
-                            }
-                        } catch (err) {
-                            console.warn(
-                                "Geocoding failed for store",
-                                store.storeName,
-                                err,
-                            );
-                        }
-                    }
-
-                    if (Number.isNaN(lat) || Number.isNaN(lng)) {
-                        lat = DEMO_STORE_LOCATION.lat;
-                        lng = DEMO_STORE_LOCATION.lng;
-                    }
-
-                    return {
-                        id: store.storeId,
-                        name: store.storeName,
-                        address: store.address || "Address unavailable",
-                        lat,
-                        lng,
-                        stockMatchPercentage: Math.round(
-                            (store.matchedItems / Math.max(itemIds.length, 1)) *
-                                100,
-                        ),
-                        transit: realTransit,
-                    };
-                }),
+                storesArray.map((store: ApiStoreMatch) =>
+                    mapApiStoreToRecommendation(
+                        store,
+                        userLocation,
+                        baseUrl,
+                        itemIds.length,
+                    ),
+                ),
             );
 
             setRecommendedStores(mappedStores);
@@ -727,7 +787,8 @@ const UnifiedMap: React.FC = () => {
             } else {
                 useStore.getState().setMacroRouteGeometry([]);
             }
-        } catch (_e) {
+        } catch (err) {
+            console.error("Failed to start route:", err);
             useStore.getState().setMacroRouteGeometry([]);
         }
 
@@ -739,36 +800,7 @@ const UnifiedMap: React.FC = () => {
         setUserLocation({ ...userLocation });
     };
 
-    const [footprint, setFootprint] = useState<[number, number][]>([
-        [activeTarget.lat + 0.0005, activeTarget.lng - 0.0008],
-        [activeTarget.lat + 0.0005, activeTarget.lng + 0.0008],
-        [activeTarget.lat - 0.0005, activeTarget.lng + 0.0008],
-        [activeTarget.lat - 0.0005, activeTarget.lng - 0.0008],
-    ]);
-
-    useEffect(() => {
-        const fetchFootprint = async () => {
-            try {
-                const query = `[out:json];way(around:150, ${activeTarget.lat}, ${activeTarget.lng})[building];out geom;`;
-                const response = await fetch(
-                    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-                );
-                const data = await response.json();
-                if (data.elements && data.elements.length > 0) {
-                    const way = data.elements[0];
-                    if (way.geometry) {
-                        const coords: [number, number][] = way.geometry.map(
-                            (p: { lat: number; lon: number }) => [p.lat, p.lon],
-                        );
-                        setFootprint(coords);
-                    }
-                }
-            } catch (err) {
-                console.warn("Could not fetch OSM footprint", err);
-            }
-        };
-        fetchFootprint();
-    }, [activeTarget]);
+    const footprint = useStoreFootprint(activeTarget);
 
     const renderSidebarContent = () => {
         if (!selectedListId) {
