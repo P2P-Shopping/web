@@ -33,7 +33,7 @@ import {
     DEMO_STORE_LOCATION,
     GEOFENCE_RADIUS_METERS,
 } from "../../services/geofence";
-// ...existing code... (removed unused loadRoute import)
+import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
 import type { ShoppingList } from "../../types";

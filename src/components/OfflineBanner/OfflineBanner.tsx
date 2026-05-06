@@ -5,8 +5,14 @@ import { useStore } from "../../context/useStore";
 /**
  * Component that displays a pill-shaped warning at the bottom of the screen
  * when the device loses its internet connection or when the backend server is unreachable.
+ *
+ * Positioning adapts based on whether the Navbar is visible:
+ * - Auth pages (login/register): bottom-1 — no Navbar
+ * - All other pages: bottom-24 — above the Navbar
  */
-export const OfflineBanner: React.FC = () => {
+export const OfflineBanner: React.FC<{ isAuthPage?: boolean }> = ({
+    isAuthPage = false,
+}) => {
     const isOnline = useStore((state) => state.isOnline);
     const isServerConnected = useStore((state) => state.isServerConnected);
 
@@ -15,9 +21,8 @@ export const OfflineBanner: React.FC = () => {
     if (!showBanner) return null;
 
     return (
-        <div
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-100 flex items-center justify-center gap-2.5 py-2.5 px-6 bg-surface/90 backdrop-blur-md text-text-strong text-sm font-bold shadow-2xl rounded-full border border-border animate-in slide-in-from-bottom-4 duration-500"
-            role="status"
+        <output
+            className={`fixed ${isAuthPage ? "bottom-1" : "bottom-24"} left-1/2 -translate-x-1/2 z-100 flex items-center justify-center gap-2.5 py-2.5 px-6 bg-surface/90 backdrop-blur-md text-text-strong text-sm font-bold shadow-2xl rounded-full border border-border animate-in slide-in-from-bottom-4 duration-500`}
             aria-live="polite"
         >
             <WifiOff
@@ -26,6 +31,6 @@ export const OfflineBanner: React.FC = () => {
                 aria-hidden="true"
             />
             <span>Reconnecting...</span>
-        </div>
+        </output>
     );
 };

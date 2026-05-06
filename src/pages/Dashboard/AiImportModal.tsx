@@ -487,10 +487,11 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         />
 
                         <button
-                            type="submit"
+                            type="button"
                             disabled={
                                 isProcessing || (!prompt.trim() && !image)
                             }
+                            onClick={() => void handleSend()}
                             className="p-2.5 bg-accent text-white rounded-xl shadow-md hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                             <Send size={18} />

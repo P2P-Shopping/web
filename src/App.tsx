@@ -1,5 +1,5 @@
 import type { StompSubscription } from "@stomp/stompjs";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect } from "react";
 import {
     Navigate,
     Route,
@@ -7,6 +7,7 @@ import {
     useLocation,
     useNavigate,
 } from "react-router-dom";
+import { Toaster, toast } from "sonner";
 import { Navbar, OfflineBanner } from "./components";
 import { useStore } from "./context/useStore";
 import { useNetworkState } from "./hooks/useNetworkState";
@@ -24,6 +25,7 @@ import { loadRoute } from "./services/loadRoute";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
 import { useThemeStore } from "./store/useThemeStore";
+import { isWebView } from "./utils/webview";
 
 function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     const authChecked = useStore((state) => state.authChecked);
@@ -107,9 +109,6 @@ function App() {
     const setStatus = useStore((state) => state.setStatus);
     const { theme } = useThemeStore();
 
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
-    const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
     useEffect(() => {
         const root = document.documentElement;
         if (theme === "system") {
@@ -119,23 +118,9 @@ function App() {
         }
     }, [theme]);
 
-    const clearToastTimeout = useCallback(() => {
-        if (!toastTimeoutRef.current) return;
-        clearTimeout(toastTimeoutRef.current);
-        toastTimeoutRef.current = null;
+    const handlePongMessage = useCallback((message: { body: string }) => {
+        toast.info(`Server Response: ${message.body}`);
     }, []);
-
-    const handlePongMessage = useCallback(
-        (message: { body: string }) => {
-            setToastMessage(`Server Response: ${message.body}`);
-            clearToastTimeout();
-            toastTimeoutRef.current = setTimeout(() => {
-                setToastMessage(null);
-                toastTimeoutRef.current = null;
-            }, 3000);
-        },
-        [clearToastTimeout],
-    );
 
     const authChecked = useStore((state) => state.authChecked);
 
@@ -294,12 +279,6 @@ function App() {
         stompClient.onStompError = (frame) => {
             console.error("Broker error:", frame.headers.message);
             setServerConnected(false);
-            setToastMessage("Connection lost. Retrying...");
-            clearToastTimeout();
-            toastTimeoutRef.current = setTimeout(() => {
-                setToastMessage(null);
-                toastTimeoutRef.current = null;
-            }, 3000);
         };
 
         stompClient.onWebSocketClose = () => {
@@ -311,10 +290,6 @@ function App() {
 
         return () => {
             if (subscription) subscription.unsubscribe();
-            if (toastTimeoutRef.current) {
-                clearTimeout(toastTimeoutRef.current);
-                toastTimeoutRef.current = null;
-            }
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
             stompClient.onStompError = () => {};
@@ -326,31 +301,24 @@ function App() {
                 }
             })();
         };
-    }, [handlePongMessage, setServerConnected, clearToastTimeout, token]);
+    }, [handlePongMessage, setServerConnected, token]);
 
     // Determine if Navbar should be shown
     const searchParams = new URLSearchParams(location.search);
     const isAiImport = searchParams.get("import") === "ai";
     const isAuthPage =
         location.pathname === "/login" || location.pathname === "/register";
-    const showNavbar = isAuthenticated && !isAuthPage && !isAiImport;
+    const showNavbar =
+        isAuthenticated && !isAuthPage && !isAiImport && !isWebView();
 
     return (
         <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">
-            <OfflineBanner />
+            <Toaster position="top-center" richColors />
+            <OfflineBanner isAuthPage={isAuthPage || isWebView()} />
 
             <main
                 className={`flex-1 flex flex-col ${isAiImport ? "overflow-hidden" : "overflow-y-auto"} min-h-0 relative`}
             >
-                {toastMessage && (
-                    <output
-                        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-500 px-6 py-3 bg-text-strong text-bg rounded-full shadow-2xl text-sm font-bold animate-in fade-in slide-in-from-bottom-4 duration-300"
-                        aria-live="polite"
-                    >
-                        {toastMessage}
-                    </output>
-                )}
-
                 <Routes>
                     <Route
                         path="/login"

@@ -24,6 +24,10 @@ interface ImportItemsModalProps {
     isSubmitting: boolean;
     submitLabel?: string;
     submittingLabel?: string;
+    // New list creation
+    allowNewList?: boolean;
+    newListName?: string;
+    onNewListNameChange?: (name: string) => void;
 }
 
 const ImportItemsModal = ({
@@ -45,6 +49,9 @@ const ImportItemsModal = ({
     isSubmitting,
     submitLabel = "Add selected",
     submittingLabel = "Adding...",
+    allowNewList = false,
+    newListName = "",
+    onNewListNameChange,
 }: ImportItemsModalProps) => {
     // Determine the active target list for duplicate checking
     const activeTargetList =
@@ -80,25 +87,57 @@ const ImportItemsModal = ({
         >
             <div className="flex flex-col gap-5">
                 {availableTargetLists && onTargetListChange && (
-                    <div className="flex flex-col gap-2">
-                        <label
-                            htmlFor="target-normal-list"
-                            className="text-[13px] font-semibold text-text-strong"
-                        >
-                            Target normal list
-                        </label>
-                        <select
-                            id="target-normal-list"
-                            value={selectedTargetListId}
-                            onChange={(e) => onTargetListChange(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-bg-muted px-3.5 py-3 text-sm text-text-strong outline-none transition-all focus:border-accent"
-                        >
-                            {availableTargetLists.map((list) => (
-                                <option key={list.id} value={list.id}>
-                                    {list.name}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-2">
+                            <label
+                                htmlFor="target-normal-list"
+                                className="text-[13px] font-semibold text-text-strong"
+                            >
+                                Target normal list
+                            </label>
+                            <select
+                                id="target-normal-list"
+                                value={selectedTargetListId}
+                                onChange={(e) =>
+                                    onTargetListChange(e.target.value)
+                                }
+                                className="w-full rounded-xl border border-border bg-bg-muted px-3.5 py-3 text-sm text-text-strong outline-none transition-all focus:border-accent"
+                            >
+                                {allowNewList && (
+                                    <option value="NEW_LIST">
+                                        + Create new list
+                                    </option>
+                                )}
+                                {availableTargetLists.map((list) => (
+                                    <option key={list.id} value={list.id}>
+                                        {list.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {allowNewList &&
+                            selectedTargetListId === "NEW_LIST" &&
+                            onNewListNameChange && (
+                                <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <label
+                                        htmlFor="new-list-name"
+                                        className="text-[13px] font-semibold text-text-strong"
+                                    >
+                                        New list name
+                                    </label>
+                                    <input
+                                        id="new-list-name"
+                                        type="text"
+                                        value={newListName}
+                                        onChange={(e) =>
+                                            onNewListNameChange(e.target.value)
+                                        }
+                                        placeholder="Enter list name..."
+                                        className="w-full rounded-xl border border-border bg-bg-muted px-3.5 py-3 text-sm text-text-strong outline-none transition-all focus:border-accent"
+                                    />
+                                </div>
+                            )}
                     </div>
                 )}
 
