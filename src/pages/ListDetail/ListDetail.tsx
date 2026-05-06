@@ -87,6 +87,8 @@ const useListItems = (effectiveListId: string | undefined) => {
         itemsRef.current = items;
     }, [items]);
 
+    const pendingSyncItems = useRef(new Set<string>());
+
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
@@ -284,13 +286,17 @@ const useListItems = (effectiveListId: string | undefined) => {
                 const payload = JSON.parse(message.body) as SyncPayload;
 
                 if (payload.status === "Rejection") {
-                    const item = itemsRef.current.find(
-                        (i) => i.id === payload.itemId,
-                    );
-                    toast.error("Conflict Warning", {
-                        description: `Conflict detected for "${item?.name || "an item"}". Your change was reverted because another user made a more recent update.`,
-                        duration: 4000,
-                    });
+                    const itemId = payload.itemId;
+                    if (itemId && pendingSyncItems.current.has(itemId)) {
+                        pendingSyncItems.current.delete(itemId);
+                        const item = itemsRef.current.find(
+                            (i) => i.id === itemId,
+                        );
+                        toast.error("Conflict Warning", {
+                            description: `Conflict detected for "${item?.name || "an item"}". Your change was reverted because another user made a more recent update.`,
+                            duration: 4000,
+                        });
+                    }
                 }
 
                 setItems((prev) => {
@@ -410,6 +416,7 @@ const useListItems = (effectiveListId: string | undefined) => {
 
     const publishSync = (action: SyncPayload["action"], item: Item) => {
         if (!effectiveListId || !stompClient.connected) return;
+        pendingSyncItems.current.add(item.id);
         stompClient.publish({
             destination: `/app/list/${effectiveListId}/update`,
             body: JSON.stringify({
@@ -585,6 +592,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             await api.put(`/api/items/${itemId}`, payload);
 
             if (effectiveListId && stompClient.connected) {
+                pendingSyncItems.current.add(itemId);
                 const syncPayload: SyncPayload = {
                     action: "CHECK_OFF",
                     itemId,
@@ -637,6 +645,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             await api.delete(`/api/items/${itemId}`);
 
             if (effectiveListId && stompClient.connected) {
+                pendingSyncItems.current.add(itemId);
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/update`,
                     body: JSON.stringify({
