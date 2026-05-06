@@ -81,4 +81,32 @@ export const aiMultimodalRequest = async (
     return api.post("/api/ai/generate", formData, { timeout: 60_000 });
 };
 
+export interface ProductSuggestion {
+    name: string;
+    brand: string | null;
+    category: string | null;
+    price: number | null;
+    quantity: string;
+}
+export const fetchProductSuggestions = async (
+    query: string,
+): Promise<ProductSuggestion[]> => {
+    if (!query || query.trim().length === 0) {
+        return [];
+    }
+
+    try {
+        const response = await api.get<ProductSuggestion[]>(
+            `/api/catalog/suggest?q=${encodeURIComponent(query)}`,
+        );
+        return response.data;
+    } catch (error) {
+        console.error(
+            "Error while fetching the suggestions from backend: ",
+            error,
+        );
+        return [];
+    }
+};
+
 export default api;

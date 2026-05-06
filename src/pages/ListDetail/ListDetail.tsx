@@ -6,14 +6,7 @@ import {
     Settings,
     UserPlus,
 } from "lucide-react";
-import {
-    type RefObject,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -28,8 +21,10 @@ import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
+import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
+    fetchProductSuggestions,
     finishShoppingRequest,
 } from "../../services/api";
 import stompClient from "../../services/socketService";
@@ -73,199 +68,6 @@ interface ListDetailProps {
     onSwitchList?: () => void;
 }
 
-interface ListDetailMainContentProps {
-    showListSelection: boolean;
-    lists: ReturnType<typeof useListsStore.getState>["lists"];
-    listsLoading: boolean;
-    onSelectList: (listId: string) => void;
-    itemsLoading: boolean;
-    activeList: { name: string; category?: ListCategory } | null;
-    activeCollaborationUsers: string[];
-    canImportIntoNormalList: boolean;
-    onOpenImportModal: () => void;
-    onOpenRenameModal: () => void;
-    onOpenShareModal: () => void;
-    addInputRef: RefObject<HTMLInputElement | null>;
-    newItemName: string;
-    onNameChange: (name: string) => void;
-    onInlineAdd: (e: React.FormEvent) => void;
-    onOpenDetails: () => void;
-    isReadOnly: boolean;
-    isEmbedded: boolean;
-    items: Item[];
-    onToggleItem: (itemId: string) => void;
-    onDeleteItem: (itemId: string) => void;
-    isTemplate: boolean;
-    estimatedTotal: string;
-    onFinishShopping: () => void;
-}
-
-const ListDetailMainContent = ({
-    showListSelection,
-    lists,
-    listsLoading,
-    onSelectList,
-    itemsLoading,
-    activeList,
-    activeCollaborationUsers,
-    canImportIntoNormalList,
-    onOpenImportModal,
-    onOpenRenameModal,
-    onOpenShareModal,
-    addInputRef,
-    newItemName,
-    onNameChange,
-    onInlineAdd,
-    onOpenDetails,
-    isReadOnly,
-    isEmbedded,
-    items,
-    onToggleItem,
-    onDeleteItem,
-    isTemplate,
-    estimatedTotal,
-    onFinishShopping,
-}: ListDetailMainContentProps) => {
-    if (showListSelection) {
-        return (
-            <ListSelectionView
-                lists={lists}
-                isLoading={listsLoading}
-                onSelect={onSelectList}
-            />
-        );
-    }
-
-    if (itemsLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
-                <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
-                <p>Loading list...</p>
-            </div>
-        );
-    }
-
-    if (activeList === null) {
-        return (
-            <p className="text-center py-10 text-text-muted italic text-sm">
-                List not found or could not be loaded.
-            </p>
-        );
-    }
-
-    return (
-        <>
-            <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-end px-1">
-                    <div className="flex flex-col">
-                        <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                            Collaboration
-                        </h2>
-                        <div className="flex items-center gap-2">
-                            <PresenceBar
-                                variant="avatars"
-                                allUsers={activeCollaborationUsers}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2">
-                        {canImportIntoNormalList && (
-                            <button
-                                type="button"
-                                onClick={onOpenImportModal}
-                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
-                            >
-                                <Plus size={14} strokeWidth={2.5} />
-                                Add to your cart
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={onOpenRenameModal}
-                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
-                        >
-                            Edit
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onOpenShareModal}
-                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
-                        >
-                            <UserPlus size={14} strokeWidth={2.5} />
-                            Invite
-                        </button>
-                    </div>
-                </div>
-
-                <InlineAddForm
-                    addInputRef={addInputRef}
-                    newItemName={newItemName}
-                    onNameChange={onNameChange}
-                    onSubmit={onInlineAdd}
-                    onOpenDetails={onOpenDetails}
-                    isReadOnly={isReadOnly}
-                    isEmbedded={isEmbedded}
-                />
-
-                <div className="min-h-[16px] px-2 flex items-center">
-                    <PresenceBar variant="typing" />
-                </div>
-            </div>
-
-            <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
-                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
-                    <ShoppingListItems
-                        items={items}
-                        onCheck={onToggleItem}
-                        onDelete={onDeleteItem}
-                        disabled={isReadOnly}
-                        checkable={!isTemplate}
-                    />
-                    {items.length > 0 && !isTemplate && (
-                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
-                            <div className="flex justify-between items-center">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-                                        Estimated Total
-                                    </span>
-                                    <span className="text-xs text-text-muted opacity-70">
-                                        {items.length} items
-                                    </span>
-                                </div>
-                                <span className="text-xl font-black text-accent tracking-tight">
-                                    {estimatedTotal} lei
-                                </span>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onFinishShopping}
-                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                            >
-                                Finish Shopping
-                            </button>
-                        </div>
-                    )}
-                    {items.length > 0 && isTemplate && (
-                        <div className="mt-4 pt-4 border-t border-border flex items-center justify-between bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4">
-                            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-                                Template
-                            </span>
-                            <span className="text-xs font-bold text-text-muted">
-                                {items.length}{" "}
-                                {items.length === 1 ? "item" : "items"}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </>
-    );
-};
-
-/**
- * Custom hook to manage shopping list items, including fetching, adding, toggling, and deleting items.
- * @param effectiveListId - The ID of the currently active list.
- */
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
     const [items, setItems] = useState<Item[]>([]);
@@ -338,13 +140,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                 const response = await api.get<ApiShoppingList>(
                     `/api/lists/${targetListId}`,
                 );
-                // Note: api.get returns response.data directly in the feature branch implementation of 'api' service usually,
-                // but main seems to have switched to 'fetch' or a different api wrapper.
-                // Looking at the conflict:
-                // HEAD: const currentList = response.data;
-                // main: if (!response.ok) { ... } const currentList = (await response.json()) as ApiShoppingList;
-                // If 'api' is the axios-like wrapper from feature branch, it has .data.
-                // Let's check what 'api' is.
 
                 const currentList = response.data;
                 if (!currentList) {
@@ -468,8 +263,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         } catch (err) {
             console.error("handleReviewConfirm error:", err);
             setError("Error saving some items. Please check your list.");
-
-            // NEW: Fetch the list anyway to show any items that successfully saved before the crash
             await fetchListData(effectiveListId);
         }
     };
@@ -505,7 +298,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                     } else if (payload.action === "ADD" && payload.content) {
                         try {
                             const newItem = JSON.parse(payload.content) as Item;
-                            // Prevent duplicates if the creator receives their own echo
                             if (!prev.some((i) => i.id === newItem.id)) {
                                 next = [...prev, newItem];
                             }
@@ -517,8 +309,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                         }
                     }
 
-                    // CRITICAL FIX: Synchronize the new local state up to the global Zustand store
-                    // This prevents the global store from overriding our real-time WebSocket updates
                     if (next !== prev) {
                         syncListItemsInStore(next);
                     }
@@ -552,9 +342,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         };
     }, [effectiveListId, handleSyncMessage, isServerConnected]);
 
-    /**
-     * Reverts an item addition locally if the server request fails.
-     */
     const rollbackItem = useCallback(
         (itemId: string) => {
             setItems((prev) => {
@@ -566,9 +353,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
-    /**
-     * Reverts an item's checked status if the server request fails.
-     */
     const revertItemChecked = useCallback(
         (itemId: string, originalChecked: boolean) => {
             setItems((prev) => {
@@ -584,9 +368,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore],
     );
 
-    /**
-     * Adds a new item to the current shopping list with optional details.
-     */
     const addItem = async (
         name: string,
         quantity?: string,
@@ -679,9 +460,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
-    /**
-     * Toggles the checked status of an item and updates the server.
-     */
     const toggleItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const currentItem = items.find((item) => item.id === itemId);
@@ -750,9 +528,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
-    /**
-     * Deletes an item from the list and the server.
-     */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
         const nextItems = items.filter((item) => item.id !== itemId);
@@ -816,7 +591,6 @@ const useListItems = (effectiveListId: string | undefined) => {
 
 /**
  * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
- * Migrated to a server-authoritative roster model to fix late-arrival sync issues.
  */
 const useListPresence = (effectiveListId: string | undefined) => {
     const { handlePresenceEvent, clearPresence } = usePresenceStore();
@@ -860,8 +634,6 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 listId: effectiveListId,
             };
 
-            // Notify server that we joined.
-            // The server will respond by broadcasting a ROSTER_UPDATE to all clients.
             stompClient.publish({
                 destination: `/app/list/${effectiveListId}/presence`,
                 body: JSON.stringify(joinEvent),
@@ -893,9 +665,6 @@ const useListPresence = (effectiveListId: string | undefined) => {
         isServerConnected,
     ]);
 
-    /**
-     * Sends a typing event to the server to notify other connected users.
-     */
     const sendTypingEvent = useCallback(() => {
         if (
             !effectiveListId ||
@@ -924,9 +693,6 @@ const useListPresence = (effectiveListId: string | undefined) => {
     return { sendTypingEvent };
 };
 
-/**
- * Renders a view for selecting a list when no specific list is active.
- */
 const ListSelectionView = ({
     lists,
     isLoading,
@@ -994,43 +760,230 @@ interface AddItemModalProps {
     setShowExpanded?: (val: boolean) => void;
 }
 
-/** Component for the item name input field inside the add modal. */
+/**
+ * Custom hook to extract duplicate Autocomplete logic.
+ */
+const useProductAutocomplete = (
+    inputValue: string,
+    isDisabled: boolean = false,
+    onSuggestionSelect: (suggestion: ProductSuggestion) => void,
+) => {
+    const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+
+    useEffect(() => {
+        if (!inputValue.trim() || isDisabled) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        let isMounted = true;
+
+        const timerId = setTimeout(async () => {
+            try {
+                const results = await fetchProductSuggestions(inputValue);
+                if (isMounted) {
+                    setSuggestions(results);
+                    setShowSuggestions(true);
+                    setActiveIndex(-1);
+                }
+            } catch (error) {
+                if (isMounted)
+                    console.error("Eroare la fetch sugestii:", error);
+            }
+        }, 300);
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timerId);
+        };
+    }, [inputValue, isDisabled]);
+
+    const handleKeyDown = useCallback(
+        (e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (!showSuggestions || suggestions.length === 0) return;
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setActiveIndex((prev) =>
+                    prev < suggestions.length - 1 ? prev + 1 : prev,
+                );
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
+            } else if (e.key === "Enter" && activeIndex >= 0) {
+                e.preventDefault();
+                onSuggestionSelect(suggestions[activeIndex]);
+                setShowSuggestions(false);
+                setActiveIndex(-1);
+            } else if (e.key === "Escape") {
+                setShowSuggestions(false);
+            }
+        },
+        [activeIndex, onSuggestionSelect, showSuggestions, suggestions],
+    );
+
+    const selectSuggestion = useCallback(
+        (suggestion: ProductSuggestion) => {
+            onSuggestionSelect(suggestion);
+            setShowSuggestions(false);
+            setActiveIndex(-1);
+        },
+        [onSuggestionSelect],
+    );
+
+    return {
+        suggestions,
+        showSuggestions,
+        setShowSuggestions,
+        activeIndex,
+        handleKeyDown,
+        selectSuggestion,
+    };
+};
+
+/**
+ * Shared Dropdown Component to fix Code Duplication
+ */
+const SuggestionsDropdown = ({
+    showSuggestions,
+    suggestions,
+    activeIndex,
+    onSelect,
+}: {
+    showSuggestions: boolean;
+    suggestions: ProductSuggestion[];
+    activeIndex: number;
+    onSelect: (suggestion: ProductSuggestion) => void;
+}) => {
+    if (!showSuggestions || suggestions.length === 0) return null;
+
+    return (
+        <div
+            role="listbox"
+            className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto p-0"
+        >
+            {suggestions.map((suggestion, index) => (
+                <button
+                    key={suggestion.name}
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    className={`w-full text-left px-4 py-3 flex justify-between items-center text-sm font-medium text-text-strong cursor-pointer outline-none focus:bg-bg-muted border-b border-border/50 last:border-0 transition-colors ${
+                        index === activeIndex
+                            ? "bg-bg-muted"
+                            : "hover:bg-bg-muted"
+                    }`}
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        onSelect(suggestion);
+                    }}
+                >
+                    <span className="font-bold">{suggestion.name}</span>
+                    <div className="flex items-center gap-3 text-[11px]">
+                        {suggestion.brand && (
+                            <span className="text-text-muted uppercase opacity-70 tracking-wider">
+                                {suggestion.brand}
+                            </span>
+                        )}
+                        {suggestion.price !== null &&
+                            suggestion.price !== undefined && (
+                                <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
+                                    {suggestion.price} lei
+                                </span>
+                            )}
+                    </div>
+                </button>
+            ))}
+        </div>
+    );
+};
+
+/** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
     idPrefix,
     value,
     onChange,
     onTyping,
     isMobile,
+    setQuantity,
+    setBrand,
+    setPrice,
 }: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
     onTyping?: () => void;
     isMobile: boolean;
-}) => (
-    <div className="flex flex-col gap-1.5">
-        <label
-            htmlFor={`${idPrefix}-item-name`}
-            className="text-[13px] font-semibold text-text-strong"
-        >
-            Item Name
-        </label>
-        <input
-            id={`${idPrefix}-item-name`}
-            type="text"
-            value={value}
-            onChange={(e) => {
-                onChange(e.target.value);
-                onTyping?.();
-            }}
-            placeholder={isMobile ? "e.g. Milk" : "e.g., Milk"}
-            required
-            className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
-        />
-    </div>
-);
+    setQuantity: (val: string) => void;
+    setBrand: (val: string) => void;
+    setPrice: (val: string) => void;
+}) => {
+    const handleSelect = useCallback(
+        (suggestion: ProductSuggestion) => {
+            onChange(suggestion.name);
+            if (suggestion.brand) setBrand(suggestion.brand);
+            if (suggestion.price !== undefined && suggestion.price !== null) {
+                setPrice(String(suggestion.price));
+            } else {
+                setPrice("");
+            }
+            if (suggestion.quantity) {
+                setQuantity(suggestion.quantity);
+            } else {
+                setQuantity("1");
+            }
+        },
+        [onChange, setBrand, setPrice, setQuantity],
+    );
 
-/** Button to toggle the display of extra item details (price, brand, etc). */
+    const {
+        suggestions,
+        showSuggestions,
+        setShowSuggestions,
+        activeIndex,
+        handleKeyDown,
+        selectSuggestion,
+    } = useProductAutocomplete(value, false, handleSelect);
+
+    return (
+        <div className="flex flex-col gap-1.5 relative">
+            <label
+                htmlFor={`${idPrefix}-item-name`}
+                className="text-[13px] font-semibold text-text-strong"
+            >
+                Item Name
+            </label>
+            <input
+                id={`${idPrefix}-item-name`}
+                type="text"
+                value={value}
+                onChange={(e) => {
+                    onChange(e.target.value);
+                    onTyping?.();
+                }}
+                onFocus={() => {
+                    if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                onBlur={() => setShowSuggestions(false)}
+                onKeyDown={handleKeyDown}
+                placeholder={isMobile ? "e.g. Milk" : "e.g., Milk"}
+                required
+                autoComplete="off"
+                className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
+            />
+
+            <SuggestionsDropdown
+                showSuggestions={showSuggestions}
+                suggestions={suggestions}
+                activeIndex={activeIndex}
+                onSelect={selectSuggestion}
+            />
+        </div>
+    );
+};
+
 const ExpandDetailsButton = ({
     showExpanded,
     onClick,
@@ -1054,7 +1007,6 @@ const ExpandDetailsButton = ({
     </button>
 );
 
-/** Component containing the detailed input fields (quantity, price, brand). */
 const ItemDetailsFields = ({
     idPrefix,
     quantity,
@@ -1136,7 +1088,6 @@ const ItemDetailsFields = ({
     </div>
 );
 
-/** Modal component for adding an item with optional details. */
 const AddItemDetailsModal = ({
     isOpen,
     onClose,
@@ -1194,6 +1145,9 @@ const AddItemDetailsModal = ({
                     onChange={setItemName}
                     onTyping={onTyping}
                     isMobile={isMobile}
+                    setQuantity={setQuantity}
+                    setBrand={setBrand}
+                    setPrice={setPrice}
                 />
 
                 {isMobile && setShowExpanded && (
@@ -1220,7 +1174,6 @@ const AddItemDetailsModal = ({
     );
 };
 
-/** Component to display an error alert within the list detail view. */
 const ListErrorAlert = ({
     error,
     isEmbedded,
@@ -1239,7 +1192,7 @@ const ListErrorAlert = ({
     </div>
 );
 
-/** Inline form component for quickly adding items without details. */
+/** Inline form component for quickly adding items without details. ACUM CU MEMORIE PENTRU AUTO-FILL! */
 const InlineAddForm = ({
     addInputRef,
     newItemName,
@@ -1248,55 +1201,111 @@ const InlineAddForm = ({
     onOpenDetails,
     isReadOnly,
     isEmbedded,
+    onAddFullItem,
 }: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
     onSubmit: (e: React.FormEvent) => void;
-    onOpenDetails: () => void;
+    onOpenDetails: (suggestion?: ProductSuggestion | null) => void;
     isReadOnly: boolean;
     isEmbedded: boolean;
-}) => (
-    <form
-        onSubmit={onSubmit}
-        className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${isEmbedded ? "" : "max-[600px]:hidden"}`}
-    >
-        <input
-            ref={addInputRef}
-            type="text"
-            value={newItemName}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder={
-                isReadOnly
-                    ? "List is read-only. Please sign in again."
-                    : "Add item..."
-            }
-            disabled={isReadOnly}
-            className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
-        />
-        <button
-            type="button"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
-            disabled={isReadOnly}
-            onClick={onOpenDetails}
-            aria-label="Add item details"
-        >
-            <Settings size={18} />
-        </button>
-        <button
-            type="submit"
-            disabled={isReadOnly}
-            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 ${isReadOnly ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}`}
-            aria-label="Add"
-        >
-            <Plus size={18} strokeWidth={3} />
-        </button>
-    </form>
-);
+    onAddFullItem: (suggestion: ProductSuggestion) => void;
+}) => {
+    const [selectedSuggestion, setSelectedSuggestion] =
+        useState<ProductSuggestion | null>(null);
 
-/**
- * Main ListDetail component that orchestrates displaying items, managing presence, and handling item additions.
- */
+    const handleSelect = useCallback(
+        (suggestion: ProductSuggestion) => {
+            onNameChange(suggestion.name);
+            setSelectedSuggestion(suggestion);
+        },
+        [onNameChange],
+    );
+
+    const {
+        suggestions,
+        showSuggestions,
+        setShowSuggestions,
+        activeIndex,
+        handleKeyDown,
+        selectSuggestion,
+    } = useProductAutocomplete(newItemName, isReadOnly, handleSelect);
+
+    const handleKeyDownWithOverride = (
+        e: React.KeyboardEvent<HTMLInputElement>,
+    ) => {
+        if (e.key === "Enter" && activeIndex >= 0) {
+            e.preventDefault();
+            onAddFullItem(suggestions[activeIndex]);
+            setShowSuggestions(false);
+        } else {
+            handleKeyDown(e);
+        }
+    };
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newItemName.trim()) return;
+
+        if (selectedSuggestion && selectedSuggestion.name === newItemName) {
+            onAddFullItem(selectedSuggestion);
+        } else {
+            onSubmit(e);
+        }
+        setSelectedSuggestion(null);
+    };
+
+    return (
+        <form
+            onSubmit={handleFormSubmit}
+            className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm relative ${isEmbedded ? "" : "max-[600px]:hidden"}`}
+        >
+            <input
+                ref={addInputRef}
+                type="text"
+                value={newItemName}
+                onChange={(e) => {
+                    onNameChange(e.target.value);
+                    setSelectedSuggestion(null);
+                }}
+                onFocus={() => {
+                    if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                onBlur={() => setShowSuggestions(false)}
+                onKeyDown={handleKeyDownWithOverride}
+                placeholder={isReadOnly ? "List is read-only" : "Add item..."}
+                disabled={isReadOnly}
+                autoComplete="off"
+                className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
+            />
+
+            <SuggestionsDropdown
+                showSuggestions={showSuggestions}
+                suggestions={suggestions}
+                activeIndex={activeIndex}
+                onSelect={selectSuggestion}
+            />
+
+            <button
+                type="button"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent border border-border transition-all shrink-0"
+                disabled={isReadOnly}
+                onClick={() => onOpenDetails(selectedSuggestion)}
+            >
+                <Settings size={18} />
+            </button>
+            <button
+                type="submit"
+                disabled={isReadOnly}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 hover:opacity-90"
+            >
+                <Plus size={18} strokeWidth={3} />
+            </button>
+        </form>
+    );
+};
+
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
@@ -1343,7 +1352,6 @@ const ListDetail = ({
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
 
-    // Task 4 States
     const [isFinishing, setIsFinishing] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
     const [finishStoreName, setFinishStoreName] = useState("");
@@ -1388,10 +1396,6 @@ const ListDetail = ({
     const estimatedTotal = useMemo(() => {
         return items
             .reduce((sum, item) => {
-                /**
-                 * Task 4: Fix miscomputation for strings like "500g"
-                 * CodeRabbit: If the quantity is not purely numeric, count as 1.
-                 */
                 const qtyStr = (item.quantity || "1").trim();
                 const qty = /^\d+(?:\.\d+)?$/.test(qtyStr)
                     ? Number.parseFloat(qtyStr)
@@ -1401,7 +1405,6 @@ const ListDetail = ({
             .toFixed(2);
     }, [items]);
 
-    // Geolocation permission tracking
     useEffect(() => {
         let isMounted = true;
         let permResult: PermissionStatus | null = null;
@@ -1419,9 +1422,7 @@ const ListDetail = ({
                     setPermissionStatus(result.state);
                     result.addEventListener("change", handler);
                 })
-                .catch(() => {
-                    // Fail silently for browsers with limited support
-                });
+                .catch(() => {});
         }
 
         return () => {
@@ -1430,7 +1431,6 @@ const ListDetail = ({
         };
     }, []);
 
-    // Re-show banner if permission transitions to denied
     useEffect(() => {
         if (permissionStatus === "denied") {
             setShowBanner(true);
@@ -1483,11 +1483,26 @@ const ListDetail = ({
         setNewItemName("");
     };
 
-    const openDetailsModal = () => {
+    const openDetailsModal = (suggestion?: ProductSuggestion | null) => {
         setDetailName(newItemName);
-        setDetailQuantity("");
-        setDetailBrand("");
-        setDetailPrice("");
+
+        if (suggestion) {
+            setDetailQuantity(suggestion.quantity || "1");
+            setDetailBrand(suggestion.brand || "");
+            setDetailPrice(
+                suggestion.price !== null && suggestion.price !== undefined
+                    ? String(suggestion.price)
+                    : "",
+            );
+            if (suggestion.brand || suggestion.price) {
+                setShowExpandedDetails(true);
+            }
+        } else {
+            setDetailQuantity("");
+            setDetailBrand("");
+            setDetailPrice("");
+        }
+
         setShowDetailsModal(true);
     };
 
@@ -1508,10 +1523,6 @@ const ListDetail = ({
     };
 
     const isReadOnly = authFailed;
-    const isTemplate =
-        activeList?.category === "RECIPE" ||
-        activeList?.category === "FREQUENT";
-    const showListSelection = effectiveListId === "default" && isEmbedded;
     const wrapperClassName = isEmbedded
         ? "w-full flex flex-col h-full bg-surface/50"
         : "flex justify-center items-start p-20px bg-bg";
@@ -1637,6 +1648,22 @@ const ListDetail = ({
         }
     };
 
+    const handleInstantAdd = (suggestion: ProductSuggestion) => {
+        const finalPrice =
+            suggestion.price !== null && suggestion.price !== undefined
+                ? Number(suggestion.price)
+                : undefined;
+
+        addItem(
+            suggestion.name,
+            suggestion.quantity || "1",
+            suggestion.brand || undefined,
+            finalPrice,
+        );
+
+        setNewItemName("");
+    };
+
     return (
         <div className={wrapperClassName}>
             <div className={contentClassName}>
@@ -1664,34 +1691,112 @@ const ListDetail = ({
                     </div>
                 )}
 
-                <ListDetailMainContent
-                    showListSelection={showListSelection}
-                    lists={lists}
-                    listsLoading={listsLoading}
-                    onSelectList={(listId) => navigate(`/nav/${listId}`)}
-                    itemsLoading={itemsLoading}
-                    activeList={activeList}
-                    activeCollaborationUsers={activeCollaborationUsers}
-                    canImportIntoNormalList={canImportIntoNormalList}
-                    onOpenImportModal={() => {
-                        void openImportModal();
-                    }}
-                    onOpenRenameModal={() => setShowRenameModal(true)}
-                    onOpenShareModal={() => setShowShareModal(true)}
-                    addInputRef={addInputRef}
-                    newItemName={newItemName}
-                    onNameChange={handleNewItemNameChange}
-                    onInlineAdd={handleInlineAdd}
-                    onOpenDetails={openDetailsModal}
-                    isReadOnly={isReadOnly}
-                    isEmbedded={isEmbedded}
-                    items={items}
-                    onToggleItem={toggleItem}
-                    onDeleteItem={deleteItem}
-                    isTemplate={isTemplate}
-                    estimatedTotal={estimatedTotal}
-                    onFinishShopping={() => setShowFinishModal(true)}
-                />
+                {effectiveListId === "default" && isEmbedded ? (
+                    <ListSelectionView
+                        lists={lists}
+                        isLoading={listsLoading}
+                        onSelect={(listId) => navigate(`/nav/${listId}`)}
+                    />
+                ) : (
+                    <>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex justify-between items-end px-1">
+                                <div className="flex flex-col">
+                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                        Collaboration
+                                    </h2>
+                                    <div className="flex items-center gap-2">
+                                        <PresenceBar
+                                            variant="avatars"
+                                            allUsers={activeCollaborationUsers}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    {canImportIntoNormalList && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void openImportModal();
+                                            }}
+                                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                                        >
+                                            <Plus size={14} strokeWidth={2.5} />
+                                            Add to normal list
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowShareModal(true)}
+                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                                    >
+                                        <UserPlus size={14} strokeWidth={2.5} />
+                                        Invite
+                                    </button>
+                                </div>
+                            </div>
+
+                            <InlineAddForm
+                                addInputRef={addInputRef}
+                                newItemName={newItemName}
+                                onNameChange={handleNewItemNameChange}
+                                onSubmit={handleInlineAdd}
+                                onOpenDetails={openDetailsModal}
+                                isReadOnly={isReadOnly}
+                                isEmbedded={isEmbedded}
+                                onAddFullItem={handleInstantAdd}
+                            />
+
+                            <div className="min-h-[16px] px-2 flex items-center">
+                                <PresenceBar variant="typing" />
+                            </div>
+                        </div>
+
+                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
+                            {itemsLoading ? (
+                                <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
+                                    <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
+                                    <p>Loading...</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
+                                    <ShoppingListItems
+                                        items={items}
+                                        onCheck={toggleItem}
+                                        onDelete={deleteItem}
+                                        disabled={isReadOnly}
+                                    />
+                                    {items.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                                        Estimated Total
+                                                    </span>
+                                                    <span className="text-xs text-text-muted opacity-70">
+                                                        {items.length} items
+                                                    </span>
+                                                </div>
+                                                <span className="text-xl font-black text-accent tracking-tight">
+                                                    {estimatedTotal} lei
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowFinishModal(true)
+                                                }
+                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                            >
+                                                Finish Shopping
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
             {!isReadOnly && (
@@ -1746,7 +1851,6 @@ const ListDetail = ({
                 onTyping={sendTypingEvent}
             />
 
-            {/* Finish Shopping Modal */}
             <Modal
                 isOpen={showFinishModal}
                 onClose={() => setShowFinishModal(false)}
