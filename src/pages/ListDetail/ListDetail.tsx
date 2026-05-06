@@ -1610,11 +1610,6 @@ const ListDetail = ({
 
             await fetchLists();
             clearImportState();
-
-            // Optionally navigate to the new list
-            if (selectedTargetListId === "NEW_LIST") {
-                navigate(`/nav/${targetListId}`);
-            }
         } catch (importError) {
             const errorMessage =
                 importError instanceof Error
@@ -1680,117 +1675,6 @@ const ListDetail = ({
                     estimatedTotal={estimatedTotal}
                     onFinishShopping={() => setShowFinishModal(true)}
                 />
-                {effectiveListId === "default" && isEmbedded ? (
-                    <ListSelectionView
-                        lists={lists}
-                        isLoading={listsLoading}
-                        onSelect={(listId) => navigate(`/nav/${listId}`)}
-                    />
-                ) : (
-                    <>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex justify-between items-end px-1">
-                                <div className="flex flex-col">
-                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                                        Collaboration
-                                    </h2>
-                                    <div className="flex items-center gap-2">
-                                        <PresenceBar
-                                            variant="avatars"
-                                            allUsers={activeCollaborationUsers}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap justify-end gap-2">
-                                    {canImportIntoNormalList && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                void openImportModal();
-                                            }}
-                                            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:translate-y-0 hover:-translate-y-px ${
-                                                isRecipeList
-                                                    ? "bg-accent text-white hover:opacity-90"
-                                                    : "bg-bg-muted text-text-strong border border-border hover:border-accent hover:text-accent"
-                                            }`}
-                                        >
-                                            <Plus size={14} strokeWidth={2.5} />
-                                            {isRecipeList
-                                                ? "Add all ingredients to list"
-                                                : "Add to normal list"}
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowShareModal(true)}
-                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
-                                    >
-                                        <UserPlus size={14} strokeWidth={2.5} />
-                                        Invite
-                                    </button>
-                                </div>
-                            </div>
-
-                            <InlineAddForm
-                                addInputRef={addInputRef}
-                                newItemName={newItemName}
-                                onNameChange={handleNewItemNameChange}
-                                onSubmit={handleInlineAdd}
-                                onOpenDetails={openDetailsModal}
-                                isReadOnly={isReadOnly}
-                                isEmbedded={isEmbedded}
-                            />
-
-                            <div className="min-h-[16px] px-2 flex items-center">
-                                <PresenceBar variant="typing" />
-                            </div>
-                        </div>
-
-                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
-                            {itemsLoading ? (
-                                <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
-                                    <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
-                                    <p>Loading...</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
-                                    <ShoppingListItems
-                                        items={items}
-                                        onCheck={toggleItem}
-                                        onDelete={deleteItem}
-                                        disabled={isReadOnly}
-                                    />
-                                    {items.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
-                                            <div className="flex justify-between items-center">
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-                                                        Estimated Total
-                                                    </span>
-                                                    <span className="text-xs text-text-muted opacity-70">
-                                                        {items.length} items
-                                                    </span>
-                                                </div>
-                                                <span className="text-xl font-black text-accent tracking-tight">
-                                                    {estimatedTotal} lei
-                                                </span>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setShowFinishModal(true)
-                                                }
-                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                            >
-                                                Finish Shopping
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </>
-                )}
             </div>
 
             {!isReadOnly && (
