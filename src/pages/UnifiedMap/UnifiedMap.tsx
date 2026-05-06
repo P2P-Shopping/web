@@ -8,9 +8,10 @@ import {
     Polygon,
     Polyline,
     Popup,
-    // TileLayer,
+    TileLayer,
     useMap,
     useMapEvents,
+    ZoomControl,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -23,7 +24,6 @@ import {
     List as ListIcon,
     LocateFixed,
     MapPin,
-    Maximize2,
     Satellite,
     X,
     Zap,
@@ -33,7 +33,6 @@ import {
     DEMO_STORE_LOCATION,
     GEOFENCE_RADIUS_METERS,
 } from "../../services/geofence";
-import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
 import type { ShoppingList } from "../../types";
@@ -59,41 +58,24 @@ interface ApiStoreMatch {
     storeName: string;
     matchedItems: number;
     distanceMeters: number;
-    lat: number;
-    lng: number;
+    lat?: number;
+    lng?: number;
+    latitude?: number;
+    longitude?: number;
+    location?: { lat?: number; lng?: number };
+    coords?: { lat?: number; lng?: number; lon?: number };
+    point?: { lat?: number; lng?: number; lon?: number };
+    x?: number;
+    y?: number;
+    px?: number;
+    py?: number;
+    lon?: number;
     address?: string;
     transit?: {
-        driving?: { timeMins: number; distanceKm: string | number };
-        walking?: { timeMins: number; distanceKm: string | number };
+        driving?: { timeMins?: number; distanceKm?: string | number };
+        walking?: { timeMins?: number; distanceKm?: string | number };
     };
 }
-
-const MOCK_STORES: StoreRecommendation[] = [
-    {
-        id: "store-1",
-        name: "Kaufland Tudor Vladimirescu",
-        address: "Strada Theodor Pallady",
-        lat: 47.1532,
-        lng: 27.5891,
-        stockMatchPercentage: 98,
-        transit: {
-            driving: { timeMins: 5, distanceKm: 1.2 },
-            walking: { timeMins: 15, distanceKm: 1.2 },
-        },
-    },
-    {
-        id: "store-2",
-        name: "Carrefour Felicia",
-        address: "Strada Bucium",
-        lat: 47.1495,
-        lng: 27.592,
-        stockMatchPercentage: 95,
-        transit: {
-            driving: { timeMins: 8, distanceKm: 2.5 },
-            walking: { timeMins: 30, distanceKm: 2.2 },
-        },
-    },
-];
 
 // Fix Leaflet marker icons
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -402,7 +384,11 @@ const ListDetailView: React.FC<ListDetailViewProps> = ({
                 </button>
             )}
             <div className="flex-1 overflow-y-auto scrollbar-thin">
-                <ListDetail isEmbedded={true} listIdOverride={selectedListId} />
+                <ListDetail
+                    isEmbedded={true}
+                    listIdOverride={selectedListId}
+                    onSwitchList={() => setSelectedListId(null)}
+                />
             </div>
 
             {!targetStoreLocation && !isMicroView && (
@@ -441,9 +427,14 @@ const UnifiedMap: React.FC = () => {
     const setTargetStoreLocation = useStore(
         (state) => state.setTargetStoreLocation,
     );
+    const targetStoreTransit = useStore((state) => state.targetStoreTransit);
+    const setTargetStoreTransit = useStore(
+        (state) => state.setTargetStoreTransit,
+    );
     const navigationMode = useStore((state) => state.navigationMode);
     const setNavigationMode = useStore((state) => state.setNavigationMode);
     const route = useStore((state) => state.route);
+    const macroRouteGeometry = useStore((state) => state.macroRouteGeometry);
     const setItems = useStore((state) => state.setItems);
     const isAutoCenterEnabled = useStore((state) => state.isAutoCenterEnabled);
     const setIsAutoCenterEnabled = useStore(
@@ -467,10 +458,46 @@ const UnifiedMap: React.FC = () => {
     const isMicroView = navigationMode === "indoor";
 
     const activeTarget = targetStoreLocation || DEMO_STORE_LOCATION;
+    const activeTransit = targetStoreTransit ?? {
+        driving: { timeMins: 0, distanceKm: "0.0" },
+        walking: { timeMins: 0, distanceKm: "0.0" },
+    };
 
     useEffect(() => {
         // Automatic geofence transitions disabled per user request
     }, []);
+
+    // Task FE: Tranziție Automată Interior-Exterior (Sincronizare Closed-Loop)
+    useEffect(() => {
+        if (navigationMode === "indoor" && route.length > 0 && selectedListId) {
+            const activeList = lists.find((l) => l.id === selectedListId);
+            if (!activeList) return;
+
+            const lastRoutePoint = route[route.length - 1];
+            const lastItemState = activeList.items.find(
+                (item) => item.id === lastRoutePoint.itemId,
+            );
+
+            if (lastItemState?.checked) {
+                const transitionTimer = setTimeout(() => {
+                    setNavigationMode("city");
+                    setTargetStoreLocation(null);
+                    setTargetStoreTransit(null);
+                    useStore.getState().setMacroRouteGeometry([]);
+                }, 1000);
+
+                return () => clearTimeout(transitionTimer);
+            }
+        }
+    }, [
+        lists,
+        selectedListId,
+        route,
+        navigationMode,
+        setNavigationMode,
+        setTargetStoreLocation,
+        setTargetStoreTransit,
+    ]);
 
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
@@ -493,7 +520,7 @@ const UnifiedMap: React.FC = () => {
         try {
             const itemIds = selectedList.items.map((item) => item.id) || [];
             if (itemIds.length === 0) {
-                setRecommendedStores(MOCK_STORES);
+                setRecommendedStores([]);
                 setIsShowingStores(true);
                 return;
             }
@@ -518,106 +545,198 @@ const UnifiedMap: React.FC = () => {
                 },
             );
 
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            if (!response.ok) {
+                console.error(`HTTP Error: ${response.status}`);
+                setRecommendedStores([]);
+                setIsShowingStores(true);
+                return;
+            }
             const data = await response.json();
             const storesArray = Array.isArray(data) ? data : [data];
 
-            const mappedStores: StoreRecommendation[] = storesArray.map(
-                (store: ApiStoreMatch) => ({
-                    id: store.storeId,
-                    name: store.storeName,
-                    address: store.address || "Address unavailable",
-                    lat: store.lat || DEMO_STORE_LOCATION.lat,
-                    lng: store.lng || DEMO_STORE_LOCATION.lng,
-                    stockMatchPercentage: Math.round(
-                        (store.matchedItems / Math.max(itemIds.length, 1)) *
-                            100,
-                    ),
-                    transit: {
-                        driving: store.transit?.driving || {
-                            timeMins: 10,
-                            distanceKm: 2,
-                        },
-                        walking: store.transit?.walking || {
-                            timeMins: 30,
-                            distanceKm: 2,
-                        },
-                    },
+            const mappedStores: StoreRecommendation[] = await Promise.all(
+                storesArray.map(async (store: ApiStoreMatch) => {
+                    const realTransit = {
+                        driving: { timeMins: 10, distanceKm: "2.0" },
+                        walking: { timeMins: 30, distanceKm: "2.0" },
+                    };
+
+                    try {
+                        const params = new URLSearchParams({
+                            userLat: String(userLocation.lat),
+                            userLng: String(userLocation.lng),
+                            storeId: store.storeId,
+                        });
+                        const macroRes = await fetch(
+                            `${baseUrl}/api/routing/macro?${params}`,
+                        );
+                        if (macroRes.ok) {
+                            const macroData = await macroRes.json();
+                            if (macroData.driving) {
+                                realTransit.driving = {
+                                    timeMins: Math.round(
+                                        macroData.driving.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.driving.distanceM / 1000
+                                    ).toFixed(1),
+                                };
+                            }
+                            if (macroData.walking) {
+                                realTransit.walking = {
+                                    timeMins: Math.round(
+                                        macroData.walking.durationSeconds / 60,
+                                    ),
+                                    distanceKm: (
+                                        macroData.walking.distanceM / 1000
+                                    ).toFixed(1),
+                                };
+                            }
+                        }
+                    } catch (err) {
+                        console.warn("Could not fetch macro-routing", err);
+                    }
+
+                    // Ensure we have usable coordinates. If the backend didn't provide
+                    // lat/lng, try a light geocoding lookup using Nominatim (OSM) before
+                    // falling back to DEMO_STORE_LOCATION. This prevents every store
+                    // defaulting to the demo (Palas) location when coords are missing.
+                    const parseNumber = (v: unknown) =>
+                        v != null && v !== "" ? Number(v) : NaN;
+
+                    // Support multiple possible coordinate field names the backend
+                    // might return (lat/lng, latitude/longitude, nested location, etc.).
+                    const rawLat =
+                        store.lat ??
+                        store.latitude ??
+                        store.location?.lat ??
+                        store.coords?.lat ??
+                        store.point?.lat ??
+                        store.y ??
+                        store.py;
+                    const rawLng =
+                        store.lng ??
+                        store.longitude ??
+                        store.location?.lng ??
+                        store.coords?.lon ??
+                        store.coords?.lng ??
+                        store.point?.lng ??
+                        store.point?.lon ??
+                        store.x ??
+                        store.px ??
+                        store.lon;
+
+                    let lat = parseNumber(rawLat);
+                    let lng = parseNumber(rawLng);
+
+                    const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
+                    if (!hasCoords) {
+                        try {
+                            const query = encodeURIComponent(
+                                `${store.storeName} ${store.address || ""}`,
+                            );
+                            // Bias geocoding to the user's area so results don't resolve to
+                            // cities elsewhere in Romania (e.g., Cluj, Târgu Mureș).
+                            const delta = 0.25; // ~25-30km box
+                            const left = userLocation.lng - delta;
+                            const right = userLocation.lng + delta;
+                            const top = userLocation.lat + delta;
+                            const bottom = userLocation.lat - delta;
+                            const nomUrl = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&viewbox=${left},${top},${right},${bottom}&bounded=1`;
+                            const nomRes = await fetch(nomUrl, {
+                                headers: {
+                                    Accept: "application/json",
+                                },
+                            });
+                            if (nomRes.ok) {
+                                const nomData = await nomRes.json();
+                                if (
+                                    Array.isArray(nomData) &&
+                                    nomData.length > 0
+                                ) {
+                                    lat = Number(nomData[0].lat);
+                                    lng = Number(nomData[0].lon);
+                                }
+                            }
+                        } catch (err) {
+                            console.warn(
+                                "Geocoding failed for store",
+                                store.storeName,
+                                err,
+                            );
+                        }
+                    }
+
+                    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+                        lat = DEMO_STORE_LOCATION.lat;
+                        lng = DEMO_STORE_LOCATION.lng;
+                    }
+
+                    return {
+                        id: store.storeId,
+                        name: store.storeName,
+                        address: store.address || "Address unavailable",
+                        lat,
+                        lng,
+                        stockMatchPercentage: Math.round(
+                            (store.matchedItems / Math.max(itemIds.length, 1)) *
+                                100,
+                        ),
+                        transit: realTransit,
+                    };
                 }),
             );
 
-            setRecommendedStores(
-                mappedStores.length > 0 ? mappedStores : MOCK_STORES,
-            );
+            setRecommendedStores(mappedStores);
             setIsShowingStores(true);
         } catch (error) {
-            console.warn("Backend match failed, using mock stores", error);
-            setRecommendedStores(MOCK_STORES);
+            console.error("Backend match failed", error);
+            setRecommendedStores([]);
             setIsShowingStores(true);
         } finally {
             setIsFetchingStores(false);
         }
     };
 
-    const handleStartRoute = (store: StoreRecommendation) => {
+    const handleStartRoute = async (store: StoreRecommendation) => {
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
+        setTargetStoreTransit(store.transit);
+
+        try {
+            const apiBase =
+                import.meta.env.VITE_API_URL ||
+                import.meta.env.VITE_API_BASE_URL ||
+                "http://localhost:8081";
+            const baseUrl = apiBase === "/" ? "" : apiBase;
+            const params = new URLSearchParams({
+                userLat: String(userLocation.lat),
+                userLng: String(userLocation.lng),
+                storeId: store.id,
+            });
+            const response = await fetch(
+                `${baseUrl}/api/routing/macro?${params}`,
+            );
+            if (response.ok) {
+                const data = await response.json();
+                const geo = data[transportMode]?.geometry;
+                if (geo && Array.isArray(geo)) {
+                    useStore.getState().setMacroRouteGeometry(geo);
+                } else {
+                    useStore.getState().setMacroRouteGeometry([]);
+                }
+            } else {
+                useStore.getState().setMacroRouteGeometry([]);
+            }
+        } catch (_e) {
+            useStore.getState().setMacroRouteGeometry([]);
+        }
+
         setNavigationMode("city");
     };
 
     const handleRecenter = () => {
         setIsAutoCenterEnabled(true);
         setUserLocation({ ...userLocation });
-    };
-
-    const handleForceIndoor = () => {
-        setIsAutoCenterEnabled(true);
-        setTargetStoreLocation(DEMO_STORE_LOCATION);
-        forceIndoorMode();
-    };
-
-    const handleDemoTSP = async () => {
-        const demoItems = [
-            {
-                id: "11111111-a1b2-c3d4-e5f6-1234567890ab",
-                name: "Produs 1",
-                checked: false,
-            },
-            {
-                id: "22222222-b2c3-d4e5-f6a7-2345678901bc",
-                name: "Produs 2",
-                checked: false,
-            },
-            {
-                id: "33333333-c3d4-e5f6-a7b8-3456789012cd",
-                name: "Produs 3",
-                checked: false,
-            },
-            {
-                id: "44444444-d4e5-f6a7-b8c9-4567890123de",
-                name: "Produs 4",
-                checked: false,
-            },
-            {
-                id: "55555555-e5f6-a7b8-c9d0-5678901234ef",
-                name: "Produs 5",
-                checked: false,
-            },
-            {
-                id: "66666666-f6a7-b8c9-d0e1-6789012345f0",
-                name: "Produs 6",
-                checked: false,
-            },
-        ];
-
-        setItems(demoItems);
-        handleForceIndoor();
-        teleport(DEMO_STORE_LOCATION.lat, DEMO_STORE_LOCATION.lng);
-
-        await loadRoute(
-            demoItems.map((i) => i.id),
-            DEMO_STORE_LOCATION.lat,
-            DEMO_STORE_LOCATION.lng,
-        );
     };
 
     const [footprint, setFootprint] = useState<[number, number][]>([
@@ -709,14 +828,13 @@ const UnifiedMap: React.FC = () => {
                         }}
                         zoomControl={false}
                     >
-                        {/*
-                      NOTE FOR LATER: Map tiles and OSM attribution are hidden per user request.
-                      Re-enable the TileLayer below to show the real-world map again.
-                    */}
-                        {/* <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    /> */}
+                        <style>{`\n                            .leaflet-top.leaflet-left {\n                                margin-top: 60px;\n                            }\n                        `}</style>
+                        <ZoomControl position="topleft" />
+
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
                         <MapEvents />
                         <MapController
                             center={[userLocation.lat, userLocation.lng]}
@@ -781,13 +899,23 @@ const UnifiedMap: React.FC = () => {
 
                         {targetStoreLocation && !isMicroView && (
                             <Polyline
-                                positions={[
-                                    [userLocation.lat, userLocation.lng],
-                                    [activeTarget.lat, activeTarget.lng],
-                                ]}
+                                positions={
+                                    macroRouteGeometry.length > 0
+                                        ? macroRouteGeometry
+                                        : [
+                                              [
+                                                  userLocation.lat,
+                                                  userLocation.lng,
+                                              ],
+                                              [
+                                                  activeTarget.lat,
+                                                  activeTarget.lng,
+                                              ],
+                                          ]
+                                }
                                 pathOptions={{
                                     color: "var(--color-blue-neon)",
-                                    weight: 3,
+                                    weight: 4,
                                     dashArray: "10, 10",
                                 }}
                             />
@@ -834,14 +962,14 @@ const UnifiedMap: React.FC = () => {
                 {isSidebarExpanded && (
                     <button
                         type="button"
-                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-[2400] min-[1000px]:hidden animate-fade-in"
+                        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] z-2400 min-[1000px]:hidden animate-fade-in"
                         onClick={() => setIsSidebarExpanded(false)}
                         aria-label="Close List"
                     />
                 )}
 
                 <div
-                    className={`absolute z-[2500] transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-[400px] min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-[32px] max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
+                    className={`absolute z-2500 transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-100 min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-4xl max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
                 >
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
@@ -850,64 +978,151 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                        <div
-                            className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md shrink-0 ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
-                        >
-                            {isMicroView
-                                ? "Micro View: Indoor"
-                                : "Macro View: City"}
-                        </div>
-                        {!isMicroView && (
-                            <button
-                                type="button"
-                                onClick={handleForceIndoor}
-                                className="flex items-center gap-2 px-4 py-2 bg-surface/90 backdrop-blur-md border border-border rounded-xl text-xs font-bold text-text-strong shadow-lg hover:bg-surface transition-all active:scale-95 shrink-0"
-                            >
-                                <Maximize2
-                                    size={14}
-                                    className="text-green-500"
-                                />
-                                Force Indoor
-                            </button>
-                        )}
+                <div className="absolute top-4 left-4 z-1000 flex flex-col gap-2">
+                    <div
+                        className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
+                    >
+                        {isMicroView
+                            ? "Micro View: Indoor"
+                            : "Macro View: City"}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
-                            <button
-                                type="button"
-                                onClick={() => setIsMockGpsEnabled(true)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
-                                title="Use Mock GPS (Drift)"
-                            >
-                                <Cpu size={12} />
-                                Mock
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsMockGpsEnabled(false)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "text-text-muted hover:text-text-strong" : "bg-blue-600 text-white"}`}
-                                title="Use Real Device GPS"
-                            >
-                                <Satellite size={12} />
-                                Real
-                            </button>
-                        </div>
+                </div>
+
+                <div className="absolute top-4 right-4 z-1000 flex flex-col gap-2">
+                    <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
                         <button
                             type="button"
-                            onClick={handleDemoTSP}
-                            className="flex items-center gap-2 px-4 py-2 bg-accent text-white border border-accent/20 rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all active:scale-95"
+                            onClick={() => setIsMockGpsEnabled(true)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
+                            title="Use Mock GPS (Drift)"
                         >
-                            <Zap size={14} fill="currentColor" />
-                            Demo TSP Route
+                            <Cpu size={12} />
+                            Mock
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsMockGpsEnabled(false)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${isMockGpsEnabled ? "text-text-muted hover:text-text-strong" : "bg-blue-600 text-white"}`}
+                            title="Use Real Device GPS"
+                        >
+                            <Satellite size={12} />
+                            Real
                         </button>
                     </div>
+
+                    {/* Demo action buttons removed per UX request */}
                 </div>
             </div>
 
+            {!isMicroView && targetStoreLocation && (
+                <div
+                    className={`absolute bottom-28 left-6 z-2000 rounded-3xl border border-border bg-surface/95 p-5 shadow-2xl backdrop-blur-xl transition-all duration-500 ${isSidebarExpanded ? "right-6 min-[1000px]:right-106" : "right-6"}`}
+                >
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-black uppercase tracking-tight text-text-strong">
+                                Route Active
+                            </h3>
+                            <p className="text-xs font-medium text-text-muted">
+                                Head to the store entrance
+                            </p>
+                        </div>
+                        <div className="flex rounded-xl border border-border bg-bg-muted p-1 shadow-inner">
+                            <button
+                                type="button"
+                                onClick={() => setTransportMode("driving")}
+                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all ${transportMode === "driving" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
+                            >
+                                <Car size={14} />
+                                <span className="text-[10px] font-black uppercase tracking-widest">
+                                    {activeTransit.driving.timeMins}m
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTransportMode("walking")}
+                                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all ${transportMode === "walking" ? "bg-surface text-accent shadow-sm" : "text-text-muted hover:text-text-strong"}`}
+                            >
+                                <Footprints size={14} />
+                                <span className="text-[10px] font-black uppercase tracking-widest">
+                                    {activeTransit.walking.timeMins}m
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setTargetStoreLocation(null);
+                                setTargetStoreTransit(null);
+                                useStore.getState().setMacroRouteGeometry([]);
+                            }}
+                            className="flex-1 rounded-2xl border border-border bg-bg-muted py-3 text-xs font-black text-text-strong transition-colors hover:bg-bg"
+                        >
+                            CANCEL
+                        </button>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                // When the user taps ARRIVED, switch to indoor/store map
+                                // and populate the indoor route with the selected list items
+                                // (same behavior as Demo TSP but using the real target store).
+                                const activeList = lists.find(
+                                    (l) => l.id === selectedListId,
+                                );
+                                const currentItems = activeList?.items || [];
+
+                                if (currentItems.length === 0) {
+                                    alert(
+                                        "Te rog selectează o listă care conține măcar un produs!",
+                                    );
+                                    return;
+                                }
+
+                                const loc =
+                                    targetStoreLocation || DEMO_STORE_LOCATION;
+
+                                // Enable auto-center and enter indoor mode
+                                setIsAutoCenterEnabled(true);
+                                setTargetStoreLocation(loc);
+                                forceIndoorMode();
+
+                                // Teleport mock GPS into the store
+                                teleport(loc.lat, loc.lng);
+
+                                // Create a simple synthetic indoor route around the store entrance
+                                const customRoute = currentItems.map(
+                                    (item, index) => {
+                                        const latOffset = 0.00015 * (index + 1);
+                                        const lngOffset =
+                                            0.00015 *
+                                            (index % 2 === 0 ? 1 : -1);
+                                        return {
+                                            itemId: item.id,
+                                            name: item.name,
+                                            lat: loc.lat + latOffset,
+                                            lng: loc.lng + lngOffset,
+                                        };
+                                    },
+                                );
+
+                                // Set route and items into global state so StoreMap shows them
+                                useStore.getState().setRoute(customRoute);
+                                setItems(currentItems);
+                            }}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-xs font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                            <CheckCircle2 size={16} />
+                            ARRIVED
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {!isMicroView && (
-                <div className="relative z-[3000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+                <div className="relative z-3000 flex h-21 items-center justify-between border-t border-border bg-surface/80 px-6 shadow-[0_-8px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl">
                     <div className="flex items-center gap-4">
                         <button
                             type="button"

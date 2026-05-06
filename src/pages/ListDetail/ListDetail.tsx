@@ -70,6 +70,7 @@ interface ApiShoppingList {
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
+    onSwitchList?: () => void;
 }
 
 interface ListDetailMainContentProps {
