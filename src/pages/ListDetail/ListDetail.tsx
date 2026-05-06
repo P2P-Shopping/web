@@ -23,7 +23,9 @@ import type { SyncPayload } from "../../dto/SyncPayload";
 import api, {
     aiMultimodalRequest,
     finishShoppingRequest,
+    fetchProductSuggestions,
 } from "../../services/api";
+import type { ProductSuggestion } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import type { ListCategory } from "../../types";
@@ -388,7 +390,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             checked: false,
             brand: brand || undefined,
             quantity: quantity || undefined,
-            price: price ?? undefined,
+            price: price,
         };
 
         const optimisticItems = [...items, newItem];
@@ -779,41 +781,154 @@ interface AddItemModalProps {
     setShowExpanded?: (val: boolean) => void;
 }
 
-/** Component for the item name input field inside the add modal. */
+/** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
-    idPrefix,
-    value,
-    onChange,
-    onTyping,
-    isMobile,
-}: {
+                           idPrefix,
+                           value,
+                           onChange,
+                           onTyping,
+                           isMobile,
+                           setQuantity,
+                           setBrand,
+                           setPrice,
+                       }: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
     onTyping?: () => void;
     isMobile: boolean;
-}) => (
-    <div className="flex flex-col gap-1.5">
-        <label
-            htmlFor={`${idPrefix}-item-name`}
-            className="text-[13px] font-semibold text-text-strong"
-        >
-            Item Name
-        </label>
-        <input
-            id={`${idPrefix}-item-name`}
-            type="text"
-            value={value}
-            onChange={(e) => {
-                onChange(e.target.value);
-                onTyping?.();
-            }}
-            placeholder={isMobile ? "e.g. Milk" : "e.g., Milk"}
-            required
-            className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
-        />
-    </div>
-);
+    setQuantity: (val: string) => void;
+    setBrand: (val: string) => void;
+    setPrice: (val: string) => void;
+}) => {
+    const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+
+    useEffect(() => {
+        if (!value.trim()) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const timerId = setTimeout(async () => {
+            try {
+                const results = await fetchProductSuggestions(value);
+                setSuggestions(results);
+                setShowSuggestions(true);
+                setActiveIndex(-1);
+            } catch (error) {
+                console.error("Eroare la fetch sugestii:", error);
+            }
+        }, 300);
+
+        return () => clearTimeout(timerId);
+    }, [value]);
+
+    const handleSelectSuggestion = (suggestion: ProductSuggestion) => {
+        onChange(suggestion.name);
+
+        if (suggestion.brand) {
+            setBrand(suggestion.brand);
+        }
+
+        if (suggestion.price !== undefined && suggestion.price !== null) {
+            setPrice(String(suggestion.price));
+        } else {
+            setPrice("");
+        }
+
+        if (suggestion.quantity) {
+            setQuantity(suggestion.quantity);
+        } else {
+            setQuantity("1");
+        }
+
+        setShowSuggestions(false);
+        setActiveIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!showSuggestions || suggestions.length === 0) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === "Enter" && activeIndex >= 0) {
+            e.preventDefault();
+            handleSelectSuggestion(suggestions[activeIndex]);
+        } else if (e.key === "Escape") {
+            setShowSuggestions(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-1.5 relative">
+            <label
+                htmlFor={`${idPrefix}-item-name`}
+                className="text-[13px] font-semibold text-text-strong"
+            >
+                Item Name
+            </label>
+            <input
+                id={`${idPrefix}-item-name`}
+                type="text"
+                value={value}
+                onChange={(e) => {
+                    onChange(e.target.value);
+                    onTyping?.();
+                }}
+                onFocus={() => {
+                    if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                onBlur={() => setShowSuggestions(false)}
+                onKeyDown={handleKeyDown}
+                placeholder={isMobile ? "e.g. Milk" : "e.g., Milk"}
+                required
+                autoComplete="off"
+                className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
+            />
+
+            {showSuggestions && suggestions.length > 0 && (
+                <ul className="absolute top-[100%] left-0 right-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {suggestions.map((suggestion, index) => (
+                        <li
+                            key={index}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectSuggestion(suggestion);
+                            }}
+                            className={`px-4 py-2.5 text-sm text-text-strong cursor-pointer border-b border-border/50 last:border-0 transition-colors
+                                ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}
+                            `}
+                        >
+                            {/* Afișăm explicit Numele, Brandul și Prețul */}
+                            <div className="flex justify-between items-center w-full">
+                                <span className="font-medium">{suggestion.name}</span>
+                                <div className="flex gap-2 text-xs">
+                                    {suggestion.brand && (
+                                        <span className="text-text-muted uppercase font-bold opacity-70">
+                                            {suggestion.brand}
+                                        </span>
+                                    )}
+                                    {suggestion.price !== null && suggestion.price !== undefined && (
+                                        <span className="font-bold text-accent">
+                                            {suggestion.price} lei
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+};
 
 /** Button to toggle the display of extra item details (price, brand, etc). */
 const ExpandDetailsButton = ({
@@ -979,6 +1094,9 @@ const AddItemDetailsModal = ({
                     onChange={setItemName}
                     onTyping={onTyping}
                     isMobile={isMobile}
+                    setQuantity={setQuantity}
+                    setBrand={setBrand}
+                    setPrice={setPrice}
                 />
 
                 {isMobile && setShowExpanded && (
@@ -1048,16 +1166,17 @@ const ListHeader = ({
     </header>
 );
 
-/** Inline form component for quickly adding items without details. */
+/** Inline form component for quickly adding items without details. ACUM CU AUTO-FILL COMPLET! */
 const InlineAddForm = ({
-    addInputRef,
-    newItemName,
-    onNameChange,
-    onSubmit,
-    onOpenDetails,
-    isReadOnly,
-    isEmbedded,
-}: {
+                           addInputRef,
+                           newItemName,
+                           onNameChange,
+                           onSubmit,
+                           onOpenDetails,
+                           isReadOnly,
+                           isEmbedded,
+                           onAddFullItem,
+                       }: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
@@ -1065,42 +1184,128 @@ const InlineAddForm = ({
     onOpenDetails: () => void;
     isReadOnly: boolean;
     isEmbedded: boolean;
-}) => (
-    <form
-        onSubmit={onSubmit}
-        className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm ${isEmbedded ? "" : "max-[600px]:hidden"}`}
-    >
-        <input
-            ref={addInputRef}
-            type="text"
-            value={newItemName}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder={
-                isReadOnly ? "List is read-only (sync failed)" : "Add item..."
-            }
-            disabled={isReadOnly}
-            className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
-        />
-        <button
-            type="button"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent hover:bg-accent-subtle hover:border-accent-border border border-border transition-all shrink-0"
-            disabled={isReadOnly}
-            onClick={onOpenDetails}
-            aria-label="Add item details"
-        >
-            <Settings size={18} />
-        </button>
-        <button
-            type="submit"
-            disabled={isReadOnly}
-            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 ${isReadOnly ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}`}
-            aria-label="Add"
-        >
-            <Plus size={18} strokeWidth={3} />
-        </button>
-    </form>
-);
+    onAddFullItem: (suggestion: ProductSuggestion) => void;
+}) => {
+    const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
 
+    useEffect(() => {
+        if (!newItemName.trim() || isReadOnly) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const timerId = setTimeout(async () => {
+            try {
+                const results = await fetchProductSuggestions(newItemName);
+                setSuggestions(results);
+                setShowSuggestions(true);
+                setActiveIndex(-1);
+            } catch (error) {
+                console.error("Eroare la fetch sugestii:", error);
+            }
+        }, 300);
+
+        return () => clearTimeout(timerId);
+    }, [newItemName, isReadOnly]);
+
+    const handleSelectSuggestion = (suggestion: ProductSuggestion) => {
+        onAddFullItem(suggestion);
+        setShowSuggestions(false);
+        setActiveIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!showSuggestions || suggestions.length === 0) return;
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === "Enter" && activeIndex >= 0) {
+            e.preventDefault();
+            handleSelectSuggestion(suggestions[activeIndex]);
+        } else if (e.key === "Escape") {
+            setShowSuggestions(false);
+        }
+    };
+
+    return (
+        <form
+            onSubmit={onSubmit}
+            className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm relative ${isEmbedded ? "" : "max-[600px]:hidden"}`}
+        >
+            <input
+                ref={addInputRef}
+                type="text"
+                value={newItemName}
+                onChange={(e) => onNameChange(e.target.value)}
+                onFocus={() => {
+                    if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                onBlur={() => setShowSuggestions(false)}
+                onKeyDown={handleKeyDown}
+                placeholder={isReadOnly ? "List is read-only" : "Add item..."}
+                disabled={isReadOnly}
+                autoComplete="off"
+                className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
+            />
+
+            {showSuggestions && suggestions.length > 0 && (
+                <ul className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto list-none p-0">
+                    {suggestions.map((suggestion, index) => (
+                        <li
+                            key={index}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectSuggestion(suggestion);
+                            }}
+                            className={`px-4 py-3 text-sm font-medium text-text-strong cursor-pointer border-b border-border/50 last:border-0 transition-colors
+                                ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}
+                            `}
+                        >
+                            {/* AICI ESTE MAGIA: Afișăm pe ecran toate datele din obiect! */}
+                            <div className="flex justify-between items-center w-full">
+                                <span className="font-bold">{suggestion.name}</span>
+                                <div className="flex items-center gap-3 text-[11px]">
+                                    {suggestion.brand && (
+                                        <span className="text-text-muted uppercase opacity-70 tracking-wider">
+                                            {suggestion.brand}
+                                        </span>
+                                    )}
+                                    {suggestion.price !== null && suggestion.price !== undefined && (
+                                        <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
+                                            {suggestion.price} lei
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <button
+                type="button"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent border border-border transition-all shrink-0"
+                disabled={isReadOnly}
+                onClick={onOpenDetails}
+            >
+                <Settings size={18} />
+            </button>
+            <button
+                type="submit"
+                disabled={isReadOnly}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 hover:opacity-90"
+            >
+                <Plus size={18} strokeWidth={3} />
+            </button>
+        </form>
+    );
+};
 /**
  * Main ListDetail component that orchestrates displaying items, managing presence, and handling item additions.
  */
@@ -1413,6 +1618,22 @@ const ListDetail = ({
         }
     };
 
+    const handleInstantAdd = (suggestion: ProductSuggestion) => {
+        // Luăm prețul din sugestie. Dacă e null, dăm undefined ca să nu creeze erori
+        const finalPrice = (suggestion.price !== null && suggestion.price !== undefined)
+            ? Number(suggestion.price)
+            : undefined;
+
+        addItem(
+            suggestion.name,
+            suggestion.quantity || "1",
+            suggestion.brand || undefined,
+            finalPrice
+        );
+
+        setNewItemName("");
+    };
+
     return (
         <div
             className={
@@ -1510,6 +1731,7 @@ const ListDetail = ({
                                 onOpenDetails={openDetailsModal}
                                 isReadOnly={isReadOnly}
                                 isEmbedded={isEmbedded}
+                                onAddFullItem={handleInstantAdd}
                             />
 
                             <div className="min-h-[16px] px-2 flex items-center">
