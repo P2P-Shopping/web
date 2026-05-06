@@ -780,18 +780,61 @@ interface AddItemModalProps {
     showExpanded?: boolean;
     setShowExpanded?: (val: boolean) => void;
 }
+/** Shared Dropdown Component to fix Code Duplication */
+const SuggestionsDropdown = ({
+                                 showSuggestions,
+                                 suggestions,
+                                 activeIndex,
+                                 onSelect
+                             }: {
+    showSuggestions: boolean;
+    suggestions: ProductSuggestion[];
+    activeIndex: number;
+    onSelect: (suggestion: ProductSuggestion) => void;
+}) => {
+    if (!showSuggestions || suggestions.length === 0) return null;
+
+    return (
+        <ul className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto list-none p-0">
+            {suggestions.map((suggestion, index) => (
+                <li
+                    key={suggestion.name}
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        onSelect(suggestion);
+                    }}
+                    className={`px-4 py-3 text-sm font-medium text-text-strong cursor-pointer border-b border-border/50 last:border-0 transition-colors flex justify-between items-center ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}`}
+                >
+                    <span className="font-bold">{suggestion.name}</span>
+                    <div className="flex items-center gap-3 text-[11px]">
+                        {suggestion.brand && (
+                            <span className="text-text-muted uppercase opacity-70 tracking-wider">
+                                {suggestion.brand}
+                            </span>
+                        )}
+                        {suggestion.price !== null && suggestion.price !== undefined && (
+                            <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
+                                {suggestion.price} lei
+                            </span>
+                        )}
+                    </div>
+                </li>
+            ))}
+        </ul>
+    );
+};
 
 /** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
-    idPrefix,
-    value,
-    onChange,
-    onTyping,
-    isMobile,
-    setQuantity,
-    setBrand,
-    setPrice,
-}: {
+                           idPrefix,
+                           value,
+                           onChange,
+                           onTyping,
+                           isMobile,
+                           setQuantity,
+                           setBrand,
+                           setPrice,
+                       }: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
@@ -828,35 +871,26 @@ const ItemNameField = ({
 
     const handleSelectSuggestion = (suggestion: ProductSuggestion) => {
         onChange(suggestion.name);
-
-        if (suggestion.brand) {
-            setBrand(suggestion.brand);
-        }
-
+        if (suggestion.brand) setBrand(suggestion.brand);
         if (suggestion.price !== undefined && suggestion.price !== null) {
             setPrice(String(suggestion.price));
         } else {
             setPrice("");
         }
-
         if (suggestion.quantity) {
             setQuantity(suggestion.quantity);
         } else {
             setQuantity("1");
         }
-
         setShowSuggestions(false);
         setActiveIndex(-1);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (!showSuggestions || suggestions.length === 0) return;
-
         if (e.key === "ArrowDown") {
             e.preventDefault();
-            setActiveIndex((prev) =>
-                prev < suggestions.length - 1 ? prev + 1 : prev,
-            );
+            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
@@ -895,42 +929,12 @@ const ItemNameField = ({
                 className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] transition-all"
             />
 
-            {showSuggestions && suggestions.length > 0 && (
-                <ul className="absolute top-[100%] left-0 right-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
-                    {suggestions.map((suggestion, index) => (
-                        <li
-                            key={suggestion.name}
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                handleSelectSuggestion(suggestion);
-                            }}
-                            className={`px-4 py-2.5 text-sm text-text-strong cursor-pointer border-b border-border/50 last:border-0 transition-colors
-                                ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}
-                            `}
-                        >
-                            {/* Afișăm explicit Numele, Brandul și Prețul */}
-                            <div className="flex justify-between items-center w-full">
-                                <span className="font-medium">
-                                    {suggestion.name}
-                                </span>
-                                <div className="flex gap-2 text-xs">
-                                    {suggestion.brand && (
-                                        <span className="text-text-muted uppercase font-bold opacity-70">
-                                            {suggestion.brand}
-                                        </span>
-                                    )}
-                                    {suggestion.price !== null &&
-                                        suggestion.price !== undefined && (
-                                            <span className="font-bold text-accent">
-                                                {suggestion.price} lei
-                                            </span>
-                                        )}
-                                </div>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <SuggestionsDropdown
+                showSuggestions={showSuggestions}
+                suggestions={suggestions}
+                activeIndex={activeIndex}
+                onSelect={handleSelectSuggestion}
+            />
         </div>
     );
 };
@@ -1171,22 +1175,22 @@ const ListHeader = ({
     </header>
 );
 
-/** Inline form component for quickly adding items without details. ACUM CU AUTO-FILL COMPLET! */
+/** Inline form component for quickly adding items without details. ACUM CU MEMORIE PENTRU AUTO-FILL! */
 const InlineAddForm = ({
-    addInputRef,
-    newItemName,
-    onNameChange,
-    onSubmit,
-    onOpenDetails,
-    isReadOnly,
-    isEmbedded,
-    onAddFullItem,
-}: {
+                           addInputRef,
+                           newItemName,
+                           onNameChange,
+                           onSubmit,
+                           onOpenDetails,
+                           isReadOnly,
+                           isEmbedded,
+                           onAddFullItem,
+                       }: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
     onSubmit: (e: React.FormEvent) => void;
-    onOpenDetails: () => void;
+    onOpenDetails: (suggestion?: ProductSuggestion | null) => void;
     isReadOnly: boolean;
     isEmbedded: boolean;
     onAddFullItem: (suggestion: ProductSuggestion) => void;
@@ -1194,6 +1198,7 @@ const InlineAddForm = ({
     const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
+    const [selectedSuggestion, setSelectedSuggestion] = useState<ProductSuggestion | null>(null);
 
     useEffect(() => {
         if (!newItemName.trim() || isReadOnly) {
@@ -1217,7 +1222,8 @@ const InlineAddForm = ({
     }, [newItemName, isReadOnly]);
 
     const handleSelectSuggestion = (suggestion: ProductSuggestion) => {
-        onAddFullItem(suggestion);
+        onNameChange(suggestion.name);
+        setSelectedSuggestion(suggestion);
         setShowSuggestions(false);
         setActiveIndex(-1);
     };
@@ -1226,30 +1232,45 @@ const InlineAddForm = ({
         if (!showSuggestions || suggestions.length === 0) return;
         if (e.key === "ArrowDown") {
             e.preventDefault();
-            setActiveIndex((prev) =>
-                prev < suggestions.length - 1 ? prev + 1 : prev,
-            );
+            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
         } else if (e.key === "Enter" && activeIndex >= 0) {
             e.preventDefault();
-            handleSelectSuggestion(suggestions[activeIndex]);
+            onAddFullItem(suggestions[activeIndex]);
+            setShowSuggestions(false);
+            setActiveIndex(-1);
         } else if (e.key === "Escape") {
             setShowSuggestions(false);
         }
     };
 
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newItemName.trim()) return;
+
+        if (selectedSuggestion && selectedSuggestion.name === newItemName) {
+            onAddFullItem(selectedSuggestion);
+        } else {
+            onSubmit(e);
+        }
+        setSelectedSuggestion(null);
+    };
+
     return (
         <form
-            onSubmit={onSubmit}
+            onSubmit={handleFormSubmit}
             className={`flex items-center gap-2 bg-surface border border-border rounded-xl p-[10px_14px] shadow-sm relative ${isEmbedded ? "" : "max-[600px]:hidden"}`}
         >
             <input
                 ref={addInputRef}
                 type="text"
                 value={newItemName}
-                onChange={(e) => onNameChange(e.target.value)}
+                onChange={(e) => {
+                    onNameChange(e.target.value);
+                    setSelectedSuggestion(null);
+                }}
                 onFocus={() => {
                     if (suggestions.length > 0) setShowSuggestions(true);
                 }}
@@ -1261,48 +1282,18 @@ const InlineAddForm = ({
                 className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
             />
 
-            {showSuggestions && suggestions.length > 0 && (
-                <ul className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto list-none p-0">
-                    {suggestions.map((suggestion, index) => (
-                        <li
-                            key={suggestion.name}
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                handleSelectSuggestion(suggestion);
-                            }}
-                            className={`px-4 py-3 text-sm font-medium text-text-strong cursor-pointer border-b border-border/50 last:border-0 transition-colors
-                                ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}
-                            `}
-                        >
-                            {/* Display all item details */}
-                            <div className="flex justify-between items-center w-full">
-                                <span className="font-bold">
-                                    {suggestion.name}
-                                </span>
-                                <div className="flex items-center gap-3 text-[11px]">
-                                    {suggestion.brand && (
-                                        <span className="text-text-muted uppercase opacity-70 tracking-wider">
-                                            {suggestion.brand}
-                                        </span>
-                                    )}
-                                    {suggestion.price !== null &&
-                                        suggestion.price !== undefined && (
-                                            <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
-                                                {suggestion.price} lei
-                                            </span>
-                                        )}
-                                </div>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <SuggestionsDropdown
+                showSuggestions={showSuggestions}
+                suggestions={suggestions}
+                activeIndex={activeIndex}
+                onSelect={handleSelectSuggestion}
+            />
 
             <button
                 type="button"
                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent border border-border transition-all shrink-0"
                 disabled={isReadOnly}
-                onClick={onOpenDetails}
+                onClick={() => onOpenDetails(selectedSuggestion)}
             >
                 <Settings size={18} />
             </button>
