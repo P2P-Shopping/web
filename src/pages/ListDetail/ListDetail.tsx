@@ -64,6 +64,8 @@ interface ApiShoppingList {
     id: string;
     category?: ListCategory;
     items?: ApiListItem[];
+    ownerEmail?: string;
+    collaboratorEmails?: string[];
 }
 
 interface ListDetailProps {
@@ -160,9 +162,11 @@ const useListItems = (effectiveListId: string | undefined) => {
                     isRecurrent: item.isRecurrent,
                 }));
                 setItems(mappedItems);
-                if (currentList.category) {
+                if (currentList.category || currentList.ownerEmail || currentList.collaboratorEmails) {
                     useListsStore.getState().updateList(targetListId, {
                         category: currentList.category,
+                        ownerEmail: currentList.ownerEmail,
+                        collaboratorEmails: currentList.collaboratorEmails,
                     });
                 }
                 syncListItemsInStore(mappedItems, targetListId);
