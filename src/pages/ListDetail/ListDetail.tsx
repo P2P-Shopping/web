@@ -782,11 +782,11 @@ interface AddItemModalProps {
 }
 /** Shared Dropdown Component to fix Code Duplication */
 const SuggestionsDropdown = ({
-                                 showSuggestions,
-                                 suggestions,
-                                 activeIndex,
-                                 onSelect
-                             }: {
+    showSuggestions,
+    suggestions,
+    activeIndex,
+    onSelect,
+}: {
     showSuggestions: boolean;
     suggestions: ProductSuggestion[];
     activeIndex: number;
@@ -812,11 +812,12 @@ const SuggestionsDropdown = ({
                                 {suggestion.brand}
                             </span>
                         )}
-                        {suggestion.price !== null && suggestion.price !== undefined && (
-                            <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
-                                {suggestion.price} lei
-                            </span>
-                        )}
+                        {suggestion.price !== null &&
+                            suggestion.price !== undefined && (
+                                <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
+                                    {suggestion.price} lei
+                                </span>
+                            )}
                     </div>
                 </li>
             ))}
@@ -826,15 +827,15 @@ const SuggestionsDropdown = ({
 
 /** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
-                           idPrefix,
-                           value,
-                           onChange,
-                           onTyping,
-                           isMobile,
-                           setQuantity,
-                           setBrand,
-                           setPrice,
-                       }: {
+    idPrefix,
+    value,
+    onChange,
+    onTyping,
+    isMobile,
+    setQuantity,
+    setBrand,
+    setPrice,
+}: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
@@ -890,7 +891,9 @@ const ItemNameField = ({
         if (!showSuggestions || suggestions.length === 0) return;
         if (e.key === "ArrowDown") {
             e.preventDefault();
-            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+            setActiveIndex((prev) =>
+                prev < suggestions.length - 1 ? prev + 1 : prev,
+            );
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
@@ -1177,15 +1180,15 @@ const ListHeader = ({
 
 /** Inline form component for quickly adding items without details. ACUM CU MEMORIE PENTRU AUTO-FILL! */
 const InlineAddForm = ({
-                           addInputRef,
-                           newItemName,
-                           onNameChange,
-                           onSubmit,
-                           onOpenDetails,
-                           isReadOnly,
-                           isEmbedded,
-                           onAddFullItem,
-                       }: {
+    addInputRef,
+    newItemName,
+    onNameChange,
+    onSubmit,
+    onOpenDetails,
+    isReadOnly,
+    isEmbedded,
+    onAddFullItem,
+}: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
@@ -1198,7 +1201,8 @@ const InlineAddForm = ({
     const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
-    const [selectedSuggestion, setSelectedSuggestion] = useState<ProductSuggestion | null>(null);
+    const [selectedSuggestion, setSelectedSuggestion] =
+        useState<ProductSuggestion | null>(null);
 
     useEffect(() => {
         if (!newItemName.trim() || isReadOnly) {
@@ -1232,7 +1236,9 @@ const InlineAddForm = ({
         if (!showSuggestions || suggestions.length === 0) return;
         if (e.key === "ArrowDown") {
             e.preventDefault();
-            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+            setActiveIndex((prev) =>
+                prev < suggestions.length - 1 ? prev + 1 : prev,
+            );
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
