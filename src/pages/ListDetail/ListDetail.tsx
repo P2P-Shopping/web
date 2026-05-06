@@ -222,8 +222,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     };
 
     const handleReviewConfirm = async ({
-                                           items: feedback,
-                                       }: ReviewSubmission) => {
+        items: feedback,
+    }: ReviewSubmission) => {
         try {
             for (const item of feedback) {
                 const res = await fetch(
@@ -679,10 +679,10 @@ const useListPresence = (effectiveListId: string | undefined) => {
 };
 
 const ListSelectionView = ({
-                               lists,
-                               isLoading,
-                               onSelect,
-                           }: {
+    lists,
+    isLoading,
+    onSelect,
+}: {
     lists: { id: string; name: string; items: Item[] }[];
     isLoading: boolean;
     onSelect: (id: string) => void;
@@ -832,11 +832,11 @@ const useProductAutocomplete = (
  * Shared Dropdown Component to fix Code Duplication
  */
 const SuggestionsDropdown = ({
-                                 showSuggestions,
-                                 suggestions,
-                                 activeIndex,
-                                 onSelect,
-                             }: {
+    showSuggestions,
+    suggestions,
+    activeIndex,
+    onSelect,
+}: {
     showSuggestions: boolean;
     suggestions: ProductSuggestion[];
     activeIndex: number;
@@ -887,15 +887,15 @@ const SuggestionsDropdown = ({
 
 /** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
-                           idPrefix,
-                           value,
-                           onChange,
-                           onTyping,
-                           isMobile,
-                           setQuantity,
-                           setBrand,
-                           setPrice,
-                       }: {
+    idPrefix,
+    value,
+    onChange,
+    onTyping,
+    isMobile,
+    setQuantity,
+    setBrand,
+    setPrice,
+}: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
@@ -970,9 +970,9 @@ const ItemNameField = ({
 };
 
 const ExpandDetailsButton = ({
-                                 showExpanded,
-                                 onClick,
-                             }: {
+    showExpanded,
+    onClick,
+}: {
     showExpanded: boolean;
     onClick: () => void;
 }) => (
@@ -993,15 +993,15 @@ const ExpandDetailsButton = ({
 );
 
 const ItemDetailsFields = ({
-                               idPrefix,
-                               quantity,
-                               setQuantity,
-                               price,
-                               setPrice,
-                               brand,
-                               setBrand,
-                               isMobile,
-                           }: {
+    idPrefix,
+    quantity,
+    setQuantity,
+    price,
+    setPrice,
+    brand,
+    setBrand,
+    isMobile,
+}: {
     idPrefix: string;
     quantity: string;
     setQuantity: (val: string) => void;
@@ -1074,25 +1074,25 @@ const ItemDetailsFields = ({
 );
 
 const AddItemDetailsModal = ({
-                                 isOpen,
-                                 onClose,
-                                 onSubmit,
-                                 title,
-                                 subtitle,
-                                 idPrefix,
-                                 itemName,
-                                 setItemName,
-                                 quantity,
-                                 setQuantity,
-                                 brand,
-                                 setBrand,
-                                 price,
-                                 setPrice,
-                                 onTyping,
-                                 isMobile = false,
-                                 showExpanded = true,
-                                 setShowExpanded,
-                             }: AddItemModalProps) => {
+    isOpen,
+    onClose,
+    onSubmit,
+    title,
+    subtitle,
+    idPrefix,
+    itemName,
+    setItemName,
+    quantity,
+    setQuantity,
+    brand,
+    setBrand,
+    price,
+    setPrice,
+    onTyping,
+    isMobile = false,
+    showExpanded = true,
+    setShowExpanded,
+}: AddItemModalProps) => {
     return (
         <Modal
             isOpen={isOpen}
@@ -1160,9 +1160,9 @@ const AddItemDetailsModal = ({
 };
 
 const ListErrorAlert = ({
-                            error,
-                            isEmbedded,
-                        }: {
+    error,
+    isEmbedded,
+}: {
     error: string;
     isEmbedded: boolean;
 }) => (
@@ -1178,9 +1178,9 @@ const ListErrorAlert = ({
 );
 
 const ListHeader = ({
-                        effectiveListId,
-                        onSwitchList,
-                    }: {
+    effectiveListId,
+    onSwitchList,
+}: {
     effectiveListId: string;
     onSwitchList?: () => void;
 }) => (
@@ -1202,15 +1202,15 @@ const ListHeader = ({
 
 /** Inline form component for quickly adding items without details. ACUM CU MEMORIE PENTRU AUTO-FILL! */
 const InlineAddForm = ({
-                           addInputRef,
-                           newItemName,
-                           onNameChange,
-                           onSubmit,
-                           onOpenDetails,
-                           isReadOnly,
-                           isEmbedded,
-                           onAddFullItem,
-                       }: {
+    addInputRef,
+    newItemName,
+    onNameChange,
+    onSubmit,
+    onOpenDetails,
+    isReadOnly,
+    isEmbedded,
+    onAddFullItem,
+}: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
@@ -1315,10 +1315,10 @@ const InlineAddForm = ({
 };
 
 const ListDetail = ({
-                        isEmbedded = false,
-                        listIdOverride,
-                        onSwitchList,
-                    }: ListDetailProps) => {
+    isEmbedded = false,
+    listIdOverride,
+    onSwitchList,
+}: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const effectiveListId = listIdOverride ?? id;
