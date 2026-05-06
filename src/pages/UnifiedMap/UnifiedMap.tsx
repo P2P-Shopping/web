@@ -515,10 +515,7 @@ const ListDetailView: React.FC<ListDetailViewProps> = ({
                 </button>
             )}
             <div className="flex-1 overflow-y-auto scrollbar-thin">
-                <ListDetail
-                    isEmbedded={true}
-                    listIdOverride={selectedListId}
-                />
+                <ListDetail isEmbedded={true} listIdOverride={selectedListId} />
             </div>
 
             {!targetStoreLocation && !isMicroView && (

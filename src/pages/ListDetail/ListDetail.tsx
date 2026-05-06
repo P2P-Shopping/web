@@ -29,7 +29,11 @@ import api, {
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import type { Item as GlobalItem, ListCategory, ShoppingList } from "../../types";
+import type {
+    Item as GlobalItem,
+    ListCategory,
+    ShoppingList,
+} from "../../types";
 import { buildItemDuplicateKey } from "../../utils/listUtils";
 import RenameListModal from "../Dashboard/RenameListModal";
 import ShareListModal from "../Dashboard/ShareListModal";
@@ -1616,7 +1620,9 @@ const ListDetail = ({
 
     const performItemsImport = async (targetList: ShoppingList) => {
         const existingKeys = new Set(
-            targetList.items.map((item: GlobalItem) => buildItemDuplicateKey(item)),
+            targetList.items.map((item: GlobalItem) =>
+                buildItemDuplicateKey(item),
+            ),
         );
         const itemsToImport = items.filter(
             (item) =>
