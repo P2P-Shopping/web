@@ -136,13 +136,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                 const response = await api.get<ApiShoppingList>(
                     `/api/lists/${targetListId}`,
                 );
-                // Note: api.get returns response.data directly in the feature branch implementation of 'api' service usually,
-                // but main seems to have switched to 'fetch' or a different api wrapper.
-                // Looking at the conflict:
-                // HEAD: const currentList = response.data;
-                // main: if (!response.ok) { ... } const currentList = (await response.json()) as ApiShoppingList;
-                // If 'api' is the axios-like wrapper from feature branch, it has .data.
-                // Let's check what 'api' is.
 
                 const currentList = response.data;
                 if (!currentList) {
@@ -229,8 +222,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     };
 
     const handleReviewConfirm = async ({
-        items: feedback,
-    }: ReviewSubmission) => {
+                                           items: feedback,
+                                       }: ReviewSubmission) => {
         try {
             for (const item of feedback) {
                 const res = await fetch(
@@ -780,13 +773,92 @@ interface AddItemModalProps {
     showExpanded?: boolean;
     setShowExpanded?: (val: boolean) => void;
 }
-/** Shared Dropdown Component to fix Code Duplication */
+/**
+ * Custom hook to extract duplicate Autocomplete logic.
+ */
+const useProductAutocomplete = (
+    inputValue: string,
+    isDisabled: boolean = false,
+    onSuggestionSelect: (suggestion: ProductSuggestion) => void
+) => {
+    const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+
+    useEffect(() => {
+        if (!inputValue.trim() || isDisabled) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        let isMounted = true; // Flag for preventing race conditions
+
+        const timerId = setTimeout(async () => {
+            try {
+                const results = await fetchProductSuggestions(inputValue);
+                if (isMounted) { // Only update UI if this is still the active request
+                    setSuggestions(results);
+                    setShowSuggestions(true);
+                    setActiveIndex(-1);
+                }
+            } catch (error) {
+                if (isMounted) console.error("Eroare la fetch sugestii:", error);
+            }
+        }, 300);
+
+        return () => {
+            isMounted = false; // Invalidate stale requests when input changes
+            clearTimeout(timerId);
+        };
+    }, [inputValue, isDisabled]);
+
+    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!showSuggestions || suggestions.length === 0) return;
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveIndex((prev) =>
+                prev < suggestions.length - 1 ? prev + 1 : prev,
+            );
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === "Enter" && activeIndex >= 0) {
+            e.preventDefault();
+            onSuggestionSelect(suggestions[activeIndex]);
+            setShowSuggestions(false);
+            setActiveIndex(-1);
+        } else if (e.key === "Escape") {
+            setShowSuggestions(false);
+        }
+    }, [activeIndex, onSuggestionSelect, showSuggestions, suggestions]);
+
+    const selectSuggestion = useCallback((suggestion: ProductSuggestion) => {
+        onSuggestionSelect(suggestion);
+        setShowSuggestions(false);
+        setActiveIndex(-1);
+    }, [onSuggestionSelect]);
+
+    return {
+        suggestions,
+        showSuggestions,
+        setShowSuggestions,
+        activeIndex,
+        handleKeyDown,
+        selectSuggestion
+    };
+};
+
+/**
+ * Shared Dropdown Component to fix Code Duplication
+ * FIX (CodeRabbit): Added accessibility roles and interactive <button> wrapper.
+ */
 const SuggestionsDropdown = ({
-    showSuggestions,
-    suggestions,
-    activeIndex,
-    onSelect,
-}: {
+                                 showSuggestions,
+                                 suggestions,
+                                 activeIndex,
+                                 onSelect,
+                             }: {
     showSuggestions: boolean;
     suggestions: ProductSuggestion[];
     activeIndex: number;
@@ -795,47 +867,52 @@ const SuggestionsDropdown = ({
     if (!showSuggestions || suggestions.length === 0) return null;
 
     return (
-        <ul className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto list-none p-0">
+        <ul role="listbox" className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto list-none p-0">
             {suggestions.map((suggestion, index) => (
                 <li
-                    key={suggestion.name}
-                    onMouseDown={(e) => {
-                        e.preventDefault();
-                        onSelect(suggestion);
-                    }}
-                    className={`px-4 py-3 text-sm font-medium text-text-strong cursor-pointer border-b border-border/50 last:border-0 transition-colors flex justify-between items-center ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}`}
+                    key={(suggestion as any).id || suggestion.name}
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    className={`border-b border-border/50 last:border-0 transition-colors ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}`}
                 >
-                    <span className="font-bold">{suggestion.name}</span>
-                    <div className="flex items-center gap-3 text-[11px]">
-                        {suggestion.brand && (
-                            <span className="text-text-muted uppercase opacity-70 tracking-wider">
-                                {suggestion.brand}
-                            </span>
-                        )}
-                        {suggestion.price !== null &&
-                            suggestion.price !== undefined && (
+                    <button
+                        type="button"
+                        className="w-full text-left px-4 py-3 flex justify-between items-center text-sm font-medium text-text-strong cursor-pointer outline-none focus:bg-bg-muted"
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            onSelect(suggestion);
+                        }}
+                    >
+                        <span className="font-bold">{suggestion.name}</span>
+                        <div className="flex items-center gap-3 text-[11px]">
+                            {suggestion.brand && (
+                                <span className="text-text-muted uppercase opacity-70 tracking-wider">
+                                    {suggestion.brand}
+                                </span>
+                            )}
+                            {suggestion.price !== null && suggestion.price !== undefined && (
                                 <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
                                     {suggestion.price} lei
                                 </span>
                             )}
-                    </div>
+                        </div>
+                    </button>
                 </li>
             ))}
         </ul>
     );
 };
-
 /** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
-    idPrefix,
-    value,
-    onChange,
-    onTyping,
-    isMobile,
-    setQuantity,
-    setBrand,
-    setPrice,
-}: {
+                           idPrefix,
+                           value,
+                           onChange,
+                           onTyping,
+                           isMobile,
+                           setQuantity,
+                           setBrand,
+                           setPrice,
+                       }: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
@@ -845,32 +922,7 @@ const ItemNameField = ({
     setBrand: (val: string) => void;
     setPrice: (val: string) => void;
 }) => {
-    const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [activeIndex, setActiveIndex] = useState(-1);
-
-    useEffect(() => {
-        if (!value.trim()) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        const timerId = setTimeout(async () => {
-            try {
-                const results = await fetchProductSuggestions(value);
-                setSuggestions(results);
-                setShowSuggestions(true);
-                setActiveIndex(-1);
-            } catch (error) {
-                console.error("Eroare la fetch sugestii:", error);
-            }
-        }, 300);
-
-        return () => clearTimeout(timerId);
-    }, [value]);
-
-    const handleSelectSuggestion = (suggestion: ProductSuggestion) => {
+    const handleSelect = useCallback((suggestion: ProductSuggestion) => {
         onChange(suggestion.name);
         if (suggestion.brand) setBrand(suggestion.brand);
         if (suggestion.price !== undefined && suggestion.price !== null) {
@@ -883,27 +935,16 @@ const ItemNameField = ({
         } else {
             setQuantity("1");
         }
-        setShowSuggestions(false);
-        setActiveIndex(-1);
-    };
+    }, [onChange, setBrand, setPrice, setQuantity]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!showSuggestions || suggestions.length === 0) return;
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setActiveIndex((prev) =>
-                prev < suggestions.length - 1 ? prev + 1 : prev,
-            );
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
-        } else if (e.key === "Enter" && activeIndex >= 0) {
-            e.preventDefault();
-            handleSelectSuggestion(suggestions[activeIndex]);
-        } else if (e.key === "Escape") {
-            setShowSuggestions(false);
-        }
-    };
+    const {
+        suggestions,
+        showSuggestions,
+        setShowSuggestions,
+        activeIndex,
+        handleKeyDown,
+        selectSuggestion
+    } = useProductAutocomplete(value, false, handleSelect);
 
     return (
         <div className="flex flex-col gap-1.5 relative">
@@ -936,7 +977,7 @@ const ItemNameField = ({
                 showSuggestions={showSuggestions}
                 suggestions={suggestions}
                 activeIndex={activeIndex}
-                onSelect={handleSelectSuggestion}
+                onSelect={selectSuggestion}
             />
         </div>
     );
@@ -1180,15 +1221,15 @@ const ListHeader = ({
 
 /** Inline form component for quickly adding items without details. ACUM CU MEMORIE PENTRU AUTO-FILL! */
 const InlineAddForm = ({
-    addInputRef,
-    newItemName,
-    onNameChange,
-    onSubmit,
-    onOpenDetails,
-    isReadOnly,
-    isEmbedded,
-    onAddFullItem,
-}: {
+                           addInputRef,
+                           newItemName,
+                           onNameChange,
+                           onSubmit,
+                           onOpenDetails,
+                           isReadOnly,
+                           isEmbedded,
+                           onAddFullItem,
+                       }: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
@@ -1198,57 +1239,29 @@ const InlineAddForm = ({
     isEmbedded: boolean;
     onAddFullItem: (suggestion: ProductSuggestion) => void;
 }) => {
-    const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [activeIndex, setActiveIndex] = useState(-1);
-    const [selectedSuggestion, setSelectedSuggestion] =
-        useState<ProductSuggestion | null>(null);
+    const [selectedSuggestion, setSelectedSuggestion] = useState<ProductSuggestion | null>(null);
 
-    useEffect(() => {
-        if (!newItemName.trim() || isReadOnly) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        const timerId = setTimeout(async () => {
-            try {
-                const results = await fetchProductSuggestions(newItemName);
-                setSuggestions(results);
-                setShowSuggestions(true);
-                setActiveIndex(-1);
-            } catch (error) {
-                console.error("Eroare la fetch sugestii:", error);
-            }
-        }, 300);
-
-        return () => clearTimeout(timerId);
-    }, [newItemName, isReadOnly]);
-
-    const handleSelectSuggestion = (suggestion: ProductSuggestion) => {
+    const handleSelect = useCallback((suggestion: ProductSuggestion) => {
         onNameChange(suggestion.name);
         setSelectedSuggestion(suggestion);
-        setShowSuggestions(false);
-        setActiveIndex(-1);
-    };
+    }, [onNameChange]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!showSuggestions || suggestions.length === 0) return;
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setActiveIndex((prev) =>
-                prev < suggestions.length - 1 ? prev + 1 : prev,
-            );
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
-        } else if (e.key === "Enter" && activeIndex >= 0) {
+    const {
+        suggestions,
+        showSuggestions,
+        setShowSuggestions,
+        activeIndex,
+        handleKeyDown,
+        selectSuggestion
+    } = useProductAutocomplete(newItemName, isReadOnly, handleSelect);
+
+    const handleKeyDownWithOverride = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && activeIndex >= 0) {
             e.preventDefault();
             onAddFullItem(suggestions[activeIndex]);
             setShowSuggestions(false);
-            setActiveIndex(-1);
-        } else if (e.key === "Escape") {
-            setShowSuggestions(false);
+        } else {
+            handleKeyDown(e);
         }
     };
 
@@ -1281,7 +1294,7 @@ const InlineAddForm = ({
                     if (suggestions.length > 0) setShowSuggestions(true);
                 }}
                 onBlur={() => setShowSuggestions(false)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={handleKeyDownWithOverride}
                 placeholder={isReadOnly ? "List is read-only" : "Add item..."}
                 disabled={isReadOnly}
                 autoComplete="off"
@@ -1292,7 +1305,7 @@ const InlineAddForm = ({
                 showSuggestions={showSuggestions}
                 suggestions={suggestions}
                 activeIndex={activeIndex}
-                onSelect={handleSelectSuggestion}
+                onSelect={selectSuggestion}
             />
 
             <button
@@ -1499,11 +1512,24 @@ const ListDetail = ({
         setNewItemName("");
     };
 
-    const openDetailsModal = () => {
+    const openDetailsModal = (suggestion?: ProductSuggestion | null) => {
         setDetailName(newItemName);
-        setDetailQuantity("");
-        setDetailBrand("");
-        setDetailPrice("");
+
+        // FIX (CodeRabbit): Propagate selected suggestion metadata into modal
+        if (suggestion) {
+            setDetailQuantity(suggestion.quantity || "1");
+            setDetailBrand(suggestion.brand || "");
+            setDetailPrice(suggestion.price !== null && suggestion.price !== undefined ? String(suggestion.price) : "");
+            // Show expanded section automatically if we have metadata
+            if (suggestion.brand || suggestion.price) {
+                setShowExpandedDetails(true);
+            }
+        } else {
+            setDetailQuantity("");
+            setDetailBrand("");
+            setDetailPrice("");
+        }
+
         setShowDetailsModal(true);
     };
 
