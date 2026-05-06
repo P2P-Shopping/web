@@ -88,16 +88,23 @@ export interface ProductSuggestion {
     price: number | null;
     quantity: string;
 }
-export const fetchProductSuggestions = async (query: string): Promise<ProductSuggestion[]> => {
+export const fetchProductSuggestions = async (
+    query: string,
+): Promise<ProductSuggestion[]> => {
     if (!query || query.trim().length === 0) {
         return [];
     }
 
     try {
-        const response = await api.get<ProductSuggestion[]>(`/api/catalog/suggest?q=${encodeURIComponent(query)}`);
+        const response = await api.get<ProductSuggestion[]>(
+            `/api/catalog/suggest?q=${encodeURIComponent(query)}`,
+        );
         return response.data;
     } catch (error) {
-        console.error("Error while fetching the suggestions from backend: ", error);
+        console.error(
+            "Error while fetching the suggestions from backend: ",
+            error,
+        );
         return [];
     }
 };

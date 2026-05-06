@@ -20,12 +20,12 @@ import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
+import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
-    finishShoppingRequest,
     fetchProductSuggestions,
+    finishShoppingRequest,
 } from "../../services/api";
-import type { ProductSuggestion } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import type { ListCategory } from "../../types";
@@ -783,15 +783,15 @@ interface AddItemModalProps {
 
 /** Component for the item name input field inside the add modal, with Autocomplete. */
 const ItemNameField = ({
-                           idPrefix,
-                           value,
-                           onChange,
-                           onTyping,
-                           isMobile,
-                           setQuantity,
-                           setBrand,
-                           setPrice,
-                       }: {
+    idPrefix,
+    value,
+    onChange,
+    onTyping,
+    isMobile,
+    setQuantity,
+    setBrand,
+    setPrice,
+}: {
     idPrefix: string;
     value: string;
     onChange: (val: string) => void;
@@ -854,7 +854,9 @@ const ItemNameField = ({
 
         if (e.key === "ArrowDown") {
             e.preventDefault();
-            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+            setActiveIndex((prev) =>
+                prev < suggestions.length - 1 ? prev + 1 : prev,
+            );
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
@@ -897,7 +899,7 @@ const ItemNameField = ({
                 <ul className="absolute top-[100%] left-0 right-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
                     {suggestions.map((suggestion, index) => (
                         <li
-                            key={index}
+                            key={suggestion.name}
                             onMouseDown={(e) => {
                                 e.preventDefault();
                                 handleSelectSuggestion(suggestion);
@@ -908,18 +910,21 @@ const ItemNameField = ({
                         >
                             {/* Afișăm explicit Numele, Brandul și Prețul */}
                             <div className="flex justify-between items-center w-full">
-                                <span className="font-medium">{suggestion.name}</span>
+                                <span className="font-medium">
+                                    {suggestion.name}
+                                </span>
                                 <div className="flex gap-2 text-xs">
                                     {suggestion.brand && (
                                         <span className="text-text-muted uppercase font-bold opacity-70">
                                             {suggestion.brand}
                                         </span>
                                     )}
-                                    {suggestion.price !== null && suggestion.price !== undefined && (
-                                        <span className="font-bold text-accent">
-                                            {suggestion.price} lei
-                                        </span>
-                                    )}
+                                    {suggestion.price !== null &&
+                                        suggestion.price !== undefined && (
+                                            <span className="font-bold text-accent">
+                                                {suggestion.price} lei
+                                            </span>
+                                        )}
                                 </div>
                             </div>
                         </li>
@@ -1168,15 +1173,15 @@ const ListHeader = ({
 
 /** Inline form component for quickly adding items without details. ACUM CU AUTO-FILL COMPLET! */
 const InlineAddForm = ({
-                           addInputRef,
-                           newItemName,
-                           onNameChange,
-                           onSubmit,
-                           onOpenDetails,
-                           isReadOnly,
-                           isEmbedded,
-                           onAddFullItem,
-                       }: {
+    addInputRef,
+    newItemName,
+    onNameChange,
+    onSubmit,
+    onOpenDetails,
+    isReadOnly,
+    isEmbedded,
+    onAddFullItem,
+}: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
     onNameChange: (val: string) => void;
@@ -1221,7 +1226,9 @@ const InlineAddForm = ({
         if (!showSuggestions || suggestions.length === 0) return;
         if (e.key === "ArrowDown") {
             e.preventDefault();
-            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+            setActiveIndex((prev) =>
+                prev < suggestions.length - 1 ? prev + 1 : prev,
+            );
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1));
@@ -1258,7 +1265,7 @@ const InlineAddForm = ({
                 <ul className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto list-none p-0">
                     {suggestions.map((suggestion, index) => (
                         <li
-                            key={index}
+                            key={suggestion.name}
                             onMouseDown={(e) => {
                                 e.preventDefault();
                                 handleSelectSuggestion(suggestion);
@@ -1267,20 +1274,23 @@ const InlineAddForm = ({
                                 ${index === activeIndex ? "bg-bg-muted" : "hover:bg-bg-muted"}
                             `}
                         >
-                            {/* AICI ESTE MAGIA: Afișăm pe ecran toate datele din obiect! */}
+                            {/* Display all item details */}
                             <div className="flex justify-between items-center w-full">
-                                <span className="font-bold">{suggestion.name}</span>
+                                <span className="font-bold">
+                                    {suggestion.name}
+                                </span>
                                 <div className="flex items-center gap-3 text-[11px]">
                                     {suggestion.brand && (
                                         <span className="text-text-muted uppercase opacity-70 tracking-wider">
                                             {suggestion.brand}
                                         </span>
                                     )}
-                                    {suggestion.price !== null && suggestion.price !== undefined && (
-                                        <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
-                                            {suggestion.price} lei
-                                        </span>
-                                    )}
+                                    {suggestion.price !== null &&
+                                        suggestion.price !== undefined && (
+                                            <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
+                                                {suggestion.price} lei
+                                            </span>
+                                        )}
                                 </div>
                             </div>
                         </li>
@@ -1619,16 +1629,16 @@ const ListDetail = ({
     };
 
     const handleInstantAdd = (suggestion: ProductSuggestion) => {
-        // Luăm prețul din sugestie. Dacă e null, dăm undefined ca să nu creeze erori
-        const finalPrice = (suggestion.price !== null && suggestion.price !== undefined)
-            ? Number(suggestion.price)
-            : undefined;
+        const finalPrice =
+            suggestion.price !== null && suggestion.price !== undefined
+                ? Number(suggestion.price)
+                : undefined;
 
         addItem(
             suggestion.name,
             suggestion.quantity || "1",
             suggestion.brand || undefined,
-            finalPrice
+            finalPrice,
         );
 
         setNewItemName("");
