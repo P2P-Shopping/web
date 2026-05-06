@@ -1,5 +1,5 @@
 export const uuid = () => {
-    const crypto = globalThis.crypto as any;
+    const crypto = globalThis.crypto;
     if (crypto?.randomUUID) {
         return crypto.randomUUID();
     }

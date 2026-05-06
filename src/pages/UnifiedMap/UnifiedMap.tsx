@@ -33,7 +33,6 @@ import {
     DEMO_STORE_LOCATION,
     GEOFENCE_RADIUS_METERS,
 } from "../../services/geofence";
-import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
 import type { ShoppingList } from "../../types";
@@ -59,12 +58,22 @@ interface ApiStoreMatch {
     storeName: string;
     matchedItems: number;
     distanceMeters: number;
-    lat: number;
-    lng: number;
+    lat?: number;
+    lng?: number;
+    latitude?: number;
+    longitude?: number;
+    location?: { lat?: number; lng?: number };
+    coords?: { lat?: number; lng?: number; lon?: number };
+    point?: { lat?: number; lng?: number; lon?: number };
+    x?: number;
+    y?: number;
+    px?: number;
+    py?: number;
+    lon?: number;
     address?: string;
     transit?: {
-        driving?: { timeMins: number; distanceKm: string | number };
-        walking?: { timeMins: number; distanceKm: string | number };
+        driving?: { timeMins?: number; distanceKm?: string | number };
+        walking?: { timeMins?: number; distanceKm?: string | number };
     };
 }
 
@@ -592,35 +601,35 @@ const UnifiedMap: React.FC = () => {
                     // lat/lng, try a light geocoding lookup using Nominatim (OSM) before
                     // falling back to DEMO_STORE_LOCATION. This prevents every store
                     // defaulting to the demo (Palas) location when coords are missing.
-                    const parseNumber = (v: any) =>
+                    const parseNumber = (v: unknown) =>
                         v != null && v !== "" ? Number(v) : NaN;
 
                     // Support multiple possible coordinate field names the backend
                     // might return (lat/lng, latitude/longitude, nested location, etc.).
                     const rawLat =
-                        (store as any).lat ??
-                        (store as any).latitude ??
-                        (store as any).location?.lat ??
-                        (store as any).coords?.lat ??
-                        (store as any).point?.lat ??
-                        (store as any).y ??
-                        (store as any).py;
+                        store.lat ??
+                        store.latitude ??
+                        store.location?.lat ??
+                        store.coords?.lat ??
+                        store.point?.lat ??
+                        store.y ??
+                        store.py;
                     const rawLng =
-                        (store as any).lng ??
-                        (store as any).longitude ??
-                        (store as any).location?.lng ??
-                        (store as any).coords?.lon ??
-                        (store as any).coords?.lng ??
-                        (store as any).point?.lng ??
-                        (store as any).point?.lon ??
-                        (store as any).x ??
-                        (store as any).px ??
-                        (store as any).lon;
+                        store.lng ??
+                        store.longitude ??
+                        store.location?.lng ??
+                        store.coords?.lon ??
+                        store.coords?.lng ??
+                        store.point?.lng ??
+                        store.point?.lon ??
+                        store.x ??
+                        store.px ??
+                        store.lon;
 
                     let lat = parseNumber(rawLat);
                     let lng = parseNumber(rawLng);
 
-                    const hasCoords = !isNaN(lat) && !isNaN(lng);
+                    const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
                     if (!hasCoords) {
                         try {
                             const query = encodeURIComponent(
@@ -658,7 +667,7 @@ const UnifiedMap: React.FC = () => {
                         }
                     }
 
-                    if (isNaN(lat) || isNaN(lng)) {
+                    if (Number.isNaN(lat) || Number.isNaN(lng)) {
                         lat = DEMO_STORE_LOCATION.lat;
                         lng = DEMO_STORE_LOCATION.lng;
                     }
@@ -718,7 +727,7 @@ const UnifiedMap: React.FC = () => {
             } else {
                 useStore.getState().setMacroRouteGeometry([]);
             }
-        } catch (e) {
+        } catch (_e) {
             useStore.getState().setMacroRouteGeometry([]);
         }
 
