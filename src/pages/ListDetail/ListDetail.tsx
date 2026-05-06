@@ -1319,6 +1319,7 @@ const ListDetail = ({
         Set<string>
     >(new Set());
     const [isImportingItems, setIsImportingItems] = useState(false);
+    const [importNewListName, setImportNewListName] = useState("");
 
     const [detailName, setDetailName] = useState("");
     const [detailQuantity, setDetailQuantity] = useState("");
@@ -1349,9 +1350,10 @@ const ListDetail = ({
             ),
         [effectiveListId, lists],
     );
+    const isRecipeList = activeList?.category === "RECIPE";
+
     const canImportIntoNormalList =
-        (activeList?.category === "RECIPE" ||
-            activeList?.category === "FREQUENT") &&
+        (isRecipeList || activeList?.category === "FREQUENT") &&
         items.length > 0;
 
     const activeCollaborationUsers = useMemo(() => {
@@ -1427,6 +1429,7 @@ const ListDetail = ({
     useEffect(() => {
         if (
             !showImportModal ||
+            selectedTargetListId === "NEW_LIST" ||
             normalLists.length === 0 ||
             normalLists.some((list) => list.id === selectedTargetListId)
         ) {
@@ -1497,8 +1500,7 @@ const ListDetail = ({
         : "flex justify-center items-start p-20px bg-bg";
     const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`;
 
-    const openImportModal = async () => {
-        await fetchLists();
+    const openImportModal = () => {
         const refreshedLists = useListsStore.getState().lists;
         const refreshedNormalLists = refreshedLists.filter(
             (list) =>
@@ -1506,16 +1508,17 @@ const ListDetail = ({
                 (list.category ?? "NORMAL") === "NORMAL",
         );
 
-        if (refreshedNormalLists.length === 0) {
-            setError("Create a normal list first, then try again.");
-            return;
-        }
+        setSelectedTargetListId((currentId) => {
+            if (isRecipeList) return "NEW_LIST";
+            if (refreshedNormalLists.some((list) => list.id === currentId)) {
+                return currentId;
+            }
+            return refreshedNormalLists.length > 0
+                ? refreshedNormalLists[0].id
+                : "NEW_LIST";
+        });
 
-        setSelectedTargetListId((currentId) =>
-            refreshedNormalLists.some((list) => list.id === currentId)
-                ? currentId
-                : refreshedNormalLists[0].id,
-        );
+        setImportNewListName(activeList?.name ? `${activeList.name}` : "");
         setSelectedImportItemIds(new Set(items.map((item) => item.id)));
         setShowImportModal(true);
     };
@@ -1536,41 +1539,61 @@ const ListDetail = ({
         setShowImportModal(false);
         setSelectedImportItemIds(new Set());
         setIsImportingItems(false);
+        setImportNewListName("");
     };
 
     const handleImportIntoNormalList = async () => {
         if (!selectedTargetListId) return;
 
-        const targetList = useListsStore
-            .getState()
-            .lists.find((list) => list.id === selectedTargetListId);
-        if (!targetList) {
-            setError("Target list could not be found.");
-            return;
-        }
-
-        const existingKeys = new Set(
-            targetList.items.map((item) => buildItemDuplicateKey(item)),
-        );
-        const itemsToImport = items.filter(
-            (item) =>
-                selectedImportItemIds.has(item.id) &&
-                !existingKeys.has(buildItemDuplicateKey(item)),
-        );
-
-        if (itemsToImport.length === 0) {
-            setError("All selected items already exist in the target list.");
-            return;
-        }
+        let targetListId = selectedTargetListId;
 
         setIsImportingItems(true);
         setError(null);
 
         try {
+            // Create a new list if requested
+            if (selectedTargetListId === "NEW_LIST") {
+                if (!importNewListName.trim()) {
+                    throw new Error("Please enter a name for the new list.");
+                }
+                const newList = await useListsStore
+                    .getState()
+                    .addList(importNewListName.trim(), "NORMAL");
+                if (!newList) {
+                    throw new Error("Failed to create the new list.");
+                }
+                targetListId = newList.id;
+            }
+
+            const targetList = useListsStore
+                .getState()
+                .lists.find((list) => list.id === targetListId);
+            if (!targetList) {
+                throw new Error("Target list could not be found.");
+            }
+
+            const existingKeys = new Set(
+                targetList.items.map((item) => buildItemDuplicateKey(item)),
+            );
+            const itemsToImport = items.filter(
+                (item) =>
+                    selectedImportItemIds.has(item.id) &&
+                    !existingKeys.has(buildItemDuplicateKey(item)),
+            );
+
+            if (itemsToImport.length === 0) {
+                if (selectedTargetListId !== "NEW_LIST") {
+                    throw new Error(
+                        "All selected items already exist in the target list.",
+                    );
+                }
+                // If it's a new list, we don't expect duplicates, but just in case
+            }
+
             for (const item of itemsToImport) {
                 const added = await useListsStore
                     .getState()
-                    .addItem(selectedTargetListId, {
+                    .addItem(targetListId, {
                         name: item.name,
                         checked: false,
                         brand: item.brand,
@@ -1587,6 +1610,11 @@ const ListDetail = ({
 
             await fetchLists();
             clearImportState();
+
+            // Optionally navigate to the new list
+            if (selectedTargetListId === "NEW_LIST") {
+                navigate(`/nav/${targetListId}`);
+            }
         } catch (importError) {
             const errorMessage =
                 importError instanceof Error
@@ -1652,6 +1680,117 @@ const ListDetail = ({
                     estimatedTotal={estimatedTotal}
                     onFinishShopping={() => setShowFinishModal(true)}
                 />
+                {effectiveListId === "default" && isEmbedded ? (
+                    <ListSelectionView
+                        lists={lists}
+                        isLoading={listsLoading}
+                        onSelect={(listId) => navigate(`/nav/${listId}`)}
+                    />
+                ) : (
+                    <>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex justify-between items-end px-1">
+                                <div className="flex flex-col">
+                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                        Collaboration
+                                    </h2>
+                                    <div className="flex items-center gap-2">
+                                        <PresenceBar
+                                            variant="avatars"
+                                            allUsers={activeCollaborationUsers}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    {canImportIntoNormalList && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void openImportModal();
+                                            }}
+                                            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-sm active:translate-y-0 hover:-translate-y-px ${
+                                                isRecipeList
+                                                    ? "bg-accent text-white hover:opacity-90"
+                                                    : "bg-bg-muted text-text-strong border border-border hover:border-accent hover:text-accent"
+                                            }`}
+                                        >
+                                            <Plus size={14} strokeWidth={2.5} />
+                                            {isRecipeList
+                                                ? "Add all ingredients to list"
+                                                : "Add to normal list"}
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowShareModal(true)}
+                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                                    >
+                                        <UserPlus size={14} strokeWidth={2.5} />
+                                        Invite
+                                    </button>
+                                </div>
+                            </div>
+
+                            <InlineAddForm
+                                addInputRef={addInputRef}
+                                newItemName={newItemName}
+                                onNameChange={handleNewItemNameChange}
+                                onSubmit={handleInlineAdd}
+                                onOpenDetails={openDetailsModal}
+                                isReadOnly={isReadOnly}
+                                isEmbedded={isEmbedded}
+                            />
+
+                            <div className="min-h-[16px] px-2 flex items-center">
+                                <PresenceBar variant="typing" />
+                            </div>
+                        </div>
+
+                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
+                            {itemsLoading ? (
+                                <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
+                                    <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
+                                    <p>Loading...</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
+                                    <ShoppingListItems
+                                        items={items}
+                                        onCheck={toggleItem}
+                                        onDelete={deleteItem}
+                                        disabled={isReadOnly}
+                                    />
+                                    {items.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                                        Estimated Total
+                                                    </span>
+                                                    <span className="text-xs text-text-muted opacity-70">
+                                                        {items.length} items
+                                                    </span>
+                                                </div>
+                                                <span className="text-xl font-black text-accent tracking-tight">
+                                                    {estimatedTotal} lei
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowFinishModal(true)
+                                                }
+                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                            >
+                                                Finish Shopping
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
             </div>
 
             {!isReadOnly && (
@@ -1843,6 +1982,9 @@ const ListDetail = ({
                 isSubmitting={isImportingItems}
                 submitLabel="Import selected"
                 submittingLabel="Importing..."
+                allowNewList={true}
+                newListName={importNewListName}
+                onNewListNameChange={setImportNewListName}
             />
 
             {showShareModal && (

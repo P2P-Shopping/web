@@ -131,15 +131,14 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                     <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.15s]" />
                     <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.3s]" />
                 </div>
-                <span
+                <output
                     className="text-[12px] font-bold text-text-muted tracking-tight leading-none"
-                    role="status"
                     aria-live="polite"
                 >
                     {typingArray.length === 1
                         ? `${typingArray[0]} is typing...`
                         : "Several people are typing..."}
-                </span>
+                </output>
             </div>
         );
     }

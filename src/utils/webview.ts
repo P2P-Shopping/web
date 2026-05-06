@@ -1,9 +1,8 @@
+import type { P2PBridge } from "../types/bridge";
+
 declare global {
     interface Window {
-        P2PBridge?: {
-            getDeviceId: () => string;
-            getPlatform: () => string;
-        };
+        P2PBridge?: P2PBridge;
     }
 }
 
