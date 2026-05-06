@@ -405,6 +405,7 @@ const useListItems = (effectiveListId: string | undefined) => {
 
         if (existingItem) {
             const mergedQty = mergeQuantities(existingItem.quantity, quantity);
+            const previousItems = items;
             const nextItems = items.map((it) =>
                 it.id === existingItem.id ? { ...it, quantity: mergedQty } : it,
             );
@@ -464,8 +465,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                         : "Failed to update the product.";
                 console.error("addItem merge error:", err);
                 setError(errorMessage);
-                setItems(items);
-                syncListItemsInStore(items);
+                setItems(previousItems);
+                syncListItemsInStore(previousItems);
             }
             return;
         }
