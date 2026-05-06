@@ -24,7 +24,7 @@ export interface Item {
     checked: boolean;
 }
 
-interface AppState {
+export interface AppState {
     userLocation: Coordinate;
     setUserLocation: (loc: Coordinate) => void;
 

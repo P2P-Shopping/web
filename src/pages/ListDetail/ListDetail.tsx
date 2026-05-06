@@ -29,7 +29,7 @@ import api, {
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import type { ListCategory } from "../../types";
+import type { Item as GlobalItem, ListCategory, ShoppingList } from "../../types";
 import { buildItemDuplicateKey } from "../../utils/listUtils";
 import RenameListModal from "../Dashboard/RenameListModal";
 import ShareListModal from "../Dashboard/ShareListModal";
@@ -65,7 +65,6 @@ interface ApiShoppingList {
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
-    onSwitchList?: () => void;
 }
 
 const useListItems = (effectiveListId: string | undefined) => {
@@ -765,8 +764,8 @@ interface AddItemModalProps {
  */
 const useProductAutocomplete = (
     inputValue: string,
-    isDisabled: boolean = false,
     onSuggestionSelect: (suggestion: ProductSuggestion) => void,
+    isDisabled: boolean = false,
 ) => {
     const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -860,43 +859,39 @@ const SuggestionsDropdown = ({
     if (!showSuggestions || suggestions.length === 0) return null;
 
     return (
-        <div
-            role="listbox"
-            className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto p-0"
-        >
+        <ul className="absolute top-[100%] left-0 right-0 mt-2 bg-surface border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto p-0 list-none">
             {suggestions.map((suggestion, index) => (
-                <button
-                    key={suggestion.name}
-                    type="button"
-                    role="option"
-                    aria-selected={index === activeIndex}
-                    className={`w-full text-left px-4 py-3 flex justify-between items-center text-sm font-medium text-text-strong cursor-pointer outline-none focus:bg-bg-muted border-b border-border/50 last:border-0 transition-colors ${
-                        index === activeIndex
-                            ? "bg-bg-muted"
-                            : "hover:bg-bg-muted"
-                    }`}
-                    onMouseDown={(e) => {
-                        e.preventDefault();
-                        onSelect(suggestion);
-                    }}
-                >
-                    <span className="font-bold">{suggestion.name}</span>
-                    <div className="flex items-center gap-3 text-[11px]">
-                        {suggestion.brand && (
-                            <span className="text-text-muted uppercase opacity-70 tracking-wider">
-                                {suggestion.brand}
-                            </span>
-                        )}
-                        {suggestion.price !== null &&
-                            suggestion.price !== undefined && (
-                                <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
-                                    {suggestion.price} lei
+                <li key={suggestion.name}>
+                    <button
+                        type="button"
+                        className={`w-full text-left px-4 py-3 flex justify-between items-center text-sm font-medium text-text-strong cursor-pointer outline-none focus:bg-bg-muted border-b border-border/50 last:border-0 transition-colors ${
+                            index === activeIndex
+                                ? "bg-bg-muted"
+                                : "hover:bg-bg-muted"
+                        }`}
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            onSelect(suggestion);
+                        }}
+                    >
+                        <span className="font-bold">{suggestion.name}</span>
+                        <div className="flex items-center gap-3 text-[11px]">
+                            {suggestion.brand && (
+                                <span className="text-text-muted uppercase opacity-70 tracking-wider">
+                                    {suggestion.brand}
                                 </span>
                             )}
-                    </div>
-                </button>
+                            {suggestion.price !== null &&
+                                suggestion.price !== undefined && (
+                                    <span className="font-black text-accent bg-accent-subtle px-2 py-1 rounded-md">
+                                        {suggestion.price} lei
+                                    </span>
+                                )}
+                        </div>
+                    </button>
+                </li>
             ))}
-        </div>
+        </ul>
     );
 };
 
@@ -945,7 +940,7 @@ const ItemNameField = ({
         activeIndex,
         handleKeyDown,
         selectSuggestion,
-    } = useProductAutocomplete(value, false, handleSelect);
+    } = useProductAutocomplete(value, handleSelect, false);
 
     return (
         <div className="flex flex-col gap-1.5 relative">
@@ -1230,7 +1225,7 @@ const InlineAddForm = ({
         activeIndex,
         handleKeyDown,
         selectSuggestion,
-    } = useProductAutocomplete(newItemName, isReadOnly, handleSelect);
+    } = useProductAutocomplete(newItemName, handleSelect, isReadOnly);
 
     const handleKeyDownWithOverride = (
         e: React.KeyboardEvent<HTMLInputElement>,
@@ -1248,7 +1243,7 @@ const InlineAddForm = ({
         e.preventDefault();
         if (!newItemName.trim()) return;
 
-        if (selectedSuggestion && selectedSuggestion.name === newItemName) {
+        if (selectedSuggestion?.name === newItemName) {
             onAddFullItem(selectedSuggestion);
         } else {
             onSubmit(e);
@@ -1573,69 +1568,20 @@ const ListDetail = ({
     const handleImportIntoNormalList = async () => {
         if (!selectedTargetListId) return;
 
-        let targetListId = selectedTargetListId;
-
         setIsImportingItems(true);
         setError(null);
 
         try {
-            // Create a new list if requested
-            if (selectedTargetListId === "NEW_LIST") {
-                if (!importNewListName.trim()) {
-                    throw new Error("Please enter a name for the new list.");
-                }
-                const newList = await useListsStore
-                    .getState()
-                    .addList(importNewListName.trim(), "NORMAL");
-                if (!newList) {
-                    throw new Error("Failed to create the new list.");
-                }
-                targetListId = newList.id;
-            }
-
+            const targetListId = await resolveTargetListId();
             const targetList = useListsStore
                 .getState()
                 .lists.find((list) => list.id === targetListId);
+
             if (!targetList) {
                 throw new Error("Target list could not be found.");
             }
 
-            const existingKeys = new Set(
-                targetList.items.map((item) => buildItemDuplicateKey(item)),
-            );
-            const itemsToImport = items.filter(
-                (item) =>
-                    selectedImportItemIds.has(item.id) &&
-                    !existingKeys.has(buildItemDuplicateKey(item)),
-            );
-
-            if (itemsToImport.length === 0) {
-                if (selectedTargetListId !== "NEW_LIST") {
-                    throw new Error(
-                        "All selected items already exist in the target list.",
-                    );
-                }
-                // If it's a new list, we don't expect duplicates, but just in case
-            }
-
-            for (const item of itemsToImport) {
-                const added = await useListsStore
-                    .getState()
-                    .addItem(targetListId, {
-                        name: item.name,
-                        checked: false,
-                        brand: item.brand,
-                        quantity: item.quantity,
-                        price: item.price,
-                        category: item.category,
-                        isRecurrent: targetList.category === "FREQUENT",
-                    });
-
-                if (!added) {
-                    throw new Error(`Failed to add ${item.name}`);
-                }
-            }
-
+            await performItemsImport(targetList);
             await fetchLists();
             clearImportState();
         } catch (importError) {
@@ -1645,6 +1591,61 @@ const ListDetail = ({
                     : "Failed to import the selected items.";
             setError(errorMessage);
             setIsImportingItems(false);
+        }
+    };
+
+    const resolveTargetListId = async (): Promise<string> => {
+        if (selectedTargetListId !== "NEW_LIST") {
+            return selectedTargetListId;
+        }
+
+        if (!importNewListName.trim()) {
+            throw new Error("Please enter a name for the new list.");
+        }
+
+        const newList = await useListsStore
+            .getState()
+            .addList(importNewListName.trim(), "NORMAL");
+
+        if (!newList) {
+            throw new Error("Failed to create the new list.");
+        }
+
+        return newList.id;
+    };
+
+    const performItemsImport = async (targetList: ShoppingList) => {
+        const existingKeys = new Set(
+            targetList.items.map((item: GlobalItem) => buildItemDuplicateKey(item)),
+        );
+        const itemsToImport = items.filter(
+            (item) =>
+                selectedImportItemIds.has(item.id) &&
+                !existingKeys.has(buildItemDuplicateKey(item)),
+        );
+
+        if (itemsToImport.length === 0 && selectedTargetListId !== "NEW_LIST") {
+            throw new Error(
+                "All selected items already exist in the target list.",
+            );
+        }
+
+        for (const item of itemsToImport) {
+            const added = await useListsStore
+                .getState()
+                .addItem(targetList.id, {
+                    name: item.name,
+                    checked: false,
+                    brand: item.brand,
+                    quantity: item.quantity,
+                    price: item.price,
+                    category: item.category,
+                    isRecurrent: targetList.category === "FREQUENT",
+                });
+
+            if (!added) {
+                throw new Error(`Failed to add ${item.name}`);
+            }
         }
     };
 
@@ -1717,7 +1718,7 @@ const ListDetail = ({
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                void openImportModal();
+                                                openImportModal();
                                             }}
                                             className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
                                         >
@@ -1982,7 +1983,7 @@ const ListDetail = ({
                 }
                 onClearSelection={() => setSelectedImportItemIds(new Set())}
                 onConfirm={() => {
-                    void handleImportIntoNormalList();
+                    handleImportIntoNormalList();
                 }}
                 isSubmitting={isImportingItems}
                 submitLabel="Import selected"

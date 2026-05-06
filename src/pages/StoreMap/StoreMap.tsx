@@ -262,7 +262,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         let lastTime: number | null = null;
 
         const renderLoop = (timestamp: number) => {
-            if (lastTime === null) lastTime = timestamp;
+            lastTime ??= timestamp;
             const dt = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
 

@@ -786,7 +786,7 @@ const Dashboard = () => {
     }, [displayMode]);
 
     useEffect(() => {
-        void fetchLists();
+        fetchLists();
     }, [fetchLists]);
 
     const toggleSection = (section: string) => {
