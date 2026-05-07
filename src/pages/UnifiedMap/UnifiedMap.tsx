@@ -1,6 +1,6 @@
 import L from "leaflet";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     Circle,
     MapContainer,
@@ -34,9 +34,10 @@ import {
     DEMO_STORE_LOCATION,
     GEOFENCE_RADIUS_METERS,
 } from "../../services/geofence";
+import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
-import type { ShoppingList } from "../../types";
+import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import StoreMap from "../StoreMap/StoreMap";
 
@@ -220,6 +221,86 @@ const DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+const METERS_PER_DEGREE_LAT = 111320;
+
+const getDistanceMeters = (a: Coordinate, b: Coordinate): number => {
+    const metersPerDegreeLng =
+        METERS_PER_DEGREE_LAT * Math.cos((a.lat * Math.PI) / 180);
+    const dx = (b.lng - a.lng) * metersPerDegreeLng;
+    const dy = (b.lat - a.lat) * METERS_PER_DEGREE_LAT;
+    return Math.hypot(dx, dy);
+};
+
+const getPointToSegmentDistanceMeters = (
+    point: Coordinate,
+    segmentStart: Coordinate,
+    segmentEnd: Coordinate,
+): number => {
+    const metersPerDegreeLng =
+        METERS_PER_DEGREE_LAT * Math.cos((segmentStart.lat * Math.PI) / 180);
+    const px = (point.lng - segmentStart.lng) * metersPerDegreeLng;
+    const py = (point.lat - segmentStart.lat) * METERS_PER_DEGREE_LAT;
+    const ax = 0;
+    const ay = 0;
+    const bx = (segmentEnd.lng - segmentStart.lng) * metersPerDegreeLng;
+    const by = (segmentEnd.lat - segmentStart.lat) * METERS_PER_DEGREE_LAT;
+    const lengthSquared = bx * bx + by * by;
+
+    if (lengthSquared === 0) return Math.hypot(px, py);
+
+    const t = Math.max(
+        0,
+        Math.min(1, ((px - ax) * bx + (py - ay) * by) / lengthSquared),
+    );
+    return Math.hypot(px - bx * t, py - by * t);
+};
+
+const getDistanceToRouteMeters = (
+    point: Coordinate,
+    routeOrigin: Coordinate,
+    route: RoutePoint[],
+): number => {
+    const path = [routeOrigin, ...route.map(({ lat, lng }) => ({ lat, lng }))];
+    if (path.length < 2) return Number.POSITIVE_INFINITY;
+
+    return path.slice(1).reduce((nearest, segmentEnd, index) => {
+        const segmentStart = path[index];
+        return Math.min(
+            nearest,
+            getPointToSegmentDistanceMeters(point, segmentStart, segmentEnd),
+        );
+    }, Number.POSITIVE_INFINITY);
+};
+
+const normalizeLabel = (value: string) => value.trim().toLowerCase();
+
+const alignRouteToItems = (
+    route: RoutePoint[],
+    items: Item[],
+): RoutePoint[] => {
+    if (route.length === 0 || items.length === 0) return route;
+
+    const remainingItems = new Map(items.map((item) => [item.id, item]));
+    const itemsByName = new Map(
+        items.map((item) => [normalizeLabel(item.name), item]),
+    );
+
+    return route.map((point) => {
+        const exactMatch = remainingItems.get(point.itemId);
+        const nameMatch = itemsByName.get(normalizeLabel(point.name));
+        const matchedItem = exactMatch ?? nameMatch;
+
+        if (!matchedItem) return point;
+
+        remainingItems.delete(matchedItem.id);
+        return {
+            ...point,
+            itemId: matchedItem.id,
+            name: matchedItem.name,
+        };
+    });
+};
 
 const MapController = ({
     center,
@@ -547,6 +628,147 @@ const ListDetailView: React.FC<ListDetailViewProps> = ({
     </div>
 );
 
+interface IndoorRouteListProps {
+    listId: string;
+    items: Item[];
+    route: RoutePoint[];
+}
+
+const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
+    listId,
+    items,
+    route,
+}) => {
+    const [disappearingItemIds, setDisappearingItemIds] = useState<Set<string>>(
+        () => new Set(),
+    );
+    const updateItem = useListsStore((state) => state.updateItem);
+    const setGlobalItems = useStore((state) => state.setItems);
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+    const itemsByName = new Map(
+        items.map((item) => [normalizeLabel(item.name), item]),
+    );
+    const uncheckedItems = items.filter((item) => !item.checked);
+    const matchedRouteItems = route
+        .map(
+            (point) =>
+                itemsById.get(point.itemId) ??
+                itemsByName.get(normalizeLabel(point.name)),
+        )
+        .filter(
+            (item, index, matchedItems): item is Item =>
+                item !== undefined &&
+                matchedItems.findIndex((entry) => entry?.id === item.id) ===
+                    index,
+        );
+    const matchedIds = new Set(matchedRouteItems.map((item) => item.id));
+    const orderedItems =
+        route.length > 0
+            ? [
+                  ...matchedRouteItems,
+                  ...uncheckedItems.filter((item) => !matchedIds.has(item.id)),
+              ]
+            : uncheckedItems;
+    const visibleItems = orderedItems.filter(
+        (item) => !item.checked || disappearingItemIds.has(item.id),
+    );
+
+    const handleCheck = (item: Item) => {
+        if (item.checked || disappearingItemIds.has(item.id)) return;
+
+        setDisappearingItemIds((prev) => new Set(prev).add(item.id));
+
+        window.setTimeout(async () => {
+            const updatedItems = items.map((entry) =>
+                entry.id === item.id ? { ...entry, checked: true } : entry,
+            );
+            setGlobalItems(updatedItems);
+            const didUpdate = await updateItem(listId, item.id, {
+                checked: true,
+            });
+
+            if (!didUpdate) {
+                setDisappearingItemIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(item.id);
+                    return next;
+                });
+                setGlobalItems(items);
+            }
+        }, 220);
+    };
+
+    useEffect(() => {
+        setDisappearingItemIds((prev) => {
+            const next = new Set(
+                [...prev].filter((itemId) =>
+                    items.some((item) => item.id === itemId && !item.checked),
+                ),
+            );
+            return next.size === prev.size ? prev : next;
+        });
+    }, [items]);
+
+    return (
+        <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-300">
+            <header>
+                <h2 className="text-2xl font-black text-text-strong uppercase tracking-tight">
+                    TSP Route
+                </h2>
+                <p className="text-sm text-text-muted mt-1 leading-relaxed">
+                    {uncheckedItems.length} stops remaining
+                </p>
+            </header>
+
+            {visibleItems.length === 0 ? (
+                <div className="py-12 text-center flex flex-col items-center gap-3 bg-bg-muted rounded-3xl border border-dashed border-border">
+                    <CheckCircle2
+                        size={32}
+                        className="text-accent opacity-70"
+                    />
+                    <p className="text-sm font-bold text-text-muted">
+                        Route complete.
+                    </p>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-3">
+                    {visibleItems.map((item, index) => {
+                        const isDisappearing = disappearingItemIds.has(item.id);
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleCheck(item)}
+                                className={`flex items-center gap-4 overflow-hidden rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-300 hover:border-accent hover:bg-accent-subtle/20 ${
+                                    isDisappearing
+                                        ? "max-h-0 translate-x-4 scale-95 p-0 opacity-0"
+                                        : "max-h-24 opacity-100"
+                                }`}
+                            >
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-black text-white">
+                                    {index + 1}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm font-black text-text-strong">
+                                        {item.name}
+                                    </span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                                        Tap to check off
+                                    </span>
+                                </span>
+                                <CheckCircle2
+                                    size={20}
+                                    className="shrink-0 text-text-muted"
+                                />
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const useIndoorCityTransition = (
     navigationMode: "city" | "indoor",
     route: RoutePoint[],
@@ -557,9 +779,23 @@ const useIndoorCityTransition = (
     setTargetStoreTransit: (transit: AppState["targetStoreTransit"]) => void,
 ) => {
     useEffect(() => {
-        if (navigationMode === "indoor" && route.length > 0 && selectedListId) {
+        if (navigationMode === "indoor" && selectedListId) {
             const activeList = lists.find((l) => l.id === selectedListId);
             if (!activeList) return;
+
+            if (
+                activeList.items.length > 0 &&
+                activeList.items.every((item) => item.checked)
+            ) {
+                const transitionTimer = setTimeout(() => {
+                    setNavigationMode("city");
+                    setTargetStoreLocation(null);
+                    setTargetStoreTransit(null);
+                    useStore.getState().setMacroRouteGeometry([]);
+                }, 1000);
+
+                return () => clearTimeout(transitionTimer);
+            }
 
             const lastRoutePoint = route.at(-1);
             if (!lastRoutePoint) return;
@@ -639,6 +875,7 @@ const UnifiedMap: React.FC = () => {
     const setNavigationMode = useStore((state) => state.setNavigationMode);
     const route = useStore((state) => state.route);
     const macroRouteGeometry = useStore((state) => state.macroRouteGeometry);
+    const indoorItems = useStore((state) => state.items);
     const setItems = useStore((state) => state.setItems);
     const isAutoCenterEnabled = useStore((state) => state.isAutoCenterEnabled);
     const setIsAutoCenterEnabled = useStore(
@@ -659,9 +896,23 @@ const UnifiedMap: React.FC = () => {
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
+    const routeOriginRef = useRef<Coordinate | null>(null);
+    const lastDeviationRecalcRef = useRef<Coordinate | null>(null);
     const isMicroView = navigationMode === "indoor";
 
     const activeTarget = targetStoreLocation || DEMO_STORE_LOCATION;
+    const selectedList = selectedListId
+        ? lists.find((list) => list.id === selectedListId)
+        : null;
+    const activeIndoorItems =
+        selectedList?.items && selectedList.items.length > 0
+            ? selectedList.items
+            : indoorItems;
+    const remainingIndoorItemIds =
+        activeIndoorItems
+            .filter((item) => !item.checked)
+            .map((item) => item.id) ?? [];
+    const remainingIndoorItemKey = remainingIndoorItemIds.join("|");
     const activeTransit = targetStoreTransit ?? {
         driving: { timeMins: 0, distanceKm: "0.0" },
         walking: { timeMins: 0, distanceKm: "0.0" },
@@ -680,6 +931,98 @@ const UnifiedMap: React.FC = () => {
         setTargetStoreLocation,
         setTargetStoreTransit,
     );
+
+    useEffect(() => {
+        if (navigationMode !== "indoor" || !selectedListId) {
+            return;
+        }
+
+        setItems(activeIndoorItems);
+
+        if (remainingIndoorItemIds.length === 0) {
+            useStore.getState().setRoute([]);
+            useStore.getState().setStatus("All items checked.");
+            return;
+        }
+
+        routeOriginRef.current = { ...userLocation };
+        lastDeviationRecalcRef.current = { ...userLocation };
+        void loadRoute(
+            remainingIndoorItemIds,
+            userLocation.lat,
+            userLocation.lng,
+            activeIndoorItems.filter((item) => !item.checked),
+        );
+    }, [
+        navigationMode,
+        selectedListId,
+        activeIndoorItems,
+        remainingIndoorItemKey,
+        setItems,
+    ]);
+
+    useEffect(() => {
+        if (
+            navigationMode !== "indoor" ||
+            activeIndoorItems.length === 0 ||
+            route.length === 0
+        ) {
+            return;
+        }
+
+        const alignedRoute = alignRouteToItems(
+            route,
+            activeIndoorItems.filter((item) => !item.checked),
+        );
+        const routeChanged = alignedRoute.some(
+            (point, index) =>
+                point.itemId !== route[index]?.itemId ||
+                point.name !== route[index]?.name,
+        );
+
+        if (routeChanged) {
+            useStore.getState().setRoute(alignedRoute);
+        }
+    }, [navigationMode, route, activeIndoorItems]);
+
+    useEffect(() => {
+        if (
+            navigationMode !== "indoor" ||
+            remainingIndoorItemIds.length === 0 ||
+            route.length === 0 ||
+            !routeOriginRef.current
+        ) {
+            return;
+        }
+
+        const distanceToRoute = getDistanceToRouteMeters(
+            userLocation,
+            routeOriginRef.current,
+            route,
+        );
+        const distanceFromLastRecalc = lastDeviationRecalcRef.current
+            ? getDistanceMeters(userLocation, lastDeviationRecalcRef.current)
+            : Number.POSITIVE_INFINITY;
+
+        if (distanceToRoute < 15 || distanceFromLastRecalc < 8) {
+            return;
+        }
+
+        routeOriginRef.current = { ...userLocation };
+        lastDeviationRecalcRef.current = { ...userLocation };
+        void loadRoute(
+            remainingIndoorItemIds,
+            userLocation.lat,
+            userLocation.lng,
+            activeIndoorItems.filter((item) => !item.checked),
+        );
+    }, [
+        navigationMode,
+        remainingIndoorItemKey,
+        route,
+        userLocation,
+        activeIndoorItems,
+    ]);
 
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
@@ -821,6 +1164,16 @@ const UnifiedMap: React.FC = () => {
                     setTransportMode={setTransportMode}
                     setSelectedListId={setSelectedListId}
                     handleStartRoute={handleStartRoute}
+                />
+            );
+        }
+
+        if (isMicroView && selectedListId) {
+            return (
+                <IndoorRouteList
+                    listId={selectedListId}
+                    items={activeIndoorItems}
+                    route={route}
                 />
             );
         }
@@ -1098,13 +1451,13 @@ const UnifiedMap: React.FC = () => {
                         <button
                             type="button"
                             onClick={async () => {
-                                // When the user taps ARRIVED, switch to indoor/store map
-                                // and populate the indoor route with the selected list items
-                                // (same behavior as Demo TSP but using the real target store).
                                 const activeList = lists.find(
                                     (l) => l.id === selectedListId,
                                 );
-                                const currentItems = activeList?.items || [];
+                                const currentItems =
+                                    activeList?.items.filter(
+                                        (item) => !item.checked,
+                                    ) || [];
 
                                 if (currentItems.length === 0) {
                                     alert(
@@ -1119,30 +1472,19 @@ const UnifiedMap: React.FC = () => {
                                 // Enable auto-center and enter indoor mode
                                 setIsAutoCenterEnabled(true);
                                 setTargetStoreLocation(loc);
+                                setUserLocation(loc);
                                 forceIndoorMode();
 
                                 // Teleport mock GPS into the store
                                 teleport(loc.lat, loc.lng);
 
-                                // Create a simple synthetic indoor route around the store entrance
-                                const customRoute = currentItems.map(
-                                    (item, index) => {
-                                        const latOffset = 0.00015 * (index + 1);
-                                        const lngOffset =
-                                            0.00015 *
-                                            (index % 2 === 0 ? 1 : -1);
-                                        return {
-                                            itemId: item.id,
-                                            name: item.name,
-                                            lat: loc.lat + latOffset,
-                                            lng: loc.lng + lngOffset,
-                                        };
-                                    },
+                                setItems(activeList?.items || []);
+                                await loadRoute(
+                                    currentItems.map((item) => item.id),
+                                    loc.lat,
+                                    loc.lng,
+                                    currentItems,
                                 );
-
-                                // Set route and items into global state so StoreMap shows them
-                                useStore.getState().setRoute(customRoute);
-                                setItems(currentItems);
                             }}
                             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-xs font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >

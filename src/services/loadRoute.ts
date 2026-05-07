@@ -2,7 +2,7 @@
 
 import { useStore } from "../context/useStore";
 import { calculateMockTspRoute, type MockRouteSeed } from "./mockTsp";
-import { calculateRoute } from "./routingService";
+import { calculateRoute, pollFullRoute } from "./routingService";
 
 // Module-level cleanup to prevent multiple polling loops from accumulating
 let activePollCleanup: (() => void) | null = null;
@@ -71,6 +71,7 @@ export const loadRoute = async (
     productIds: string[],
     userLat: number,
     userLng: number,
+    fallbackItems: { id: string; name: string }[] = [],
 ) => {
     const { setRoute, setStatus } = useStore.getState();
     setStatus("Calculating route...");
@@ -92,7 +93,32 @@ export const loadRoute = async (
                 "[loadRoute] Successfully received route from server API",
             );
             setRoute(serverData.route);
-            setStatus("Optimized route loaded from server.");
+            setStatus(
+                serverData.partial
+                    ? "Partial route loaded. Optimizing..."
+                    : "Optimized route loaded from server.",
+            );
+
+            if (activePollCleanup) {
+                activePollCleanup();
+                activePollCleanup = null;
+            }
+
+            if (serverData.partial && serverData.routeId) {
+                activePollCleanup = pollFullRoute(
+                    serverData.routeId,
+                    (fullRoute) => {
+                        setRoute(fullRoute);
+                        setStatus("Optimized route loaded from server.");
+                        activePollCleanup = null;
+                    },
+                    (error) => {
+                        console.warn("[loadRoute] Full route polling failed:", error);
+                        setStatus("Partial route loaded from server.");
+                        activePollCleanup = null;
+                    },
+                );
+            }
             return;
         }
         console.warn("[loadRoute] Server returned empty route or non-success.");
@@ -114,11 +140,27 @@ export const loadRoute = async (
                 lat: item.lat,
                 lng: item.lng,
             });
+        } else {
+            const fallbackItem = fallbackItems.find((entry) => entry.id === id);
+            if (fallbackItem) {
+                const index = points.length;
+                const ring = Math.floor(index / 6) + 1;
+                const angle = (index % 6) * (Math.PI / 3);
+                const latOffset = Math.cos(angle) * 0.00008 * ring;
+                const lngOffset = Math.sin(angle) * 0.0001 * ring;
+                points.push({
+                    itemId: fallbackItem.id,
+                    name: fallbackItem.name,
+                    lat: userLat + latOffset,
+                    lng: userLng + lngOffset,
+                });
+            }
         }
     }
 
     if (points.length === 0) {
         console.warn("[loadRoute] No items found for mock calculation.");
+        setRoute([]);
         setStatus("No items to route.");
         return;
     }
