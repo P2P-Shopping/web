@@ -42,6 +42,18 @@ const getBaseUrl = () => {
 };
 
 const getRoutingUrl = (path = "") => `${getBaseUrl()}/api/routing${path}`;
+
+/**
+ * Validates that a routeId contains only safe characters.
+ * Prevents path traversal attacks by rejecting any input with
+ * slashes, dots, or other special characters.
+ */
+const validateRouteId = (routeId: string): string => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(routeId)) {
+        throw new Error("Invalid routeId: contains unsafe characters");
+    }
+    return routeId;
+};
 const TIMEOUT_MS = 10000;
 
 /**
@@ -73,7 +85,8 @@ export async function calculateRoute(
 export async function getFullRoute(
     routeId: string,
 ): Promise<CalculateRouteResponse | null> {
-    const res = await fetch(getRoutingUrl(`/full/${routeId}`), {
+    const safeRouteId = validateRouteId(routeId);
+    const res = await fetch(getRoutingUrl(`/full/${safeRouteId}`), {
         signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
