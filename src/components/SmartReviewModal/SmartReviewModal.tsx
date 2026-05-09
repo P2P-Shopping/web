@@ -50,7 +50,11 @@ const SmartReviewModal = ({
         prevIsOpen.current = isOpen;
     }, [isOpen, initialListName]);
 
-    const updateItem = (index: number, field: EditableField, value: string | number) => {
+    const updateItem = (
+        index: number,
+        field: EditableField,
+        value: string | number,
+    ) => {
         setEditedItems((prev) =>
             prev.map((item, i) =>
                 i === index ? { ...item, [field]: value } : item,
@@ -137,7 +141,9 @@ const SmartReviewModal = ({
                 </div>
                 {editedItems.length === 0 && (
                     <div className="rounded-xl border border-dashed border-border bg-bg-muted px-4 py-8 text-center">
-                        <p className="text-sm text-text-muted mb-3">No items left to save.</p>
+                        <p className="text-sm text-text-muted mb-3">
+                            No items left to save.
+                        </p>
                         <button
                             type="button"
                             onClick={addNewItem}
@@ -227,7 +233,9 @@ const SmartReviewModal = ({
                                     updateItem(
                                         index,
                                         "price",
-                                        e.target.value ? parseFloat(e.target.value) : "",
+                                        e.target.value
+                                            ? parseFloat(e.target.value)
+                                            : "",
                                     )
                                 }
                                 placeholder="0.00"
