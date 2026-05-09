@@ -1,5 +1,5 @@
 import L from "leaflet";
-import type React from "react";
+import React, {useMemo} from "react";
 import { useEffect, useRef, useState } from "react";
 import {
     Circle,
@@ -908,11 +908,11 @@ const UnifiedMap: React.FC = () => {
         selectedList?.items && selectedList.items.length > 0
             ? selectedList.items
             : indoorItems;
-    const remainingIndoorItemIds =
-        activeIndoorItems
+    const remainingIndoorItemIds = useMemo(() => {
+        return activeIndoorItems
             .filter((item) => !item.checked)
             .map((item) => item.id) ?? [];
-    const remainingIndoorItemKey = remainingIndoorItemIds.join("|");
+    }, [activeIndoorItems]); // Only recalculate if activeIndoorItems changes
     const activeTransit = targetStoreTransit ?? {
         driving: { timeMins: 0, distanceKm: "0.0" },
         walking: { timeMins: 0, distanceKm: "0.0" },
@@ -957,7 +957,7 @@ const UnifiedMap: React.FC = () => {
         navigationMode,
         selectedListId,
         activeIndoorItems,
-        remainingIndoorItemKey,
+        remainingIndoorItemIds,
         setItems,
     ]);
 
@@ -1018,7 +1018,7 @@ const UnifiedMap: React.FC = () => {
         );
     }, [
         navigationMode,
-        remainingIndoorItemKey,
+        remainingIndoorItemIds,
         route,
         userLocation,
         activeIndoorItems,
