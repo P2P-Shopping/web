@@ -1,6 +1,5 @@
 import L from "leaflet";
-import React, {useMemo} from "react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     Circle,
     MapContainer,
@@ -909,10 +908,12 @@ const UnifiedMap: React.FC = () => {
             ? selectedList.items
             : indoorItems;
     const remainingIndoorItemIds = useMemo(() => {
-        return activeIndoorItems
-            .filter((item) => !item.checked)
-            .map((item) => item.id) ?? [];
-    }, [activeIndoorItems]); // Only recalculate if activeIndoorItems changes
+        return (
+            activeIndoorItems
+                .filter((item) => !item.checked)
+                .map((item) => item.id) ?? []
+        );
+    }, [activeIndoorItems]);
     const activeTransit = targetStoreTransit ?? {
         driving: { timeMins: 0, distanceKm: "0.0" },
         walking: { timeMins: 0, distanceKm: "0.0" },
@@ -945,12 +946,17 @@ const UnifiedMap: React.FC = () => {
             return;
         }
 
-        routeOriginRef.current = { ...userLocation };
-        lastDeviationRecalcRef.current = { ...userLocation };
+        // Grab the LATEST user location directly from the store
+        // without making it a reactive dependency!
+        const currentUserLocation = useStore.getState().userLocation;
+
+        routeOriginRef.current = { ...currentUserLocation };
+        lastDeviationRecalcRef.current = { ...currentUserLocation };
+
         void loadRoute(
             remainingIndoorItemIds,
-            userLocation.lat,
-            userLocation.lng,
+            currentUserLocation.lat,
+            currentUserLocation.lng,
             activeIndoorItems.filter((item) => !item.checked),
         );
     }, [
