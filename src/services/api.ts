@@ -88,6 +88,7 @@ export interface ProductSuggestion {
     price: number | null;
     quantity: string;
 }
+
 export const fetchProductSuggestions = async (
     query: string,
 ): Promise<ProductSuggestion[]> => {
@@ -107,6 +108,14 @@ export const fetchProductSuggestions = async (
         );
         return [];
     }
+};
+
+/**
+ * Task 21: Endpoint for fetching a single list by its ID to perform a hard refresh.
+ */
+export const fetchListByIdRequest = async (listId: string) => {
+    const response = await api.get(`/api/lists/${listId}`, { timeout: 10_000 });
+    return response.data;
 };
 
 export default api;
