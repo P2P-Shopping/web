@@ -38,6 +38,7 @@ interface AiItem {
     quantity?: number | string;
     unit?: string;
     category?: string;
+    price?: number;
 }
 
 interface AiResponse {
@@ -159,13 +160,21 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                     processAiResponse(data);
                 } catch (error) {
                     console.error("AI Retry failed:", error);
+                    let errorMessage =
+                        "Retry failed. Please check your connection and try again.";
+                    if (
+                        error instanceof Error &&
+                        error.message.includes("timeout")
+                    ) {
+                        errorMessage =
+                            "The request took too long. Try again with a simpler request.";
+                    }
                     setMessages((prev) => [
                         ...prev,
                         {
                             id: crypto.randomUUID(),
                             role: "assistant",
-                            content:
-                                "Retry failed. Please check your connection or try a different request.",
+                            content: errorMessage,
                             timestamp: Date.now(),
                         },
                     ]);
@@ -177,7 +186,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     };
 
     const processAiResponse = (data: AiResponse) => {
-        if (data.items && Array.isArray(data.items)) {
+        if (data.items && Array.isArray(data.items) && data.items.length > 0) {
             const items: ReviewItem[] = data.items.map((item) => ({
                 id: crypto.randomUUID(),
                 name: item.genericName || item.specificName || "Unknown Item",
@@ -187,6 +196,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         ? `${item.quantity} ${item.unit || ""}`.trim()
                         : undefined,
                 category: item.category,
+                price: item.price,
             }));
 
             setReviewItems(items);
@@ -208,11 +218,11 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             const assistantMessage: Message = {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                content: `I've analyzed your input and found ${items.length} items. Please review them below to save them to a new list.`,
+                content: `✨ Perfect! I found ${items.length} item${items.length !== 1 ? "s" : ""}. Please review them and make any adjustments before saving to your list.`,
                 timestamp: Date.now(),
             };
             setMessages((prev) => [...prev, assistantMessage]);
-            setTimeout(() => setIsReviewOpen(true), 1000);
+            setTimeout(() => setIsReviewOpen(true), 500);
         } else {
             setMessages((prev) => [
                 ...prev,
@@ -220,7 +230,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                     id: crypto.randomUUID(),
                     role: "assistant",
                     content:
-                        "I couldn't find any specific items in your request. Could you please provide more details?",
+                        "I couldn't identify any items in your request. Try:\n• Uploading a clearer image\n• Describing specific products (e.g., 'milk, eggs, bread')\n• Sharing an image of a receipt or product package",
                     timestamp: Date.now(),
                 },
             ]);
@@ -257,13 +267,30 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             processAiResponse(response.data);
         } catch (error) {
             console.error("AI Analysis failed:", error);
+            let errorContent =
+                "Oops! I encountered an error while analyzing your request. ";
+
+            if (error instanceof Error) {
+                if (error.message.includes("timeout")) {
+                    errorContent +=
+                        "The request took too long. Please try again with a simpler request or a smaller image.";
+                } else if (error.message.includes("network")) {
+                    errorContent +=
+                        "Please check your internet connection and try again.";
+                } else {
+                    errorContent += error.message;
+                }
+            } else {
+                errorContent +=
+                    "Please check your connection and try again. If the problem persists, try a different approach.";
+            }
+
             setMessages((prev) => [
                 ...prev,
                 {
                     id: crypto.randomUUID(),
                     role: "assistant",
-                    content:
-                        "I'm sorry, I encountered an error while processing your request. Please try again later.",
+                    content: errorContent,
                     timestamp: Date.now(),
                 },
             ]);
@@ -287,20 +314,48 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             const newList = await addList(listName, listCategory);
             if (newList) {
                 for (const item of items) {
+                    const price = item.price
+                        ? typeof item.price === "string"
+                            ? parseFloat(item.price)
+                            : item.price
+                        : undefined;
+
                     await addItem(newList.id, {
                         name: item.name,
                         checked: false,
                         brand: item.brand,
                         quantity: item.quantity,
                         category: item.category,
+                        price: price,
                         isRecurrent: listCategory === "FREQUENT",
                     });
                 }
+                // Show success message to user
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        id: crypto.randomUUID(),
+                        role: "assistant",
+                        content: `✅ Great! I've created your list "${listName}" with ${items.length} items. You can now view it in your shopping lists.`,
+                        timestamp: Date.now(),
+                    },
+                ]);
+                // Auto-close after a brief delay
+                setTimeout(() => onClose(), 2000);
             }
-            onClose();
         } catch (error) {
             console.error("Failed to save reviewed items:", error);
-            alert("Failed to save the list. Please try again.");
+            const errorMessage =
+                error instanceof Error ? error.message : "Unknown error";
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: crypto.randomUUID(),
+                    role: "assistant",
+                    content: `❌ Sorry, I couldn't save your list. Error: ${errorMessage}. Please try again or check your connection.`,
+                    timestamp: Date.now(),
+                },
+            ]);
         }
     };
 

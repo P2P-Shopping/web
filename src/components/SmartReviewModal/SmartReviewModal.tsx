@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "../";
 
@@ -8,6 +8,7 @@ export type ReviewItem = {
     brand?: string;
     quantity?: string;
     category?: string;
+    price?: number | string;
 };
 
 export type ReviewSubmission = {
@@ -15,7 +16,7 @@ export type ReviewSubmission = {
     items: ReviewItem[];
 };
 
-type EditableField = "name" | "brand" | "quantity" | "category";
+type EditableField = "name" | "brand" | "quantity" | "category" | "price";
 
 type SmartReviewModalProps = {
     isOpen: boolean;
@@ -35,6 +36,7 @@ const SmartReviewModal = ({
     const [editedItems, setEditedItems] = useState<ReviewItem[]>(items);
     const [listName, setListName] = useState(initialListName || "");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isAddingItem, setIsAddingItem] = useState(false);
     const prevIsOpen = useRef(false);
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally omitting items to prevent overwriting user edits
@@ -43,11 +45,12 @@ const SmartReviewModal = ({
             setEditedItems(items);
             setListName(initialListName || "");
             setIsSubmitting(false);
+            setIsAddingItem(false);
         }
         prevIsOpen.current = isOpen;
     }, [isOpen, initialListName]);
 
-    const updateItem = (index: number, field: EditableField, value: string) => {
+    const updateItem = (index: number, field: EditableField, value: string | number) => {
         setEditedItems((prev) =>
             prev.map((item, i) =>
                 i === index ? { ...item, [field]: value } : item,
@@ -57,6 +60,19 @@ const SmartReviewModal = ({
 
     const removeItem = (itemId: string) => {
         setEditedItems((prev) => prev.filter((item) => item.id !== itemId));
+    };
+
+    const addNewItem = () => {
+        const newItem: ReviewItem = {
+            id: crypto.randomUUID(),
+            name: "",
+            brand: "",
+            quantity: "",
+            category: "",
+            price: undefined,
+        };
+        setEditedItems((prev) => [...prev, newItem]);
+        setIsAddingItem(false);
     };
 
     const handleConfirm = () => {
@@ -120,8 +136,17 @@ const SmartReviewModal = ({
                     </div>
                 </div>
                 {editedItems.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-border bg-bg-muted px-4 py-8 text-center text-sm text-text-muted">
-                        No items left to save.
+                    <div className="rounded-xl border border-dashed border-border bg-bg-muted px-4 py-8 text-center">
+                        <p className="text-sm text-text-muted mb-3">No items left to save.</p>
+                        <button
+                            type="button"
+                            onClick={addNewItem}
+                            disabled={isSubmitting}
+                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-accent border border-accent rounded-lg hover:bg-accent-subtle transition-colors disabled:opacity-50"
+                        >
+                            <Plus size={16} />
+                            Add Item Manually
+                        </button>
                     </div>
                 )}
                 {editedItems.map((item, index) => (
@@ -129,7 +154,7 @@ const SmartReviewModal = ({
                         key={item.id}
                         className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-bg-muted p-4 lg:grid-cols-12"
                     >
-                        <div className="flex flex-col gap-1 lg:col-span-5">
+                        <div className="flex flex-col gap-1 lg:col-span-4">
                             <label
                                 htmlFor={`item-${index}-name`}
                                 className="text-xs font-semibold uppercase tracking-wider text-text-muted"
@@ -186,6 +211,30 @@ const SmartReviewModal = ({
                         </div>
                         <div className="flex flex-col gap-1 lg:col-span-2">
                             <label
+                                htmlFor={`item-${index}-price`}
+                                className="text-xs font-semibold uppercase tracking-wider text-text-muted"
+                            >
+                                Price
+                            </label>
+                            <input
+                                id={`item-${index}-price`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="w-full min-w-0 break-words whitespace-normal px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none"
+                                value={item.price ?? ""}
+                                onChange={(e) =>
+                                    updateItem(
+                                        index,
+                                        "price",
+                                        e.target.value ? parseFloat(e.target.value) : "",
+                                    )
+                                }
+                                placeholder="0.00"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1 lg:col-span-2">
+                            <label
                                 htmlFor={`item-${index}-category`}
                                 className="text-xs font-semibold uppercase tracking-wider text-text-muted"
                             >
@@ -225,6 +274,17 @@ const SmartReviewModal = ({
                         </div>
                     </div>
                 ))}
+                {editedItems.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={addNewItem}
+                        disabled={isSubmitting || isAddingItem}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-accent border border-dashed border-accent rounded-lg hover:bg-accent-subtle transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Plus size={16} />
+                        Add Another Item
+                    </button>
+                )}
             </div>
         </Modal>
     );
