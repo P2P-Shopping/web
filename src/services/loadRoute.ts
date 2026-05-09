@@ -113,7 +113,10 @@ export const loadRoute = async (
                         activePollCleanup = null;
                     },
                     (error) => {
-                        console.warn("[loadRoute] Full route polling failed:", error);
+                        console.warn(
+                            "[loadRoute] Full route polling failed:",
+                            error,
+                        );
                         setStatus("Partial route loaded from server.");
                         activePollCleanup = null;
                     },
