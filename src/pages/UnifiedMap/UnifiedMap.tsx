@@ -912,6 +912,7 @@ const UnifiedMap: React.FC = () => {
         activeIndoorItems
             .filter((item) => !item.checked)
             .map((item) => item.id) ?? [];
+    const remainingIndoorItemKey = remainingIndoorItemIds.join("|");
     const activeTransit = targetStoreTransit ?? {
         driving: { timeMins: 0, distanceKm: "0.0" },
         walking: { timeMins: 0, distanceKm: "0.0" },
@@ -956,9 +957,8 @@ const UnifiedMap: React.FC = () => {
         navigationMode,
         selectedListId,
         activeIndoorItems,
-        remainingIndoorItemIds,
+        remainingIndoorItemKey,
         setItems,
-        userLocation,
     ]);
 
     useEffect(() => {
@@ -1018,7 +1018,7 @@ const UnifiedMap: React.FC = () => {
         );
     }, [
         navigationMode,
-        remainingIndoorItemIds,
+        remainingIndoorItemKey,
         route,
         userLocation,
         activeIndoorItems,
