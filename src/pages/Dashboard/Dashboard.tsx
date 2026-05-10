@@ -7,12 +7,12 @@ import {
     Plus,
     Sparkles,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ImportItemsModal, ListCard } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item, ListCategory, ShoppingList } from "../../types";
-import { buildItemDuplicateKey } from "../../utils/listUtils";
+import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
@@ -114,16 +114,14 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
                 {lists.map((list) => (
                     <li
                         key={list.id}
-                        draggable={
-                            section !== "NORMAL" && list.items.length > 0
-                        }
+                        draggable={list.items.length > 0}
                         onDragStart={(e) => onDragStart(e, list.id)}
                         onDragEnd={onDragEnd}
                         onDragOver={(e) => onDragOver(e, list.id)}
                         onDragLeave={() => onDragLeave(list.id)}
                         onDrop={(e) => onDrop(e, list.id)}
                         className={`w-[320px] shrink-0 rounded-xl transition-all ${
-                            section !== "NORMAL" && list.items.length > 0
+                            list.items.length > 0
                                 ? "cursor-grab active:cursor-grabbing"
                                 : ""
                         } ${
@@ -170,14 +168,17 @@ const useDashboardDnD = (
 ) => {
     const [draggedListId, setDraggedListId] = useState<string | null>(null);
     const [dragOverListId, setDragOverListId] = useState<string | null>(null);
+    const draggedListIdRef = useRef<string | null>(null);
 
     const resetDragState = () => {
         setDraggedListId(null);
         setDragOverListId(null);
+        draggedListIdRef.current = null;
     };
 
     const handleDragStart = (e: React.DragEvent, listId: string) => {
         setDraggedListId(listId);
+        draggedListIdRef.current = listId;
 
         const list = lists.find((l) => l.id === listId);
         if (list) {
@@ -234,15 +235,10 @@ const useDashboardDnD = (
     };
 
     const handleTabDragOver = (e: React.DragEvent, section: string) => {
-        if (section === "NORMAL" && draggedListId) {
-            const draggedList = lists.find((l) => l.id === draggedListId);
-            if (
-                draggedList &&
-                ["RECIPE", "FREQUENT"].includes(draggedList.category ?? "")
-            ) {
-                e.preventDefault();
-                setDragOverListId("TAB_NORMAL");
-            }
+        const currentId = draggedListIdRef.current;
+        if (section === "NORMAL" && currentId) {
+            e.preventDefault();
+            setDragOverListId("TAB_NORMAL");
         }
     };
 
@@ -251,15 +247,17 @@ const useDashboardDnD = (
     };
 
     const handleTabDrop = (e: React.DragEvent, section: string) => {
-        if (section === "NORMAL" && draggedListId) {
+        const currentId = draggedListIdRef.current;
+        if (section === "NORMAL" && currentId) {
             e.preventDefault();
-            void handleCopyListToNormal(draggedListId);
+            void handleCopyListToNormal(currentId);
             setDragOverListId(null);
         }
     };
 
     return {
         draggedListId,
+        draggedListIdRef,
         dragOverListId,
         setDragOverListId,
         resetDragState,
@@ -326,6 +324,11 @@ const useDashboardListManagement = (
 const useDashboardImport = (
     lists: ShoppingList[],
     addItem: (listId: string, item: Omit<Item, "id">) => Promise<boolean>,
+    updateItem: (
+        listId: string,
+        itemId: string,
+        updates: Partial<Item>,
+    ) => Promise<boolean>,
     resetDragState: () => void,
 ) => {
     const [importSourceListId, setImportSourceListId] = useState<string | null>(
@@ -371,34 +374,48 @@ const useDashboardImport = (
     const confirmImportSelection = async () => {
         if (!importSourceList || !importTargetList) return;
 
-        const existingKeys = new Set(
-            importTargetList.items.map((item) => buildItemDuplicateKey(item)),
+        const existingByKey = new Map(
+            importTargetList.items.map((item) => [
+                buildItemDuplicateKey(item),
+                item,
+            ]),
         );
-        const itemsToImport = importSourceList.items.filter(
-            (item) =>
-                selectedImportItemIds.has(item.id) &&
-                !existingKeys.has(buildItemDuplicateKey(item)),
-        );
-
-        if (itemsToImport.length === 0) {
-            clearImportSelection();
-            return;
-        }
+        const newItems: Omit<Item, "id">[] = [];
 
         setIsImportingItems(true);
 
         try {
-            for (const item of itemsToImport) {
-                await addItem(importTargetList.id, {
-                    name: item.name,
-                    checked: false,
-                    brand: item.brand,
-                    quantity: item.quantity,
-                    category: item.category,
-                    price: item.price,
-                    isRecurrent: false,
-                });
+            for (const item of importSourceList.items) {
+                if (!selectedImportItemIds.has(item.id)) continue;
+
+                const dupKey = buildItemDuplicateKey(item);
+                const existing = existingByKey.get(dupKey);
+
+                if (existing) {
+                    const mergedQty = mergeQuantities(
+                        existing.quantity,
+                        item.quantity,
+                    );
+                    await updateItem(importTargetList.id, existing.id, {
+                        quantity: mergedQty,
+                    });
+                } else {
+                    newItems.push({
+                        name: item.name,
+                        checked: false,
+                        brand: item.brand,
+                        quantity: item.quantity,
+                        category: item.category,
+                        price: item.price,
+                        isRecurrent: false,
+                    });
+                }
             }
+
+            for (const newItem of newItems) {
+                await addItem(importTargetList.id, newItem);
+            }
+
             clearImportSelection();
         } catch (error) {
             console.error("Bulk add failed:", error);
@@ -418,12 +435,7 @@ const useDashboardImport = (
         const sourceList = lists.find((list) => list.id === draggedListId);
         const targetList = lists.find((list) => list.id === targetListId);
 
-        if (
-            !sourceList ||
-            !targetList ||
-            !["RECIPE", "FREQUENT"].includes(sourceList.category ?? "") ||
-            (targetList.category ?? "NORMAL") !== "NORMAL"
-        ) {
+        if (!sourceList || !targetList) {
             resetDragState();
             return;
         }
@@ -571,6 +583,13 @@ interface DashboardTabsViewProps {
     handleTabDragOver: (e: React.DragEvent, section: string) => void;
     handleTabDragLeave: () => void;
     handleTabDrop: (e: React.DragEvent, section: string) => void;
+    handleDropOnNormalList: (
+        targetListId: string,
+        draggedListId: string | null,
+    ) => void;
+    draggedListIdRef: React.MutableRefObject<string | null>;
+    setDragOverListId: (id: string | null) => void;
+    dragOverListId: string | null;
     getTabClassName: (section: string) => string;
 }
 
@@ -588,6 +607,10 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
     handleTabDragOver,
     handleTabDragLeave,
     handleTabDrop,
+    handleDropOnNormalList,
+    draggedListIdRef,
+    setDragOverListId,
+    dragOverListId,
     getTabClassName,
 }) => (
     <div className="flex flex-col gap-6">
@@ -600,7 +623,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                     onDragOver={(e) => handleTabDragOver(e, section)}
                     onDragLeave={handleTabDragLeave}
                     onDrop={(e) => handleTabDrop(e, section)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2 shrink-0 ${getTabClassName(section)}`}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all flex items-center gap-2 shrink-0 ${getTabClassName(section)}`}
                 >
                     {sectionLabels[section]}
                     <span
@@ -616,26 +639,52 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
             ))}
         </div>
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
-            {groupedLists[activeTab].map((list) => (
-                <li
-                    key={list.id}
-                    draggable={activeTab !== "NORMAL" && list.items.length > 0}
-                    onDragStart={(e) => handleDragStart(e, list.id)}
-                    onDragEnd={resetDragState}
-                    className={
-                        activeTab !== "NORMAL" && list.items.length > 0
-                            ? "cursor-grab active:cursor-grabbing"
-                            : ""
-                    }
-                >
-                    <ListCard
-                        list={list}
-                        onClick={() => onCardClick(list.id)}
-                        onDelete={(e) => onDeleteList(e, list.id, list.name)}
-                        isDeleting={deletingListId === list.id}
-                    />
-                </li>
-            ))}
+            {groupedLists[activeTab].map((list) => {
+                const isDraggingOver = dragOverListId === list.id;
+                const currentDragged = draggedListIdRef.current;
+
+                return (
+                    <li
+                        key={list.id}
+                        draggable={list.items.length > 0}
+                        onDragStart={(e) => handleDragStart(e, list.id)}
+                        onDragEnd={resetDragState}
+                        onDragOver={(e) => {
+                            if (!currentDragged || currentDragged === list.id)
+                                return;
+                            e.preventDefault();
+                            setDragOverListId(list.id);
+                        }}
+                        onDragLeave={() => {
+                            if (isDraggingOver) setDragOverListId(null);
+                        }}
+                        onDrop={(e) => {
+                            const droppedId = draggedListIdRef.current;
+                            if (!droppedId || droppedId === list.id) return;
+                            e.preventDefault();
+                            handleDropOnNormalList(list.id, droppedId);
+                        }}
+                        className={`${
+                            list.items.length > 0
+                                ? "cursor-grab active:cursor-grabbing"
+                                : ""
+                        } ${
+                            isDraggingOver
+                                ? "scale-[1.02] ring-2 ring-accent ring-offset-4 ring-offset-bg rounded-xl transition-all"
+                                : ""
+                        }`}
+                    >
+                        <ListCard
+                            list={list}
+                            onClick={() => onCardClick(list.id)}
+                            onDelete={(e) =>
+                                onDeleteList(e, list.id, list.name)
+                            }
+                            isDeleting={deletingListId === list.id}
+                        />
+                    </li>
+                );
+            })}
             {groupedLists[activeTab].length === 0 && (
                 <li className="col-span-full py-20 text-center text-text-muted list-none">
                     No lists in this category
@@ -652,6 +701,7 @@ interface DashboardSplitViewProps {
     collapsedSections: Set<string>;
     toggleSection: (section: string) => void;
     draggedListId: string | null;
+    draggedListIdRef: React.MutableRefObject<string | null>;
     dragOverListId: string | null;
     setDragOverListId: (id: string | null) => void;
     handleDragStart: (e: React.DragEvent, id: string) => void;
@@ -676,6 +726,7 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
     collapsedSections,
     toggleSection,
     draggedListId,
+    draggedListIdRef,
     dragOverListId,
     setDragOverListId,
     handleDragStart,
@@ -697,8 +748,8 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                 onDragStart={handleDragStart}
                 onDragEnd={resetDragState}
                 onDragOver={(e, id) => {
-                    if (section !== "NORMAL") return;
-                    if (!draggedListId || draggedListId === id) return;
+                    const currentDragged = draggedListIdRef.current;
+                    if (!currentDragged || currentDragged === id) return;
                     e.preventDefault();
                     setDragOverListId(id);
                 }}
@@ -706,9 +757,10 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                     if (dragOverListId === id) setDragOverListId(null);
                 }}
                 onDrop={(e, id) => {
-                    if (section !== "NORMAL") return;
+                    const currentDragged = draggedListIdRef.current;
+                    if (!currentDragged || currentDragged === id) return;
                     e.preventDefault();
-                    handleDropOnNormalList(id, draggedListId);
+                    handleDropOnNormalList(id, currentDragged);
                 }}
                 dragOverListId={dragOverListId}
                 onCardClick={onCardClick}
@@ -735,6 +787,7 @@ const Dashboard = () => {
         addList,
         deleteList,
         addItem,
+        updateItem,
         openModal,
         closeModal,
     } = useListsStore();
@@ -753,6 +806,7 @@ const Dashboard = () => {
 
     const {
         draggedListId,
+        draggedListIdRef,
         dragOverListId,
         setDragOverListId,
         resetDragState,
@@ -779,7 +833,7 @@ const Dashboard = () => {
         toggleImportItem,
         confirmImportSelection,
         handleDropOnNormalList,
-    } = useDashboardImport(lists, addItem, resetDragState);
+    } = useDashboardImport(lists, addItem, updateItem, resetDragState);
 
     useEffect(() => {
         localStorage.setItem("dashboard_display_mode", displayMode);
@@ -893,6 +947,10 @@ const Dashboard = () => {
                             handleTabDragOver={handleTabDragOver}
                             handleTabDragLeave={handleTabDragLeave}
                             handleTabDrop={handleTabDrop}
+                            handleDropOnNormalList={handleDropOnNormalList}
+                            draggedListIdRef={draggedListIdRef}
+                            setDragOverListId={setDragOverListId}
+                            dragOverListId={dragOverListId}
                             getTabClassName={getTabClassName}
                         />
                     ) : (
@@ -903,6 +961,7 @@ const Dashboard = () => {
                             collapsedSections={collapsedSections}
                             toggleSection={toggleSection}
                             draggedListId={draggedListId}
+                            draggedListIdRef={draggedListIdRef}
                             dragOverListId={dragOverListId}
                             setDragOverListId={setDragOverListId}
                             handleDragStart={handleDragStart}
