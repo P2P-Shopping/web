@@ -13,6 +13,7 @@ export interface RoutePoint {
     name: string;
     lat: number;
     lng: number;
+    audio_instruction?: string;
 }
 
 /**

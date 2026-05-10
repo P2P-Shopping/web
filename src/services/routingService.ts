@@ -5,6 +5,7 @@ export interface BackendRoutePoint {
     name: string;
     lat: number;
     lng: number;
+    audio_instruction?: string;
 }
 
 export interface CalculateRouteRequest {

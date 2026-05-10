@@ -1034,18 +1034,13 @@ const UnifiedMap: React.FC = () => {
         userLocation,
         activeIndoorItems,
     ]);
+   
     // --- AUDIO NAVIGATION LOGIC ---
     useEffect(() => {
-        // Rulăm doar în modul indoor, dacă avem o rută și dacă audio e pornit
-        if (
-            navigationMode !== "indoor" ||
-            route.length === 0 ||
-            !isAudioEnabled
-        ) {
+        if (navigationMode !== "indoor" || route.length === 0 || !isAudioEnabled) {
             return;
         }
 
-        // Verificăm dacă browser-ul suportă Web Speech API
         if (!("speechSynthesis" in window)) {
             console.warn("Browser does not support speech synthesis.");
             return;
@@ -1058,20 +1053,35 @@ const UnifiedMap: React.FC = () => {
             });
             const nodeId = point.itemId || `${point.lat}-${point.lng}`;
 
-            // Dacă utilizatorul e la mai puțin de 4 metri și nodul nu a fost vorbit încă
             if (distance <= 4 && !spokenNodesRef.current.has(nodeId)) {
                 spokenNodesRef.current.add(nodeId);
 
-                // Folosim cast la 'any' pentru audio_instruction în caz că interfața RoutePoint nu e updatată
-                const instructionText =
-                    (point as any).audio_instruction ||
-                    `Approaching ${point.name}`;
+                // CORECTURĂ: Folosim proprietatea camelCase trimisă de Spring Boot
+                const instructionText = point.audio_instruction || `Te apropii de ${point.name}`;
+                // SUNET DE NOTIFICARE (Beep) înainte de vorbire
+                try {
+                    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.1);
+                } catch (e) {
+                    console.warn("Audio beep failed", e);
+                }
 
                 const utterance = new SpeechSynthesisUtterance(instructionText);
-                utterance.lang = "en-US"; // Poți schimba în 'ro-RO' dacă backend-ul trimite texte în română
+                utterance.lang = "ro-RO"; // Setăm limba română pentru textele din backend
                 utterance.rate = 1.0;
 
-                window.speechSynthesis.speak(utterance);
+                // Mic delay pentru a lăsa beep-ul să se audă primul
+                setTimeout(() => {
+                    window.speechSynthesis.speak(utterance);
+                }, 150);
             }
         });
     }, [userLocation, route, navigationMode, isAudioEnabled]);
