@@ -639,12 +639,13 @@ const useListItems = (effectiveListId: string | undefined) => {
      * Optimistically deletes an item with a 5-second Undo window.
      * Falls back to offline queue if the permanent deletion fails.
      */
-    const deleteItem = async (itemId: string) => {
+const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
 
         const itemToDelete = items.find((item) => item.id === itemId);
         if (!itemToDelete) return;
 
+        // 1. Ștergere optimistă
         const nextItems = items.filter((item) => item.id !== itemId);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
@@ -659,18 +660,42 @@ const useListItems = (effectiveListId: string | undefined) => {
 
                 if (!res.ok) {
                     if (res.status === 401) {
-                        useStore.getState().setAuth(null);
-                        throw new Error("Session expired.");
+                        handleUnauthorizedResponse();
+                        return;
                     }
                     throw new Error(`Failed to delete item (${res.status})`);
                 }
+
+                if (effectiveListId && stompClient.connected) {
+                    pendingSyncItems.current.add(itemId);
+                    stompClient.publish({
+                        destination: `/app/list/${effectiveListId}/update`,
+                        body: JSON.stringify({
+                            action: "DELETE",
+                            itemId,
+                            timestamp: Date.now(),
+                        }),
+                    });
+                }
+
             } catch (err) {
                 console.error("deleteItem error:", err);
-                useStore.getState().enqueueAction({
-                    id: crypto.randomUUID(),
-                    type: "DELETE_ITEM",
-                    payload: { listId: effectiveListId, itemId },
-                    timestamp: Date.now(),
+                
+                if (!navigator.onLine) {
+                    useStore.getState().enqueueAction({
+                        id: crypto.randomUUID(),
+                        type: "DELETE_ITEM",
+                        payload: { listId: effectiveListId, itemId },
+                        timestamp: Date.now(),
+                    });
+                    return;
+                }
+
+                setItems((prev) => {
+                    if (prev.some((i) => i.id === itemId)) return prev;
+                    const restored = [...prev, itemToDelete];
+                    syncListItemsInStore(restored);
+                    return restored;
                 });
             }
         }, 5000);
@@ -681,7 +706,6 @@ const useListItems = (effectiveListId: string | undefined) => {
                 label: "Undo",
                 onClick: () => {
                     clearTimeout(timerId);
-
                     setItems((prev) => {
                         if (prev.some((i) => i.id === itemId)) return prev;
                         const restored = [...prev, itemToDelete];
