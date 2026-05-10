@@ -168,7 +168,7 @@ export const loadRoute = async (
         return;
     }
 
-   const orderedRoute = calculateMockTspRoute(points, {
+    const orderedRoute = calculateMockTspRoute(points, {
         lat: userLat,
         lng: userLng,
     });
@@ -179,12 +179,14 @@ export const loadRoute = async (
         "Mergi înainte 10 metri pe acest culoar.",
         "Ia-o la stânga și oprește-te în fața raftului.",
         "Întoarce-te, produsul este exact în spatele tău.",
-        "Ai ajuns la destinația finală din lista ta."
+        "Ai ajuns la destinația finală din lista ta.",
     ];
 
     orderedRoute.forEach((point, index) => {
         // Injectăm frazele în ordine. Dacă avem mai multe puncte decât fraze, o repetăm pe ultima.
-        (point as any).audio_instruction = mockInstructions[index] || mockInstructions[mockInstructions.length - 1];
+        (point as any).audio_instruction =
+            mockInstructions[index] ||
+            mockInstructions[mockInstructions.length - 1];
     });
     // ------------------------------------------
 
