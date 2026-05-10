@@ -33,7 +33,25 @@ export interface MacroRoutingResponse {
     driving: MacroEstimate | null;
 }
 
-const BASE_URL = "/api/routing";
+const getBaseUrl = () => {
+    const base =
+        import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+    return base === "/" ? "" : base;
+};
+
+const getRoutingUrl = (path = "") => `${getBaseUrl()}/api/routing${path}`;
+
+/**
+ * Validates that a routeId contains only safe characters.
+ * Prevents path traversal attacks by rejecting any input with
+ * slashes, dots, or other special characters.
+ */
+const validateRouteId = (routeId: string): string => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(routeId)) {
+        throw new Error("Invalid routeId: contains unsafe characters");
+    }
+    return routeId;
+};
 const TIMEOUT_MS = 10000;
 
 /**
@@ -45,7 +63,7 @@ const TIMEOUT_MS = 10000;
 export async function calculateRoute(
     request: CalculateRouteRequest,
 ): Promise<CalculateRouteResponse> {
-    const res = await fetch(`${BASE_URL}/calculate`, {
+    const res = await fetch(getRoutingUrl("/calculate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Order is deliberate: request.lazyN will override the default 5
@@ -65,7 +83,8 @@ export async function calculateRoute(
 export async function getFullRoute(
     routeId: string,
 ): Promise<CalculateRouteResponse | null> {
-    const res = await fetch(`${BASE_URL}/full/${routeId}`, {
+    const safeRouteId = validateRouteId(routeId);
+    const res = await fetch(getRoutingUrl(`/full/${safeRouteId}`), {
         signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
@@ -89,7 +108,7 @@ export async function getMacroEstimates(
         storeId,
     });
 
-    const res = await fetch(`${BASE_URL}/macro?${params}`, {
+    const res = await fetch(getRoutingUrl(`/macro?${params}`), {
         signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`Macro routing failed: ${res.status}`);
