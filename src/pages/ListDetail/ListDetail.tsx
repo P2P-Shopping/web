@@ -635,48 +635,62 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    /**
+     * Optimistically deletes an item with a 5-second Undo window.
+     * Falls back to offline queue if the permanent deletion fails.
+     */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
+
+        const itemToDelete = items.find((item) => item.id === itemId);
+        if (!itemToDelete) return;
+
         const nextItems = items.filter((item) => item.id !== itemId);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
 
-        try {
-            await api.delete(`/api/items/${itemId}`);
-
-            if (effectiveListId && stompClient.connected) {
-                pendingSyncItems.current.add(itemId);
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify({
-                        action: "DELETE",
-                        itemId,
-                        timestamp: Date.now(),
-                    }),
+        const timerId = setTimeout(async () => {
+            try {
+                const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+                    method: "DELETE",
+                    headers: getAuthHeaders(),
+                    credentials: "include",
                 });
-            }
-        } catch (err) {
-            if (!navigator.onLine) {
+
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        useStore.getState().setAuth(null);
+                        throw new Error("Session expired.");
+                    }
+                    throw new Error(`Failed to delete item (${res.status})`);
+                }
+            } catch (err) {
+                console.error("deleteItem error:", err);
                 useStore.getState().enqueueAction({
                     id: crypto.randomUUID(),
                     type: "DELETE_ITEM",
-                    payload: {
-                        listId: effectiveListId,
-                        itemId,
-                    },
+                    payload: { listId: effectiveListId, itemId },
                     timestamp: Date.now(),
                 });
-                return;
             }
+        }, 5000);
 
-            const errorMessage =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to delete the product.";
-            console.error("deleteItem error:", err);
-            setError(errorMessage);
-            fetchListData(effectiveListId);
-        }
+        toast("Item deleted.", {
+            duration: 5000,
+            action: {
+                label: "Undo",
+                onClick: () => {
+                    clearTimeout(timerId);
+
+                    setItems((prev) => {
+                        if (prev.some((i) => i.id === itemId)) return prev;
+                        const restored = [...prev, itemToDelete];
+                        syncListItemsInStore(restored);
+                        return restored;
+                    });
+                },
+            },
+        });
     };
 
     return {
