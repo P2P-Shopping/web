@@ -26,6 +26,8 @@ import {
     Satellite,
     X,
     Zap,
+    Volume2,
+    VolumeX,
 } from "lucide-react";
 import type { AppState, Coordinate, RoutePoint } from "../../context/useStore";
 import { useStore } from "../../context/useStore";
@@ -895,6 +897,8 @@ const UnifiedMap: React.FC = () => {
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
+    const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+    const spokenNodesRef = useRef<Set<string>>(new Set());
     const routeOriginRef = useRef<Coordinate | null>(null);
     const lastDeviationRecalcRef = useRef<Coordinate | null>(null);
     const isMicroView = navigationMode === "indoor";
@@ -1029,6 +1033,47 @@ const UnifiedMap: React.FC = () => {
         userLocation,
         activeIndoorItems,
     ]);
+    // --- AUDIO NAVIGATION LOGIC ---
+    useEffect(() => {
+        // Rulăm doar în modul indoor, dacă avem o rută și dacă audio e pornit
+        if (
+            navigationMode !== "indoor" ||
+            route.length === 0 ||
+            !isAudioEnabled
+        ) {
+            return;
+        }
+
+        // Verificăm dacă browser-ul suportă Web Speech API
+        if (!("speechSynthesis" in window)) {
+            console.warn("Browser does not support speech synthesis.");
+            return;
+        }
+
+        route.forEach((point) => {
+            const distance = getDistanceMeters(userLocation, {
+                lat: point.lat,
+                lng: point.lng,
+            });
+            const nodeId = point.itemId || `${point.lat}-${point.lng}`;
+
+            // Dacă utilizatorul e la mai puțin de 4 metri și nodul nu a fost vorbit încă
+            if (distance <= 4 && !spokenNodesRef.current.has(nodeId)) {
+                spokenNodesRef.current.add(nodeId);
+
+                // Folosim cast la 'any' pentru audio_instruction în caz că interfața RoutePoint nu e updatată
+                const instructionText =
+                    (point as any).audio_instruction ||
+                    `Approaching ${point.name}`;
+
+                const utterance = new SpeechSynthesisUtterance(instructionText);
+                utterance.lang = "en-US"; // Poți schimba în 'ro-RO' dacă backend-ul trimite texte în română
+                utterance.rate = 1.0;
+
+                window.speechSynthesis.speak(utterance);
+            }
+        });
+    }, [userLocation, route, navigationMode, isAudioEnabled]);
 
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
@@ -1379,7 +1424,47 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="absolute top-4 right-4 z-1000 flex flex-col gap-2">
+                <div className="absolute top-4 left-4 z-3000 flex flex-col gap-2 items-start">
+                    {/* Badge-ul de View */}
+                    <div
+                        className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md w-fit ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
+                    >
+                        {isMicroView
+                            ? "Micro View: Indoor"
+                            : "Macro View: City"}
+                    </div>
+
+                    {/* Butonul de Audio (Doar pe Indoor) */}
+                    {isMicroView && (
+                        <div className="flex w-fit bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (isAudioEnabled) {
+                                        window.speechSynthesis.cancel();
+                                    } else {
+                                        spokenNodesRef.current.clear();
+                                    }
+                                    setIsAudioEnabled(!isAudioEnabled);
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-tighter transition-all ${isAudioEnabled ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
+                                title={
+                                    isAudioEnabled
+                                        ? "Mute Voice"
+                                        : "Unmute Voice"
+                                }
+                            >
+                                {isAudioEnabled ? (
+                                    <Volume2 size={14} />
+                                ) : (
+                                    <VolumeX size={14} />
+                                )}
+                                {isAudioEnabled ? "ON" : "OFF"}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* BUTOANELE EXISTENTE: MOCK / REAL GPS */}
                     <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
                         <button
                             type="button"
