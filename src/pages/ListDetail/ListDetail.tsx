@@ -483,7 +483,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
-        category?: string
+        category?: string,
     ) => {
         const newItem: Item = {
             id: crypto.randomUUID(),
@@ -551,7 +551,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
-        category?: string
+        category?: string,
     ) => {
         if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
@@ -562,11 +562,22 @@ const useListItems = (effectiveListId: string | undefined) => {
         );
 
         if (existingItem) {
-            await mergeExistingItem(effectiveListId, existingItem, finalQuantity);
+            await mergeExistingItem(
+                effectiveListId,
+                existingItem,
+                finalQuantity,
+            );
             return;
         }
 
-        await createNewItem(effectiveListId, name, finalQuantity, brand, price,category);
+        await createNewItem(
+            effectiveListId,
+            name,
+            finalQuantity,
+            brand,
+            price,
+            category,
+        );
     };
 
     const toggleItem = async (itemId: string) => {
@@ -1166,7 +1177,8 @@ const ItemDetailsFields = ({
                         return;
                     }
                     setQuantity(val);
-                }}placeholder={isMobile ? "e.g. 2 pcs" : "e.g., 2"}
+                }}
+                placeholder={isMobile ? "e.g. 2 pcs" : "e.g., 2"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
         </div>
@@ -1217,7 +1229,9 @@ const ItemDetailsFields = ({
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
         </div>
-        <div className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}>
+        <div
+            className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}
+        >
             <label
                 htmlFor={`${idPrefix}-category`}
                 className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
@@ -1669,10 +1683,11 @@ const ListDetail = ({
 
     const handleDetailsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const priceNum = detailPrice ? Number.parseFloat(detailPrice) : undefined;
+        const priceNum = detailPrice
+            ? Number.parseFloat(detailPrice)
+            : undefined;
 
         if (editingItemId) {
-
             try {
                 const payload = {
                     name: detailName,
@@ -1680,8 +1695,10 @@ const ListDetail = ({
                     quantity: detailQuantity || "1",
                     price: priceNum || null,
                     category: detailCategory || null,
-                    isChecked: items.find(i => i.id === editingItemId)?.checked || false,
-                    timestamp: Date.now()
+                    isChecked:
+                        items.find((i) => i.id === editingItemId)?.checked ||
+                        false,
+                    timestamp: Date.now(),
                 };
 
                 await api.put(`/api/items/${editingItemId}`, payload);
@@ -1692,8 +1709,13 @@ const ListDetail = ({
                 setError("Failed to update item.");
             }
         } else {
-
-            addItem(detailName, detailQuantity, detailBrand, priceNum, detailCategory);
+            addItem(
+                detailName,
+                detailQuantity,
+                detailBrand,
+                priceNum,
+                detailCategory,
+            );
         }
 
         setShowDetailsModal(false);
@@ -1821,7 +1843,9 @@ const ListDetail = ({
             const existingItem = existingMap.get(dupKey);
             const itemQty = item.quantity?.trim() ? item.quantity.trim() : "1";
             if (existingItem) {
-                const existingQty = existingItem.quantity?.trim() ? existingItem.quantity.trim() : "1";
+                const existingQty = existingItem.quantity?.trim()
+                    ? existingItem.quantity.trim()
+                    : "1";
                 const mergedQty = mergeQuantities(existingQty, itemQty);
                 const updated = await useListsStore
                     .getState()

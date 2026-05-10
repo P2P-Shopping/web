@@ -1,4 +1,4 @@
-import { Check, Trash2, Pencil } from "lucide-react";
+import { Check, Pencil, Trash2 } from "lucide-react";
 import React from "react";
 
 interface Item {
