@@ -1,183 +1,338 @@
-import StoreMap from "./components/StoreMap.tsx";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Toaster, toast } from "sonner";
 import type { StompSubscription } from "@stomp/stompjs";
-import stompClient from "./services/socketService";
+
+import { Navbar, OfflineBanner } from "./components";
+import { useStore } from "./context/useStore";
+import { useNetworkState } from "./hooks/useNetworkState";
+import { useOfflineSync } from "./hooks/useOfflineSync";
+import { Dashboard, ListDetail, LoginPage, RegistrationPage, UnifiedMap } from "./pages";
+import { checkAuthRequest } from "./services/authService";
+import { DEMO_STORE_LOCATION, isWithinGeofence } from "./services/geofence";
+import { loadRoute } from "./services/loadRoute";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
-import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import stompClient from "./services/socketService";
+import { useThemeStore } from "./store/useThemeStore";
+import { isWebView } from "./utils/webview";
 
-// Auth Pages
-import LoginPage from "./pages/LoginPage";
-import RegistrationPage from "./pages/RegistrationPage";
+function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
+    const authChecked = useStore((state) => state.authChecked);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
 
-import MapPage from "./pages/MapPage";
-import RoutePage from "./pages/RoutePage";
-import ListDetail from "./pages/ListDetail";
-import "./App.css";
+    if (!authChecked) {
+        return <div className="flex-1 flex items-center justify-center">Loading session...</div>;
+    }
+
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+    return children;
+}
+
+function GuestRoute({ children }: Readonly<{ children: React.ReactNode }>) {
+    const authChecked = useStore((state) => state.authChecked);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
+
+    if (!authChecked) {
+        return <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted">Loading session...</div>;
+    }
+
+    if (isAuthenticated) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+}
+
+function NotFound() {
+    const authChecked = useStore((state) => state.authChecked);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
+
+    if (!authChecked) {
+        return <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh text-text-muted" />;
+    }
+
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return <div className="flex-1 flex items-center justify-center text-text-muted">Page not found</div>;
+}
 
 function App() {
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const location = useLocation();
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useNetworkState();
+    useOfflineSync();
+    const location = useLocation();
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    startMockEmitter();
-    return () => stopMockEmitter();
-  }, []);
+    const setServerConnected = useStore((state) => state.setServerConnected);
+    const setAuth = useStore((state) => state.setAuth);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
+    const userLocation = useStore((state) => state.userLocation);
+    const targetStoreLocation = useStore((state) => state.targetStoreLocation);
+    const navigationMode = useStore((state) => state.navigationMode);
+    const hasEnteredStore = useStore((state) => state.hasEnteredStore);
+    const isTransitioningToStore = useStore((state) => state.isTransitioningToStore);
+    const items = useStore((state) => state.items);
+    const setNavigationMode = useStore((state) => state.setNavigationMode);
+    const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
+    const setIsTransitioningToStore = useStore((state) => state.setIsTransitioningToStore);
+    const setStatus = useStore((state) => state.setStatus);
+    const { theme } = useThemeStore();
 
-  useEffect(() => {
-    let subscription: StompSubscription | null = null;
-
-    stompClient.onConnect = () => {
-      setIsConnected(true);
-
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-
-      subscription = stompClient.subscribe("/topic/pong", (message) => {
-        setToastMessage(`Server Response: ${message.body}`);
-        if (toastTimeoutRef.current) {
-          clearTimeout(toastTimeoutRef.current);
+    useEffect(() => {
+        const root = document.documentElement;
+        if (theme === "system") {
+            delete root.dataset.theme;
+        } else {
+            root.dataset.theme = theme;
         }
-        toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 3000);
-      });
-    };
+    }, [theme]);
 
-    stompClient.onWebSocketClose = () => {
-      setIsConnected(false);
-    };
+    const handlePongMessage = useCallback((message: { body: string }) => {
+        toast.info(`Server Response: ${message.body}`);
+    }, []);
 
-    stompClient.activate();
+    const authChecked = useStore((state) => state.authChecked);
 
-    return () => {
-      if (subscription) subscription.unsubscribe();
-      stompClient.onConnect = () => {};
-      stompClient.onWebSocketClose = () => {};
-      stompClient.deactivate();
-    };
-  }, []);
+    useEffect(() => {
+        let timeoutId: ReturnType<typeof setTimeout>;
 
-  const handleAuthSuccess = (result: unknown) => {
-    console.info("Authentication successful", result);
-  };
+        if (!authChecked) {
+            timeoutId = setTimeout(() => {
+                if (!useStore.getState().authChecked) {
+                    console.warn("Auth check timed out, proceeding as guest");
+                    setAuth(null, null);
+                }
+            }, 12_000);
 
-  const handlePingPress = () => {
-    if (isConnected) {
-      stompClient.publish({
-        destination: "/app/ping",
-        body: "Ping from React Navigation!",
-      });
-    } else {
-      alert("Cannot ping. Server is disconnected.");
-    }
-  };
+            checkAuthRequest()
+                .then((user) => {
+                    setAuth(user, (user as { token?: string })?.token);
+                })
+                .catch(() => {
+                    setAuth(null, null);
+                })
+                .finally(() => {
+                    clearTimeout(timeoutId);
+                });
+        }
 
-  const isStoreMap = location.pathname === "/nav";
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [setAuth, authChecked]);
 
-  if (isStoreMap) {
-    return <StoreMap />;
-  }
+    const isMockGpsEnabled = useStore((state) => state.isMockGpsEnabled);
+    const setUserLocation = useStore((state) => state.setUserLocation);
 
-  return (
-    <div className="app-container">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          style={{
-            position: "fixed",
-            top: "80px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--accent, #aa3bff)",
-            color: "#fff",
-            padding: "10px 20px",
-            borderRadius: "8px",
-            zIndex: 1000,
-            boxShadow: "var(--shadow)",
-            fontWeight: "bold",
-          }}
-        >
-          {toastMessage}
-        </div>
-      )}
+    useEffect(() => {
+        if (isMockGpsEnabled) {
+            startMockEmitter();
+            return () => stopMockEmitter();
+        }
 
-      <header className="main-header">
-        <nav className="nav-menu">
-          {/* Added your link to Login */}
-          <Link to="/login" className="nav-link">
-            Login
-          </Link>
-          <Link to="/register" className="nav-link">
-            Register
-          </Link>
-          <Link to="/map" className="nav-link">
-            Map
-          </Link>
-          <Link to="/route" className="nav-link">
-            Route
-          </Link>
-          <Link to="/nav" className="nav-link">
-            Store Map
-          </Link>
-          <Link to="/list/default" className="nav-link">
-            List
-          </Link>
+        if (!navigator.geolocation) {
+            console.error("Geolocation is not supported by this browser.");
+            return;
+        }
 
-          <button
-            className="nav-link"
-            onClick={handlePingPress}
-            disabled={!isConnected}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              font: "inherit",
-              color: isConnected ? "inherit" : "gray",
-              cursor: isConnected ? "pointer" : "not-allowed",
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-            }}
-          >
-            {isConnected ? "🟢 Ping Server" : "🔴 Disconnected"}
-          </button>
-        </nav>
-        <div className="logo-section">
-          <span className="cart-icon">🛒</span>
-          <h1>P2P Shopping</h1>
-        </div>
-      </header>
-
-      <main className="content">
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              <div className="auth-container">
-                <LoginPage />
-              </div>
+        const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                setUserLocation({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                });
+            },
+            (error) => {
+                console.error("Real GPS error:", error);
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 1000,
+                timeout: 5000,
             }
-          />
-          <Route
-            path="/register"
-            element={
-              <div className="auth-container">
-                <RegistrationPage onAuthSuccess={handleAuthSuccess} />
-              </div>
-            }
-          />
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/nav" element={<StoreMap />} />
-          <Route path="/route" element={<RoutePage />} />
-          <Route path="/list/:id" element={<ListDetail />} />
+        );
 
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<div>Page not found</div>} />
-        </Routes>
-      </main>
-    </div>
-  );
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, [isMockGpsEnabled, setUserLocation]);
+
+    useEffect(() => {
+        if (navigationMode === "indoor" || hasEnteredStore || isTransitioningToStore) {
+            return;
+        }
+
+        const storeLocation = targetStoreLocation ?? DEMO_STORE_LOCATION;
+        if (!isWithinGeofence(userLocation, storeLocation)) return;
+
+        let cancelled = false;
+
+        (async () => {
+            setIsTransitioningToStore(true);
+            setStatus("Geofence detected. Loading indoor canvas...");
+            await loadRoute(
+                items.map((item) => item.id),
+                storeLocation.lat,
+                storeLocation.lng
+            );
+
+            if (cancelled) return;
+
+            setNavigationMode("indoor");
+            setHasEnteredStore(true);
+            setStatus("Indoor canvas active.");
+
+            if (!location.pathname.startsWith("/map")) {
+                navigate("/map", { replace: true });
+            }
+        })()
+            .catch((error) => {
+                console.error("Geofence transition failed:", error);
+                setStatus("Failed to enter indoor canvas.");
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsTransitioningToStore(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        hasEnteredStore,
+        items,
+        location.pathname,
+        navigationMode,
+        navigate,
+        setHasEnteredStore,
+        setNavigationMode,
+        setStatus,
+        setIsTransitioningToStore,
+        targetStoreLocation,
+        userLocation,
+        isTransitioningToStore,
+    ]);
+
+    const token = useStore((state) => state.token);
+
+    useEffect(() => {
+        let subscription: StompSubscription | null = null;
+
+        if (token) {
+            stompClient.connectHeaders = {
+                Authorization: `Bearer ${token}`,
+            };
+        } else {
+            stompClient.connectHeaders = {};
+        }
+
+        stompClient.onConnect = () => {
+            setServerConnected(true);
+            console.debug("[ws] connected");
+
+            if (subscription) {
+                subscription.unsubscribe();
+            }
+
+            subscription = stompClient.subscribe("/topic/pong", handlePongMessage);
+            console.debug("[ws] subscribed /topic/pong");
+        };
+
+        stompClient.onStompError = (frame) => {
+            console.error("Broker error:", frame.headers.message);
+            setServerConnected(false);
+        };
+
+        stompClient.onWebSocketClose = () => {
+            setServerConnected(false);
+            console.debug("[ws] closed");
+        };
+
+        stompClient.activate();
+
+        return () => {
+            if (subscription) subscription.unsubscribe();
+            stompClient.onConnect = () => { };
+            stompClient.onWebSocketClose = () => { };
+            stompClient.onStompError = () => { };
+            (async () => {
+                try {
+                    await stompClient.deactivate();
+                } catch (err) {
+                    console.error("Failed to deactivate STOMP client:", err);
+                }
+            })();
+        };
+    }, [handlePongMessage, setServerConnected, token]);
+
+    const searchParams = new URLSearchParams(location.search);
+    const isAiImport = searchParams.get("import") === "ai";
+    const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+    const showNavbar = isAuthenticated && !isAuthPage && !isAiImport && !isWebView();
+
+    return (
+        <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">
+            <Toaster position="top-center" richColors />
+            <OfflineBanner isAuthPage={isAuthPage || isWebView()} />
+
+            <main className={`flex-1 flex flex-col ${isAiImport ? "overflow-hidden" : "overflow-y-auto"} min-h-0 relative`}>
+                <Routes>
+                    <Route
+                        path="/login"
+                        element={
+                            <GuestRoute>
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
+                                    <LoginPage />
+                                </div>
+                            </GuestRoute>
+                        }
+                    />
+                    <Route
+                        path="/register"
+                        element={
+                            <GuestRoute>
+                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
+                                    <RegistrationPage />
+                                </div>
+                            </GuestRoute>
+                        }
+                    />
+                    <Route
+                        path="/map"
+                        element={
+                            <ProtectedRoute>
+                                <UnifiedMap />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/dashboard"
+                        element={
+                            <ProtectedRoute>
+                                <Dashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/list/:id"
+                        element={
+                            <ProtectedRoute>
+                                <ListDetail />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/"
+                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
+                    />
+                    <Route path="*" element={<NotFound />} />
+                </Routes>
+            </main>
+            {showNavbar && <Navbar />}
+        </div>
+    );
 }
 
 export default App;
