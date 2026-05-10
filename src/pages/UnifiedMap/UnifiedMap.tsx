@@ -1,5 +1,6 @@
 import L from "leaflet";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Circle,
     MapContainer,
@@ -24,10 +25,10 @@ import {
     LocateFixed,
     MapPin,
     Satellite,
-    X,
-    Zap,
     Volume2,
     VolumeX,
+    X,
+    Zap,
 } from "lucide-react";
 import type { AppState, Coordinate, RoutePoint } from "../../context/useStore";
 import { useStore } from "../../context/useStore";
