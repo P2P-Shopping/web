@@ -1,3 +1,4 @@
+import polyline from "@mapbox/polyline";
 import L from "leaflet";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -39,7 +40,6 @@ import { useListsStore } from "../../store/useListsStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import StoreMap from "../StoreMap/StoreMap";
-import polyline from "@mapbox/polyline";
 // --- Types & Constants ---
 export interface StoreRecommendation {
     id: string;
