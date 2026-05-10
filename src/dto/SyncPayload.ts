@@ -6,6 +6,7 @@ export type ActionType =
     | "UPDATE"
     | "DELETE"
     | "CHECK_OFF"
+    | "BULK_DELETE"
     | "TYPING"
     | "UNKNOWN";
 
@@ -31,6 +32,12 @@ export interface SyncPayload {
 
     /** Timestamp of the modification for conflict resolution. */
     timestamp?: number;
+
+    /**
+     * For BULK_DELETE: list of item IDs that were deleted.
+     * Allows all collaborators to remove the items atomically.
+     */
+    deletedItemIds?: string[];
 
     /** Status of the operation, returned by the server. */
     status?: "Success" | "Rejection";

@@ -2,8 +2,11 @@ import {
     AlertCircle,
     Camera,
     ChevronDown,
+    Edit3,
+    MoreVertical,
     Plus,
     Settings,
+    Trash2,
     UserPlus,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +27,7 @@ import type { SyncPayload } from "../../dto/SyncPayload";
 import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
+    clearCompletedItems,
     fetchProductSuggestions,
     finishShoppingRequest,
 } from "../../services/api";
@@ -339,9 +343,12 @@ const useListItems = (effectiveListId: string | undefined) => {
                         } catch (e) {
                             console.error(
                                 "Failed to parse incoming ADD item JSON",
-                                e,
                             );
                         }
+                    } else if (payload.action === "BULK_DELETE") {
+                        const ids = payload.deletedItemIds || payload.content?.split(",") || [];
+                        const deletedIds = new Set(ids);
+                        next = prev.filter((item) => !deletedIds.has(item.id));
                     }
 
                     if (next !== prev) {
@@ -679,6 +686,32 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const clearCompleted = async () => {
+        if (!effectiveListId || effectiveListId === "default") return;
+
+        const checkedItems = items.filter((item) => item.checked);
+        if (checkedItems.length === 0) return;
+
+        const previousItems = items;
+        const nextItems = items.filter((item) => !item.checked);
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        try {
+            await clearCompletedItems(effectiveListId);
+            // The WebSocket event will be sent by the server
+        } catch (err) {
+            console.error("clearCompleted error:", err);
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to clear completed items.",
+            );
+            setItems(previousItems);
+            syncListItemsInStore(previousItems);
+        }
+    };
+
     return {
         items,
         isLoading,
@@ -688,6 +721,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         addItem,
         toggleItem,
         deleteItem,
+        clearCompleted,
         setError,
         handleAiImport,
         isReviewModalOpen,
@@ -1430,6 +1464,7 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        clearCompleted,
         setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
@@ -1460,6 +1495,22 @@ const ListDetail = ({
     const [showFinishModal, setShowFinishModal] = useState(false);
     const [finishStoreName, setFinishStoreName] = useState("");
     const [receiptImage, setReceiptImage] = useState<File | null>(null);
+    const [showListMenu, setShowListMenu] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                menuRef.current &&
+                !menuRef.current.contains(event.target as Node)
+            ) {
+                setShowListMenu(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
@@ -1811,7 +1862,7 @@ const ListDetail = ({
                             onClick={() => setShowBanner(false)}
                             aria-label="Close warning"
                         >
-                            ✕
+                            Ã¢Å“â€¢
                         </button>
                     </div>
                 )}
@@ -1837,23 +1888,97 @@ const ListDetail = ({
                                         />
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap justify-end gap-2">
+                                <div className="flex items-center gap-2 relative" ref={menuRef}>
                                     {canImportIntoNormalList && (
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 openImportModal();
                                             }}
-                                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent shadow-sm active:scale-95"
                                         >
                                             <Plus size={14} strokeWidth={2.5} />
-                                            Add to normal list
+                                            <span className="max-[500px]:hidden">Add to normal list</span>
+                                            <span className="min-[501px]:hidden">Import</span>
                                         </button>
                                     )}
                                     <button
                                         type="button"
+                                        onClick={() =>
+                                            setShowListMenu(!showListMenu)
+                                        }
+                                        className="inline-flex items-center justify-center w-9 h-9 bg-bg-muted text-text-strong border border-border rounded-lg transition-all hover:border-accent hover:text-accent shadow-sm active:scale-95"
+                                        aria-label="List Actions"
+                                    >
+                                        <MoreVertical size={18} />
+                                    </button>
+
+                                    {showListMenu && (
+                                        <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top-right">
+                                            <div className="p-1.5 flex flex-col gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowListMenu(false);
+                                                        setShowRenameModal(true);
+                                                    }}
+                                                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-text-strong hover:bg-bg-muted rounded-lg transition-colors text-left"
+                                                >
+                                                    <Edit3
+                                                        size={16}
+                                                        className="text-text-muted"
+                                                    />
+                                                    Rename List
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowListMenu(false);
+                                                        setShowShareModal(true);
+                                                    }}
+                                                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-text-strong hover:bg-bg-muted rounded-lg transition-colors text-left"
+                                                >
+                                                    <UserPlus
+                                                        size={16}
+                                                        className="text-accent"
+                                                    />
+                                                    Share List
+                                                </button>
+
+                                                {items.some(
+                                                    (item) => item.checked,
+                                                ) && (
+                                                    <>
+                                                        <div className="h-px bg-border/50 my-1" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setShowListMenu(
+                                                                    false,
+                                                                );
+                                                                if (
+                                                                    window.confirm(
+                                                                        "Are you sure you want to remove all completed items?",
+                                                                    )
+                                                                ) {
+                                                                    clearCompleted();
+                                                                }
+                                                            }}
+                                                            className="flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                            Clear Completed
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
                                         onClick={() => setShowShareModal(true)}
-                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0 max-[450px]:hidden"
                                     >
                                         <UserPlus size={14} strokeWidth={2.5} />
                                         Invite

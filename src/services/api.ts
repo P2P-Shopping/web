@@ -40,7 +40,7 @@ api.interceptors.response.use(
 
 /**
  * Task 4: API Request for Finishing Shopping
- * REPARAT: Fără header-ul Content-Type manual pentru a lăsa Axios să pună 'boundary' corect.
+ * REPARAT: FÃ„Æ’rÃ„Æ’ header-ul Content-Type manual pentru a lÃ„Æ’sa Axios sÃ„Æ’ punÃ„Æ’ 'boundary' corect.
  */
 export const finishShoppingRequest = async (data: {
     storeName: string;
@@ -107,6 +107,10 @@ export const fetchProductSuggestions = async (
         );
         return [];
     }
+};
+
+export const clearCompletedItems = async (listId: string) => {
+    return api.delete(`/api/lists/${listId}/items/completed`);
 };
 
 export default api;
