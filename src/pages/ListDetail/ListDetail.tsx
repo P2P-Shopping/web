@@ -639,7 +639,7 @@ const useListItems = (effectiveListId: string | undefined) => {
      * Optimistically deletes an item with a 5-second Undo window.
      * Falls back to offline queue if the permanent deletion fails.
      */
-const deleteItem = async (itemId: string) => {
+    const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
 
         const itemToDelete = items.find((item) => item.id === itemId);
@@ -677,10 +677,9 @@ const deleteItem = async (itemId: string) => {
                         }),
                     });
                 }
-
             } catch (err) {
                 console.error("deleteItem error:", err);
-                
+
                 if (!navigator.onLine) {
                     useStore.getState().enqueueAction({
                         id: crypto.randomUUID(),
