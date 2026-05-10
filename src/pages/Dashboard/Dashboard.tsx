@@ -70,7 +70,6 @@ interface ListCategorySectionProps {
 }
 
 const ListCategorySection: React.FC<ListCategorySectionProps> = ({
-    section,
     label,
     lists,
     isCollapsed,
@@ -587,7 +586,7 @@ interface DashboardTabsViewProps {
         targetListId: string,
         draggedListId: string | null,
     ) => void;
-    draggedListIdRef: React.MutableRefObject<string | null>;
+    draggedListIdRef: React.RefObject<string | null>;
     setDragOverListId: (id: string | null) => void;
     dragOverListId: string | null;
     getTabClassName: (section: string) => string;
@@ -641,8 +640,6 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5 mt-2">
             {groupedLists[activeTab].map((list) => {
                 const isDraggingOver = dragOverListId === list.id;
-                const currentDragged = draggedListIdRef.current;
-
                 return (
                     <li
                         key={list.id}
@@ -650,6 +647,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                         onDragStart={(e) => handleDragStart(e, list.id)}
                         onDragEnd={resetDragState}
                         onDragOver={(e) => {
+                            const currentDragged = draggedListIdRef.current;
                             if (!currentDragged || currentDragged === list.id)
                                 return;
                             e.preventDefault();
@@ -725,7 +723,6 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
     sectionLabels,
     collapsedSections,
     toggleSection,
-    draggedListId,
     draggedListIdRef,
     dragOverListId,
     setDragOverListId,
