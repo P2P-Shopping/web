@@ -1,42 +1,42 @@
 {
-  "name": "web",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "biome check .",
-    "preview": "vite preview",
-    "format": "biome format --write .",
-    "check": "biome check --write ."
-  },
-  "dependencies": {
-    "@stomp/stompjs": "^7.3.0",
-    "@tailwindcss/vite": "^4.2.4",
-    "@types/leaflet": "^1.9.21",
-    "axios": "^1.15.2",
-    "leaflet": "^1.9.4",
-    "lucide-react": "^1.13.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.14.2",
-    "sockjs-client": "^1.6.1",
-    "sonner": "^2.0.7",
-    "tailwindcss": "^4.2.4",
-    "zustand": "^5.0.12"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.12",
-    "@types/node": "^24.12.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@types/sockjs-client": "^1.5.4",
-    "@vitejs/plugin-basic-ssl": "^2.3.0",
-    "@vitejs/plugin-react": "^6.0.1",
-    "typescript": "~5.9.3",
-    "vite": "^8.0.10",
-    "vite-plugin-mkcert": "^2.0.0"
-  }
+    "name": "web",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc -b && vite build",
+        "lint": "biome check .",
+        "preview": "vite preview",
+        "format": "biome format --write .",
+        "check": "biome check --write ."
+    },
+    "dependencies": {
+        "@stomp/stompjs": "^7.3.0",
+        "@tailwindcss/vite": "^4.2.4",
+        "@types/leaflet": "^1.9.21",
+        "axios": "^1.15.2",
+        "leaflet": "^1.9.4",
+        "lucide-react": "^1.13.0",
+        "react": "^19.2.5",
+        "react-dom": "^19.2.5",
+        "react-leaflet": "^5.0.0",
+        "react-router-dom": "^7.14.2",
+        "sockjs-client": "^1.6.1",
+        "sonner": "^2.0.7",
+        "tailwindcss": "^4.2.4",
+        "zustand": "^5.0.12"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.12",
+        "@types/node": "^24.12.2",
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
+        "@types/sockjs-client": "^1.5.4",
+        "@vitejs/plugin-basic-ssl": "^2.3.0",
+        "@vitejs/plugin-react": "^6.0.1",
+        "typescript": "~5.9.3",
+        "vite": "^8.0.10",
+        "vite-plugin-mkcert": "^2.0.0"
+    }
 }
