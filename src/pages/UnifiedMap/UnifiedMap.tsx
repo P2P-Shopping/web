@@ -1132,14 +1132,17 @@ const UnifiedMap: React.FC = () => {
                 if (polylineString) {
                     const decodedPath = polyline.decode(polylineString);
                     useStore.getState().setMacroRouteGeometry(decodedPath);
-                    
+
                     // NOU: Mutăm locația magazinului pe ultimul punct din traseul real
                     if (decodedPath.length > 0) {
                         const lastPoint = decodedPath[decodedPath.length - 1];
-                        setTargetStoreLocation({ lat: lastPoint[0], lng: lastPoint[1] });
+                        setTargetStoreLocation({
+                            lat: lastPoint[0],
+                            lng: lastPoint[1],
+                        });
                     }
                 } else {
-                     useStore.getState().setMacroRouteGeometry([]);
+                    useStore.getState().setMacroRouteGeometry([]);
                 }
             } else {
                 useStore.getState().setMacroRouteGeometry([]);
