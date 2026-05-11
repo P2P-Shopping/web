@@ -283,57 +283,47 @@ const useListItems = (effectiveListId: string | undefined) => {
 
     const applySyncAction = useCallback(
         (prev: Item[], payload: SyncPayload): Item[] => {
-            switch (payload.action) {
-                case "CHECK_OFF":
-                    if (!payload.itemId) return prev;
-                    return prev.map((item) =>
-                        item.id === payload.itemId
-                            ? { ...item, checked: Boolean(payload.checked) }
-                            : item,
-                    );
-                case "UPDATE": {
-                    if (!payload.itemId || !payload.content) return prev;
-                    try {
-                        const updated = JSON.parse(payload.content) as Item;
-                        return prev.map((item) =>
-                            item.id === payload.itemId
-                                ? { ...item, ...updated }
-                                : item,
-                        );
-                    } catch (e) {
-                        console.error(
-                            "Failed to parse incoming UPDATE item JSON",
-                            e,
-                        );
-                        return prev;
-                    }
-                }
-                case "DELETE":
-                    if (!payload.itemId) return prev;
-                    return prev.filter((item) => item.id !== payload.itemId);
-                case "BULK_DELETE": {
-                    if (!payload.itemIds) return prev;
-                    const deletedIds = new Set(payload.itemIds);
-                    return prev.filter((item) => !deletedIds.has(item.id));
-                }
-                case "ADD": {
-                    if (!payload.content) return prev;
-                    try {
-                        const newItem = JSON.parse(payload.content) as Item;
-                        if (!prev.some((i) => i.id === newItem.id)) {
-                            return [...prev, newItem];
-                        }
-                    } catch (e) {
-                        console.error(
-                            "Failed to parse incoming ADD item JSON",
-                            e,
-                        );
-                    }
-                    return prev;
-                }
-                default:
-                    return prev;
+            const { action, itemId, itemIds, content, checked } = payload;
+
+            if (action === "CHECK_OFF" && itemId) {
+                return prev.map((item) =>
+                    item.id === itemId
+                        ? { ...item, checked: Boolean(checked) }
+                        : item,
+                );
             }
+            if (action === "UPDATE" && itemId && content) {
+                try {
+                    const updated = JSON.parse(content) as Item;
+                    return prev.map((item) =>
+                        item.id === itemId ? { ...item, ...updated } : item,
+                    );
+                } catch (e) {
+                    console.error(
+                        "Failed to parse incoming UPDATE item JSON",
+                        e,
+                    );
+                }
+                return prev;
+            }
+            if (action === "DELETE" && itemId) {
+                return prev.filter((item) => item.id !== itemId);
+            }
+            if (action === "BULK_DELETE" && itemIds) {
+                const deletedIds = new Set(itemIds);
+                return prev.filter((item) => !deletedIds.has(item.id));
+            }
+            if (action === "ADD" && content) {
+                try {
+                    const newItem = JSON.parse(content) as Item;
+                    if (!prev.some((i) => i.id === newItem.id)) {
+                        return [...prev, newItem];
+                    }
+                } catch (e) {
+                    console.error("Failed to parse incoming ADD item JSON", e);
+                }
+            }
+            return prev;
         },
         [],
     );
