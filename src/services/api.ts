@@ -39,8 +39,7 @@ api.interceptors.response.use(
 );
 
 /**
- * Task 4: API Request for Finishing Shopping
- * REPARAT: Fără header-ul Content-Type manual pentru a lăsa Axios să pună 'boundary' corect.
+ * API Request for Finishing Shopping
  */
 export const finishShoppingRequest = async (data: {
     storeName: string;
@@ -58,7 +57,7 @@ export const finishShoppingRequest = async (data: {
 };
 
 /**
- * Task 4: API Request for Multimodal AI Input
+ * API Request for Multimodal AI Input
  */
 export const aiMultimodalRequest = async (
     text: string,
@@ -88,6 +87,7 @@ export interface ProductSuggestion {
     price: number | null;
     quantity: string;
 }
+
 export const fetchProductSuggestions = async (
     query: string,
 ): Promise<ProductSuggestion[]> => {
@@ -107,6 +107,14 @@ export const fetchProductSuggestions = async (
         );
         return [];
     }
+};
+
+/**
+ * Endpoint for fetching a single list by its ID to perform a hard refresh.
+ */
+export const fetchListByIdRequest = async (listId: string) => {
+    const response = await api.get(`/api/lists/${listId}`);
+    return response.data;
 };
 
 export default api;
