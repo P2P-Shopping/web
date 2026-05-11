@@ -1,3 +1,4 @@
+import polyline from "@mapbox/polyline";
 import L from "leaflet";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -42,7 +43,6 @@ import { useListsStore } from "../../store/useListsStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import StoreMap from "../StoreMap/StoreMap";
-
 // --- Types & Constants ---
 export interface StoreRecommendation {
     id: string;
@@ -1194,9 +1194,20 @@ const UnifiedMap: React.FC = () => {
             );
             if (response.ok) {
                 const data = await response.json();
-                const geo = data[transportMode]?.geometry;
-                if (geo && Array.isArray(geo)) {
-                    useStore.getState().setMacroRouteGeometry(geo);
+                const polylineString = data[transportMode]?.polyline;
+
+                if (polylineString) {
+                    const decodedPath = polyline.decode(polylineString);
+                    useStore.getState().setMacroRouteGeometry(decodedPath);
+
+                    // NOU: Mutăm locația magazinului pe ultimul punct din traseul real
+                    if (decodedPath.length > 0) {
+                        const lastPoint = decodedPath[decodedPath.length - 1];
+                        setTargetStoreLocation({
+                            lat: lastPoint[0],
+                            lng: lastPoint[1],
+                        });
+                    }
                 } else {
                     useStore.getState().setMacroRouteGeometry([]);
                 }

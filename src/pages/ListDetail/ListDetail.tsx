@@ -21,6 +21,7 @@ import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
+import { useListSocketSync } from "../../hooks/useListSocketSync";
 import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
@@ -81,6 +82,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [syncFailed, setSyncFailed] = useState(false);
     const [authFailed, setAuthFailed] = useState(false);
     const isServerConnected = useStore((state) => state.isServerConnected);
+    const { isHardSyncing } = useListSocketSync(effectiveListId);
+    const wasHardSyncingRef = useRef(false);
 
     const itemsRef = useRef(items);
     useEffect(() => {
@@ -192,6 +195,13 @@ const useListItems = (effectiveListId: string | undefined) => {
     );
 
     useEffect(() => {
+        if (wasHardSyncingRef.current && !isHardSyncing && effectiveListId) {
+            fetchListData(effectiveListId);
+        }
+        wasHardSyncingRef.current = isHardSyncing;
+    }, [isHardSyncing, effectiveListId, fetchListData]);
+
+    useEffect(() => {
         setIsLoading(true);
         fetchListData();
     }, [fetchListData]);
@@ -283,6 +293,10 @@ const useListItems = (effectiveListId: string | undefined) => {
     const handleSyncMessage = useCallback(
         (message: { body: string }) => {
             try {
+                if (useListsStore.getState().isHardSyncing) {
+                    return;
+                }
+
                 const payload = JSON.parse(message.body) as SyncPayload;
 
                 if (payload.status === "Rejection") {
