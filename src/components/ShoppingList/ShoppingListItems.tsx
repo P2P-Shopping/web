@@ -1,4 +1,4 @@
-import { Check, Trash2 } from "lucide-react";
+import { Check, Pencil, Trash2 } from "lucide-react";
 import React from "react";
 
 interface Item {
@@ -15,6 +15,7 @@ interface Props {
     items: Item[];
     onCheck: (id: string) => void;
     onDelete?: (id: string) => void;
+    onEdit?: (item: Item) => void;
     disabled?: boolean;
     /** When false, hides checkboxes (template mode). Defaults to true. */
     checkable?: boolean;
@@ -60,6 +61,7 @@ const ShoppingListItems: React.FC<Props> = ({
     items,
     onCheck,
     onDelete,
+    onEdit,
     disabled = false,
     checkable = true,
 }) => {
@@ -158,6 +160,20 @@ const ShoppingListItems: React.FC<Props> = ({
                                         aria-label={`Remove ${item.name}`}
                                     >
                                         <Trash2 size={18} />
+                                    </button>
+                                )}
+
+                                {onEdit && (
+                                    <button
+                                        type="button"
+                                        className="flex items-center justify-center w-8 h-8 rounded-lg text-text-muted opacity-0 group-hover:opacity-100 transition-all hover:bg-bg-muted hover:text-accent shrink-0 outline-none"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onEdit(item); // 3. Trimitem tot obiectul item spre editare
+                                        }}
+                                        disabled={disabled}
+                                    >
+                                        <Pencil size={16} />
                                     </button>
                                 )}
                             </li>

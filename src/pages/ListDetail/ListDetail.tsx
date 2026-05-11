@@ -21,6 +21,7 @@ import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
+import { useListSocketSync } from "../../hooks/useListSocketSync";
 import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
@@ -81,6 +82,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [syncFailed, setSyncFailed] = useState(false);
     const [authFailed, setAuthFailed] = useState(false);
     const isServerConnected = useStore((state) => state.isServerConnected);
+    const { isHardSyncing } = useListSocketSync(effectiveListId);
+    const wasHardSyncingRef = useRef(false);
 
     const itemsRef = useRef(items);
     useEffect(() => {
@@ -192,6 +195,13 @@ const useListItems = (effectiveListId: string | undefined) => {
     );
 
     useEffect(() => {
+        if (wasHardSyncingRef.current && !isHardSyncing && effectiveListId) {
+            fetchListData(effectiveListId);
+        }
+        wasHardSyncingRef.current = isHardSyncing;
+    }, [isHardSyncing, effectiveListId, fetchListData]);
+
+    useEffect(() => {
         setIsLoading(true);
         fetchListData();
     }, [fetchListData]);
@@ -283,6 +293,10 @@ const useListItems = (effectiveListId: string | undefined) => {
     const handleSyncMessage = useCallback(
         (message: { body: string }) => {
             try {
+                if (useListsStore.getState().isHardSyncing) {
+                    return;
+                }
+
                 const payload = JSON.parse(message.body) as SyncPayload;
 
                 if (payload.status === "Rejection") {
@@ -483,6 +497,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
+        category?: string,
     ) => {
         const newItem: Item = {
             id: crypto.randomUUID(),
@@ -491,6 +506,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             brand: brand || undefined,
             quantity: quantity || undefined,
             price: price ?? undefined,
+            category: category || undefined,
         };
 
         const optimisticItems = [...items, newItem];
@@ -549,21 +565,33 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
+        category?: string,
     ) => {
         if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
-
+        const finalQuantity = quantity?.trim() ? quantity.trim() : "1";
         const dupKey = buildItemDuplicateKey({ name, brand });
         const existingItem = items.find(
             (it) => buildItemDuplicateKey(it) === dupKey,
         );
 
         if (existingItem) {
-            await mergeExistingItem(effectiveListId, existingItem, quantity);
+            await mergeExistingItem(
+                effectiveListId,
+                existingItem,
+                finalQuantity,
+            );
             return;
         }
 
-        await createNewItem(effectiveListId, name, quantity, brand, price);
+        await createNewItem(
+            effectiveListId,
+            name,
+            finalQuantity,
+            brand,
+            price,
+            category,
+        );
     };
 
     const toggleItem = async (itemId: string) => {
@@ -694,6 +722,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         setIsReviewModalOpen,
         reviewItems,
         handleReviewConfirm,
+        fetchListData,
     };
 };
 
@@ -862,6 +891,8 @@ interface AddItemModalProps {
     setBrand: (val: string) => void;
     price: string;
     setPrice: (val: string) => void;
+    category?: string;
+    setCategory?: (val: string) => void;
     onTyping?: () => void;
     isMobile?: boolean;
     showExpanded?: boolean;
@@ -1062,6 +1093,7 @@ const ItemNameField = ({
             <input
                 id={`${idPrefix}-item-name`}
                 type="text"
+                maxLength={100}
                 value={value}
                 onChange={(e) => {
                     onChange(e.target.value);
@@ -1119,6 +1151,8 @@ const ItemDetailsFields = ({
     setPrice,
     brand,
     setBrand,
+    category,
+    setCategory,
     isMobile,
 }: {
     idPrefix: string;
@@ -1128,6 +1162,8 @@ const ItemDetailsFields = ({
     setPrice: (val: string) => void;
     brand: string;
     setBrand: (val: string) => void;
+    category: string;
+    setCategory: (val: string) => void;
     isMobile: boolean;
 }) => (
     <div
@@ -1147,8 +1183,15 @@ const ItemDetailsFields = ({
             <input
                 id={`${idPrefix}-quantity`}
                 type="text"
+                maxLength={50}
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    if (val !== "" && !/^[\p{L}\p{N}\s.,/]*$/u.test(val)) {
+                        return;
+                    }
+                    setQuantity(val);
+                }}
                 placeholder={isMobile ? "e.g. 2 pcs" : "e.g., 2"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -1165,8 +1208,18 @@ const ItemDetailsFields = ({
                 type="number"
                 step="0.01"
                 min="0"
+                max="999999999.99"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.length > 10) {
+                        return;
+                    }
+                    if (val && Number(val) > 999999999.99) {
+                        return;
+                    }
+                    setPrice(val);
+                }}
                 placeholder={isMobile ? "0.00" : "e.g., 4.99"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -1183,9 +1236,29 @@ const ItemDetailsFields = ({
             <input
                 id={`${idPrefix}-brand`}
                 type="text"
+                maxLength={50}
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 placeholder={isMobile ? "e.g. Zuzu" : "e.g., Organic Valley"}
+                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+            />
+        </div>
+        <div
+            className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}
+        >
+            <label
+                htmlFor={`${idPrefix}-category`}
+                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+            >
+                Category (Optional)
+            </label>
+            <input
+                id={`${idPrefix}-category`}
+                type="text"
+                maxLength={50}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="e.g., Diary"
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
         </div>
@@ -1207,6 +1280,8 @@ const AddItemDetailsModal = ({
     setBrand,
     price,
     setPrice,
+    category,
+    setCategory,
     onTyping,
     isMobile = false,
     showExpanded = true,
@@ -1270,6 +1345,8 @@ const AddItemDetailsModal = ({
                         setPrice={setPrice}
                         brand={brand}
                         setBrand={setBrand}
+                        category={category || ""}
+                        setCategory={setCategory || (() => {})}
                         isMobile={isMobile}
                     />
                 )}
@@ -1368,6 +1445,7 @@ const InlineAddForm = ({
             <input
                 ref={addInputRef}
                 type="text"
+                maxLength={100}
                 value={newItemName}
                 onChange={(e) => {
                     onNameChange(e.target.value);
@@ -1435,6 +1513,7 @@ const ListDetail = ({
         setIsReviewModalOpen,
         reviewItems,
         handleReviewConfirm,
+        fetchListData,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -1455,12 +1534,12 @@ const ListDetail = ({
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
-
+    const [detailCategory, setDetailCategory] = useState("");
     const [isFinishing, setIsFinishing] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
     const [finishStoreName, setFinishStoreName] = useState("");
     const [receiptImage, setReceiptImage] = useState<File | null>(null);
-
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
     const [showBanner, setShowBanner] = useState(true);
@@ -1572,6 +1651,7 @@ const ListDetail = ({
         setDetailQuantity("");
         setDetailBrand("");
         setDetailPrice("");
+        setDetailCategory("");
     }, []);
 
     useEffect(() => {
@@ -1601,22 +1681,56 @@ const ListDetail = ({
                     ? String(suggestion.price)
                     : "",
             );
-            if (suggestion.brand || suggestion.price) {
+            setDetailCategory(suggestion.category || "");
+            if (suggestion.brand || suggestion.price || suggestion.category) {
                 setShowExpandedDetails(true);
             }
         } else {
             setDetailQuantity("");
             setDetailBrand("");
             setDetailPrice("");
+            setDetailCategory("");
         }
 
         setShowDetailsModal(true);
     };
 
-    const handleDetailsSubmit = (e: React.FormEvent) => {
+    const handleDetailsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const price = detailPrice ? Number.parseFloat(detailPrice) : undefined;
-        addItem(detailName, detailQuantity, detailBrand, price);
+        const priceNum = detailPrice
+            ? Number.parseFloat(detailPrice)
+            : undefined;
+
+        if (editingItemId) {
+            try {
+                const payload = {
+                    name: detailName,
+                    brand: detailBrand || null,
+                    quantity: detailQuantity || "1",
+                    price: priceNum || null,
+                    category: detailCategory || null,
+                    isChecked:
+                        items.find((i) => i.id === editingItemId)?.checked ||
+                        false,
+                    timestamp: Date.now(),
+                };
+
+                await api.put(`/api/items/${editingItemId}`, payload);
+                await fetchListData(effectiveListId);
+                toast.success("Item updated successfully");
+            } catch (err) {
+                console.error("Edit error:", err);
+                setError("Failed to update item.");
+            }
+        } else {
+            addItem(
+                detailName,
+                detailQuantity,
+                detailBrand,
+                priceNum,
+                detailCategory,
+            );
+        }
 
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
@@ -1626,7 +1740,9 @@ const ListDetail = ({
         setDetailQuantity("");
         setDetailBrand("");
         setDetailPrice("");
+        setDetailCategory("");
         setNewItemName("");
+        setEditingItemId(null);
     };
 
     const isReadOnly = authFailed;
@@ -1739,12 +1855,12 @@ const ListDetail = ({
 
             const dupKey = buildItemDuplicateKey(item);
             const existingItem = existingMap.get(dupKey);
-
+            const itemQty = item.quantity?.trim() ? item.quantity.trim() : "1";
             if (existingItem) {
-                const mergedQty = mergeQuantities(
-                    existingItem.quantity,
-                    item.quantity,
-                );
+                const existingQty = existingItem.quantity?.trim()
+                    ? existingItem.quantity.trim()
+                    : "1";
+                const mergedQty = mergeQuantities(existingQty, itemQty);
                 const updated = await useListsStore
                     .getState()
                     .updateItem(targetList.id, existingItem.id, {
@@ -1760,7 +1876,7 @@ const ListDetail = ({
                         name: item.name,
                         checked: false,
                         brand: item.brand,
-                        quantity: item.quantity,
+                        quantity: itemQty,
                         price: item.price,
                         category: item.category,
                         isRecurrent: targetList.category === "FREQUENT",
@@ -1787,6 +1903,18 @@ const ListDetail = ({
         );
 
         setNewItemName("");
+    };
+
+    const handleEditClick = (item: Item) => {
+        setEditingItemId(item.id);
+        setDetailName(item.name);
+        setDetailQuantity(item.quantity || "");
+        setDetailBrand(item.brand || "");
+        setDetailPrice(item.price ? String(item.price) : "");
+        setDetailCategory(item.category || "");
+
+        setShowExpandedDetails(true);
+        setShowDetailsModal(true);
     };
 
     return (
@@ -1889,6 +2017,7 @@ const ListDetail = ({
                                         items={items}
                                         onCheck={toggleItem}
                                         onDelete={deleteItem}
+                                        onEdit={handleEditClick}
                                         disabled={isReadOnly}
                                         checkable={!isTemplateList}
                                     />
@@ -1955,6 +2084,8 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
+                category={detailCategory}
+                setCategory={setDetailCategory}
                 onTyping={sendTypingEvent}
                 isMobile={true}
                 showExpanded={showExpandedDetails}
@@ -1976,6 +2107,8 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
+                category={detailCategory}
+                setCategory={setDetailCategory}
                 onTyping={sendTypingEvent}
             />
 
@@ -1996,6 +2129,7 @@ const ListDetail = ({
                         <input
                             id="store-name-input"
                             type="text"
+                            maxLength={50}
                             value={finishStoreName}
                             onChange={(e) => setFinishStoreName(e.target.value)}
                             placeholder="e.g. Lidl"

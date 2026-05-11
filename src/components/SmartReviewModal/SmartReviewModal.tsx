@@ -94,7 +94,7 @@ const SmartReviewModal = ({
                             editedItems.some((item) => !item.name.trim())
                         }
                         onClick={handleConfirm}
-                        className="px-5 py-2.5 text-sm font-bold text-white bg-text-strong rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-5 py-2.5 text-sm font-bold text-bg bg-text-strong rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? "Saving..." : "Confirm & Save"}
                     </button>

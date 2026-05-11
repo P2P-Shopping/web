@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { useStore } from "../context/useStore";
-import type { Item, ListCategory, ShoppingList } from "../types";
+import { fetchListByIdRequest } from "../services/api";
+import type {
+    Item,
+    ListCategory,
+    PendingInvitation,
+    ShoppingList,
+} from "../types";
 
 interface ApiItem {
     id: string;
@@ -26,6 +32,7 @@ interface ApiShoppingList {
     ownerEmail?: string;
     userId?: string;
     collaboratorEmails?: string[];
+    version?: number;
 }
 
 interface ListsState {
@@ -35,7 +42,15 @@ interface ListsState {
     error: string | null;
     isModalOpen: boolean;
     deletingListId: string | null;
+
+    isHardSyncing: boolean;
+    forceHardRefresh: (listId: string) => Promise<void>;
+
+    pendingInvitations: PendingInvitation[];
     fetchLists: () => Promise<void>;
+    fetchPendingInvitations: () => Promise<void>;
+    acceptInvitation: (invitationId: string) => Promise<boolean>;
+    declineInvitation: (invitationId: string) => Promise<boolean>;
     addList: (
         name: string,
         category?: ListCategory,
@@ -136,6 +151,7 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     userId: list.userId,
     collaboratorEmails: list.collaboratorEmails ?? [],
     items: (list.items ?? []).map(normalizeItem),
+    version: list.version || 0,
 });
 
 /**
@@ -192,6 +208,41 @@ export const useListsStore = create<ListsState>((set, get) => ({
     error: null,
     isModalOpen: false,
     deletingListId: null,
+    isHardSyncing: false,
+    pendingInvitations: [],
+
+    /**
+     * Hard refresh a specific list from the REST API to ensure synchronization.
+     * Wipes the local list state and replaces it entirely with the authoritative copy.
+     * @param listId - The ID of the list to hard refresh.
+     */
+    forceHardRefresh: async (listId: string) => {
+        set({ isHardSyncing: true, error: null });
+        try {
+            const data = (await fetchListByIdRequest(
+                listId,
+            )) as ApiShoppingList;
+            const freshList = normalizeListFromApi(data);
+
+            set((state) => ({
+                lists: state.lists.map((list) =>
+                    list.id === listId ? freshList : list,
+                ),
+                currentList:
+                    state.currentList?.id === listId
+                        ? freshList
+                        : state.currentList,
+                isHardSyncing: false,
+            }));
+        } catch (error) {
+            console.error(
+                "Hard refresh failed, falling back to full fetch",
+                error,
+            );
+            await get().fetchLists();
+            set({ isHardSyncing: false });
+        }
+    },
 
     /**
      * Fetches all shopping lists for the current user from the backend API.
@@ -582,6 +633,107 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     error instanceof Error
                         ? error.message
                         : "Failed to share list",
+            });
+            return false;
+        }
+    },
+
+    fetchPendingInvitations: async () => {
+        try {
+            const response = await fetch(`${getBaseUrl()}/api/invitations`, {
+                headers: jsonHeaders(),
+                credentials: "include",
+            });
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to fetch invitations (${response.status})`,
+                );
+            }
+
+            const data = (await response.json()) as PendingInvitation[];
+            set({ pendingInvitations: Array.isArray(data) ? data : [] });
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to fetch invitations",
+            });
+        }
+    },
+
+    acceptInvitation: async (invitationId: string) => {
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/invitations/${invitationId}/accept`,
+                {
+                    method: "POST",
+                    headers: jsonHeaders(),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to accept invitation (${response.status})`,
+                );
+            }
+
+            set((state) => ({
+                pendingInvitations: state.pendingInvitations.filter(
+                    (inv) => inv.id !== invitationId,
+                ),
+            }));
+
+            await get().fetchLists();
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to accept invitation",
+            });
+            return false;
+        }
+    },
+
+    declineInvitation: async (invitationId: string) => {
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/invitations/${invitationId}/decline`,
+                {
+                    method: "POST",
+                    headers: jsonHeaders(),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to decline invitation (${response.status})`,
+                );
+            }
+
+            set((state) => ({
+                pendingInvitations: state.pendingInvitations.filter(
+                    (inv) => inv.id !== invitationId,
+                ),
+            }));
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to decline invitation",
             });
             return false;
         }
