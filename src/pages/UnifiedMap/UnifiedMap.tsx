@@ -1045,7 +1045,7 @@ const UnifiedMap: React.FC = () => {
             return;
         }
 
-        if (!("speechSynthesis" in window)) {
+        if (!("speechSynthesis" in globalThis)) {
             console.warn("Browser does not support speech synthesis.");
             return;
         }
@@ -1065,10 +1065,15 @@ const UnifiedMap: React.FC = () => {
                     point.audio_instruction || `Te apropii de ${point.name}`;
                 // SUNET DE NOTIFICARE (Beep) înainte de vorbire
                 try {
-                    const audioCtx = new (
-                        window.AudioContext ||
-                        (window as any).webkitAudioContext
-                    )();
+                    const AudioCtxConstructor =
+                        globalThis.AudioContext ??
+                        (
+                            globalThis as {
+                                webkitAudioContext?: typeof AudioContext;
+                            }
+                        ).webkitAudioContext;
+                    if (!AudioCtxConstructor) return;
+                    const audioCtx = new AudioCtxConstructor();
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
                     oscillator.connect(gainNode);
@@ -1087,11 +1092,11 @@ const UnifiedMap: React.FC = () => {
 
                 const utterance = new SpeechSynthesisUtterance(instructionText);
                 utterance.lang = "ro-RO"; // Setăm limba română pentru textele din backend
-                utterance.rate = 1.0;
+                utterance.rate = 1;
 
                 // Mic delay pentru a lăsa beep-ul să se audă primul
                 setTimeout(() => {
-                    window.speechSynthesis.speak(utterance);
+                    globalThis.speechSynthesis.speak(utterance);
                 }, 150);
             }
         });
@@ -1464,7 +1469,7 @@ const UnifiedMap: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                     if (isAudioEnabled) {
-                                        window.speechSynthesis.cancel();
+                                        globalThis.speechSynthesis.cancel();
                                     } else {
                                         spokenNodesRef.current.clear();
                                     }
