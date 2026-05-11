@@ -358,7 +358,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
         set({ error: null });
         try {
             const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
-                method: "PUT",
+                method: "PATCH",
                 headers: jsonHeaders(true),
                 body: JSON.stringify({ title: trimmedName }),
                 credentials: "include",
