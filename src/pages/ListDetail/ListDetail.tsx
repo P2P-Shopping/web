@@ -678,6 +678,9 @@ const useListItems = (effectiveListId: string | undefined) => {
         setItems(nextItems);
         syncListItemsInStore(nextItems);
 
+        // 2. Broadcast imediat
+        publishSync("DELETE", itemToDelete);
+
         const timerId = setTimeout(async () => {
             try {
                 const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
@@ -694,17 +697,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     throw new Error(`Failed to delete item (${res.status})`);
                 }
 
-                if (effectiveListId && stompClient.connected) {
-                    pendingSyncItems.current.add(itemId);
-                    stompClient.publish({
-                        destination: `/app/list/${effectiveListId}/update`,
-                        body: JSON.stringify({
-                            action: "DELETE",
-                            itemId,
-                            timestamp: Date.now(),
-                        }),
-                    });
-                }
+                // Broadcast-ul a fost trimis deja
             } catch (err) {
                 console.error("deleteItem error:", err);
 
@@ -737,6 +730,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                         if (prev.some((i) => i.id === itemId)) return prev;
                         const restored = [...prev, itemToDelete];
                         syncListItemsInStore(restored);
+                        // 3. Broadcast restaurare
+                        publishSync("ADD", itemToDelete);
                         return restored;
                     });
                 },
