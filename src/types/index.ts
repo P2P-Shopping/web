@@ -109,3 +109,13 @@ export interface Route {
     totalDistance: number;
     estimatedTime: number;
 }
+
+export interface PendingInvitation {
+    id: string;
+    listId: string;
+    listTitle: string;
+    inviterName: string;
+    inviterEmail: string;
+    status: "PENDING" | "ACCEPTED" | "DECLINED";
+    createdAt: string;
+}

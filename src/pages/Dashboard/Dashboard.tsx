@@ -17,6 +17,7 @@ import ListDetail from "../ListDetail/ListDetail";
 import AiImportModal from "./AiImportModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import CreateListModal from "./CreateListModal";
+import PendingInviteCard from "./PendingInviteCard";
 
 type TabType = "NORMAL" | "RECIPE" | "FREQUENT";
 
@@ -47,6 +48,39 @@ const DashboardEmptyState: React.FC<DashboardEmptyStateProps> = ({
         </button>
     </div>
 );
+
+interface PendingInvitesSectionProps {
+    invitations: import("../../types").PendingInvitation[];
+}
+
+const PendingInvitesSection: React.FC<PendingInvitesSectionProps> = ({
+    invitations,
+}) => {
+    if (invitations.length === 0) return null;
+
+    return (
+        <section className="flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-extrabold text-text-strong tracking-tight">
+                        Pending Invites
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-xs font-bold">
+                        {invitations.length}
+                    </span>
+                </div>
+            </div>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+                {invitations.map((invitation) => (
+                    <PendingInviteCard
+                        key={invitation.id}
+                        invitation={invitation}
+                    />
+                ))}
+            </div>
+        </section>
+    );
+};
 
 interface ListCategorySectionProps {
     section: string;
@@ -731,7 +765,9 @@ const Dashboard = () => {
         isLoading,
         isModalOpen,
         deletingListId,
+        pendingInvitations,
         fetchLists,
+        fetchPendingInvitations,
         addList,
         deleteList,
         addItem,
@@ -787,7 +823,8 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchLists();
-    }, [fetchLists]);
+        fetchPendingInvitations();
+    }, [fetchLists, fetchPendingInvitations]);
 
     const toggleSection = (section: string) => {
         setCollapsedSections((prev) => {
@@ -864,6 +901,16 @@ const Dashboard = () => {
         }
 
         if (lists.length === 0) {
+            if (pendingInvitations.length > 0) {
+                return (
+                    <div className="flex flex-col gap-8">
+                        <PendingInvitesSection
+                            invitations={pendingInvitations}
+                        />
+                        <DashboardEmptyState openModal={openModal} />
+                    </div>
+                );
+            }
             return <DashboardEmptyState openModal={openModal} />;
         }
 
@@ -877,7 +924,8 @@ const Dashboard = () => {
 
         if (hasGroupedLists) {
             return (
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-8">
+                    <PendingInvitesSection invitations={pendingInvitations} />
                     {displayMode === "tabs" ? (
                         <DashboardTabsView
                             activeTab={activeTab}
@@ -918,20 +966,23 @@ const Dashboard = () => {
         }
 
         return (
-            <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
-                {lists.map((list) => (
-                    <li key={list.id} className="list-none">
-                        <ListCard
-                            list={list}
-                            onClick={() => handleCardClick(list.id)}
-                            onDelete={(e) =>
-                                handleDeleteList(e, list.id, list.name)
-                            }
-                            isDeleting={deletingListId === list.id}
-                        />
-                    </li>
-                ))}
-            </ul>
+            <div className="flex flex-col gap-8">
+                <PendingInvitesSection invitations={pendingInvitations} />
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
+                    {lists.map((list) => (
+                        <li key={list.id} className="list-none">
+                            <ListCard
+                                list={list}
+                                onClick={() => handleCardClick(list.id)}
+                                onDelete={(e) =>
+                                    handleDeleteList(e, list.id, list.name)
+                                }
+                                isDeleting={deletingListId === list.id}
+                            />
+                        </li>
+                    ))}
+                </ul>
+            </div>
         );
     };
 
