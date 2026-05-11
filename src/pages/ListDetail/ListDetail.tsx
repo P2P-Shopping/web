@@ -422,26 +422,43 @@ const useListItems = (effectiveListId: string | undefined) => {
         timestamp: Date.now(),
     });
 
-    const publishSync = (action: SyncPayload["action"], item: Item) => {
-        if (!effectiveListId || !stompClient.connected) return;
+    const publishSync = useCallback(
+        (action: SyncPayload["action"], item: Item) => {
+            if (!effectiveListId || !stompClient.connected) return;
 
-        let timestamp = Date.now();
-        if (timestamp <= lastSyncTimestamp.current) {
-            timestamp = lastSyncTimestamp.current + 1;
-        }
-        lastSyncTimestamp.current = timestamp;
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
 
-        pendingSyncItems.current.add(item.id);
-        stompClient.publish({
-            destination: `/app/list/${effectiveListId}/update`,
-            body: JSON.stringify({
-                action,
-                itemId: item.id,
-                content: JSON.stringify(item),
-                timestamp,
-            } as SyncPayload),
-        });
-    };
+            pendingSyncItems.current.add(item.id);
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action,
+                    itemId: item.id,
+                    content: JSON.stringify(item),
+                    timestamp,
+                } as SyncPayload),
+            });
+        },
+        [effectiveListId],
+    );
+
+    const restoreItem = useCallback(
+        (itemToRestore: Item) => {
+            setItems((prev) => {
+                if (prev.some((i) => i.id === itemToRestore.id)) return prev;
+                const restored = [...prev, itemToRestore];
+                syncListItemsInStore(restored);
+                // Dacă ștergerea a eșuat pe server sau s-a dat Undo, re-difuzăm adăugarea
+                publishSync("ADD", itemToRestore);
+                return restored;
+            });
+        },
+        [syncListItemsInStore, publishSync],
+    );
 
     const mergeExistingItem = async (
         listId: string,
@@ -704,14 +721,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     return;
                 }
 
-                setItems((prev) => {
-                    if (prev.some((i) => i.id === itemId)) return prev;
-                    const restored = [...prev, itemToDelete];
-                    syncListItemsInStore(restored);
-                    // Dacă ștergerea a eșuat pe server, re-difuzăm adăugarea
-                    publishSync("ADD", itemToDelete);
-                    return restored;
-                });
+                restoreItem(itemToDelete);
             }
         }, 5000);
 
@@ -721,14 +731,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 label: "Undo",
                 onClick: () => {
                     clearTimeout(timerId);
-                    setItems((prev) => {
-                        if (prev.some((i) => i.id === itemId)) return prev;
-                        const restored = [...prev, itemToDelete];
-                        syncListItemsInStore(restored);
-                        // 3. Broadcast al restaurării (undo)
-                        publishSync("ADD", itemToDelete);
-                        return restored;
-                    });
+                    restoreItem(itemToDelete);
                 },
             },
         });
