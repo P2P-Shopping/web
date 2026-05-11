@@ -27,7 +27,9 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
             if (success) {
                 onClose();
             } else {
-                setError("Failed to share the list. User might not exist.");
+                setError(
+                    "Failed to send invitation. User might not exist or is already a collaborator.",
+                );
             }
         } catch (error) {
             setError(
@@ -43,7 +45,7 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
             isOpen={true}
             onClose={onClose}
             icon={<UserPlus size={20} />}
-            title="Share List"
+            title="Invite to List"
             subtitle={`Invite others to "${listName}"`}
             initialFocusSelector="#share-email"
             footer={
@@ -63,11 +65,11 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
                         disabled={!email.trim() || isSubmitting}
                     >
                         {isSubmitting ? (
-                            "Sharing..."
+                            "Sending..."
                         ) : (
                             <>
                                 <Send size={16} />
-                                Share
+                                Send Invite
                             </>
                         )}
                     </button>
@@ -80,8 +82,8 @@ const ShareListModal = ({ listId, listName, onClose }: ShareListModalProps) => {
                 className="flex flex-col gap-4"
             >
                 <p className="text-sm text-text-muted">
-                    Enter the email address of the person you'd like to share
-                    this list with.
+                    Enter the email address of the person you'd like to invite
+                    to collaborate on this list.
                 </p>
                 <div className="flex flex-col gap-2">
                     <label
