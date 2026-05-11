@@ -1420,7 +1420,28 @@ const ListDetail = ({
 
     const [showShareModal, setShowShareModal] = useState(false);
     const [showRenameModal, setShowRenameModal] = useState(false);
-    const { lists, isLoading: listsLoading, fetchLists } = useListsStore();
+    const { lists, isLoading: listsLoading, fetchLists, renameList } = useListsStore();
+
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editedName, setEditedName] = useState("");
+
+    useEffect(() => {
+        if (activeList?.name) {
+            setEditedName(activeList.name);
+        }
+    }, [activeList?.name]);
+
+    const handleRenameSubmit = async () => {
+        if (!effectiveListId || effectiveListId === "default" || !editedName.trim()) {
+            setIsEditingName(false);
+            setEditedName(activeList?.name || "");
+            return;
+        }
+        if (editedName.trim() !== activeList?.name) {
+            await renameList(effectiveListId, editedName.trim());
+        }
+        setIsEditingName(false);
+    };
 
     const {
         items,
@@ -1826,15 +1847,40 @@ const ListDetail = ({
                     <>
                         <div className="flex flex-col gap-3">
                             <div className="flex justify-between items-end px-1">
-                                <div className="flex flex-col">
-                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                                        Collaboration
-                                    </h2>
-                                    <div className="flex items-center gap-2">
-                                        <PresenceBar
-                                            variant="avatars"
-                                            allUsers={activeCollaborationUsers}
+                              <div className="flex flex-col gap-1">
+                                    {isEditingName ? (
+                                        <input
+                                            autoFocus
+                                            className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
+                                            value={editedName}
+                                            onChange={(e) => setEditedName(e.target.value)}
+                                            onBlur={handleRenameSubmit}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") handleRenameSubmit();
+                                                if (e.key === "Escape") {
+                                                    setEditedName(activeList?.name || "");
+                                                    setIsEditingName(false);
+                                                }
+                                            }}
                                         />
+                                    ) : (
+                                        <h1 
+                                            onClick={() => !isReadOnly && setIsEditingName(true)}
+                                            className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer"
+                                        >
+                                            {activeList?.name || "Shopping List"}
+                                        </h1>
+                                    )}
+                                    <div className="flex flex-col">
+                                        <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                            Collaboration
+                                        </h2>
+                                        <div className="flex items-center gap-2">
+                                            <PresenceBar
+                                                variant="avatars"
+                                                allUsers={activeCollaborationUsers}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-2">
@@ -2131,16 +2177,7 @@ const ListDetail = ({
                 />
             )}
 
-            {showRenameModal && (
-                <RenameListModal
-                    listId={effectiveListId ?? ""}
-                    currentName={
-                        lists.find((l) => l.id === effectiveListId)?.name ||
-                        "Shopping List"
-                    }
-                    onClose={() => setShowRenameModal(false)}
-                />
-            )}
+           
         </div>
     );
 };
