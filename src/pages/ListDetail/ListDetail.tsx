@@ -73,6 +73,62 @@ interface ListDetailProps {
     listIdOverride?: string;
 }
 
+type SyncActionHandler = (prev: Item[], payload: SyncPayload) => Item[];
+
+const handleCheckOff: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    return prev.map((item) =>
+        item.id === payload.itemId
+            ? { ...item, checked: Boolean(payload.checked) }
+            : item,
+    );
+};
+
+const handleUpdate: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId || !payload.content) return prev;
+    try {
+        const updated = JSON.parse(payload.content) as Item;
+        return prev.map((item) =>
+            item.id === payload.itemId ? { ...item, ...updated } : item,
+        );
+    } catch (e) {
+        console.error("Failed to parse incoming UPDATE item JSON", e);
+    }
+    return prev;
+};
+
+const handleDelete: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    return prev.filter((item) => item.id !== payload.itemId);
+};
+
+const handleBulkDelete: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemIds) return prev;
+    const deletedIds = new Set(payload.itemIds);
+    return prev.filter((item) => !deletedIds.has(item.id));
+};
+
+const handleAdd: SyncActionHandler = (prev, payload) => {
+    if (!payload.content) return prev;
+    try {
+        const newItem = JSON.parse(payload.content) as Item;
+        if (!prev.some((i) => i.id === newItem.id)) {
+            return [...prev, newItem];
+        }
+    } catch (e) {
+        console.error("Failed to parse incoming ADD item JSON", e);
+    }
+    return prev;
+};
+
+const SYNC_ACTION_HANDLERS: Record<string, SyncActionHandler> = {
+    CHECK_OFF: handleCheckOff,
+    UPDATE: handleUpdate,
+    DELETE: handleDelete,
+    BULK_DELETE: handleBulkDelete,
+    ADD: handleAdd,
+};
+
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
     const [items, setItems] = useState<Item[]>([]);
@@ -283,47 +339,9 @@ const useListItems = (effectiveListId: string | undefined) => {
 
     const applySyncAction = useCallback(
         (prev: Item[], payload: SyncPayload): Item[] => {
-            const { action, itemId, itemIds, content, checked } = payload;
-
-            if (action === "CHECK_OFF" && itemId) {
-                return prev.map((item) =>
-                    item.id === itemId
-                        ? { ...item, checked: Boolean(checked) }
-                        : item,
-                );
-            }
-            if (action === "UPDATE" && itemId && content) {
-                try {
-                    const updated = JSON.parse(content) as Item;
-                    return prev.map((item) =>
-                        item.id === itemId ? { ...item, ...updated } : item,
-                    );
-                } catch (e) {
-                    console.error(
-                        "Failed to parse incoming UPDATE item JSON",
-                        e,
-                    );
-                }
-                return prev;
-            }
-            if (action === "DELETE" && itemId) {
-                return prev.filter((item) => item.id !== itemId);
-            }
-            if (action === "BULK_DELETE" && itemIds) {
-                const deletedIds = new Set(itemIds);
-                return prev.filter((item) => !deletedIds.has(item.id));
-            }
-            if (action === "ADD" && content) {
-                try {
-                    const newItem = JSON.parse(content) as Item;
-                    if (!prev.some((i) => i.id === newItem.id)) {
-                        return [...prev, newItem];
-                    }
-                } catch (e) {
-                    console.error("Failed to parse incoming ADD item JSON", e);
-                }
-            }
-            return prev;
+            const handler = SYNC_ACTION_HANDLERS[payload.action];
+            if (!handler) return prev;
+            return handler(prev, payload);
         },
         [],
     );
