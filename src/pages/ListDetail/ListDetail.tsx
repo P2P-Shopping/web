@@ -479,6 +479,25 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore, publishSync],
     );
 
+    const restoreItems = useCallback(
+        (itemsToRestore: Item[]) => {
+            setItems((prev) => {
+                const existingIds = new Set(prev.map((i) => i.id));
+                const newItems = itemsToRestore.filter(
+                    (i) => !existingIds.has(i.id),
+                );
+                if (newItems.length === 0) return prev;
+                const restored = [...prev, ...newItems];
+                syncListItemsInStore(restored);
+                for (const item of newItems) {
+                    publishSync("ADD", item);
+                }
+                return restored;
+            });
+        },
+        [syncListItemsInStore, publishSync],
+    );
+
     const mergeExistingItem = async (
         listId: string,
         existingItem: Item,
@@ -762,57 +781,62 @@ const useListItems = (effectiveListId: string | undefined) => {
         const checkedItems = items.filter((item) => item.checked);
         if (checkedItems.length === 0) return;
 
-        const previousItems = items;
         const nextItems = items.filter((item) => !item.checked);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
 
-        try {
-            const response = await api.delete<{ deletedItemIds: string[] }>(
-                `/api/lists/${effectiveListId}/items/completed`,
-            );
+        const deletedIds = checkedItems.map((item) => item.id);
 
-            const deletedIds = response.data.deletedItemIds;
-
-            if (effectiveListId && stompClient.connected) {
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify({
-                        action: "BULK_DELETE",
-                        itemIds: deletedIds,
-                        timestamp: Date.now(),
-                    }),
-                });
-            }
-
-            toast.success("Cleared", {
-                description: `${deletedIds.length} completed item${deletedIds.length === 1 ? "" : "s"} removed.`,
-            });
-        } catch (err) {
-            if (!navigator.onLine) {
-                useStore.getState().enqueueAction({
-                    id: crypto.randomUUID(),
-                    type: "CLEAR_COMPLETED",
-                    payload: { listId: effectiveListId },
+        if (effectiveListId && stompClient.connected) {
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action: "BULK_DELETE",
+                    itemIds: deletedIds,
                     timestamp: Date.now(),
-                });
-                toast.info("Queued", {
-                    description:
-                        "Clear completed items will sync when you're back online.",
-                });
-                return;
-            }
-
-            console.error("clearCompletedItems error:", err);
-            setItems(previousItems);
-            syncListItemsInStore(previousItems);
-            const errorMessage =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to clear completed items.";
-            setError(errorMessage);
-            fetchListData(effectiveListId);
+                }),
+            });
         }
+
+        const timerId = setTimeout(async () => {
+            try {
+                await api.delete<{ deletedItemIds: string[] }>(
+                    `/api/lists/${effectiveListId}/items/completed`,
+                );
+            } catch (err) {
+                console.error("clearCompletedItems error:", err);
+
+                if (!navigator.onLine) {
+                    useStore.getState().enqueueAction({
+                        id: crypto.randomUUID(),
+                        type: "CLEAR_COMPLETED",
+                        payload: { listId: effectiveListId },
+                        timestamp: Date.now(),
+                    });
+                    return;
+                }
+
+                restoreItems(checkedItems);
+                const errorMessage =
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to clear completed items.";
+                setError(errorMessage);
+                fetchListData(effectiveListId);
+            }
+        }, 5000);
+
+        const count = checkedItems.length;
+        toast(`Cleared ${count} completed item${count === 1 ? "" : "s"}.`, {
+            duration: 5000,
+            action: {
+                label: "Undo",
+                onClick: () => {
+                    clearTimeout(timerId);
+                    restoreItems(checkedItems);
+                },
+            },
+        });
     };
 
     return {
