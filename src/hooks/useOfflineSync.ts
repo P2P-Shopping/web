@@ -60,6 +60,12 @@ export const useOfflineSync = () => {
                 await api.delete(`/api/items/${payload.itemId}`);
                 break;
 
+            case "CLEAR_COMPLETED":
+                await api.delete(
+                    `/api/lists/${payload.listId}/items/completed`,
+                );
+                break;
+
             default:
                 console.warn(`Unknown action type: ${type}`);
         }

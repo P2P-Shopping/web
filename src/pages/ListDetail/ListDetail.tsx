@@ -1,6 +1,7 @@
 import {
     AlertCircle,
     Camera,
+    CheckCircle2,
     ChevronDown,
     Plus,
     Settings,
@@ -71,6 +72,62 @@ interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
 }
+
+type SyncActionHandler = (prev: Item[], payload: SyncPayload) => Item[];
+
+const handleCheckOff: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    return prev.map((item) =>
+        item.id === payload.itemId
+            ? { ...item, checked: Boolean(payload.checked) }
+            : item,
+    );
+};
+
+const handleUpdate: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId || !payload.content) return prev;
+    try {
+        const updated = JSON.parse(payload.content) as Item;
+        return prev.map((item) =>
+            item.id === payload.itemId ? { ...item, ...updated } : item,
+        );
+    } catch (e) {
+        console.error("Failed to parse incoming UPDATE item JSON", e);
+    }
+    return prev;
+};
+
+const handleDelete: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    return prev.filter((item) => item.id !== payload.itemId);
+};
+
+const handleBulkDelete: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemIds) return prev;
+    const deletedIds = new Set(payload.itemIds);
+    return prev.filter((item) => !deletedIds.has(item.id));
+};
+
+const handleAdd: SyncActionHandler = (prev, payload) => {
+    if (!payload.content) return prev;
+    try {
+        const newItem = JSON.parse(payload.content) as Item;
+        if (!prev.some((i) => i.id === newItem.id)) {
+            return [...prev, newItem];
+        }
+    } catch (e) {
+        console.error("Failed to parse incoming ADD item JSON", e);
+    }
+    return prev;
+};
+
+const SYNC_ACTION_HANDLERS: Record<string, SyncActionHandler> = {
+    CHECK_OFF: handleCheckOff,
+    UPDATE: handleUpdate,
+    DELETE: handleDelete,
+    BULK_DELETE: handleBulkDelete,
+    ADD: handleAdd,
+};
 
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
@@ -280,6 +337,15 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const applySyncAction = useCallback(
+        (prev: Item[], payload: SyncPayload): Item[] => {
+            const handler = SYNC_ACTION_HANDLERS[payload.action];
+            if (!handler) return prev;
+            return handler(prev, payload);
+        },
+        [],
+    );
+
     const handleSyncMessage = useCallback(
         (message: { body: string }) => {
             try {
@@ -287,8 +353,6 @@ const useListItems = (effectiveListId: string | undefined) => {
 
                 if (payload.status === "Rejection") {
                     const itemId = payload.itemId;
-                    // Silențiem warning-ul de conflict pentru ADD (Undo) pentru a nu deranja userul
-                    // dacă serverul respinge o restaurare redundantă.
                     if (
                         itemId &&
                         pendingSyncItems.current.has(itemId) &&
@@ -303,77 +367,21 @@ const useListItems = (effectiveListId: string | undefined) => {
                             duration: 4000,
                         });
                     }
-                } else {
-                    setItems((prev) => {
-                        let next = prev;
-
-                        if (payload.action === "CHECK_OFF" && payload.itemId) {
-                            next = prev.map((item) =>
-                                item.id === payload.itemId
-                                    ? {
-                                          ...item,
-                                          checked: Boolean(payload.checked),
-                                      }
-                                    : item,
-                            );
-                        } else if (
-                            payload.action === "UPDATE" &&
-                            payload.itemId &&
-                            payload.content
-                        ) {
-                            try {
-                                const updated = JSON.parse(
-                                    payload.content,
-                                ) as Item;
-                                next = prev.map((item) =>
-                                    item.id === payload.itemId
-                                        ? { ...item, ...updated }
-                                        : item,
-                                );
-                            } catch (e) {
-                                console.error(
-                                    "Failed to parse incoming UPDATE item JSON",
-                                    e,
-                                );
-                            }
-                        } else if (
-                            payload.action === "DELETE" &&
-                            payload.itemId
-                        ) {
-                            next = prev.filter(
-                                (item) => item.id !== payload.itemId,
-                            );
-                        } else if (
-                            payload.action === "ADD" &&
-                            payload.content
-                        ) {
-                            try {
-                                const newItem = JSON.parse(
-                                    payload.content,
-                                ) as Item;
-                                if (!prev.some((i) => i.id === newItem.id)) {
-                                    next = [...prev, newItem];
-                                }
-                            } catch (e) {
-                                console.error(
-                                    "Failed to parse incoming ADD item JSON",
-                                    e,
-                                );
-                            }
-                        }
-
-                        if (next !== prev) {
-                            syncListItemsInStore(next);
-                        }
-
-                        return next;
-                    });
+                    return;
                 }
+
+                setItems((prev) => {
+                    const next = applySyncAction(prev, payload);
+                    if (next !== prev) {
+                        syncListItemsInStore(next);
+                    }
+                    return next;
+                });
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore], // items removed to prevent subscription churn
+        [applySyncAction, syncListItemsInStore],
     );
 
     useEffect(() => {
@@ -465,6 +473,25 @@ const useListItems = (effectiveListId: string | undefined) => {
                 syncListItemsInStore(restored);
                 // Dacă ștergerea a eșuat pe server sau s-a dat Undo, re-difuzăm adăugarea
                 publishSync("ADD", itemToRestore);
+                return restored;
+            });
+        },
+        [syncListItemsInStore, publishSync],
+    );
+
+    const restoreItems = useCallback(
+        (itemsToRestore: Item[]) => {
+            setItems((prev) => {
+                const existingIds = new Set(prev.map((i) => i.id));
+                const newItems = itemsToRestore.filter(
+                    (i) => !existingIds.has(i.id),
+                );
+                if (newItems.length === 0) return prev;
+                const restored = [...prev, ...newItems];
+                syncListItemsInStore(restored);
+                for (const item of newItems) {
+                    publishSync("ADD", item);
+                }
                 return restored;
             });
         },
@@ -748,6 +775,70 @@ const useListItems = (effectiveListId: string | undefined) => {
         });
     };
 
+    const clearCompletedItems = async () => {
+        if (!effectiveListId || effectiveListId === "default") return;
+
+        const checkedItems = items.filter((item) => item.checked);
+        if (checkedItems.length === 0) return;
+
+        const nextItems = items.filter((item) => !item.checked);
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        const deletedIds = checkedItems.map((item) => item.id);
+
+        if (effectiveListId && stompClient.connected) {
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action: "BULK_DELETE",
+                    itemIds: deletedIds,
+                    timestamp: Date.now(),
+                }),
+            });
+        }
+
+        const timerId = setTimeout(async () => {
+            try {
+                await api.delete<{ deletedItemIds: string[] }>(
+                    `/api/lists/${effectiveListId}/items/completed`,
+                );
+            } catch (err) {
+                console.error("clearCompletedItems error:", err);
+
+                if (!navigator.onLine) {
+                    useStore.getState().enqueueAction({
+                        id: crypto.randomUUID(),
+                        type: "CLEAR_COMPLETED",
+                        payload: { listId: effectiveListId },
+                        timestamp: Date.now(),
+                    });
+                    return;
+                }
+
+                restoreItems(checkedItems);
+                const errorMessage =
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to clear completed items.";
+                setError(errorMessage);
+                fetchListData(effectiveListId);
+            }
+        }, 5000);
+
+        const count = checkedItems.length;
+        toast(`Cleared ${count} completed item${count === 1 ? "" : "s"}.`, {
+            duration: 5000,
+            action: {
+                label: "Undo",
+                onClick: () => {
+                    clearTimeout(timerId);
+                    restoreItems(checkedItems);
+                },
+            },
+        });
+    };
+
     return {
         items,
         isLoading,
@@ -757,6 +848,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         addItem,
         toggleItem,
         deleteItem,
+        clearCompletedItems,
         setError,
         handleAiImport,
         isReviewModalOpen,
@@ -1523,6 +1615,7 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        clearCompletedItems,
         setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
@@ -1971,6 +2064,21 @@ const ListDetail = ({
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-2">
+                                    {!isReadOnly &&
+                                        !isTemplateList &&
+                                        items.some((item) => item.checked) && (
+                                            <button
+                                                type="button"
+                                                onClick={clearCompletedItems}
+                                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-danger hover:text-danger"
+                                            >
+                                                <CheckCircle2
+                                                    size={14}
+                                                    strokeWidth={2.5}
+                                                />
+                                                Clear Completed
+                                            </button>
+                                        )}
                                     {canImportIntoNormalList && (
                                         <button
                                             type="button"

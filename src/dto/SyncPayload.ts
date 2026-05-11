@@ -5,6 +5,7 @@ export type ActionType =
     | "ADD"
     | "UPDATE"
     | "DELETE"
+    | "BULK_DELETE"
     | "CHECK_OFF"
     | "TYPING"
     | "UNKNOWN";
@@ -22,6 +23,9 @@ export interface SyncPayload {
 
     /** The unique identifier of the modified item. */
     itemId?: string;
+
+    /** List of item IDs for bulk operations (e.g., BULK_DELETE). */
+    itemIds?: string[];
 
     /** The text content or value of the item (used for ADD/UPDATE). */
     content?: string;
