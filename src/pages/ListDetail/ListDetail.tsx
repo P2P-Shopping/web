@@ -281,6 +281,63 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const applySyncAction = useCallback(
+        (prev: Item[], payload: SyncPayload): Item[] => {
+            switch (payload.action) {
+                case "CHECK_OFF":
+                    if (!payload.itemId) return prev;
+                    return prev.map((item) =>
+                        item.id === payload.itemId
+                            ? { ...item, checked: Boolean(payload.checked) }
+                            : item,
+                    );
+                case "UPDATE": {
+                    if (!payload.itemId || !payload.content) return prev;
+                    try {
+                        const updated = JSON.parse(payload.content) as Item;
+                        return prev.map((item) =>
+                            item.id === payload.itemId
+                                ? { ...item, ...updated }
+                                : item,
+                        );
+                    } catch (e) {
+                        console.error(
+                            "Failed to parse incoming UPDATE item JSON",
+                            e,
+                        );
+                        return prev;
+                    }
+                }
+                case "DELETE":
+                    if (!payload.itemId) return prev;
+                    return prev.filter((item) => item.id !== payload.itemId);
+                case "BULK_DELETE": {
+                    if (!payload.itemIds) return prev;
+                    const deletedIds = new Set(payload.itemIds);
+                    return prev.filter((item) => !deletedIds.has(item.id));
+                }
+                case "ADD": {
+                    if (!payload.content) return prev;
+                    try {
+                        const newItem = JSON.parse(payload.content) as Item;
+                        if (!prev.some((i) => i.id === newItem.id)) {
+                            return [...prev, newItem];
+                        }
+                    } catch (e) {
+                        console.error(
+                            "Failed to parse incoming ADD item JSON",
+                            e,
+                        );
+                    }
+                    return prev;
+                }
+                default:
+                    return prev;
+            }
+        },
+        [],
+    );
+
     const handleSyncMessage = useCallback(
         (message: { body: string }) => {
             try {
@@ -288,8 +345,6 @@ const useListItems = (effectiveListId: string | undefined) => {
 
                 if (payload.status === "Rejection") {
                     const itemId = payload.itemId;
-                    // Silențiem warning-ul de conflict pentru ADD (Undo) pentru a nu deranja userul
-                    // dacă serverul respinge o restaurare redundantă.
                     if (
                         itemId &&
                         pendingSyncItems.current.has(itemId) &&
@@ -304,85 +359,21 @@ const useListItems = (effectiveListId: string | undefined) => {
                             duration: 4000,
                         });
                     }
-                } else {
-                    setItems((prev) => {
-                        let next = prev;
-
-                        if (payload.action === "CHECK_OFF" && payload.itemId) {
-                            next = prev.map((item) =>
-                                item.id === payload.itemId
-                                    ? {
-                                          ...item,
-                                          checked: Boolean(payload.checked),
-                                      }
-                                    : item,
-                            );
-                        } else if (
-                            payload.action === "UPDATE" &&
-                            payload.itemId &&
-                            payload.content
-                        ) {
-                            try {
-                                const updated = JSON.parse(
-                                    payload.content,
-                                ) as Item;
-                                next = prev.map((item) =>
-                                    item.id === payload.itemId
-                                        ? { ...item, ...updated }
-                                        : item,
-                                );
-                            } catch (e) {
-                                console.error(
-                                    "Failed to parse incoming UPDATE item JSON",
-                                    e,
-                                );
-                            }
-                        } else if (
-                            payload.action === "DELETE" &&
-                            payload.itemId
-                        ) {
-                            next = prev.filter(
-                                (item) => item.id !== payload.itemId,
-                            );
-                        } else if (
-                            payload.action === "BULK_DELETE" &&
-                            payload.itemIds
-                        ) {
-                            const deletedIds = new Set(payload.itemIds);
-                            next = prev.filter(
-                                (item) => !deletedIds.has(item.id),
-                            );
-                        } else if (
-                            payload.action === "ADD" &&
-                            payload.content
-                        ) {
-                            try {
-                                const newItem = JSON.parse(
-                                    payload.content,
-                                ) as Item;
-                                if (!prev.some((i) => i.id === newItem.id)) {
-                                    next = [...prev, newItem];
-                                }
-                            } catch (e) {
-                                console.error(
-                                    "Failed to parse incoming ADD item JSON",
-                                    e,
-                                );
-                            }
-                        }
-
-                        if (next !== prev) {
-                            syncListItemsInStore(next);
-                        }
-
-                        return next;
-                    });
+                    return;
                 }
+
+                setItems((prev) => {
+                    const next = applySyncAction(prev, payload);
+                    if (next !== prev) {
+                        syncListItemsInStore(next);
+                    }
+                    return next;
+                });
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore], // items removed to prevent subscription churn
+        [applySyncAction, syncListItemsInStore],
     );
 
     useEffect(() => {
@@ -782,7 +773,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                         action: "BULK_DELETE",
                         itemIds: deletedIds,
                         timestamp: Date.now(),
-                    } as SyncPayload),
+                    }),
                 });
             }
 
