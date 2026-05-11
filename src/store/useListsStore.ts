@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useStore } from "../context/useStore";
+import { fetchListByIdRequest } from "../services/api";
 import type { Item, ListCategory, ShoppingList } from "../types";
 
 interface ApiItem {
@@ -141,7 +142,6 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     userId: list.userId,
     collaboratorEmails: list.collaboratorEmails ?? [],
     items: (list.items ?? []).map(normalizeItem),
-    // @ts-ignore - Task 21: Added version tracking internally
     version: list.version || 0,
 });
 
@@ -209,21 +209,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
     forceHardRefresh: async (listId: string) => {
         set({ isHardSyncing: true, error: null });
         try {
-            const response = await fetch(
-                `${getBaseUrl()}/api/lists/${listId}`,
-                {
-                    headers: jsonHeaders(),
-                    credentials: "include",
-                },
-            );
-
-            handleAuthResponse(response);
-
-            if (!response.ok) {
-                throw new Error(`Hard refresh failed (${response.status})`);
-            }
-
-            const data = (await response.json()) as ApiShoppingList;
+            const data = (await fetchListByIdRequest(
+                listId,
+            )) as ApiShoppingList;
             const freshList = normalizeListFromApi(data);
 
             set((state) => ({

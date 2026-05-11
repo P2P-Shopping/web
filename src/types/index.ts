@@ -60,6 +60,7 @@ export interface ShoppingList {
     ownerName?: string;
     ownerEmail?: string;
     collaboratorEmails?: string[];
+    version?: number;
 }
 
 // Auth Types

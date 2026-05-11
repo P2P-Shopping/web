@@ -16,10 +16,10 @@ export const useListSocketSync = (listId: string | undefined) => {
     const localVersionRef = useRef<number>(0);
 
     useEffect(() => {
-        // Keep ref synced with local store state
-        // @ts-ignore
-        localVersionRef.current = currentList?.version || 0;
-    }, [currentList]);
+        if (currentList && currentList.id === listId) {
+            localVersionRef.current = currentList.version || 0;
+        }
+    }, [currentList, listId]);
 
     useEffect(() => {
         if (!listId) return;
@@ -40,6 +40,11 @@ export const useListSocketSync = (listId: string | undefined) => {
                 }
 
                 const payload = JSON.parse(message.body);
+
+                if (payload.listId && payload.listId !== listId) {
+                    return;
+                }
+
                 const serverVersion =
                     payload.version || payload.updateCount || 0;
 

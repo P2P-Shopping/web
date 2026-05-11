@@ -114,7 +114,7 @@ export const fetchProductSuggestions = async (
  * Task 21: Endpoint for fetching a single list by its ID to perform a hard refresh.
  */
 export const fetchListByIdRequest = async (listId: string) => {
-    const response = await api.get(`/api/lists/${listId}`, { timeout: 10_000 });
+    const response = await api.get(`/api/lists/${listId}`);
     return response.data;
 };
 
