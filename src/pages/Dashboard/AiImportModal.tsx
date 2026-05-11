@@ -183,9 +183,11 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                 name: item.genericName || item.specificName || "Unknown Item",
                 brand: item.brand,
                 quantity:
-                    item.quantity !== undefined && item.quantity !== null
+                    item.quantity !== undefined &&
+                    item.quantity !== null &&
+                    String(item.quantity).trim() !== ""
                         ? `${item.quantity} ${item.unit || ""}`.trim()
-                        : undefined,
+                        : "1",
                 category: item.category,
             }));
 

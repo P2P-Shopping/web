@@ -1,5 +1,6 @@
 import L from "leaflet";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Circle,
     MapContainer,
