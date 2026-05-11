@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import type { Item, ShoppingList } from "../../types";
 import { buildItemDuplicateKey } from "../../utils/listUtils";
 import Modal from "../Modal/Modal";
@@ -203,13 +204,28 @@ const ImportItemsModal = ({
                                     }`}
                                 >
                                     <input
-                                        id={`import-item-${item.id}`}
                                         type="checkbox"
+                                        className="sr-only"
+                                        id={`import-item-${item.id}`}
                                         checked={isSelected}
                                         onChange={() => onToggleItem(item.id)}
-                                        className="mt-1 h-4 w-4 rounded border-border"
                                         aria-label={`Select ${item.name}`}
                                     />
+                                    <div
+                                        className={`relative flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all shrink-0 mt-0.5 ${
+                                            isSelected
+                                                ? "bg-accent border-accent"
+                                                : "bg-surface border-border-strong group-hover:border-accent"
+                                        }`}
+                                    >
+                                        {isSelected && (
+                                            <Check
+                                                size={14}
+                                                strokeWidth={4}
+                                                className="text-white"
+                                            />
+                                        )}
+                                    </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="font-semibold text-text-strong">

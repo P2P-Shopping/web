@@ -22,7 +22,6 @@ import ShoppingListItems from "../../components/ShoppingList/ShoppingListItems";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 import type { SyncPayload } from "../../dto/SyncPayload";
-import { useListSocketSync } from "../../hooks/useListSocketSync";
 import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
@@ -37,7 +36,6 @@ import type {
     ShoppingList,
 } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
-import RenameListModal from "../Dashboard/RenameListModal";
 import ShareListModal from "../Dashboard/ShareListModal";
 
 interface Item {
@@ -83,8 +81,6 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [syncFailed, setSyncFailed] = useState(false);
     const [authFailed, setAuthFailed] = useState(false);
     const isServerConnected = useStore((state) => state.isServerConnected);
-    const { isHardSyncing } = useListSocketSync(effectiveListId);
-    const wasHardSyncingRef = useRef(false);
 
     const itemsRef = useRef(items);
     useEffect(() => {
@@ -92,6 +88,7 @@ const useListItems = (effectiveListId: string | undefined) => {
     }, [items]);
 
     const pendingSyncItems = useRef(new Set<string>());
+    const lastSyncTimestamp = useRef<number>(0);
 
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
@@ -196,13 +193,6 @@ const useListItems = (effectiveListId: string | undefined) => {
     );
 
     useEffect(() => {
-        if (wasHardSyncingRef.current && !isHardSyncing && effectiveListId) {
-            fetchListData(effectiveListId);
-        }
-        wasHardSyncingRef.current = isHardSyncing;
-    }, [isHardSyncing, effectiveListId, fetchListData]);
-
-    useEffect(() => {
         setIsLoading(true);
         fetchListData();
     }, [fetchListData]);
@@ -294,15 +284,17 @@ const useListItems = (effectiveListId: string | undefined) => {
     const handleSyncMessage = useCallback(
         (message: { body: string }) => {
             try {
-                if (useListsStore.getState().isHardSyncing) {
-                    return;
-                }
-
                 const payload = JSON.parse(message.body) as SyncPayload;
 
                 if (payload.status === "Rejection") {
                     const itemId = payload.itemId;
-                    if (itemId && pendingSyncItems.current.has(itemId)) {
+                    // Silențiem warning-ul de conflict pentru ADD (Undo) pentru a nu deranja userul
+                    // dacă serverul respinge o restaurare redundantă.
+                    if (
+                        itemId &&
+                        pendingSyncItems.current.has(itemId) &&
+                        payload.action !== "ADD"
+                    ) {
                         pendingSyncItems.current.delete(itemId);
                         const item = itemsRef.current.find(
                             (i) => i.id === itemId,
@@ -312,65 +304,80 @@ const useListItems = (effectiveListId: string | undefined) => {
                             duration: 4000,
                         });
                     }
-                }
+                } else {
+                    setItems((prev) => {
+                        let next = prev;
 
-                setItems((prev) => {
-                    let next = prev;
-
-                    if (payload.action === "CHECK_OFF" && payload.itemId) {
-                        next = prev.map((item) =>
-                            item.id === payload.itemId
-                                ? { ...item, checked: Boolean(payload.checked) }
-                                : item,
-                        );
-                    } else if (
-                        payload.action === "UPDATE" &&
-                        payload.itemId &&
-                        payload.content
-                    ) {
-                        try {
-                            const updated = JSON.parse(payload.content) as Item;
+                        if (payload.action === "CHECK_OFF" && payload.itemId) {
                             next = prev.map((item) =>
                                 item.id === payload.itemId
-                                    ? { ...item, ...updated }
+                                    ? {
+                                          ...item,
+                                          checked: Boolean(payload.checked),
+                                      }
                                     : item,
                             );
-                        } catch (e) {
-                            console.error(
-                                "Failed to parse incoming UPDATE item JSON",
-                                e,
-                            );
-                        }
-                    } else if (payload.action === "DELETE" && payload.itemId) {
-                        next = prev.filter(
-                            (item) => item.id !== payload.itemId,
-                        );
-                    } else if (
-                        payload.action === "BULK_DELETE" &&
-                        payload.itemIds
-                    ) {
-                        const deletedIds = new Set(payload.itemIds);
-                        next = prev.filter((item) => !deletedIds.has(item.id));
-                    } else if (payload.action === "ADD" && payload.content) {
-                        try {
-                            const newItem = JSON.parse(payload.content) as Item;
-                            if (!prev.some((i) => i.id === newItem.id)) {
-                                next = [...prev, newItem];
+                        } else if (
+                            payload.action === "UPDATE" &&
+                            payload.itemId &&
+                            payload.content
+                        ) {
+                            try {
+                                const updated = JSON.parse(
+                                    payload.content,
+                                ) as Item;
+                                next = prev.map((item) =>
+                                    item.id === payload.itemId
+                                        ? { ...item, ...updated }
+                                        : item,
+                                );
+                            } catch (e) {
+                                console.error(
+                                    "Failed to parse incoming UPDATE item JSON",
+                                    e,
+                                );
                             }
-                        } catch (e) {
-                            console.error(
-                                "Failed to parse incoming ADD item JSON",
-                                e,
+                        } else if (
+                            payload.action === "DELETE" &&
+                            payload.itemId
+                        ) {
+                            next = prev.filter(
+                                (item) => item.id !== payload.itemId,
                             );
+                        } else if (
+                            payload.action === "BULK_DELETE" &&
+                            payload.itemIds
+                        ) {
+                            const deletedIds = new Set(payload.itemIds);
+                            next = prev.filter(
+                                (item) => !deletedIds.has(item.id),
+                            );
+                        } else if (
+                            payload.action === "ADD" &&
+                            payload.content
+                        ) {
+                            try {
+                                const newItem = JSON.parse(
+                                    payload.content,
+                                ) as Item;
+                                if (!prev.some((i) => i.id === newItem.id)) {
+                                    next = [...prev, newItem];
+                                }
+                            } catch (e) {
+                                console.error(
+                                    "Failed to parse incoming ADD item JSON",
+                                    e,
+                                );
+                            }
                         }
-                    }
 
-                    if (next !== prev) {
-                        syncListItemsInStore(next);
-                    }
+                        if (next !== prev) {
+                            syncListItemsInStore(next);
+                        }
 
-                    return next;
-                });
+                        return next;
+                    });
+                }
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
@@ -435,19 +442,43 @@ const useListItems = (effectiveListId: string | undefined) => {
         timestamp: Date.now(),
     });
 
-    const publishSync = (action: SyncPayload["action"], item: Item) => {
-        if (!effectiveListId || !stompClient.connected) return;
-        pendingSyncItems.current.add(item.id);
-        stompClient.publish({
-            destination: `/app/list/${effectiveListId}/update`,
-            body: JSON.stringify({
-                action,
-                itemId: item.id,
-                content: JSON.stringify(item),
-                timestamp: Date.now(),
-            } as SyncPayload),
-        });
-    };
+    const publishSync = useCallback(
+        (action: SyncPayload["action"], item: Item) => {
+            if (!effectiveListId || !stompClient.connected) return;
+
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
+            pendingSyncItems.current.add(item.id);
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action,
+                    itemId: item.id,
+                    content: JSON.stringify(item),
+                    timestamp,
+                } as SyncPayload),
+            });
+        },
+        [effectiveListId],
+    );
+
+    const restoreItem = useCallback(
+        (itemToRestore: Item) => {
+            setItems((prev) => {
+                if (prev.some((i) => i.id === itemToRestore.id)) return prev;
+                const restored = [...prev, itemToRestore];
+                syncListItemsInStore(restored);
+                // Dacă ștergerea a eșuat pe server sau s-a dat Undo, re-difuzăm adăugarea
+                publishSync("ADD", itemToRestore);
+                return restored;
+            });
+        },
+        [syncListItemsInStore, publishSync],
+    );
 
     const mergeExistingItem = async (
         listId: string,
@@ -504,7 +535,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
-        category?: string,
     ) => {
         const newItem: Item = {
             id: crypto.randomUUID(),
@@ -513,7 +543,6 @@ const useListItems = (effectiveListId: string | undefined) => {
             brand: brand || undefined,
             quantity: quantity || undefined,
             price: price ?? undefined,
-            category: category || undefined,
         };
 
         const optimisticItems = [...items, newItem];
@@ -572,33 +601,21 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
-        category?: string,
     ) => {
         if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
-        const finalQuantity = quantity?.trim() ? quantity.trim() : "1";
+
         const dupKey = buildItemDuplicateKey({ name, brand });
         const existingItem = items.find(
             (it) => buildItemDuplicateKey(it) === dupKey,
         );
 
         if (existingItem) {
-            await mergeExistingItem(
-                effectiveListId,
-                existingItem,
-                finalQuantity,
-            );
+            await mergeExistingItem(effectiveListId, existingItem, quantity);
             return;
         }
 
-        await createNewItem(
-            effectiveListId,
-            name,
-            finalQuantity,
-            brand,
-            price,
-            category,
-        );
+        await createNewItem(effectiveListId, name, quantity, brand, price);
     };
 
     const toggleItem = async (itemId: string) => {
@@ -614,6 +631,12 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
             const payload = {
                 name: currentItem.name,
                 isChecked: newChecked,
@@ -622,7 +645,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 price: currentItem.price ?? null,
                 category: currentItem.category ?? null,
                 isRecurrent: currentItem.isRecurrent ?? false,
-                timestamp: Date.now(),
+                timestamp,
             };
             await api.put(`/api/items/${itemId}`, payload);
 
@@ -632,7 +655,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     action: "CHECK_OFF",
                     itemId,
                     checked: newChecked,
-                    timestamp: Date.now(),
+                    timestamp,
                 };
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/update`,
@@ -670,48 +693,68 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    /**
+     * Optimistically deletes an item with a 5-second Undo window.
+     * Falls back to offline queue if the permanent deletion fails.
+     */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
+
+        const itemToDelete = items.find((item) => item.id === itemId);
+        if (!itemToDelete) return;
+
+        // 1. Ștergere optimistă
         const nextItems = items.filter((item) => item.id !== itemId);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
 
-        try {
-            await api.delete(`/api/items/${itemId}`);
+        // 2. Broadcast imediat al ștergerii (shallow delete)
+        publishSync("DELETE", itemToDelete);
 
-            if (effectiveListId && stompClient.connected) {
-                pendingSyncItems.current.add(itemId);
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify({
-                        action: "DELETE",
-                        itemId,
+        const timerId = setTimeout(async () => {
+            try {
+                const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+                    method: "DELETE",
+                    headers: getAuthHeaders(),
+                    credentials: "include",
+                });
+
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        handleUnauthorizedResponse();
+                        return;
+                    }
+                    throw new Error(`Failed to delete item (${res.status})`);
+                }
+
+                // Notă: Broadcast-ul de DELETE a fost trimis deja la pasul 2.
+            } catch (err) {
+                console.error("deleteItem error:", err);
+
+                if (!navigator.onLine) {
+                    useStore.getState().enqueueAction({
+                        id: crypto.randomUUID(),
+                        type: "DELETE_ITEM",
+                        payload: { listId: effectiveListId, itemId },
                         timestamp: Date.now(),
-                    }),
-                });
-            }
-        } catch (err) {
-            if (!navigator.onLine) {
-                useStore.getState().enqueueAction({
-                    id: crypto.randomUUID(),
-                    type: "DELETE_ITEM",
-                    payload: {
-                        listId: effectiveListId,
-                        itemId,
-                    },
-                    timestamp: Date.now(),
-                });
-                return;
-            }
+                    });
+                    return;
+                }
 
-            const errorMessage =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to delete the product.";
-            console.error("deleteItem error:", err);
-            setError(errorMessage);
-            fetchListData(effectiveListId);
-        }
+                restoreItem(itemToDelete);
+            }
+        }, 5000);
+
+        toast("Item deleted.", {
+            duration: 5000,
+            action: {
+                label: "Undo",
+                onClick: () => {
+                    clearTimeout(timerId);
+                    restoreItem(itemToDelete);
+                },
+            },
+        });
     };
 
     const clearCompletedItems = async () => {
@@ -789,7 +832,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         setIsReviewModalOpen,
         reviewItems,
         handleReviewConfirm,
-        fetchListData,
     };
 };
 
@@ -958,8 +1000,6 @@ interface AddItemModalProps {
     setBrand: (val: string) => void;
     price: string;
     setPrice: (val: string) => void;
-    category?: string;
-    setCategory?: (val: string) => void;
     onTyping?: () => void;
     isMobile?: boolean;
     showExpanded?: boolean;
@@ -1160,7 +1200,6 @@ const ItemNameField = ({
             <input
                 id={`${idPrefix}-item-name`}
                 type="text"
-                maxLength={100}
                 value={value}
                 onChange={(e) => {
                     onChange(e.target.value);
@@ -1218,8 +1257,6 @@ const ItemDetailsFields = ({
     setPrice,
     brand,
     setBrand,
-    category,
-    setCategory,
     isMobile,
 }: {
     idPrefix: string;
@@ -1229,8 +1266,6 @@ const ItemDetailsFields = ({
     setPrice: (val: string) => void;
     brand: string;
     setBrand: (val: string) => void;
-    category: string;
-    setCategory: (val: string) => void;
     isMobile: boolean;
 }) => (
     <div
@@ -1250,15 +1285,8 @@ const ItemDetailsFields = ({
             <input
                 id={`${idPrefix}-quantity`}
                 type="text"
-                maxLength={50}
                 value={quantity}
-                onChange={(e) => {
-                    const val = e.target.value;
-                    if (val !== "" && !/^[\p{L}\p{N}\s.,/]*$/u.test(val)) {
-                        return;
-                    }
-                    setQuantity(val);
-                }}
+                onChange={(e) => setQuantity(e.target.value)}
                 placeholder={isMobile ? "e.g. 2 pcs" : "e.g., 2"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -1275,18 +1303,8 @@ const ItemDetailsFields = ({
                 type="number"
                 step="0.01"
                 min="0"
-                max="999999999.99"
                 value={price}
-                onChange={(e) => {
-                    const val = e.target.value;
-                    if (val.length > 10) {
-                        return;
-                    }
-                    if (val && Number(val) > 999999999.99) {
-                        return;
-                    }
-                    setPrice(val);
-                }}
+                onChange={(e) => setPrice(e.target.value)}
                 placeholder={isMobile ? "0.00" : "e.g., 4.99"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -1303,29 +1321,9 @@ const ItemDetailsFields = ({
             <input
                 id={`${idPrefix}-brand`}
                 type="text"
-                maxLength={50}
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 placeholder={isMobile ? "e.g. Zuzu" : "e.g., Organic Valley"}
-                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
-            />
-        </div>
-        <div
-            className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}
-        >
-            <label
-                htmlFor={`${idPrefix}-category`}
-                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
-            >
-                Category (Optional)
-            </label>
-            <input
-                id={`${idPrefix}-category`}
-                type="text"
-                maxLength={50}
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g., Diary"
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
         </div>
@@ -1347,8 +1345,6 @@ const AddItemDetailsModal = ({
     setBrand,
     price,
     setPrice,
-    category,
-    setCategory,
     onTyping,
     isMobile = false,
     showExpanded = true,
@@ -1412,8 +1408,6 @@ const AddItemDetailsModal = ({
                         setPrice={setPrice}
                         brand={brand}
                         setBrand={setBrand}
-                        category={category || ""}
-                        setCategory={setCategory || (() => {})}
                         isMobile={isMobile}
                     />
                 )}
@@ -1512,7 +1506,6 @@ const InlineAddForm = ({
             <input
                 ref={addInputRef}
                 type="text"
-                maxLength={100}
                 value={newItemName}
                 onChange={(e) => {
                     onNameChange(e.target.value);
@@ -1564,8 +1557,32 @@ const ListDetail = ({
     const effectiveListId = listIdOverride ?? id;
 
     const [showShareModal, setShowShareModal] = useState(false);
-    const [showRenameModal, setShowRenameModal] = useState(false);
-    const { lists, isLoading: listsLoading, fetchLists } = useListsStore();
+
+    const {
+        lists,
+        isLoading: listsLoading,
+        fetchLists,
+        renameList,
+    } = useListsStore();
+
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editedName, setEditedName] = useState("");
+
+    const handleRenameSubmit = async () => {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !editedName.trim()
+        ) {
+            setIsEditingName(false);
+            setEditedName(activeList?.name || "");
+            return;
+        }
+        if (editedName.trim() !== activeList?.name) {
+            await renameList(effectiveListId, editedName.trim());
+        }
+        setIsEditingName(false);
+    };
 
     const {
         items,
@@ -1581,7 +1598,6 @@ const ListDetail = ({
         setIsReviewModalOpen,
         reviewItems,
         handleReviewConfirm,
-        fetchListData,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -1602,12 +1618,12 @@ const ListDetail = ({
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
-    const [detailCategory, setDetailCategory] = useState("");
+
     const [isFinishing, setIsFinishing] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
     const [finishStoreName, setFinishStoreName] = useState("");
     const [receiptImage, setReceiptImage] = useState<File | null>(null);
-    const [editingItemId, setEditingItemId] = useState<string | null>(null);
+
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
     const [showBanner, setShowBanner] = useState(true);
@@ -1634,7 +1650,11 @@ const ListDetail = ({
     const canImportIntoNormalList =
         (isRecipeList || activeList?.category === "FREQUENT") &&
         items.length > 0;
-
+    useEffect(() => {
+        if (activeList?.name) {
+            setEditedName(activeList.name);
+        }
+    }, [activeList?.name]);
     const activeCollaborationUsers = useMemo(() => {
         const current = activeList;
         if (!current) return [];
@@ -1719,7 +1739,6 @@ const ListDetail = ({
         setDetailQuantity("");
         setDetailBrand("");
         setDetailPrice("");
-        setDetailCategory("");
     }, []);
 
     useEffect(() => {
@@ -1749,56 +1768,22 @@ const ListDetail = ({
                     ? String(suggestion.price)
                     : "",
             );
-            setDetailCategory(suggestion.category || "");
-            if (suggestion.brand || suggestion.price || suggestion.category) {
+            if (suggestion.brand || suggestion.price) {
                 setShowExpandedDetails(true);
             }
         } else {
             setDetailQuantity("");
             setDetailBrand("");
             setDetailPrice("");
-            setDetailCategory("");
         }
 
         setShowDetailsModal(true);
     };
 
-    const handleDetailsSubmit = async (e: React.FormEvent) => {
+    const handleDetailsSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const priceNum = detailPrice
-            ? Number.parseFloat(detailPrice)
-            : undefined;
-
-        if (editingItemId) {
-            try {
-                const payload = {
-                    name: detailName,
-                    brand: detailBrand || null,
-                    quantity: detailQuantity || "1",
-                    price: priceNum || null,
-                    category: detailCategory || null,
-                    isChecked:
-                        items.find((i) => i.id === editingItemId)?.checked ||
-                        false,
-                    timestamp: Date.now(),
-                };
-
-                await api.put(`/api/items/${editingItemId}`, payload);
-                await fetchListData(effectiveListId);
-                toast.success("Item updated successfully");
-            } catch (err) {
-                console.error("Edit error:", err);
-                setError("Failed to update item.");
-            }
-        } else {
-            addItem(
-                detailName,
-                detailQuantity,
-                detailBrand,
-                priceNum,
-                detailCategory,
-            );
-        }
+        const price = detailPrice ? Number.parseFloat(detailPrice) : undefined;
+        addItem(detailName, detailQuantity, detailBrand, price);
 
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
@@ -1808,9 +1793,7 @@ const ListDetail = ({
         setDetailQuantity("");
         setDetailBrand("");
         setDetailPrice("");
-        setDetailCategory("");
         setNewItemName("");
-        setEditingItemId(null);
     };
 
     const isReadOnly = authFailed;
@@ -1923,12 +1906,12 @@ const ListDetail = ({
 
             const dupKey = buildItemDuplicateKey(item);
             const existingItem = existingMap.get(dupKey);
-            const itemQty = item.quantity?.trim() ? item.quantity.trim() : "1";
+
             if (existingItem) {
-                const existingQty = existingItem.quantity?.trim()
-                    ? existingItem.quantity.trim()
-                    : "1";
-                const mergedQty = mergeQuantities(existingQty, itemQty);
+                const mergedQty = mergeQuantities(
+                    existingItem.quantity,
+                    item.quantity,
+                );
                 const updated = await useListsStore
                     .getState()
                     .updateItem(targetList.id, existingItem.id, {
@@ -1944,7 +1927,7 @@ const ListDetail = ({
                         name: item.name,
                         checked: false,
                         brand: item.brand,
-                        quantity: itemQty,
+                        quantity: item.quantity,
                         price: item.price,
                         category: item.category,
                         isRecurrent: targetList.category === "FREQUENT",
@@ -1971,18 +1954,6 @@ const ListDetail = ({
         );
 
         setNewItemName("");
-    };
-
-    const handleEditClick = (item: Item) => {
-        setEditingItemId(item.id);
-        setDetailName(item.name);
-        setDetailQuantity(item.quantity || "");
-        setDetailBrand(item.brand || "");
-        setDetailPrice(item.price ? String(item.price) : "");
-        setDetailCategory(item.category || "");
-
-        setShowExpandedDetails(true);
-        setShowDetailsModal(true);
     };
 
     return (
@@ -2022,15 +1993,51 @@ const ListDetail = ({
                     <>
                         <div className="flex flex-col gap-3">
                             <div className="flex justify-between items-end px-1">
-                                <div className="flex flex-col">
-                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                                        Collaboration
-                                    </h2>
-                                    <div className="flex items-center gap-2">
-                                        <PresenceBar
-                                            variant="avatars"
-                                            allUsers={activeCollaborationUsers}
+                                <div className="flex flex-col gap-1">
+                                    {isEditingName ? (
+                                        <input
+                                            className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
+                                            value={editedName}
+                                            onChange={(e) =>
+                                                setEditedName(e.target.value)
+                                            }
+                                            onBlur={handleRenameSubmit}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter")
+                                                    handleRenameSubmit();
+                                                if (e.key === "Escape") {
+                                                    setEditedName(
+                                                        activeList?.name || "",
+                                                    );
+                                                    setIsEditingName(false);
+                                                }
+                                            }}
                                         />
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setIsEditingName(true)
+                                            }
+                                            disabled={isReadOnly}
+                                            className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
+                                        >
+                                            {activeList?.name ||
+                                                "Shopping List"}
+                                        </button>
+                                    )}
+                                    <div className="flex flex-col">
+                                        <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                            Collaboration
+                                        </h2>
+                                        <div className="flex items-center gap-2">
+                                            <PresenceBar
+                                                variant="avatars"
+                                                allUsers={
+                                                    activeCollaborationUsers
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-2">
@@ -2100,7 +2107,6 @@ const ListDetail = ({
                                         items={items}
                                         onCheck={toggleItem}
                                         onDelete={deleteItem}
-                                        onEdit={handleEditClick}
                                         disabled={isReadOnly}
                                         checkable={!isTemplateList}
                                     />
@@ -2167,8 +2173,6 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
-                category={detailCategory}
-                setCategory={setDetailCategory}
                 onTyping={sendTypingEvent}
                 isMobile={true}
                 showExpanded={showExpandedDetails}
@@ -2190,8 +2194,6 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
-                category={detailCategory}
-                setCategory={setDetailCategory}
                 onTyping={sendTypingEvent}
             />
 
@@ -2212,7 +2214,6 @@ const ListDetail = ({
                         <input
                             id="store-name-input"
                             type="text"
-                            maxLength={50}
                             value={finishStoreName}
                             onChange={(e) => setFinishStoreName(e.target.value)}
                             placeholder="e.g. Lidl"
@@ -2345,17 +2346,6 @@ const ListDetail = ({
                         "Shopping List"
                     }
                     onClose={() => setShowShareModal(false)}
-                />
-            )}
-
-            {showRenameModal && (
-                <RenameListModal
-                    listId={effectiveListId ?? ""}
-                    currentName={
-                        lists.find((l) => l.id === effectiveListId)?.name ||
-                        "Shopping List"
-                    }
-                    onClose={() => setShowRenameModal(false)}
                 />
             )}
         </div>
