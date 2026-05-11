@@ -60,6 +60,7 @@ export interface ShoppingList {
     ownerName?: string;
     ownerEmail?: string;
     collaboratorEmails?: string[];
+    version?: number;
 }
 
 // Auth Types
@@ -108,4 +109,14 @@ export interface Route {
     points: RoutePoint[];
     totalDistance: number;
     estimatedTime: number;
+}
+
+export interface PendingInvitation {
+    id: string;
+    listId: string;
+    listTitle: string;
+    inviterName: string;
+    inviterEmail: string;
+    status: "PENDING" | "ACCEPTED" | "DECLINED";
+    createdAt: string;
 }

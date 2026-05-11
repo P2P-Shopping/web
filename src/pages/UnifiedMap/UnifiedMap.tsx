@@ -1,5 +1,7 @@
+import polyline from "@mapbox/polyline";
 import L from "leaflet";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Circle,
     MapContainer,
@@ -24,6 +26,8 @@ import {
     LocateFixed,
     MapPin,
     Satellite,
+    Volume2,
+    VolumeX,
     X,
     Zap,
 } from "lucide-react";
@@ -39,7 +43,6 @@ import { useListsStore } from "../../store/useListsStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import StoreMap from "../StoreMap/StoreMap";
-
 // --- Types & Constants ---
 export interface StoreRecommendation {
     id: string;
@@ -895,6 +898,8 @@ const UnifiedMap: React.FC = () => {
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
+    const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+    const spokenNodesRef = useRef<Set<string>>(new Set());
     const routeOriginRef = useRef<Coordinate | null>(null);
     const lastDeviationRecalcRef = useRef<Coordinate | null>(null);
     const isMicroView = navigationMode === "indoor";
@@ -1030,6 +1035,73 @@ const UnifiedMap: React.FC = () => {
         activeIndoorItems,
     ]);
 
+    // --- AUDIO NAVIGATION LOGIC ---
+    useEffect(() => {
+        if (
+            navigationMode !== "indoor" ||
+            route.length === 0 ||
+            !isAudioEnabled
+        ) {
+            return;
+        }
+
+        if (!("speechSynthesis" in globalThis)) {
+            console.warn("Browser does not support speech synthesis.");
+            return;
+        }
+
+        route.forEach((point) => {
+            const distance = getDistanceMeters(userLocation, {
+                lat: point.lat,
+                lng: point.lng,
+            });
+            const nodeId = point.itemId || `${point.lat}-${point.lng}`;
+
+            if (distance <= 4 && !spokenNodesRef.current.has(nodeId)) {
+                spokenNodesRef.current.add(nodeId);
+
+                // CORECTURĂ: Folosim proprietatea camelCase trimisă de Spring Boot
+                const instructionText =
+                    point.audio_instruction || `Te apropii de ${point.name}`;
+                // SUNET DE NOTIFICARE (Beep) înainte de vorbire
+                try {
+                    const AudioCtxConstructor =
+                        globalThis.AudioContext ??
+                        (
+                            globalThis as {
+                                webkitAudioContext?: typeof AudioContext;
+                            }
+                        ).webkitAudioContext;
+                    if (!AudioCtxConstructor) return;
+                    const audioCtx = new AudioCtxConstructor();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.type = "sine";
+                    oscillator.frequency.setValueAtTime(
+                        880,
+                        audioCtx.currentTime,
+                    );
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.1);
+                } catch (e) {
+                    console.warn("Audio beep failed", e);
+                }
+
+                const utterance = new SpeechSynthesisUtterance(instructionText);
+                utterance.lang = "ro-RO"; // Setăm limba română pentru textele din backend
+                utterance.rate = 1;
+
+                // Mic delay pentru a lăsa beep-ul să se audă primul
+                setTimeout(() => {
+                    globalThis.speechSynthesis.speak(utterance);
+                }, 150);
+            }
+        });
+    }, [userLocation, route, navigationMode, isAudioEnabled]);
+
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
         if (!selectedList) return;
@@ -1127,9 +1199,20 @@ const UnifiedMap: React.FC = () => {
             );
             if (response.ok) {
                 const data = await response.json();
-                const geo = data[transportMode]?.geometry;
-                if (geo && Array.isArray(geo)) {
-                    useStore.getState().setMacroRouteGeometry(geo);
+                const polylineString = data[transportMode]?.polyline;
+
+                if (polylineString) {
+                    const decodedPath = polyline.decode(polylineString);
+                    useStore.getState().setMacroRouteGeometry(decodedPath);
+
+                    // NOU: Mutăm locația magazinului pe ultimul punct din traseul real
+                    if (decodedPath.length > 0) {
+                        const lastPoint = decodedPath[decodedPath.length - 1];
+                        setTargetStoreLocation({
+                            lat: lastPoint[0],
+                            lng: lastPoint[1],
+                        });
+                    }
                 } else {
                     useStore.getState().setMacroRouteGeometry([]);
                 }
@@ -1369,17 +1452,49 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="absolute top-4 left-4 z-1000 flex flex-col gap-2">
+                <div className="absolute top-4 left-4 z-3000 flex flex-col gap-2 items-start">
+                    {/* Badge-ul de View */}
                     <div
-                        className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
+                        className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md w-fit ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
                     >
                         {isMicroView
                             ? "Micro View: Indoor"
                             : "Macro View: City"}
                     </div>
+
+                    {/* Butonul de Audio (Doar pe Indoor) */}
+                    {isMicroView && (
+                        <div className="flex w-fit bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (isAudioEnabled) {
+                                        globalThis.speechSynthesis.cancel();
+                                    } else {
+                                        spokenNodesRef.current.clear();
+                                    }
+                                    setIsAudioEnabled(!isAudioEnabled);
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-tighter transition-all ${isAudioEnabled ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
+                                title={
+                                    isAudioEnabled
+                                        ? "Mute Voice"
+                                        : "Unmute Voice"
+                                }
+                            >
+                                {isAudioEnabled ? (
+                                    <Volume2 size={14} />
+                                ) : (
+                                    <VolumeX size={14} />
+                                )}
+                                {isAudioEnabled ? "ON" : "OFF"}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
-                <div className="absolute top-4 right-4 z-1000 flex flex-col gap-2">
+                {/* BUTOANELE MOCK / REAL GPS - RIGHT SIDE CORNER */}
+                <div className="absolute top-4 right-4 z-3000">
                     <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
                         <button
                             type="button"
@@ -1400,8 +1515,6 @@ const UnifiedMap: React.FC = () => {
                             Real
                         </button>
                     </div>
-
-                    {/* Demo action buttons removed per UX request */}
                 </div>
             </div>
 
