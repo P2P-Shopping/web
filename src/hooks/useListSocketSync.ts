@@ -30,7 +30,7 @@ export const useListSocketSync = (listId: string | undefined) => {
             );
             forceHardRefresh(listId).then(() => {
                 const freshList = useListsStore.getState().currentList;
-                if (freshList && freshList.id === listId) {
+                if (freshList?.id === listId) {
                     localVersionRef.current = freshList.version || 0;
                 }
             });
