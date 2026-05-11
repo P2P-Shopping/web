@@ -1425,11 +1425,7 @@ const ListDetail = ({
     const [isEditingName, setIsEditingName] = useState(false);
     const [editedName, setEditedName] = useState("");
 
-    useEffect(() => {
-        if (activeList?.name) {
-            setEditedName(activeList.name);
-        }
-    }, [activeList?.name]);
+    
 
     const handleRenameSubmit = async () => {
         if (!effectiveListId || effectiveListId === "default" || !editedName.trim()) {
@@ -1508,7 +1504,11 @@ const ListDetail = ({
     const canImportIntoNormalList =
         (isRecipeList || activeList?.category === "FREQUENT") &&
         items.length > 0;
-
+useEffect(() => {
+        if (activeList?.name) {
+            setEditedName(activeList.name);
+        }
+    }, [activeList?.name]);
     const activeCollaborationUsers = useMemo(() => {
         const current = activeList;
         if (!current) return [];
@@ -1850,7 +1850,7 @@ const ListDetail = ({
                               <div className="flex flex-col gap-1">
                                     {isEditingName ? (
                                         <input
-                                            autoFocus
+                                            
                                             className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
                                             value={editedName}
                                             onChange={(e) => setEditedName(e.target.value)}
@@ -1866,6 +1866,14 @@ const ListDetail = ({
                                     ) : (
                                         <h1 
                                             onClick={() => !isReadOnly && setIsEditingName(true)}
+                                            onKeyDown={(e) => {
+                                                if ((e.key === 'Enter' || e.key === ' ') && !isReadOnly) {
+                                                    e.preventDefault();
+                                                    setIsEditingName(true);
+                                                    }
+                                                    }}
+                                                    tabIndex={isReadOnly ? -1 : 0}
+                                                    role="button"
                                             className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer"
                                         >
                                             {activeList?.name || "Shopping List"}
