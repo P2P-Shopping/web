@@ -1475,7 +1475,6 @@ const UnifiedMap: React.FC = () => {
                             </button>
                         </div>
                     )}
-
                 </div>
 
                 {/* BUTOANELE MOCK / REAL GPS - RIGHT SIDE CORNER */}
