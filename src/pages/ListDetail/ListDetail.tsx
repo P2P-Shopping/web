@@ -1,6 +1,7 @@
 import {
     AlertCircle,
     Camera,
+    CheckCircle2,
     ChevronDown,
     Plus,
     Settings,
@@ -344,6 +345,12 @@ const useListItems = (effectiveListId: string | undefined) => {
                         next = prev.filter(
                             (item) => item.id !== payload.itemId,
                         );
+                    } else if (
+                        payload.action === "BULK_DELETE" &&
+                        payload.itemIds
+                    ) {
+                        const deletedIds = new Set(payload.itemIds);
+                        next = prev.filter((item) => !deletedIds.has(item.id));
                     } else if (payload.action === "ADD" && payload.content) {
                         try {
                             const newItem = JSON.parse(payload.content) as Item;
@@ -707,6 +714,65 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const clearCompletedItems = async () => {
+        if (!effectiveListId || effectiveListId === "default") return;
+
+        const checkedItems = items.filter((item) => item.checked);
+        if (checkedItems.length === 0) return;
+
+        const previousItems = items;
+        const nextItems = items.filter((item) => !item.checked);
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        try {
+            const response = await api.delete<{ deletedItemIds: string[] }>(
+                `/api/lists/${effectiveListId}/items/completed`,
+            );
+
+            const deletedIds = response.data.deletedItemIds;
+
+            if (effectiveListId && stompClient.connected) {
+                stompClient.publish({
+                    destination: `/app/list/${effectiveListId}/update`,
+                    body: JSON.stringify({
+                        action: "BULK_DELETE",
+                        itemIds: deletedIds,
+                        timestamp: Date.now(),
+                    } as SyncPayload),
+                });
+            }
+
+            toast.success("Cleared", {
+                description: `${deletedIds.length} completed item${deletedIds.length === 1 ? "" : "s"} removed.`,
+            });
+        } catch (err) {
+            if (!navigator.onLine) {
+                useStore.getState().enqueueAction({
+                    id: crypto.randomUUID(),
+                    type: "CLEAR_COMPLETED",
+                    payload: { listId: effectiveListId },
+                    timestamp: Date.now(),
+                });
+                toast.info("Queued", {
+                    description:
+                        "Clear completed items will sync when you're back online.",
+                });
+                return;
+            }
+
+            console.error("clearCompletedItems error:", err);
+            setItems(previousItems);
+            syncListItemsInStore(previousItems);
+            const errorMessage =
+                err instanceof Error
+                    ? err.message
+                    : "Failed to clear completed items.";
+            setError(errorMessage);
+            fetchListData(effectiveListId);
+        }
+    };
+
     return {
         items,
         isLoading,
@@ -716,6 +782,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         addItem,
         toggleItem,
         deleteItem,
+        clearCompletedItems,
         setError,
         handleAiImport,
         isReviewModalOpen,
@@ -1508,6 +1575,7 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        clearCompletedItems,
         setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
@@ -1966,6 +2034,21 @@ const ListDetail = ({
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-2">
+                                    {!isReadOnly &&
+                                        !isTemplateList &&
+                                        items.some((item) => item.checked) && (
+                                            <button
+                                                type="button"
+                                                onClick={clearCompletedItems}
+                                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-danger hover:text-danger"
+                                            >
+                                                <CheckCircle2
+                                                    size={14}
+                                                    strokeWidth={2.5}
+                                                />
+                                                Clear Completed
+                                            </button>
+                                        )}
                                     {canImportIntoNormalList && (
                                         <button
                                             type="button"

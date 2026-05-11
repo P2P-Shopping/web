@@ -19,7 +19,11 @@ export type ListCategory = "NORMAL" | "RECIPE" | "FREQUENT";
 /**
  * Supported types of actions that can be queued while offline.
  */
-export type OfflineActionType = "ADD_ITEM" | "TOGGLE_ITEM" | "DELETE_ITEM";
+export type OfflineActionType =
+    | "ADD_ITEM"
+    | "TOGGLE_ITEM"
+    | "DELETE_ITEM"
+    | "CLEAR_COMPLETED";
 
 /**
  * Represents an action that failed due to being offline and is waiting for sync.
