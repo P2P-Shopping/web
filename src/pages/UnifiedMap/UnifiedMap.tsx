@@ -1436,16 +1436,6 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="absolute top-4 left-4 z-1000 flex flex-col gap-2">
-                    <div
-                        className={`px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg border backdrop-blur-md ${isMicroView ? "bg-accent text-white border-accent" : "bg-surface/80 text-text-strong border-border"}`}
-                    >
-                        {isMicroView
-                            ? "Micro View: Indoor"
-                            : "Macro View: City"}
-                    </div>
-                </div>
-
                 <div className="absolute top-4 left-4 z-3000 flex flex-col gap-2 items-start">
                     {/* Badge-ul de View */}
                     <div
@@ -1486,7 +1476,10 @@ const UnifiedMap: React.FC = () => {
                         </div>
                     )}
 
-                    {/* BUTOANELE EXISTENTE: MOCK / REAL GPS */}
+                </div>
+
+                {/* BUTOANELE MOCK / REAL GPS - RIGHT SIDE CORNER */}
+                <div className="absolute top-4 right-4 z-3000">
                     <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
                         <button
                             type="button"
@@ -1507,8 +1500,6 @@ const UnifiedMap: React.FC = () => {
                             Real
                         </button>
                     </div>
-
-                    {/* Demo action buttons removed per UX request */}
                 </div>
             </div>
 
