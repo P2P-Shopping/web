@@ -1,25 +1,42 @@
 import { useEffect, useRef } from "react";
+import { useStore } from "../context/useStore";
 import stompClient from "../services/socketService";
 import { useListsStore } from "../store/useListsStore";
 
-/**
- * Task #21: Edge Case UI Polish
- * Hook to manage WebSocket connections and detect wildly out of sync states.
- * @param listId - The ID of the list to synchronize.
- */
 export const useListSocketSync = (listId: string | undefined) => {
     const isHardSyncing = useListsStore((state) => state.isHardSyncing);
     const forceHardRefresh = useListsStore((state) => state.forceHardRefresh);
     const currentList = useListsStore((state) => state.currentList);
+    const isServerConnected = useStore((state) => state.isServerConnected);
 
-    // We track the last version we knew about to detect missed updates
     const localVersionRef = useRef<number>(0);
+    const prevConnectedRef = useRef(isServerConnected);
 
     useEffect(() => {
         if (currentList && currentList.id === listId) {
             localVersionRef.current = currentList.version || 0;
         }
     }, [currentList, listId]);
+
+    useEffect(() => {
+        if (
+            isServerConnected &&
+            !prevConnectedRef.current &&
+            listId &&
+            currentList
+        ) {
+            console.warn(
+                `[Network Sync] Reconnection detected for list ${listId}. Forcing hard refresh...`,
+            );
+            forceHardRefresh(listId).then(() => {
+                const freshList = useListsStore.getState().currentList;
+                if (freshList && freshList.id === listId) {
+                    localVersionRef.current = freshList.version || 0;
+                }
+            });
+        }
+        prevConnectedRef.current = isServerConnected;
+    }, [isServerConnected, listId, currentList, forceHardRefresh]);
 
     useEffect(() => {
         if (!listId) return;
@@ -31,11 +48,7 @@ export const useListSocketSync = (listId: string | undefined) => {
         const subscription = stompClient.subscribe(
             `/topic/list/${listId}`,
             (message) => {
-                // 1. Prevent overlapping actions if a hard refresh is already wiping the list
                 if (useListsStore.getState().isHardSyncing) {
-                    console.warn(
-                        "Update ignored: UI is currently hard syncing.",
-                    );
                     return;
                 }
 
@@ -48,27 +61,23 @@ export const useListSocketSync = (listId: string | undefined) => {
                 const serverVersion =
                     payload.version || payload.updateCount || 0;
 
-                // 2. Detect the messy reality: Are we wildly out of sync?
-                // If the incoming version is more than 1 step ahead of our local version, we missed updates.
                 if (
                     serverVersion > 0 &&
                     serverVersion > localVersionRef.current + 1
                 ) {
-                    console.error(
-                        `[Network Sync] Missed updates detected. Local: ${localVersionRef.current}, Server: ${serverVersion}. Wiping local state and forcing hard refresh...`,
+                    console.warn(
+                        `[Network Sync] Missed updates detected. Local: ${localVersionRef.current}, Server: ${serverVersion}. Forcing hard refresh...`,
                     );
                     forceHardRefresh(listId);
                     return;
                 }
 
-                // 3. Keep local version reference perfectly in sync
                 if (serverVersion > 0) {
                     localVersionRef.current = serverVersion;
                 }
             },
         );
 
-        // Explicitly remove subscription on cleanup
         return () => {
             subscription.unsubscribe();
         };

@@ -32,7 +32,7 @@ interface ApiShoppingList {
     ownerEmail?: string;
     userId?: string;
     collaboratorEmails?: string[];
-    version?: number; // Task 21: Added version tracking internally
+    version?: number;
 }
 
 interface ListsState {
@@ -212,7 +212,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     pendingInvitations: [],
 
     /**
-     * Task #21: Hard refresh a specific list from the REST API to ensure synchronization.
+     * Hard refresh a specific list from the REST API to ensure synchronization.
      * Wipes the local list state and replaces it entirely with the authoritative copy.
      * @param listId - The ID of the list to hard refresh.
      */
