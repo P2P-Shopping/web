@@ -506,9 +506,8 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                             type="button"
                             onClick={() => {
                                 // biome-ignore lint/suspicious/noExplicitAny: access globalThis safely
-                                const bridge = (globalThis as any)
-                                    // biome-ignore lint/suspicious/noExplicitAny: bridge is untyped
-                                    .P2PBridge as any;
+                                const bridge = (globalThis as any).P2PBridge as any;
+                                
                                 if (bridge) {
                                     bridge.openNativeCamera(
                                         "dashboard_upload_v1",
