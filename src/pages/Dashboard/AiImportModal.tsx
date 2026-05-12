@@ -53,7 +53,6 @@ const normalizeListType = (value?: string) => {
     return "NORMAL";
 };
 
-
 const AiImportModal = ({ onClose }: AiImportModalProps) => {
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -491,7 +490,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                                         "dashboard_upload_v1",
                                     );
                                 } else {
-                                fileInputRef.current?.click();
+                                    fileInputRef.current?.click();
                                 }
                             }}
                             className="p-2.5 text-text-muted hover:text-accent hover:bg-surface rounded-xl transition-all"
