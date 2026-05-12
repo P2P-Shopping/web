@@ -464,7 +464,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     itemId: item.id,
                     content: JSON.stringify(item),
                     timestamp,
-                } as SyncPayload),
+                }),
             });
         },
         [effectiveListId],
@@ -1703,7 +1703,7 @@ const ListDetail = ({
 
         if (navigator.permissions) {
             navigator.permissions
-                .query({ name: "geolocation" as PermissionName })
+                .query({ name: "geolocation" })
                 .then((result) => {
                     if (!isMounted) return;
                     permResult = result;

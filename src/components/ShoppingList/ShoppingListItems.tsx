@@ -65,7 +65,7 @@ const ItemMetadata = ({ item }: { item: Item }) => {
     return (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted mt-0.5">
             {parts.map((part, index) => {
-                const partKey = (part as React.ReactElement).key || index;
+                const partKey = React.isValidElement(part) ? part.key : index;
                 return (
                     <React.Fragment key={`meta-${partKey}`}>
                         {index > 0 && <span> • </span>}
@@ -364,7 +364,7 @@ const ShoppingListItems: React.FC<Props> = ({
     }
 
     // Group items by category for alphabetical/chronological modes
-    const groupedItems = sortedItems.reduce(
+    const groupedItems = sortedItems.reduce<Record<string, Item[]>>(
         (acc, item) => {
             const category = item.category || "Other";
             if (!acc[category]) {
@@ -373,7 +373,7 @@ const ShoppingListItems: React.FC<Props> = ({
             acc[category].push(item);
             return acc;
         },
-        {} as Record<string, Item[]>,
+        {},
     );
 
     const categories = Object.keys(groupedItems).sort((a, b) =>

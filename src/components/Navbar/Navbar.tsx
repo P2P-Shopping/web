@@ -56,7 +56,7 @@ export default function Navbar() {
         function handleClickOutside(event: MouseEvent) {
             if (
                 moreMenuRef.current &&
-                !moreMenuRef.current.contains(event.target as Node)
+                !moreMenuRef.current.contains(event.target)
             ) {
                 setIsMoreOpen(false);
             }
