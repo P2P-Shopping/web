@@ -91,6 +91,19 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         }
     }, [messages.length, isProcessing, scrollToBottom]);
 
+    useEffect(() => {
+        (window as any).onNativeImageReceived = (base64Data: string) => {
+            const imageSource = `data:image/jpeg;base64,${base64Data}`;
+            
+            setImagePreview(imageSource);
+            
+            setImage(imageSource as any);
+        };
+        return () => {
+            delete (window as any).onNativeImageReceived;
+        };
+    }, [setImagePreview, setImage]);
+
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -467,7 +480,13 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
                         <button
                             type="button"
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => {
+                                if ((window as any).P2PBridge) {
+                                    (window as any).P2PBridge.openNativeCamera("dashboard_upload_v1");
+                                } else {
+                                     fileInputRef.current?.click();
+                                }
+                            }}
                             className="p-2.5 text-text-muted hover:text-accent hover:bg-surface rounded-xl transition-all"
                             title="Attach image"
                         >
