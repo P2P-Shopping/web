@@ -93,16 +93,30 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
     useEffect(() => {
         // biome-ignore lint/suspicious/noExplicitAny: custom bridge callback
-        (window as any).onNativeImageReceived = (base64Data: string) => {
+        (globalThis as any).onNativeImageReceived = (base64Data: string) => {
+            if (!base64Data || typeof base64Data !== 'string' || base64Data.trim() === '') {
+                console.error('Invalid base64 data received from native bridge');
+                return;
+            }
+
             const imageSource = `data:image/jpeg;base64,${base64Data}`;
 
             setImagePreview(imageSource);
 
-            setImage(imageSource as unknown as File);
+            fetch(imageSource)
+                .then(res => res.blob())
+                .then(blob => {
+                    const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    setImage(file);
+                })
+                .catch(err => {
+                    console.error('Failed to convert native image:', err);
+                    setImage(null);
+                });
         };
         return () => {
             // biome-ignore lint/suspicious/noExplicitAny: cleanup
-            delete (window as any).onNativeImageReceived;
+            delete (globalThis as any).onNativeImageReceived;
         };
     }, []);
 
@@ -484,7 +498,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                             type="button"
                             onClick={() => {
                                 // biome-ignore lint/suspicious/noExplicitAny: native camera bridge call
-                                const bridge = window.P2PBridge as any;
+                                const bridge = (globalThis as any).P2PBridge as any;
                                 if (bridge) {
                                     bridge.openNativeCamera(
                                         "dashboard_upload_v1",
