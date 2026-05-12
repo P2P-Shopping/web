@@ -96,11 +96,11 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         (globalThis as any).onNativeImageReceived = (base64Data: string) => {
             if (
                 !base64Data ||
-                typeof base64Data !== 'string' ||
-                base64Data.trim() === ''
+                typeof base64Data !== "string" ||
+                base64Data.trim() === ""
             ) {
                 console.error(
-                    'Invalid base64 data received from native bridge',
+                    "Invalid base64 data received from native bridge",
                 );
                 return;
             }
@@ -110,15 +110,15 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             setImagePreview(imageSource);
 
             fetch(imageSource)
-                .then(res => res.blob())
-                .then(blob => {
+                .then((res) => res.blob())
+                .then((blob) => {
                     const file = new File([blob], `camera_${Date.now()}.jpg`, {
-                        type: 'image/jpeg',
+                        type: "image/jpeg",
                     });
                     setImage(file);
                 })
-                .catch(err => {
-                    console.error('Failed to convert native image:', err);
+                .catch((err) => {
+                    console.error("Failed to convert native image:", err);
                     setImage(null);
                 });
         };
@@ -505,8 +505,9 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         <button
                             type="button"
                             onClick={() => {
-                                // biome-ignore lint/suspicious/noExplicitAny: native camera bridge call
+                                // biome-ignore lint/suspicious/noExplicitAny: access globalThis safely
                                 const bridge = (globalThis as any)
+                                    // biome-ignore lint/suspicious/noExplicitAny: bridge is untyped
                                     .P2PBridge as any;
                                 if (bridge) {
                                     bridge.openNativeCamera(
