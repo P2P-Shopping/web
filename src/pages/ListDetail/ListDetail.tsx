@@ -557,6 +557,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                         brand: newItem.brand,
                         quantity: newItem.quantity,
                         price: newItem.price,
+                        positionIndex: newItem.positionIndex,
                     },
                     timestamp: Date.now(),
                 });

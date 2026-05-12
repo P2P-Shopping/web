@@ -37,6 +37,7 @@ export const useOfflineSync = () => {
                     price: payload.price ?? null,
                     category: payload.category ?? null,
                     isRecurrent: Boolean(payload.isRecurrent),
+                    positionIndex: payload.positionIndex ?? null,
                     timestamp: action.timestamp,
                 });
                 break;

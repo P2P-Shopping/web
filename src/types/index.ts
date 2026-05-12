@@ -44,6 +44,7 @@ export interface QueuedAction {
         price?: number;
         category?: string;
         isRecurrent?: boolean;
+        positionIndex?: number;
     };
     /** When the action was first attempted */
     timestamp: number;
