@@ -314,12 +314,12 @@ const ShoppingListItems: React.FC<Props> = ({
         const prevPos = prevItem?.positionIndex ?? 0;
         const nextPos = nextItem?.positionIndex ?? prevPos + 2000000;
 
-        if (!prevItem) {
-            newPos = nextPos - 1000000;
-        } else if (!nextItem) {
-            newPos = prevPos + 1000000;
-        } else {
+        if (prevItem && nextItem) {
             newPos = (prevPos + nextPos) / 2;
+        } else if (nextItem) {
+            newPos = nextPos - 1000000;
+        } else {
+            newPos = prevPos + 1000000;
         }
 
         const movedItem = {
