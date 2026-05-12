@@ -503,8 +503,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore, publishSync],
     );
 
-    
-
     const createNewItem = async (
         listId: string,
         name: string,

@@ -1,15 +1,15 @@
+import type { DragEndEvent } from "@dnd-kit/core";
 import {
+    closestCenter,
     DndContext,
     KeyboardSensor,
     PointerSensor,
-    closestCenter,
     useSensor,
     useSensors,
 } from "@dnd-kit/core";
-import type { DragEndEvent } from "@dnd-kit/core";
 import {
-    SortableContext,
     arrayMove,
+    SortableContext,
     sortableKeyboardCoordinates,
     useSortable,
     verticalListSortingStrategy,
@@ -202,8 +202,6 @@ const SortableItemRow = ({
         </li>
     );
 };
-
-
 
 const ShoppingListItems: React.FC<Props> = ({
     items,
