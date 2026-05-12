@@ -53,12 +53,12 @@ const normalizeListType = (value?: string) => {
     return "NORMAL";
 };
 declare global {
-  interface Window {
-    P2PBridge?: {
-      openNativeCamera: (callbackId: string) => void;
-    };
-    onNativeImageReceived?: (base64Data: string) => void;
-  }
+    interface Window {
+        P2PBridge?: {
+            openNativeCamera: (callbackId: string) => void;
+        };
+        onNativeImageReceived?: (base64Data: string) => void;
+    }
 }
 
 const AiImportModal = ({ onClose }: AiImportModalProps) => {
@@ -102,7 +102,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     useEffect(() => {
         window.onNativeImageReceived = (base64Data: string) => {
             const imageSource = `data:image/jpeg;base64,${base64Data}`;
-            
+
             setImagePreview(imageSource);
             
             setImage(imageSource as unknown as File);
@@ -490,9 +490,11 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                             type="button"
                             onClick={() => {
                                 if (window.P2PBridge) {
-                                    window.P2PBridge.openNativeCamera("dashboard_upload_v1");
+                                    window.P2PBridge.openNativeCamera(
+                                        "dashboard_upload_v1"
+                                    );
                                 } else {
-                                     fileInputRef.current?.click();
+                                    fileInputRef.current?.click();
                                 }
                             }}
                             className="p-2.5 text-text-muted hover:text-accent hover:bg-surface rounded-xl transition-all"
