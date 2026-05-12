@@ -52,6 +52,14 @@ const normalizeListType = (value?: string) => {
     }
     return "NORMAL";
 };
+declare global {
+  interface Window {
+    P2PBridge?: {
+      openNativeCamera: (callbackId: string) => void;
+    };
+    onNativeImageReceived?: (base64Data: string) => void;
+  }
+}
 
 const AiImportModal = ({ onClose }: AiImportModalProps) => {
     const [messages, setMessages] = useState<Message[]>([
@@ -92,17 +100,17 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     }, [messages.length, isProcessing, scrollToBottom]);
 
     useEffect(() => {
-        (window as any).onNativeImageReceived = (base64Data: string) => {
+        window.onNativeImageReceived = (base64Data: string) => {
             const imageSource = `data:image/jpeg;base64,${base64Data}`;
             
             setImagePreview(imageSource);
             
-            setImage(imageSource as any);
+            setImage(imageSource as unknown as File);
         };
         return () => {
-            delete (window as any).onNativeImageReceived;
+            delete window.onNativeImageReceived;
         };
-    }, [setImagePreview, setImage]);
+    }, []);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -481,8 +489,8 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         <button
                             type="button"
                             onClick={() => {
-                                if ((window as any).P2PBridge) {
-                                    (window as any).P2PBridge.openNativeCamera("dashboard_upload_v1");
+                                if (window.P2PBridge) {
+                                    window.P2PBridge.openNativeCamera("dashboard_upload_v1");
                                 } else {
                                      fileInputRef.current?.click();
                                 }
