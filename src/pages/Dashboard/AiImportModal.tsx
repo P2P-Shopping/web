@@ -104,7 +104,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             const imageSource = `data:image/jpeg;base64,${base64Data}`;
 
             setImagePreview(imageSource);
-            
+
             setImage(imageSource as unknown as File);
         };
         return () => {
@@ -491,7 +491,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                             onClick={() => {
                                 if (window.P2PBridge) {
                                     window.P2PBridge.openNativeCamera(
-                                        "dashboard_upload_v1"
+                                        "dashboard_upload_v1",
                                     );
                                 } else {
                                     fileInputRef.current?.click();
