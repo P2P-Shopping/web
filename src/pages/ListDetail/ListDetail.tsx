@@ -1,6 +1,7 @@
 import {
     AlertCircle,
     Camera,
+    CheckCircle2,
     ChevronDown,
     Plus,
     Settings,
@@ -35,7 +36,6 @@ import type {
     ShoppingList,
 } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
-import RenameListModal from "../Dashboard/RenameListModal";
 import ShareListModal from "../Dashboard/ShareListModal";
 
 interface Item {
@@ -47,6 +47,7 @@ interface Item {
     price?: number;
     category?: string;
     isRecurrent?: boolean;
+    positionIndex?: number;
 }
 
 interface ApiListItem {
@@ -58,6 +59,7 @@ interface ApiListItem {
     price?: number;
     category?: string;
     isRecurrent?: boolean;
+    positionIndex?: number;
 }
 
 interface ApiShoppingList {
@@ -72,6 +74,62 @@ interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
 }
+
+type SyncActionHandler = (prev: Item[], payload: SyncPayload) => Item[];
+
+const handleCheckOff: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    return prev.map((item) =>
+        item.id === payload.itemId
+            ? { ...item, checked: Boolean(payload.checked) }
+            : item,
+    );
+};
+
+const handleUpdate: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId || !payload.content) return prev;
+    try {
+        const updated = JSON.parse(payload.content) as Item;
+        return prev.map((item) =>
+            item.id === payload.itemId ? { ...item, ...updated } : item,
+        );
+    } catch (e) {
+        console.error("Failed to parse incoming UPDATE item JSON", e);
+    }
+    return prev;
+};
+
+const handleDelete: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    return prev.filter((item) => item.id !== payload.itemId);
+};
+
+const handleBulkDelete: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemIds) return prev;
+    const deletedIds = new Set(payload.itemIds);
+    return prev.filter((item) => !deletedIds.has(item.id));
+};
+
+const handleAdd: SyncActionHandler = (prev, payload) => {
+    if (!payload.content) return prev;
+    try {
+        const newItem = JSON.parse(payload.content) as Item;
+        if (!prev.some((i) => i.id === newItem.id)) {
+            return [...prev, newItem];
+        }
+    } catch (e) {
+        console.error("Failed to parse incoming ADD item JSON", e);
+    }
+    return prev;
+};
+
+const SYNC_ACTION_HANDLERS: Record<string, SyncActionHandler> = {
+    CHECK_OFF: handleCheckOff,
+    UPDATE: handleUpdate,
+    DELETE: handleDelete,
+    BULK_DELETE: handleBulkDelete,
+    ADD: handleAdd,
+};
 
 const useListItems = (effectiveListId: string | undefined) => {
     const { updateList } = useListsStore();
@@ -88,6 +146,7 @@ const useListItems = (effectiveListId: string | undefined) => {
     }, [items]);
 
     const pendingSyncItems = useRef(new Set<string>());
+    const lastSyncTimestamp = useRef<number>(0);
 
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
@@ -162,6 +221,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     quantity: item.quantity,
                     category: item.category,
                     isRecurrent: item.isRecurrent,
+                    positionIndex: item.positionIndex,
                 }));
                 setItems(mappedItems);
                 if (
@@ -280,6 +340,15 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const applySyncAction = useCallback(
+        (prev: Item[], payload: SyncPayload): Item[] => {
+            const handler = SYNC_ACTION_HANDLERS[payload.action];
+            if (!handler) return prev;
+            return handler(prev, payload);
+        },
+        [],
+    );
+
     const handleSyncMessage = useCallback(
         (message: { body: string }) => {
             try {
@@ -287,7 +356,11 @@ const useListItems = (effectiveListId: string | undefined) => {
 
                 if (payload.status === "Rejection") {
                     const itemId = payload.itemId;
-                    if (itemId && pendingSyncItems.current.has(itemId)) {
+                    if (
+                        itemId &&
+                        pendingSyncItems.current.has(itemId) &&
+                        payload.action !== "ADD"
+                    ) {
                         pendingSyncItems.current.delete(itemId);
                         const item = itemsRef.current.find(
                             (i) => i.id === itemId,
@@ -297,64 +370,21 @@ const useListItems = (effectiveListId: string | undefined) => {
                             duration: 4000,
                         });
                     }
+                    return;
                 }
 
                 setItems((prev) => {
-                    let next = prev;
-
-                    if (payload.action === "CHECK_OFF" && payload.itemId) {
-                        next = prev.map((item) =>
-                            item.id === payload.itemId
-                                ? { ...item, checked: Boolean(payload.checked) }
-                                : item,
-                        );
-                    } else if (
-                        payload.action === "UPDATE" &&
-                        payload.itemId &&
-                        payload.content
-                    ) {
-                        try {
-                            const updated = JSON.parse(payload.content) as Item;
-                            next = prev.map((item) =>
-                                item.id === payload.itemId
-                                    ? { ...item, ...updated }
-                                    : item,
-                            );
-                        } catch (e) {
-                            console.error(
-                                "Failed to parse incoming UPDATE item JSON",
-                                e,
-                            );
-                        }
-                    } else if (payload.action === "DELETE" && payload.itemId) {
-                        next = prev.filter(
-                            (item) => item.id !== payload.itemId,
-                        );
-                    } else if (payload.action === "ADD" && payload.content) {
-                        try {
-                            const newItem = JSON.parse(payload.content) as Item;
-                            if (!prev.some((i) => i.id === newItem.id)) {
-                                next = [...prev, newItem];
-                            }
-                        } catch (e) {
-                            console.error(
-                                "Failed to parse incoming ADD item JSON",
-                                e,
-                            );
-                        }
-                    }
-
+                    const next = applySyncAction(prev, payload);
                     if (next !== prev) {
                         syncListItemsInStore(next);
                     }
-
                     return next;
                 });
             } catch (err) {
                 console.error("Failed to parse sync message:", err);
             }
         },
-        [syncListItemsInStore], // items removed to prevent subscription churn
+        [applySyncAction, syncListItemsInStore],
     );
 
     useEffect(() => {
@@ -411,71 +441,67 @@ const useListItems = (effectiveListId: string | undefined) => {
         price: overrides?.price ?? item.price ?? null,
         category: overrides?.category ?? item.category ?? null,
         isRecurrent: overrides?.isRecurrent ?? item.isRecurrent ?? false,
+        positionIndex:
+            overrides?.positionIndex ?? item.positionIndex ?? undefined,
         timestamp: Date.now(),
     });
 
-    const publishSync = (action: SyncPayload["action"], item: Item) => {
-        if (!effectiveListId || !stompClient.connected) return;
-        pendingSyncItems.current.add(item.id);
-        stompClient.publish({
-            destination: `/app/list/${effectiveListId}/update`,
-            body: JSON.stringify({
-                action,
-                itemId: item.id,
-                content: JSON.stringify(item),
-                timestamp: Date.now(),
-            } as SyncPayload),
-        });
-    };
+    const publishSync = useCallback(
+        (action: SyncPayload["action"], item: Item) => {
+            if (!effectiveListId || !stompClient.connected) return;
 
-    const mergeExistingItem = async (
-        listId: string,
-        existingItem: Item,
-        quantity?: string,
-    ) => {
-        const mergedQty = mergeQuantities(existingItem.quantity, quantity);
-        const previousItems = items;
-        const updated = { ...existingItem, quantity: mergedQty };
-        const nextItems = items.map((it) =>
-            it.id === existingItem.id ? updated : it,
-        );
-        setItems(nextItems);
-        syncListItemsInStore(nextItems);
-
-        try {
-            await api.put(
-                `/api/items/${existingItem.id}`,
-                buildItemPayload(existingItem, { quantity: mergedQty }),
-            );
-            await fetchListData(listId);
-            publishSync("UPDATE", updated);
-        } catch (err) {
-            if (!navigator.onLine) {
-                useStore.getState().enqueueAction({
-                    id: crypto.randomUUID(),
-                    type: "ADD_ITEM",
-                    payload: {
-                        listId,
-                        itemId: existingItem.id,
-                        name: existingItem.name,
-                        brand: existingItem.brand,
-                        quantity: mergedQty,
-                        price: existingItem.price,
-                    },
-                    timestamp: Date.now(),
-                });
-                return;
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
             }
-            console.error("addItem merge error:", err);
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to update the product.",
-            );
-            setItems(previousItems);
-            syncListItemsInStore(previousItems);
-        }
-    };
+            lastSyncTimestamp.current = timestamp;
+
+            pendingSyncItems.current.add(item.id);
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action,
+                    itemId: item.id,
+                    content: JSON.stringify(item),
+                    timestamp,
+                }),
+            });
+        },
+        [effectiveListId],
+    );
+
+    const restoreItem = useCallback(
+        (itemToRestore: Item) => {
+            setItems((prev) => {
+                if (prev.some((i) => i.id === itemToRestore.id)) return prev;
+                const restored = [...prev, itemToRestore];
+                syncListItemsInStore(restored);
+                // Dacă ștergerea a eșuat pe server sau s-a dat Undo, re-difuzăm adăugarea
+                publishSync("ADD", itemToRestore);
+                return restored;
+            });
+        },
+        [syncListItemsInStore, publishSync],
+    );
+
+    const restoreItems = useCallback(
+        (itemsToRestore: Item[]) => {
+            setItems((prev) => {
+                const existingIds = new Set(prev.map((i) => i.id));
+                const newItems = itemsToRestore.filter(
+                    (i) => !existingIds.has(i.id),
+                );
+                if (newItems.length === 0) return prev;
+                const restored = [...prev, ...newItems];
+                syncListItemsInStore(restored);
+                for (const item of newItems) {
+                    publishSync("ADD", item);
+                }
+                return restored;
+            });
+        },
+        [syncListItemsInStore, publishSync],
+    );
 
     const createNewItem = async (
         listId: string,
@@ -493,6 +519,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             quantity: quantity || undefined,
             price: price ?? undefined,
             category: category || undefined,
+            positionIndex: Date.now(), // Fallback optimistic position pentru Drag & Drop
         };
 
         const optimisticItems = [...items, newItem];
@@ -515,6 +542,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 quantity: createdApiItem.quantity,
                 category: createdApiItem.category,
                 isRecurrent: createdApiItem.isRecurrent,
+                positionIndex: createdApiItem.positionIndex,
             };
 
             await fetchListData(listId);
@@ -531,6 +559,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                         brand: newItem.brand,
                         quantity: newItem.quantity,
                         price: newItem.price,
+                        positionIndex: newItem.positionIndex,
                     },
                     timestamp: Date.now(),
                 });
@@ -562,11 +591,32 @@ const useListItems = (effectiveListId: string | undefined) => {
         );
 
         if (existingItem) {
-            await mergeExistingItem(
-                effectiveListId,
-                existingItem,
-                finalQuantity,
-            );
+            // Păstrăm logica de îmbinare a cantităților (Smart Merge)
+            const existingQty = existingItem.quantity?.trim()
+                ? existingItem.quantity.trim()
+                : "1";
+            const mergedQty = mergeQuantities(existingQty, finalQuantity);
+
+            try {
+                const payload = {
+                    name: existingItem.name,
+                    brand: existingItem.brand || null,
+                    quantity: mergedQty,
+                    price: existingItem.price || null,
+                    category: existingItem.category || null,
+                    isChecked: existingItem.checked,
+                    isRecurrent: existingItem.isRecurrent || false,
+                    positionIndex: existingItem.positionIndex || Date.now(),
+                    timestamp: Date.now(),
+                };
+
+                await api.put(`/api/items/${existingItem.id}`, payload);
+                await fetchListData(effectiveListId); // Facem refresh ca să se vadă instant
+                toast.success(`Updated quantity for "${name}"`);
+            } catch (err) {
+                console.error("Failed to merge quantities:", err);
+                setError("Failed to update existing item quantity.");
+            }
             return;
         }
 
@@ -593,6 +643,12 @@ const useListItems = (effectiveListId: string | undefined) => {
         syncListItemsInStore(nextItems);
 
         try {
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
             const payload = {
                 name: currentItem.name,
                 isChecked: newChecked,
@@ -601,7 +657,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                 price: currentItem.price ?? null,
                 category: currentItem.category ?? null,
                 isRecurrent: currentItem.isRecurrent ?? false,
-                timestamp: Date.now(),
+                positionIndex: currentItem.positionIndex ?? null,
+                timestamp,
             };
             await api.put(`/api/items/${itemId}`, payload);
 
@@ -611,7 +668,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     action: "CHECK_OFF",
                     itemId,
                     checked: newChecked,
-                    timestamp: Date.now(),
+                    timestamp,
                 };
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/update`,
@@ -649,47 +706,157 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    /**
+     * Optimistically deletes an item with a 5-second Undo window.
+     * Falls back to offline queue if the permanent deletion fails.
+     */
     const deleteItem = async (itemId: string) => {
         if (!effectiveListId || effectiveListId === "default") return;
+
+        const itemToDelete = items.find((item) => item.id === itemId);
+        if (!itemToDelete) return;
+
+        // 1. Ștergere optimistă
         const nextItems = items.filter((item) => item.id !== itemId);
         setItems(nextItems);
         syncListItemsInStore(nextItems);
 
-        try {
-            await api.delete(`/api/items/${itemId}`);
+        // 2. Broadcast imediat al ștergerii (shallow delete)
+        publishSync("DELETE", itemToDelete);
 
-            if (effectiveListId && stompClient.connected) {
-                pendingSyncItems.current.add(itemId);
-                stompClient.publish({
-                    destination: `/app/list/${effectiveListId}/update`,
-                    body: JSON.stringify({
-                        action: "DELETE",
-                        itemId,
+        const timerId = setTimeout(async () => {
+            try {
+                const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
+                    method: "DELETE",
+                    headers: getAuthHeaders(),
+                    credentials: "include",
+                });
+
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        handleUnauthorizedResponse();
+                        return;
+                    }
+                    throw new Error(`Failed to delete item (${res.status})`);
+                }
+
+                // Notă: Broadcast-ul de DELETE a fost trimis deja la pasul 2.
+            } catch (err) {
+                console.error("deleteItem error:", err);
+
+                if (!navigator.onLine) {
+                    useStore.getState().enqueueAction({
+                        id: crypto.randomUUID(),
+                        type: "DELETE_ITEM",
+                        payload: { listId: effectiveListId, itemId },
                         timestamp: Date.now(),
-                    }),
-                });
-            }
-        } catch (err) {
-            if (!navigator.onLine) {
-                useStore.getState().enqueueAction({
-                    id: crypto.randomUUID(),
-                    type: "DELETE_ITEM",
-                    payload: {
-                        listId: effectiveListId,
-                        itemId,
-                    },
-                    timestamp: Date.now(),
-                });
-                return;
-            }
+                    });
+                    return;
+                }
 
-            const errorMessage =
-                err instanceof Error
-                    ? err.message
-                    : "Failed to delete the product.";
-            console.error("deleteItem error:", err);
-            setError(errorMessage);
-            fetchListData(effectiveListId);
+                restoreItem(itemToDelete);
+            }
+        }, 5000);
+
+        toast("Item deleted.", {
+            duration: 5000,
+            action: {
+                label: "Undo",
+                onClick: () => {
+                    clearTimeout(timerId);
+                    restoreItem(itemToDelete);
+                },
+            },
+        });
+    };
+
+    const clearCompletedItems = async () => {
+        if (!effectiveListId || effectiveListId === "default") return;
+
+        const checkedItems = items.filter((item) => item.checked);
+        if (checkedItems.length === 0) return;
+
+        const nextItems = items.filter((item) => !item.checked);
+        setItems(nextItems);
+        syncListItemsInStore(nextItems);
+
+        const deletedIds = checkedItems.map((item) => item.id);
+
+        if (effectiveListId && stompClient.connected) {
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action: "BULK_DELETE",
+                    itemIds: deletedIds,
+                    timestamp: Date.now(),
+                }),
+            });
+        }
+
+        const timerId = setTimeout(async () => {
+            try {
+                await api.delete<{ deletedItemIds: string[] }>(
+                    `/api/lists/${effectiveListId}/items/completed`,
+                );
+            } catch (err) {
+                console.error("clearCompletedItems error:", err);
+
+                if (!navigator.onLine) {
+                    useStore.getState().enqueueAction({
+                        id: crypto.randomUUID(),
+                        type: "CLEAR_COMPLETED",
+                        payload: { listId: effectiveListId },
+                        timestamp: Date.now(),
+                    });
+                    return;
+                }
+
+                restoreItems(checkedItems);
+                const errorMessage =
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to clear completed items.";
+                setError(errorMessage);
+                fetchListData(effectiveListId);
+            }
+        }, 5000);
+
+        const count = checkedItems.length;
+        toast(`Cleared ${count} completed item${count === 1 ? "" : "s"}.`, {
+            duration: 5000,
+            action: {
+                label: "Undo",
+                onClick: () => {
+                    clearTimeout(timerId);
+                    restoreItems(checkedItems);
+                },
+            },
+        });
+    };
+
+    const reorderItem = async (reorderedItems: Item[], movedItem: Item) => {
+        if (!effectiveListId || effectiveListId === "default") return;
+        setItems(reorderedItems);
+        syncListItemsInStore(reorderedItems);
+
+        try {
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
+            const payload = buildItemPayload(movedItem, {
+                positionIndex: movedItem.positionIndex,
+            });
+            const finalPayload = { ...payload, timestamp };
+            await api.put(`/api/items/${movedItem.id}`, finalPayload);
+
+            publishSync("UPDATE", movedItem);
+        } catch (err) {
+            console.error("reorderItem error:", err);
+            // Optionally could rollback if needed, but keeping it optimistic for drag and drop
+            fetchListData(effectiveListId); // Refetch to sync state
         }
     };
 
@@ -702,6 +869,8 @@ const useListItems = (effectiveListId: string | undefined) => {
         addItem,
         toggleItem,
         deleteItem,
+        clearCompletedItems,
+        reorderItem,
         setError,
         handleAiImport,
         isReviewModalOpen,
@@ -1483,8 +1652,32 @@ const ListDetail = ({
     const effectiveListId = listIdOverride ?? id;
 
     const [showShareModal, setShowShareModal] = useState(false);
-    const [showRenameModal, setShowRenameModal] = useState(false);
-    const { lists, isLoading: listsLoading, fetchLists } = useListsStore();
+
+    const {
+        lists,
+        isLoading: listsLoading,
+        fetchLists,
+        renameList,
+    } = useListsStore();
+
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editedName, setEditedName] = useState("");
+
+    const handleRenameSubmit = async () => {
+        if (
+            !effectiveListId ||
+            effectiveListId === "default" ||
+            !editedName.trim()
+        ) {
+            setIsEditingName(false);
+            setEditedName(activeList?.name || "");
+            return;
+        }
+        if (editedName.trim() !== activeList?.name) {
+            await renameList(effectiveListId, editedName.trim());
+        }
+        setIsEditingName(false);
+    };
 
     const {
         items,
@@ -1494,6 +1687,8 @@ const ListDetail = ({
         addItem,
         toggleItem,
         deleteItem,
+        clearCompletedItems,
+        reorderItem,
         setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
@@ -1529,6 +1724,9 @@ const ListDetail = ({
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
     const [showBanner, setShowBanner] = useState(true);
+    const [sortMode, setSortMode] = useState<
+        "alphabetical" | "chronological" | "custom"
+    >("chronological");
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
@@ -1552,7 +1750,11 @@ const ListDetail = ({
     const canImportIntoNormalList =
         (isRecipeList || activeList?.category === "FREQUENT") &&
         items.length > 0;
-
+    useEffect(() => {
+        if (activeList?.name) {
+            setEditedName(activeList.name);
+        }
+    }, [activeList?.name]);
     const activeCollaborationUsers = useMemo(() => {
         const current = activeList;
         if (!current) return [];
@@ -1587,7 +1789,7 @@ const ListDetail = ({
 
         if (navigator.permissions) {
             navigator.permissions
-                .query({ name: "geolocation" as PermissionName })
+                .query({ name: "geolocation" })
                 .then((result) => {
                     if (!isMounted) return;
                     permResult = result;
@@ -1940,18 +2142,69 @@ const ListDetail = ({
                     <>
                         <div className="flex flex-col gap-3">
                             <div className="flex justify-between items-end px-1">
-                                <div className="flex flex-col">
-                                    <h2 className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                                        Collaboration
-                                    </h2>
-                                    <div className="flex items-center gap-2">
-                                        <PresenceBar
-                                            variant="avatars"
-                                            allUsers={activeCollaborationUsers}
+                                <div className="flex flex-col gap-1">
+                                    {isEditingName ? (
+                                        <input
+                                            className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
+                                            value={editedName}
+                                            onChange={(e) =>
+                                                setEditedName(e.target.value)
+                                            }
+                                            onBlur={handleRenameSubmit}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter")
+                                                    handleRenameSubmit();
+                                                if (e.key === "Escape") {
+                                                    setEditedName(
+                                                        activeList?.name || "",
+                                                    );
+                                                    setIsEditingName(false);
+                                                }
+                                            }}
                                         />
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setIsEditingName(true)
+                                            }
+                                            disabled={isReadOnly}
+                                            className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
+                                        >
+                                            {activeList?.name ||
+                                                "Shopping List"}
+                                        </button>
+                                    )}
+                                    <div className="flex flex-col">
+                                        <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                            Collaboration
+                                        </h2>
+                                        <div className="flex items-center gap-2">
+                                            <PresenceBar
+                                                variant="avatars"
+                                                allUsers={
+                                                    activeCollaborationUsers
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-2">
+                                    {!isReadOnly &&
+                                        !isTemplateList &&
+                                        items.some((item) => item.checked) && (
+                                            <button
+                                                type="button"
+                                                onClick={clearCompletedItems}
+                                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-danger hover:text-danger"
+                                            >
+                                                <CheckCircle2
+                                                    size={14}
+                                                    strokeWidth={2.5}
+                                                />
+                                                Clear Completed
+                                            </button>
+                                        )}
                                     {canImportIntoNormalList && (
                                         <button
                                             type="button"
@@ -1986,7 +2239,32 @@ const ListDetail = ({
                                 onAddFullItem={handleInstantAdd}
                             />
 
-                            <div className="min-h-[16px] px-2 flex items-center">
+                            <div className="min-h-[16px] px-2 flex items-center justify-between mt-2 mb-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                        Sort:
+                                    </span>
+                                    <select
+                                        value={sortMode}
+                                        onChange={(e) =>
+                                            setSortMode(
+                                                e.target.value as
+                                                    | "alphabetical"
+                                                    | "chronological"
+                                                    | "custom",
+                                            )
+                                        }
+                                        className="bg-surface border border-border rounded-md text-xs font-semibold px-2 py-1 text-text-strong outline-none focus:border-accent transition-colors"
+                                    >
+                                        <option value="chronological">
+                                            Chronological
+                                        </option>
+                                        <option value="alphabetical">
+                                            Alphabetical
+                                        </option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
                                 <PresenceBar variant="typing" />
                             </div>
                         </div>
@@ -2006,6 +2284,8 @@ const ListDetail = ({
                                         onEdit={handleEditClick}
                                         disabled={isReadOnly}
                                         checkable={!isTemplateList}
+                                        sortMode={sortMode}
+                                        onReorder={reorderItem}
                                     />
                                     {items.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
@@ -2248,17 +2528,6 @@ const ListDetail = ({
                         "Shopping List"
                     }
                     onClose={() => setShowShareModal(false)}
-                />
-            )}
-
-            {showRenameModal && (
-                <RenameListModal
-                    listId={effectiveListId ?? ""}
-                    currentName={
-                        lists.find((l) => l.id === effectiveListId)?.name ||
-                        "Shopping List"
-                    }
-                    onClose={() => setShowRenameModal(false)}
                 />
             )}
         </div>

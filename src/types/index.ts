@@ -19,7 +19,11 @@ export type ListCategory = "NORMAL" | "RECIPE" | "FREQUENT";
 /**
  * Supported types of actions that can be queued while offline.
  */
-export type OfflineActionType = "ADD_ITEM" | "TOGGLE_ITEM" | "DELETE_ITEM";
+export type OfflineActionType =
+    | "ADD_ITEM"
+    | "TOGGLE_ITEM"
+    | "DELETE_ITEM"
+    | "CLEAR_COMPLETED";
 
 /**
  * Represents an action that failed due to being offline and is waiting for sync.
@@ -40,6 +44,7 @@ export interface QueuedAction {
         price?: number;
         category?: string;
         isRecurrent?: boolean;
+        positionIndex?: number;
     };
     /** When the action was first attempted */
     timestamp: number;
@@ -60,6 +65,7 @@ export interface ShoppingList {
     ownerName?: string;
     ownerEmail?: string;
     collaboratorEmails?: string[];
+    version?: number;
 }
 
 // Auth Types
@@ -108,4 +114,14 @@ export interface Route {
     points: RoutePoint[];
     totalDistance: number;
     estimatedTime: number;
+}
+
+export interface PendingInvitation {
+    id: string;
+    listId: string;
+    listTitle: string;
+    inviterName: string;
+    inviterEmail: string;
+    status: "PENDING" | "ACCEPTED" | "DECLINED";
+    createdAt: string;
 }

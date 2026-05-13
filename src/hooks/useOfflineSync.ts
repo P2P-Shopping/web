@@ -37,6 +37,7 @@ export const useOfflineSync = () => {
                     price: payload.price ?? null,
                     category: payload.category ?? null,
                     isRecurrent: Boolean(payload.isRecurrent),
+                    positionIndex: payload.positionIndex ?? null,
                     timestamp: action.timestamp,
                 });
                 break;
@@ -58,6 +59,12 @@ export const useOfflineSync = () => {
             case "DELETE_ITEM":
                 if (!payload.itemId) break;
                 await api.delete(`/api/items/${payload.itemId}`);
+                break;
+
+            case "CLEAR_COMPLETED":
+                await api.delete(
+                    `/api/lists/${payload.listId}/items/completed`,
+                );
                 break;
 
             default:
