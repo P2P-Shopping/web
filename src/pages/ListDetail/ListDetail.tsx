@@ -47,6 +47,7 @@ interface Item {
     price?: number;
     category?: string;
     isRecurrent?: boolean;
+    positionIndex?: number;
 }
 
 interface ApiListItem {
@@ -58,6 +59,7 @@ interface ApiListItem {
     price?: number;
     category?: string;
     isRecurrent?: boolean;
+    positionIndex?: number;
 }
 
 interface ApiShoppingList {
@@ -219,6 +221,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     quantity: item.quantity,
                     category: item.category,
                     isRecurrent: item.isRecurrent,
+                    positionIndex: item.positionIndex,
                 }));
                 setItems(mappedItems);
                 if (
@@ -438,6 +441,8 @@ const useListItems = (effectiveListId: string | undefined) => {
         price: overrides?.price ?? item.price ?? null,
         category: overrides?.category ?? item.category ?? null,
         isRecurrent: overrides?.isRecurrent ?? item.isRecurrent ?? false,
+        positionIndex:
+            overrides?.positionIndex ?? item.positionIndex ?? undefined,
         timestamp: Date.now(),
     });
 
@@ -459,7 +464,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     itemId: item.id,
                     content: JSON.stringify(item),
                     timestamp,
-                } as SyncPayload),
+                }),
             });
         },
         [effectiveListId],
@@ -498,55 +503,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         [syncListItemsInStore, publishSync],
     );
 
-    const mergeExistingItem = async (
-        listId: string,
-        existingItem: Item,
-        quantity?: string,
-    ) => {
-        const mergedQty = mergeQuantities(existingItem.quantity, quantity);
-        const previousItems = items;
-        const updated = { ...existingItem, quantity: mergedQty };
-        const nextItems = items.map((it) =>
-            it.id === existingItem.id ? updated : it,
-        );
-        setItems(nextItems);
-        syncListItemsInStore(nextItems);
-
-        try {
-            await api.put(
-                `/api/items/${existingItem.id}`,
-                buildItemPayload(existingItem, { quantity: mergedQty }),
-            );
-            await fetchListData(listId);
-            publishSync("UPDATE", updated);
-        } catch (err) {
-            if (!navigator.onLine) {
-                useStore.getState().enqueueAction({
-                    id: crypto.randomUUID(),
-                    type: "ADD_ITEM",
-                    payload: {
-                        listId,
-                        itemId: existingItem.id,
-                        name: existingItem.name,
-                        brand: existingItem.brand,
-                        quantity: mergedQty,
-                        price: existingItem.price,
-                    },
-                    timestamp: Date.now(),
-                });
-                return;
-            }
-            console.error("addItem merge error:", err);
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to update the product.",
-            );
-            setItems(previousItems);
-            syncListItemsInStore(previousItems);
-        }
-    };
-
     const createNewItem = async (
         listId: string,
         name: string,
@@ -561,6 +517,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             brand: brand || undefined,
             quantity: quantity || undefined,
             price: price ?? undefined,
+            positionIndex: Date.now(), // Fallback optimistic position
         };
 
         const optimisticItems = [...items, newItem];
@@ -583,6 +540,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 quantity: createdApiItem.quantity,
                 category: createdApiItem.category,
                 isRecurrent: createdApiItem.isRecurrent,
+                positionIndex: createdApiItem.positionIndex,
             };
 
             await fetchListData(listId);
@@ -599,6 +557,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                         brand: newItem.brand,
                         quantity: newItem.quantity,
                         price: newItem.price,
+                        positionIndex: newItem.positionIndex,
                     },
                     timestamp: Date.now(),
                 });
@@ -629,7 +588,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         );
 
         if (existingItem) {
-            await mergeExistingItem(effectiveListId, existingItem, quantity);
+            toast.error(`"${name}" is already in your list.`);
             return;
         }
 
@@ -663,6 +622,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                 price: currentItem.price ?? null,
                 category: currentItem.category ?? null,
                 isRecurrent: currentItem.isRecurrent ?? false,
+                positionIndex: currentItem.positionIndex ?? null,
                 timestamp,
             };
             await api.put(`/api/items/${itemId}`, payload);
@@ -839,6 +799,32 @@ const useListItems = (effectiveListId: string | undefined) => {
         });
     };
 
+    const reorderItem = async (reorderedItems: Item[], movedItem: Item) => {
+        if (!effectiveListId || effectiveListId === "default") return;
+        setItems(reorderedItems);
+        syncListItemsInStore(reorderedItems);
+
+        try {
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
+            const payload = buildItemPayload(movedItem, {
+                positionIndex: movedItem.positionIndex,
+            });
+            const finalPayload = { ...payload, timestamp };
+            await api.put(`/api/items/${movedItem.id}`, finalPayload);
+
+            publishSync("UPDATE", movedItem);
+        } catch (err) {
+            console.error("reorderItem error:", err);
+            // Optionally could rollback if needed, but keeping it optimistic for drag and drop
+            fetchListData(effectiveListId); // Refetch to sync state
+        }
+    };
+
     return {
         items,
         isLoading,
@@ -849,6 +835,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         toggleItem,
         deleteItem,
         clearCompletedItems,
+        reorderItem,
         setError,
         handleAiImport,
         isReviewModalOpen,
@@ -1616,6 +1603,7 @@ const ListDetail = ({
         toggleItem,
         deleteItem,
         clearCompletedItems,
+        reorderItem,
         setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
@@ -1650,6 +1638,9 @@ const ListDetail = ({
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
     const [showBanner, setShowBanner] = useState(true);
+    const [sortMode, setSortMode] = useState<
+        "alphabetical" | "chronological" | "custom"
+    >("chronological");
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
@@ -1712,7 +1703,7 @@ const ListDetail = ({
 
         if (navigator.permissions) {
             navigator.permissions
-                .query({ name: "geolocation" as PermissionName })
+                .query({ name: "geolocation" })
                 .then((result) => {
                     if (!isMounted) return;
                     permResult = result;
@@ -2113,7 +2104,32 @@ const ListDetail = ({
                                 onAddFullItem={handleInstantAdd}
                             />
 
-                            <div className="min-h-[16px] px-2 flex items-center">
+                            <div className="min-h-[16px] px-2 flex items-center justify-between mt-2 mb-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                        Sort:
+                                    </span>
+                                    <select
+                                        value={sortMode}
+                                        onChange={(e) =>
+                                            setSortMode(
+                                                e.target.value as
+                                                    | "alphabetical"
+                                                    | "chronological"
+                                                    | "custom",
+                                            )
+                                        }
+                                        className="bg-surface border border-border rounded-md text-xs font-semibold px-2 py-1 text-text-strong outline-none focus:border-accent transition-colors"
+                                    >
+                                        <option value="chronological">
+                                            Chronological
+                                        </option>
+                                        <option value="alphabetical">
+                                            Alphabetical
+                                        </option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
                                 <PresenceBar variant="typing" />
                             </div>
                         </div>
@@ -2132,6 +2148,8 @@ const ListDetail = ({
                                         onDelete={deleteItem}
                                         disabled={isReadOnly}
                                         checkable={!isTemplateList}
+                                        sortMode={sortMode}
+                                        onReorder={reorderItem}
                                     />
                                     {items.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
