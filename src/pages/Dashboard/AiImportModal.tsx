@@ -97,7 +97,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             setImage(file);
             const reader = new FileReader();
             reader.onloadend = () => {
-                setImagePreview(reader.result);
+                setImagePreview(reader.result as string);
             };
             reader.readAsDataURL(file);
         }
