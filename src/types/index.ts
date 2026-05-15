@@ -11,6 +11,7 @@ export interface Item {
     quantity?: string;
     category?: string;
     price?: number;
+    storeName?: string;
     isRecurrent?: boolean;
 }
 

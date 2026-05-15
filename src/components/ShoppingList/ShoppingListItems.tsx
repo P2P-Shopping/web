@@ -25,6 +25,7 @@ interface Item {
     brand?: string;
     quantity?: string;
     price?: number;
+    storeName?: string;
     category?: string;
     positionIndex?: number;
 }
@@ -59,7 +60,16 @@ const ItemMetadata = ({ item }: { item: Item }) => {
         parts.push(<span key="qty">{item.quantity}</span>);
     }
     if (item.price != null) {
-        parts.push(<span key="price">{formatPrice(item.price)}</span>);
+        parts.push(
+            <span key="price">
+                {formatPrice(item.price)}
+                {item.storeName && (
+                    <span className="text-accent ml-1 italic">
+                        la {item.storeName}
+                    </span>
+                )}
+            </span>,
+        );
     }
 
     return (
@@ -296,7 +306,7 @@ const ShoppingListItems: React.FC<Props> = ({
         const reordered = arrayMove(sortedItems, oldIndex, newIndex);
 
         // Calculate new positionIndex using midpoint of neighbors
-        const itemsWithPos = reordered.map((item) => {
+        const itemsWithPos = reordered.map((item: Item) => {
             const origIdx = items.findIndex((i) => i.id === item.id);
             return {
                 ...item,
