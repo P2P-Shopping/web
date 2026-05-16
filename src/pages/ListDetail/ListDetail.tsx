@@ -1138,7 +1138,7 @@ const SuggestionsDropdown = ({
                             <span className="font-bold">{suggestion.name}</span>
                             {suggestion.storeName && (
                                 <span className="text-[10px] text-accent font-bold italic">
-                                    la {suggestion.storeName}
+                                    at {suggestion.storeName}
                                 </span>
                             )}
                         </div>

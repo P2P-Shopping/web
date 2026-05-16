@@ -65,7 +65,7 @@ const ItemMetadata = ({ item }: { item: Item }) => {
                 {formatPrice(item.price)}
                 {item.storeName && (
                     <span className="text-accent ml-1 italic">
-                        la {item.storeName}
+                        at {item.storeName}
                     </span>
                 )}
             </span>,
