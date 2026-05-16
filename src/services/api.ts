@@ -85,6 +85,7 @@ export interface ProductSuggestion {
     brand: string | null;
     category: string | null;
     price: number | null;
+    storeName?: string | null;
     quantity: string;
 }
 

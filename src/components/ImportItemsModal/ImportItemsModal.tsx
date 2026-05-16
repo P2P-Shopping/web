@@ -131,8 +131,14 @@ const ImportItemsModal = ({
                                         id="new-list-name"
                                         type="text"
                                         value={newListName}
+                                        maxLength={50}
                                         onChange={(e) =>
-                                            onNewListNameChange(e.target.value)
+                                            onNewListNameChange(
+                                                e.target.value.replace(
+                                                    /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                                                    "",
+                                                ),
+                                            )
                                         }
                                         placeholder="Enter list name..."
                                         className="w-full rounded-xl border border-border bg-bg-muted px-3.5 py-3 text-sm text-text-strong outline-none transition-all focus:border-accent"

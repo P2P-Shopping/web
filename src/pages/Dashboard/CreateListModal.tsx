@@ -115,9 +115,16 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                         id="list-name"
                         type="text"
                         value={listName}
-                        onChange={(e) => setListName(e.target.value)}
+                        onChange={(e) =>
+                            setListName(
+                                e.target.value.replace(
+                                    /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                                    "",
+                                ),
+                            )
+                        }
                         placeholder="Give it a descriptive name"
-                        maxLength={100}
+                        maxLength={50}
                         className="w-full px-3.5 py-2.5 bg-bg-muted border-1.5 border-border rounded-md text-base text-text-strong transition-all focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-glow)] outline-none"
                     />
                 </div>
