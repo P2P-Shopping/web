@@ -1344,10 +1344,10 @@ const ItemDetailsFields = ({
                     }
                 }}
                 onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.trim();
                     if (
                         val === "" ||
-                        (Number.parseFloat(val) >= 0 && val.length <= 10)
+                        (/^\d*(\.\d*)?$/.test(val) && val.length <= 10)
                     ) {
                         setPrice(val);
                     }
