@@ -48,7 +48,10 @@ const SmartReviewModal = ({
     }, [isOpen, initialListName]);
 
     const sanitizeValue = (val: string) => {
-        return val.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "");
+        return val.replace(
+            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+            "",
+        );
     };
 
     const updateItem = (index: number, field: EditableField, value: string) => {
@@ -120,7 +123,9 @@ const SmartReviewModal = ({
                             className="w-full min-w-0 px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none"
                             value={listName}
                             maxLength={50}
-                            onChange={(e) => setListName(sanitizeValue(e.target.value))}
+                            onChange={(e) =>
+                                setListName(sanitizeValue(e.target.value))
+                            }
                             placeholder="Give this list a name"
                         />
                     </div>

@@ -1223,7 +1223,12 @@ const ItemNameField = ({
                 value={value}
                 maxLength={50}
                 onChange={(e) => {
-                    onChange(e.target.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, ""));
+                    onChange(
+                        e.target.value.replace(
+                            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                            "",
+                        ),
+                    );
                     onTyping?.();
                 }}
                 onFocus={() => {
@@ -1308,7 +1313,14 @@ const ItemDetailsFields = ({
                 type="text"
                 value={quantity}
                 maxLength={20}
-                onChange={(e) => setQuantity(e.target.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, ""))}
+                onChange={(e) =>
+                    setQuantity(
+                        e.target.value.replace(
+                            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                            "",
+                        ),
+                    )
+                }
                 placeholder={isMobile ? "e.g. 2 pcs" : "e.g., 2"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -1333,7 +1345,10 @@ const ItemDetailsFields = ({
                 }}
                 onChange={(e) => {
                     const val = e.target.value;
-                    if (val === "" || (Number.parseFloat(val) >= 0 && val.length <= 10)) {
+                    if (
+                        val === "" ||
+                        (Number.parseFloat(val) >= 0 && val.length <= 10)
+                    ) {
                         setPrice(val);
                     }
                 }}
@@ -1355,7 +1370,14 @@ const ItemDetailsFields = ({
                 type="text"
                 value={brand}
                 maxLength={50}
-                onChange={(e) => setBrand(e.target.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, ""))}
+                onChange={(e) =>
+                    setBrand(
+                        e.target.value.replace(
+                            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                            "",
+                        ),
+                    )
+                }
                 placeholder={isMobile ? "e.g. Zuzu" : "e.g., Organic Valley"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -2280,7 +2302,14 @@ const ListDetail = ({
                             type="text"
                             value={finishStoreName}
                             maxLength={50}
-                            onChange={(e) => setFinishStoreName(e.target.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, ""))}
+                            onChange={(e) =>
+                                setFinishStoreName(
+                                    e.target.value.replace(
+                                        /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                                        "",
+                                    ),
+                                )
+                            }
                             placeholder="e.g. Lidl"
                             className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
                         />
