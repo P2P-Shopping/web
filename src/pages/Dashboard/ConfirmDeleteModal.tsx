@@ -1,5 +1,5 @@
-import { Modal } from "../../components";
 import { toast } from "sonner";
+import { Modal } from "../../components";
 
 interface ConfirmDeleteModalProps {
     listId: string;

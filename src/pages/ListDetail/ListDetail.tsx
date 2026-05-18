@@ -332,7 +332,9 @@ const useListItems = (effectiveListId: string | undefined) => {
                 }
             }
             await fetchListData(effectiveListId);
-            toast.success(`Successfully added ${feedback.length} items to your list`);
+            toast.success(
+                `Successfully added ${feedback.length} items to your list`,
+            );
             setIsReviewModalOpen(false);
         } catch (err) {
             console.error("handleReviewConfirm error:", err);
