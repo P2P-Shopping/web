@@ -61,6 +61,7 @@ interface ApiStoreMatch {
     storeId: string;
     storeName: string;
     matchedItems: number;
+    matchPercentage?: number;
     distanceMeters: number;
     lat?: number;
     lng?: number;
@@ -211,15 +212,27 @@ const mapApiStoreToRecommendation = async (
         lng = DEMO_STORE_LOCATION.lng;
     }
 
+    // Calculate match percentage with proper validation
+    let stockMatchPercentage = 0;
+    if (store.matchPercentage !== undefined && !Number.isNaN(store.matchPercentage)) {
+        // Use matchPercentage directly from API if available
+        stockMatchPercentage = Math.max(0, Math.min(100, Math.round(store.matchPercentage)));
+    } else if (store.matchedItems !== undefined && !Number.isNaN(store.matchedItems)) {
+        // Fallback to calculating from matchedItems
+        stockMatchPercentage = Math.round(
+            (store.matchedItems / Math.max(itemCount, 1)) * 100,
+        );
+    }
+    // Ensure result is always a valid number between 0-100
+    stockMatchPercentage = Math.max(0, Math.min(100, stockMatchPercentage || 0));
+
     return {
         id: store.storeId,
         name: store.storeName,
         address: store.address || "Address unavailable",
         lat,
         lng,
-        stockMatchPercentage: Math.round(
-            (store.matchedItems / Math.max(itemCount, 1)) * 100,
-        ),
+        stockMatchPercentage,
         transit: realTransit,
     };
 };
@@ -1146,21 +1159,25 @@ const UnifiedMap: React.FC = () => {
         setRecommendedStores([]);
     };
 
-    const handleFetchStores = async (listIdOverride?: string) => {
-        const idToFetch = listIdOverride ?? selectedListId;
-        if (!idToFetch) return;
+     const handleFetchStores = async (listIdOverride?: string) => {
+         const idToFetch = listIdOverride ?? selectedListId;
+         if (!idToFetch) return;
 
-        const selectedList = lists.find((l) => l.id === idToFetch);
-        if (!selectedList) return;
+         const selectedList = lists.find((l) => l.id === idToFetch);
+         if (!selectedList) return;
 
-        setIsFetchingStores(true);
-        try {
-            const itemIds = selectedList.items.map((item) => item.id) || [];
-            if (itemIds.length === 0) {
-                setRecommendedStores([]);
-                setIsShowingStores(true);
-                return;
-            }
+         setIsFetchingStores(true);
+         try {
+             // Use catalogId (product reference) instead of item.id for matching
+             // This allows matching across different shopping lists on the same product
+             const itemIds = selectedList.items
+                 .map((item) => item.catalogId || item.id)
+                 .filter((id) => id !== undefined && id !== null) || [];
+             if (itemIds.length === 0) {
+                 setRecommendedStores([]);
+                 setIsShowingStores(true);
+                 return;
+             }
 
             const apiBase =
                 import.meta.env.VITE_API_URL ||
