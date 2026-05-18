@@ -7,13 +7,6 @@ import { calculateRoute, pollFullRoute } from "./routingService";
 // Module-level cleanup to prevent multiple polling loops from accumulating
 let activePollCleanup: (() => void) | null = null;
 
-/**
- * Coordinates for items inside Palas Mall (Iași) as seeded in the backend
- * init-scripts/99-populare.sql (raw_user_pings for store 8f3e1a2b-c4d5-6e7f-8a9b-0c1d2e3f4a5b).
- *
- * Each entry uses the most representative ping (WIFI_RTT / GPS) for that item
- * inside the Palas store footprint.
- */
 const PALAS_ITEMS: Record<string, { name: string; lat: number; lng: number }> =
     {
         "11111111-a1b2-c3d4-e5f6-1234567890ab": {
@@ -63,20 +56,15 @@ const PALAS_ITEMS: Record<string, { name: string; lat: number; lng: number }> =
         },
     };
 
-/**
- * Loads the shopping route, either from the real backend API (priority)
- * or falling back to a local mock if the server is unavailable or has no data.
- */
 export const loadRoute = async (
     productIds: string[],
     userLat: number,
     userLng: number,
     fallbackItems: { id: string; name: string }[] = [],
 ) => {
-    const { setRoute, setStatus } = useStore.getState();
+    const { setRoute, setStatus, setRouteWarnings } = useStore.getState();
     setStatus("Calculating route...");
 
-    // Priority: Try to call the real SERVER API
     try {
         console.debug("[loadRoute] Requesting route from server API...");
         const serverData = await calculateRoute({
@@ -93,6 +81,7 @@ export const loadRoute = async (
                 "[loadRoute] Successfully received route from server API",
             );
             setRoute(serverData.route);
+            setRouteWarnings(serverData.warnings ?? []);
             setStatus(
                 serverData.partial
                     ? "Partial route loaded. Optimizing..."
@@ -124,6 +113,14 @@ export const loadRoute = async (
             }
             return;
         }
+
+        if ((serverData?.warnings?.length ?? 0) > 0) {
+            setRouteWarnings(serverData.warnings);
+            setRoute([]);
+            setStatus("Unele produse nu au fost gasite.");
+            return;
+        }
+
         console.warn("[loadRoute] Server returned empty route or non-success.");
     } catch (err) {
         console.error("[loadRoute] Server API call failed:", err);
@@ -173,23 +170,21 @@ export const loadRoute = async (
         lng: userLng,
     });
 
-    // --- HACK PENTRU TESTARE AUDIO PE MOCK ---
     const mockInstructions = [
-        "În 5 metri, ia-o la dreapta spre raionul de lactate.",
-        "Mergi înainte 10 metri pe acest culoar.",
-        "Ia-o la stânga și oprește-te în fața raftului.",
-        "Întoarce-te, produsul este exact în spatele tău.",
-        "Ai ajuns la destinația finală din lista ta.",
+        "\u00cen 5 metri, ia-o la dreapta spre raionul de lactate.",
+        "Mergi \u00eenainte 10 metri pe acest culoar.",
+        "Ia-o la st\u00e2nga \u0219i opre\u0219te-te \u00een fa\u021ba raftului.",
+        "\u00centoarce-te, produsul este exact \u00een spatele t\u0103u.",
+        "Ai ajuns la destina\u021bia final\u0103 din lista ta.",
     ];
 
     orderedRoute.forEach((point, index) => {
-        // Injectăm frazele în ordine. Dacă avem mai multe puncte decât fraze, o repetăm pe ultima.
         point.audio_instruction =
             mockInstructions[index] || mockInstructions.at(-1);
     });
-    // ------------------------------------------
 
     setRoute(orderedRoute);
+    setRouteWarnings([]);
     setStatus("Indoor mock TSP route ready (Fallback).");
     if (activePollCleanup) {
         activePollCleanup();

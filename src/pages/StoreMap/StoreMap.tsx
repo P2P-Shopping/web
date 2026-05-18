@@ -676,6 +676,14 @@ const StoreMap: React.FC<StoreMapProps> = ({
         exitIndoor,
     } = useMapEngine(canvasRef);
 
+    const routeWarnings = useStore((state) => state.routeWarnings);
+    const [dismissedWarnings, setDismissedWarnings] = useState<boolean>(false);
+
+    // Reset dismissed state when new warnings arrive
+    useEffect(() => {
+        if (routeWarnings.length > 0) setDismissedWarnings(false);
+    }, [routeWarnings]);
+
     if (!hasLocationLock) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4 bg-bg">
@@ -711,6 +719,32 @@ const StoreMap: React.FC<StoreMapProps> = ({
                         className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
                     >
                         {gpsError}
+                    </div>
+                )}
+
+                {routeWarnings.length > 0 && !dismissedWarnings && (
+                    <div
+                        role="alert"
+                        aria-live="polite"
+                        className="absolute bottom-4 left-4 right-4 z-20 px-4 py-3 bg-danger/90 text-white rounded-xl text-sm shadow-lg backdrop-blur-sm"
+                    >
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-col gap-1">
+                                {routeWarnings.map((warning) => (
+                                    <p key={warning} className="font-medium">
+                                        ⚠️ {warning}
+                                    </p>
+                                ))}
+                            </div>
+                            <button
+                                type="button"
+                                className="shrink-0 mt-0.5 text-white/70 hover:text-white transition-colors"
+                                onClick={() => setDismissedWarnings(true)}
+                                aria-label="Dismiss warnings"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

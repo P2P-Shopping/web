@@ -49,6 +49,7 @@ export interface AppState {
     isMockGpsEnabled: boolean;
 
     route: RoutePoint[];
+    routeWarnings: string[];
     macroRouteGeometry: [number, number][];
     status: string;
     /** Current list of items */
@@ -84,6 +85,8 @@ export interface AppState {
     /** Manually triggers indoor mode and cross-geofence logic */
     forceIndoorMode: () => void;
 
+    /** Sets route warnings from backend */
+    setRouteWarnings: (warnings: string[]) => void;
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
     setMacroRouteGeometry: (geometry: [number, number][]) => void;
@@ -130,6 +133,7 @@ export const useStore = create<AppState>()(
             isAutoCenterEnabled: true,
             isMockGpsEnabled: true,
             route: [],
+            routeWarnings: [],
             macroRouteGeometry: [],
             status: "idle",
             items: [],
@@ -158,6 +162,7 @@ export const useStore = create<AppState>()(
                 });
             },
             setRoute: (route) => set({ route }),
+            setRouteWarnings: (routeWarnings) => set({ routeWarnings }),
             setMacroRouteGeometry: (geometry) =>
                 set({ macroRouteGeometry: geometry }),
             setStatus: (status) => set({ status }),
