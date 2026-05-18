@@ -24,6 +24,7 @@ import { DEMO_STORE_LOCATION, isWithinGeofence } from "./services/geofence";
 import { loadRoute } from "./services/loadRoute";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
+import { useListsStore } from "./store/useListsStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { isWebView } from "./utils/webview";
 
@@ -249,9 +250,14 @@ function App() {
     ]);
 
     const token = useStore((state) => state.token);
+    const userEmail = useStore((state) => state.user?.email);
+    const addPendingInvitation = useListsStore(
+        (state) => state.addPendingInvitation,
+    );
 
     useEffect(() => {
         let subscription: StompSubscription | null = null;
+        let invitationSubscription: StompSubscription | null = null;
 
         if (token) {
             stompClient.connectHeaders = {
@@ -274,6 +280,30 @@ function App() {
                 handlePongMessage,
             );
             console.debug("[ws] subscribed /topic/pong");
+
+            if (invitationSubscription) {
+                invitationSubscription.unsubscribe();
+            }
+
+            if (userEmail) {
+                invitationSubscription = stompClient.subscribe(
+                    `/topic/invitations/${userEmail}`,
+                    (message) => {
+                        try {
+                            const invitation = JSON.parse(message.body);
+                            addPendingInvitation(invitation);
+                        } catch (err) {
+                            console.error(
+                                "[ws] Failed to parse invitation:",
+                                err,
+                            );
+                        }
+                    },
+                );
+                console.debug(
+                    `[ws] subscribed /topic/invitations/${userEmail}`,
+                );
+            }
         };
 
         stompClient.onStompError = (frame) => {
@@ -290,6 +320,7 @@ function App() {
 
         return () => {
             if (subscription) subscription.unsubscribe();
+            if (invitationSubscription) invitationSubscription.unsubscribe();
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
             stompClient.onStompError = () => {};
@@ -301,7 +332,13 @@ function App() {
                 }
             })();
         };
-    }, [handlePongMessage, setServerConnected, token]);
+    }, [
+        handlePongMessage,
+        setServerConnected,
+        token,
+        userEmail,
+        addPendingInvitation,
+    ]);
 
     // Determine if Navbar should be shown
     const searchParams = new URLSearchParams(location.search);

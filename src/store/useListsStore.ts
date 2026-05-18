@@ -47,6 +47,7 @@ interface ListsState {
     forceHardRefresh: (listId: string) => Promise<void>;
 
     pendingInvitations: PendingInvitation[];
+    addPendingInvitation: (invitation: PendingInvitation) => void;
     fetchLists: () => Promise<void>;
     fetchPendingInvitations: () => Promise<void>;
     acceptInvitation: (invitationId: string) => Promise<boolean>;
@@ -210,6 +211,19 @@ export const useListsStore = create<ListsState>((set, get) => ({
     deletingListId: null,
     isHardSyncing: false,
     pendingInvitations: [],
+
+    addPendingInvitation: (invitation) => {
+        set((state) => {
+            if (
+                state.pendingInvitations.some((inv) => inv.id === invitation.id)
+            ) {
+                return state;
+            }
+            return {
+                pendingInvitations: [invitation, ...state.pendingInvitations],
+            };
+        });
+    },
 
     /**
      * Hard refresh a specific list from the REST API to ensure synchronization.
