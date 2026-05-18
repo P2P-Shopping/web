@@ -226,7 +226,7 @@ const updateCurrentListCollaborators = (
     listId: string,
     userId: number,
 ): ShoppingList | null => {
-    if (!currentList || currentList.id !== listId) return currentList;
+    if (currentList?.id !== listId) return currentList;
     return {
         ...currentList,
         collaborators: (currentList.collaborators ?? []).filter(

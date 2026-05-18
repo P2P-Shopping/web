@@ -34,6 +34,7 @@ import type { ListCategory } from "../../types";
 import ListMembersModal from "../Dashboard/ListMembersModal";
 import { useFinishShopping } from "./useFinishShopping";
 import { useImportItems } from "./useImportItems";
+import { useListPageEffects } from "./useListPageEffects";
 
 interface Item {
     id: string;
@@ -1782,13 +1783,12 @@ const ListDetail = ({
         handleFinishShopping,
     } = useFinishShopping({ effectiveListId, setError });
 
-    const [permissionStatus, setPermissionStatus] =
-        useState<PermissionState | null>(null);
-    const [showBanner, setShowBanner] = useState(true);
+    const { permissionStatus, showBanner, setShowBanner, isScrolled } =
+        useListPageEffects();
+
     const [sortMode, setSortMode] = useState<
         "alphabetical" | "chronological" | "custom"
     >("chronological");
-    const [isScrolled, setIsScrolled] = useState(false);
 
     const scrolledPaddingClass = isEmbedded
         ? " -mt-6 pt-6 pb-3"
@@ -1868,51 +1868,6 @@ const ListDetail = ({
     }, [items]);
 
     useEffect(() => {
-        let isMounted = true;
-        let permResult: PermissionStatus | null = null;
-
-        const handler = () => {
-            if (isMounted && permResult) setPermissionStatus(permResult.state);
-        };
-
-        if (navigator.permissions) {
-            navigator.permissions
-                .query({ name: "geolocation" })
-                .then((result) => {
-                    if (!isMounted) return;
-                    permResult = result;
-                    setPermissionStatus(result.state);
-                    result.addEventListener("change", handler);
-                })
-                .catch(() => {});
-        }
-
-        return () => {
-            isMounted = false;
-            permResult?.removeEventListener("change", handler);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (permissionStatus === "denied") {
-            setShowBanner(true);
-        }
-    }, [permissionStatus]);
-
-    useEffect(() => {
-        const scrollContainer = document.querySelector("main");
-        if (!scrollContainer) return;
-        const handleScroll = () => {
-            setIsScrolled(scrollContainer.scrollTop > 10);
-        };
-        scrollContainer.addEventListener("scroll", handleScroll, {
-            passive: true,
-        });
-        return () =>
-            scrollContainer.removeEventListener("scroll", handleScroll);
-    }, []);
-
-    useEffect(() => {
         if (lists.length === 0) {
             fetchLists();
         }
@@ -1965,24 +1920,21 @@ const ListDetail = ({
 
     const openDetailsModal = (suggestion?: ProductSuggestion | null) => {
         setDetailName(newItemName);
-
-        if (suggestion) {
-            setDetailQuantity(suggestion.quantity || "1");
-            setDetailBrand(suggestion.brand || "");
-            setDetailPrice(
-                suggestion.price !== null && suggestion.price !== undefined
-                    ? String(suggestion.price)
-                    : "",
-            );
-            if (suggestion.brand || suggestion.price) {
-                setShowExpandedDetails(true);
-            }
-        } else {
+        if (!suggestion) {
             setDetailQuantity("");
             setDetailBrand("");
             setDetailPrice("");
+            setShowDetailsModal(true);
+            return;
         }
-
+        setDetailQuantity(suggestion.quantity ?? "1");
+        setDetailBrand(suggestion.brand ?? "");
+        setDetailPrice(
+            suggestion.price != null ? String(suggestion.price) : "",
+        );
+        if (suggestion.brand || suggestion.price) {
+            setShowExpandedDetails(true);
+        }
         setShowDetailsModal(true);
     };
 
