@@ -207,6 +207,34 @@ const removeItemFromList = (
     });
 };
 
+const removeCollaboratorFromList = (
+    list: ShoppingList,
+    listId: string,
+    userId: number,
+): ShoppingList => {
+    if (list.id !== listId) return list;
+    return {
+        ...list,
+        collaborators: (list.collaborators ?? []).filter(
+            (c) => c.userId !== userId,
+        ),
+    };
+};
+
+const updateCurrentListCollaborators = (
+    currentList: ShoppingList | null,
+    listId: string,
+    userId: number,
+): ShoppingList | null => {
+    if (!currentList || currentList.id !== listId) return currentList;
+    return {
+        ...currentList,
+        collaborators: (currentList.collaborators ?? []).filter(
+            (c) => c.userId !== userId,
+        ),
+    };
+};
+
 export const useListsStore = create<ListsState>((set, get) => ({
     lists: [],
     currentList: null,
@@ -677,24 +705,14 @@ export const useListsStore = create<ListsState>((set, get) => ({
             }
 
             set((state) => ({
-                lists: state.lists.map((list) => {
-                    if (list.id !== listId) return list;
-                    return {
-                        ...list,
-                        collaborators: (list.collaborators ?? []).filter(
-                            (c) => c.userId !== userId,
-                        ),
-                    };
-                }),
-                currentList:
-                    state.currentList?.id === listId
-                        ? {
-                              ...state.currentList,
-                              collaborators: (
-                                  state.currentList.collaborators ?? []
-                              ).filter((c) => c.userId !== userId),
-                          }
-                        : state.currentList,
+                lists: state.lists.map((list) =>
+                    removeCollaboratorFromList(list, listId, userId),
+                ),
+                currentList: updateCurrentListCollaborators(
+                    state.currentList,
+                    listId,
+                    userId,
+                ),
             }));
             return true;
         } catch (error) {

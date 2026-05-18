@@ -26,13 +26,13 @@ import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
     fetchProductSuggestions,
-    finishShoppingRequest,
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import type { ListCategory } from "../../types";
 
 import ListMembersModal from "../Dashboard/ListMembersModal";
+import { useFinishShopping } from "./useFinishShopping";
 import { useImportItems } from "./useImportItems";
 
 interface Item {
@@ -133,8 +133,10 @@ const handleClaim: SyncActionHandler = (prev, payload) => {
             const parsed = JSON.parse(payload.content) as Partial<Item>;
             claimedBy = parsed.claimedBy ?? claimedBy;
             claimedAt = parsed.claimedAt ?? claimedAt;
-        } catch (_) {
-            // fall through to top-level values
+        } catch {
+            console.debug(
+                "Failed to parse claim content JSON, using top-level values",
+            );
         }
     }
     return prev.map((item) =>
@@ -1768,10 +1770,17 @@ const ListDetail = ({
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
 
-    const [isFinishing, setIsFinishing] = useState(false);
-    const [showFinishModal, setShowFinishModal] = useState(false);
-    const [finishStoreName, setFinishStoreName] = useState("");
-    const [receiptImage, setReceiptImage] = useState<File | null>(null);
+    const {
+        isFinishing,
+        showFinishModal,
+        setShowFinishModal,
+        finishStoreName,
+        setFinishStoreName,
+        receiptImage,
+        setReceiptImage,
+        isFinishDisabled,
+        handleFinishShopping,
+    } = useFinishShopping({ effectiveListId, setError });
 
     const [permissionStatus, setPermissionStatus] =
         useState<PermissionState | null>(null);
@@ -2015,36 +2024,42 @@ const ListDetail = ({
         setNewItemName("");
     };
 
-    const isFinishDisabled =
-        !finishStoreName.trim() ||
-        isFinishing ||
-        !effectiveListId ||
-        effectiveListId === "default";
-
-    const handleFinishShopping = async () => {
-        if (!effectiveListId || effectiveListId === "default") return;
-        setIsFinishing(true);
-        try {
-            await finishShoppingRequest({
-                storeName: finishStoreName.trim(),
-                receiptImage,
-                listId: effectiveListId,
-            });
-            setShowFinishModal(false);
-            setFinishStoreName("");
-            setReceiptImage(null);
-            navigate("/dashboard");
-        } catch (_err) {
-            const errorMessage =
-                _err instanceof Error
-                    ? _err.message
-                    : "Failed to complete shopping.";
-            console.error("Failed to complete shopping:", _err);
-            setError(errorMessage);
-        } finally {
-            setIsFinishing(false);
+    const listNameDisplay = (() => {
+        if (isEditingName) {
+            return (
+                <input
+                    className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    onBlur={handleRenameSubmit}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameSubmit();
+                        if (e.key === "Escape") {
+                            setEditedName(activeList?.name || "");
+                            setIsEditingName(false);
+                        }
+                    }}
+                />
+            );
         }
-    };
+        if (activeList?.currentUserRole === "ADMIN") {
+            return (
+                <button
+                    type="button"
+                    onClick={() => setIsEditingName(true)}
+                    disabled={isReadOnly}
+                    className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
+                >
+                    {activeList?.name || "Shopping List"}
+                </button>
+            );
+        }
+        return (
+            <h1 className="text-2xl font-black text-text-strong tracking-tight">
+                {activeList?.name || "Shopping List"}
+            </h1>
+        );
+    })();
 
     return (
         <div className={wrapperClassName}>
@@ -2093,44 +2108,7 @@ const ListDetail = ({
                         >
                             <div className="flex justify-between items-end px-1">
                                 <div className="flex flex-col gap-1">
-                                    {isEditingName ? (
-                                        <input
-                                            className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
-                                            value={editedName}
-                                            onChange={(e) =>
-                                                setEditedName(e.target.value)
-                                            }
-                                            onBlur={handleRenameSubmit}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter")
-                                                    handleRenameSubmit();
-                                                if (e.key === "Escape") {
-                                                    setEditedName(
-                                                        activeList?.name || "",
-                                                    );
-                                                    setIsEditingName(false);
-                                                }
-                                            }}
-                                        />
-                                    ) : activeList?.currentUserRole ===
-                                      "ADMIN" ? (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setIsEditingName(true)
-                                            }
-                                            disabled={isReadOnly}
-                                            className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
-                                        >
-                                            {activeList?.name ||
-                                                "Shopping List"}
-                                        </button>
-                                    ) : (
-                                        <h1 className="text-2xl font-black text-text-strong tracking-tight">
-                                            {activeList?.name ||
-                                                "Shopping List"}
-                                        </h1>
-                                    )}
+                                    {listNameDisplay}
                                     <div className="flex flex-col">
                                         <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
                                             Collaboration

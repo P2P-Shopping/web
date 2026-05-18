@@ -56,7 +56,7 @@ const ListMembersModal = ({
 
     const handleRemove = async (collaborator: CollaboratorInfo) => {
         if (
-            !window.confirm(
+            !globalThis.confirm(
                 `Remove ${collaborator.name || collaborator.email} from this list?`,
             )
         ) {
@@ -71,7 +71,9 @@ const ListMembersModal = ({
     };
 
     const handleLeave = async () => {
-        if (!window.confirm("Leave this list? You will lose access to it.")) {
+        if (
+            !globalThis.confirm("Leave this list? You will lose access to it.")
+        ) {
             return;
         }
         const success = await leaveList(listId);
