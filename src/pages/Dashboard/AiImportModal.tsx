@@ -91,6 +91,43 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
         }
     }, [messages.length, isProcessing, scrollToBottom]);
 
+    useEffect(() => {
+        // biome-ignore lint/suspicious/noExplicitAny: custom bridge callback
+        (globalThis as any).onNativeImageReceived = (base64Data: string) => {
+            if (
+                !base64Data ||
+                typeof base64Data !== "string" ||
+                base64Data.trim() === ""
+            ) {
+                console.error(
+                    "Invalid base64 data received from native bridge",
+                );
+                return;
+            }
+
+            const imageSource = `data:image/jpeg;base64,${base64Data}`;
+
+            setImagePreview(imageSource);
+
+            fetch(imageSource)
+                .then((res) => res.blob())
+                .then((blob) => {
+                    const file = new File([blob], `camera_${Date.now()}.jpg`, {
+                        type: "image/jpeg",
+                    });
+                    setImage(file);
+                })
+                .catch((err) => {
+                    console.error("Failed to convert native image:", err);
+                    setImage(null);
+                });
+        };
+        return () => {
+            // biome-ignore lint/suspicious/noExplicitAny: cleanup
+            delete (globalThis as any).onNativeImageReceived;
+        };
+    }, []);
+
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -469,7 +506,19 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
 
                         <button
                             type="button"
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => {
+                                /* biome-ignore lint/suspicious/noExplicitAny: access bridge safely */
+                                const bridge = (globalThis as any)
+                                    .P2PBridge as any;
+
+                                if (bridge) {
+                                    bridge.openNativeCamera(
+                                        "dashboard_upload_v1",
+                                    );
+                                } else {
+                                    fileInputRef.current?.click();
+                                }
+                            }}
                             className="p-2.5 text-text-muted hover:text-accent hover:bg-surface rounded-xl transition-all"
                             title="Attach image"
                         >
