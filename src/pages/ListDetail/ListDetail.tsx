@@ -582,16 +582,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
 
-        const dupKey = buildItemDuplicateKey({ name, brand });
-        const existingItem = items.find(
-            (it) => buildItemDuplicateKey(it) === dupKey,
-        );
-
-        if (existingItem) {
-            toast.error(`"${name}" is already in your list.`);
-            return;
-        }
-
         await createNewItem(effectiveListId, name, quantity, brand, price);
     };
 
@@ -876,6 +866,8 @@ const useListPresence = (effectiveListId: string | undefined) => {
             return;
         }
         const username = user?.email || "Anonymous";
+        const displayName =
+            user?.firstName?.trim() || user?.email?.split("@")[0] || undefined;
 
         console.debug("[ws] subscribing list presence", effectiveListId);
         const presenceSubscription = stompClient.subscribe(
@@ -887,6 +879,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
             const joinEvent = {
                 eventType: "JOIN" as const,
                 username,
+                displayName,
                 listId: effectiveListId,
             };
 
@@ -905,6 +898,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                     body: JSON.stringify({
                         eventType: "LEAVE",
                         username,
+                        displayName,
                         listId: effectiveListId,
                     }),
                 });
@@ -916,7 +910,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
     }, [
         effectiveListId,
         clearPresence,
-        user?.email,
+        user,
         handlePresenceMessage,
         isServerConnected,
     ]);
@@ -932,10 +926,15 @@ const useListPresence = (effectiveListId: string | undefined) => {
         const now = Date.now();
         if (now - lastTypingSentRef.current > 1500) {
             const username = user?.email || "Anonymous";
+            const displayName =
+                user?.firstName?.trim() ||
+                user?.email?.split("@")[0] ||
+                undefined;
 
             const typingEvent = {
                 eventType: "TYPING" as const,
                 username,
+                displayName,
                 listId: effectiveListId,
             };
             stompClient.publish({
@@ -944,7 +943,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
             });
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, user?.email]);
+    }, [effectiveListId, user]);
 
     return { sendTypingEvent };
 };
@@ -1641,6 +1640,7 @@ const ListDetail = ({
     const [sortMode, setSortMode] = useState<
         "alphabetical" | "chronological" | "custom"
     >("chronological");
+    const [isScrolled, setIsScrolled] = useState(false);
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
@@ -1724,6 +1724,19 @@ const ListDetail = ({
             setShowBanner(true);
         }
     }, [permissionStatus]);
+
+    useEffect(() => {
+        const scrollContainer = document.querySelector("main");
+        if (!scrollContainer) return;
+        const handleScroll = () => {
+            setIsScrolled(scrollContainer.scrollTop > 10);
+        };
+        scrollContainer.addEventListener("scroll", handleScroll, {
+            passive: true,
+        });
+        return () =>
+            scrollContainer.removeEventListener("scroll", handleScroll);
+    }, []);
 
     useEffect(() => {
         if (lists.length === 0) {
@@ -2005,7 +2018,20 @@ const ListDetail = ({
                     />
                 ) : (
                     <>
-                        <div className="flex flex-col gap-3">
+                        <div
+                            className={`sticky top-0 z-30 flex flex-col gap-3 transition-all duration-200 ${
+                                isEmbedded ? "-mx-6 px-6" : ""
+                            } ${
+                                isScrolled
+                                    ? "bg-bg/85 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] border-b border-border/50" +
+                                      (
+                                          isEmbedded
+                                              ? " -mt-6 pt-6 pb-3"
+                                              : " -mt-3 pt-3 pb-3"
+                                      )
+                                    : ""
+                            }`}
+                        >
                             <div className="flex justify-between items-end px-1">
                                 <div className="flex flex-col gap-1">
                                     {isEditingName ? (

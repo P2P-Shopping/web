@@ -2,11 +2,6 @@ import type React from "react";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
 
-/**
- * Deterministically generates a hex color from a username string to stylize avatars.
- * @param name The user's name
- * @returns A valid css hex color string
- */
 const stringToColor = (name: string): string => {
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -22,14 +17,19 @@ const stringToColor = (name: string): string => {
 
 const normalizeUsername = (name: string): string => name.trim().toLowerCase();
 
+const toDisplayName = (username: string): string => {
+    const atIndex = username.indexOf("@");
+    return atIndex > 0 ? username.substring(0, atIndex) : username;
+};
+
 const getAvatarTitle = (
-    username: string,
+    displayName: string,
     isActive: boolean,
     isTyping: boolean,
 ): string => {
-    if (isTyping) return `${username} is typing...`;
-    if (isActive) return `${username} (Active)`;
-    return `${username} (Offline)`;
+    if (isTyping) return `${displayName} is typing...`;
+    if (isActive) return `${displayName} (Active)`;
+    return `${displayName} (Offline)`;
 };
 
 const getAvatarClassName = (isActive: boolean, isTyping: boolean): string => {
@@ -48,22 +48,26 @@ interface PresenceBarProps {
     allUsers?: string[];
 }
 
-/**
- * Component that renders the active users currently viewing a shopping list,
- * or dynamic "typing..." indicators.
- */
 const PresenceBar: React.FC<PresenceBarProps> = ({
     variant = "avatars",
     allUsers = [],
 }) => {
     const activeUsers = usePresenceStore((state) => state.activeUsers);
     const typingUsers = usePresenceStore((state) => state.typingUsers);
-    const currentUserEmail = useStore((state) => state.user?.email);
+    const displayNames = usePresenceStore((state) => state.displayNames);
+    const currentUserEmail = useStore((state) => state.user?.email ?? null);
 
     const activeArray = Array.from(activeUsers);
     const typingArray = Object.keys(typingUsers);
     const activeUsernames = new Set(activeArray.map(normalizeUsername));
     const typingUsernames = new Set(typingArray.map(normalizeUsername));
+
+    const resolveDisplayName = (email: string): string => {
+        const clean = normalizeUsername(email);
+        if (displayNames[clean]) return displayNames[clean];
+        if (displayNames[email]) return displayNames[email];
+        return toDisplayName(email);
+    };
 
     if (variant === "avatars") {
         const currentEmailClean = currentUserEmail
@@ -71,24 +75,19 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
             : null;
 
         const maskEmail = (email: string) => {
-            // Replicates the backend masking: charlie@example.com -> c***@example.com
             return email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
         };
 
-        // 1. Identify all unique normalized usernames from both sources
         const allPotentialUsers = [...allUsers, ...activeArray];
         const uniqueCleanUsernames = Array.from(
             new Set(
                 allPotentialUsers.map((u) => {
                     let clean = normalizeUsername(u);
 
-                    // Treat "Anonymous" as the current user's email for merging
                     if (clean === "anonymous" && currentEmailClean) {
                         clean = currentEmailClean;
                     }
 
-                    // If the database gave us a masked email, try to find its real equivalent
-                    // in the active connections so we don't duplicate them.
                     if (clean.includes("***")) {
                         const unmaskedMatch = activeArray.find((active) => {
                             let activeClean = normalizeUsername(active);
@@ -115,16 +114,13 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
             ),
         );
 
-        // 2. For each unique normalized name, pick the best display string (prefer active)
         const baseUsers = uniqueCleanUsernames.map((clean) => {
-            // Find if this user is active (we use the activeUsernames set which is already normalized)
             const isActive =
                 activeUsernames.has(clean) ||
                 (clean === currentEmailClean &&
                     activeUsernames.has("anonymous"));
 
             if (isActive) {
-                // Return the string from the active array (or "Anonymous" if it was merged)
                 return (
                     activeArray.find((u) => {
                         const uClean = normalizeUsername(u);
@@ -137,7 +133,6 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                 );
             }
 
-            // Otherwise return the one from allUsers, accounting for the fact that it might be masked
             return (
                 allUsers.find((u) => {
                     const uClean = normalizeUsername(u);
@@ -159,8 +154,9 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                             isActive,
                             isTyping,
                         );
+                        const displayName = resolveDisplayName(username);
                         const avatarTitle = getAvatarTitle(
-                            username,
+                            displayName,
                             isActive,
                             isTyping,
                         );
@@ -174,7 +170,7 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                                     }}
                                     title={avatarTitle}
                                 >
-                                    {username.charAt(0).toUpperCase()}
+                                    {displayName.charAt(0).toUpperCase()}
                                 </div>
                                 {isTyping && (
                                     <div className="absolute -bottom-1 -right-1 flex gap-0.5 px-1.5 py-1 bg-accent text-white rounded-full text-[8px] shadow-lg animate-bounce border border-surface">
@@ -215,7 +211,7 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                     aria-live="polite"
                 >
                     {typingArray.length === 1
-                        ? `${typingArray[0]} is typing...`
+                        ? `${resolveDisplayName(typingArray[0])} is typing...`
                         : "Several people are typing..."}
                 </output>
             </div>
