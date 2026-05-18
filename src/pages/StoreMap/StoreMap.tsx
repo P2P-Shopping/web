@@ -624,9 +624,9 @@ interface StoreMapProps {
 }
 
 const StoreMap: React.FC<StoreMapProps> = ({
-                                               onToggleSidebar,
-                                               isSidebarExpanded: externalIsSidebarExpanded,
-                                           }) => {
+    onToggleSidebar,
+    isSidebarExpanded: externalIsSidebarExpanded,
+}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [internalIsSidebarExpanded, setInternalIsSidebarExpanded] =
         useState(false);
