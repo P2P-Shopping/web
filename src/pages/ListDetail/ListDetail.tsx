@@ -1701,6 +1701,59 @@ const InlineAddForm = ({
     );
 };
 
+interface ListTitleProps {
+    isEditingName: boolean;
+    editedName: string;
+    setEditedName: (name: string) => void;
+    onBlur: () => void;
+    onKeyDown: (e: React.KeyboardEvent) => void;
+    onClickEdit: () => void;
+    activeListName: string;
+    currentUserRole?: "ADMIN" | "EDITOR";
+    isReadOnly: boolean;
+}
+
+const ListTitle = ({
+    isEditingName,
+    editedName,
+    setEditedName,
+    onBlur,
+    onKeyDown,
+    onClickEdit,
+    activeListName,
+    currentUserRole,
+    isReadOnly,
+}: ListTitleProps) => {
+    if (isEditingName) {
+        return (
+            <input
+                className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={onBlur}
+                onKeyDown={onKeyDown}
+            />
+        );
+    }
+    if (currentUserRole === "ADMIN") {
+        return (
+            <button
+                type="button"
+                onClick={onClickEdit}
+                disabled={isReadOnly}
+                className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
+            >
+                {activeListName || "Shopping List"}
+            </button>
+        );
+    }
+    return (
+        <h1 className="text-2xl font-black text-text-strong tracking-tight">
+            {activeListName || "Shopping List"}
+        </h1>
+    );
+};
+
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
@@ -1835,6 +1888,7 @@ const ListDetail = ({
         isRecipeList,
         activeList,
         items,
+        normalLists,
         setError,
         fetchLists,
     });
@@ -1873,24 +1927,6 @@ const ListDetail = ({
         }
     }, [lists.length, fetchLists]);
 
-    useEffect(() => {
-        if (
-            !showImportModal ||
-            selectedTargetListId === "NEW_LIST" ||
-            normalLists.length === 0 ||
-            normalLists.some((list) => list.id === selectedTargetListId)
-        ) {
-            return;
-        }
-
-        setSelectedTargetListId(normalLists[0].id);
-    }, [
-        normalLists,
-        selectedTargetListId,
-        showImportModal,
-        setSelectedTargetListId,
-    ]);
-
     const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
@@ -1920,20 +1956,21 @@ const ListDetail = ({
 
     const openDetailsModal = (suggestion?: ProductSuggestion | null) => {
         setDetailName(newItemName);
-        if (!suggestion) {
+        if (suggestion) {
+            setDetailQuantity(suggestion.quantity ?? "1");
+            setDetailBrand(suggestion.brand ?? "");
+            setDetailPrice(
+                suggestion.price === null || suggestion.price === undefined
+                    ? ""
+                    : String(suggestion.price),
+            );
+            if (suggestion.brand || suggestion.price) {
+                setShowExpandedDetails(true);
+            }
+        } else {
             setDetailQuantity("");
             setDetailBrand("");
             setDetailPrice("");
-            setShowDetailsModal(true);
-            return;
-        }
-        setDetailQuantity(suggestion.quantity ?? "1");
-        setDetailBrand(suggestion.brand ?? "");
-        setDetailPrice(
-            suggestion.price != null ? String(suggestion.price) : "",
-        );
-        if (suggestion.brand || suggestion.price) {
-            setShowExpandedDetails(true);
         }
         setShowDetailsModal(true);
     };
@@ -1976,42 +2013,25 @@ const ListDetail = ({
         setNewItemName("");
     };
 
-    const listNameDisplay = (() => {
-        if (isEditingName) {
-            return (
-                <input
-                    className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
-                    value={editedName}
-                    onChange={(e) => setEditedName(e.target.value)}
-                    onBlur={handleRenameSubmit}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter") handleRenameSubmit();
-                        if (e.key === "Escape") {
-                            setEditedName(activeList?.name || "");
-                            setIsEditingName(false);
-                        }
-                    }}
-                />
-            );
-        }
-        if (activeList?.currentUserRole === "ADMIN") {
-            return (
-                <button
-                    type="button"
-                    onClick={() => setIsEditingName(true)}
-                    disabled={isReadOnly}
-                    className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
-                >
-                    {activeList?.name || "Shopping List"}
-                </button>
-            );
-        }
-        return (
-            <h1 className="text-2xl font-black text-text-strong tracking-tight">
-                {activeList?.name || "Shopping List"}
-            </h1>
-        );
-    })();
+    const listNameDisplay = (
+        <ListTitle
+            isEditingName={isEditingName}
+            editedName={editedName}
+            setEditedName={setEditedName}
+            onBlur={handleRenameSubmit}
+            onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameSubmit();
+                if (e.key === "Escape") {
+                    setEditedName(activeList?.name || "");
+                    setIsEditingName(false);
+                }
+            }}
+            onClickEdit={() => setIsEditingName(true)}
+            activeListName={activeList?.name || ""}
+            currentUserRole={activeList?.currentUserRole}
+            isReadOnly={isReadOnly}
+        />
+    );
 
     return (
         <div className={wrapperClassName}>

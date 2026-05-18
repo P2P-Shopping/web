@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item as GlobalItem, ShoppingList } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
@@ -8,6 +8,7 @@ interface UseImportItemsParams {
     isRecipeList: boolean;
     activeList: ShoppingList | null;
     items: GlobalItem[];
+    normalLists: ShoppingList[];
     setError: (error: string | null) => void;
     fetchLists: () => Promise<void>;
 }
@@ -38,6 +39,7 @@ export const useImportItems = ({
     isRecipeList,
     activeList,
     items,
+    normalLists,
     setError,
     fetchLists,
 }: UseImportItemsParams) => {
@@ -90,6 +92,19 @@ export const useImportItems = ({
         setIsImportingItems(false);
         setImportNewListName("");
     };
+
+    useEffect(() => {
+        if (
+            !showImportModal ||
+            selectedTargetListId === "NEW_LIST" ||
+            normalLists.length === 0 ||
+            normalLists.some((list) => list.id === selectedTargetListId)
+        ) {
+            return;
+        }
+
+        setSelectedTargetListId(normalLists[0].id);
+    }, [normalLists, selectedTargetListId, showImportModal]);
 
     const resolveTargetListId = async (): Promise<string> => {
         if (selectedTargetListId !== "NEW_LIST") {
