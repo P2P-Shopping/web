@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { useStore } from "../context/useStore";
 import { fetchListByIdRequest } from "../services/api";
 import type {
+    CollaboratorInfo,
     Item,
     ListCategory,
     PendingInvitation,
@@ -31,7 +32,8 @@ interface ApiShoppingList {
     ownerName?: string;
     ownerEmail?: string;
     userId?: string;
-    collaboratorEmails?: string[];
+    collaborators?: CollaboratorInfo[];
+    currentUserRole?: "ADMIN" | "EDITOR";
     version?: number;
 }
 
@@ -47,6 +49,7 @@ interface ListsState {
     forceHardRefresh: (listId: string) => Promise<void>;
 
     pendingInvitations: PendingInvitation[];
+    addPendingInvitation: (invitation: PendingInvitation) => void;
     fetchLists: () => Promise<void>;
     fetchPendingInvitations: () => Promise<void>;
     acceptInvitation: (invitationId: string) => Promise<boolean>;
@@ -68,6 +71,8 @@ interface ListsState {
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
     shareList: (listId: string, email: string) => Promise<boolean>;
+    removeCollaborator: (listId: string, userId: number) => Promise<boolean>;
+    leaveList: (listId: string) => Promise<boolean>;
     openModal: () => void;
     closeModal: () => void;
     getListById: (id: string) => ShoppingList | undefined;
@@ -149,7 +154,8 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     ownerName: list.ownerName || "You",
     ownerEmail: list.ownerEmail,
     userId: list.userId,
-    collaboratorEmails: list.collaboratorEmails ?? [],
+    collaborators: list.collaborators ?? [],
+    currentUserRole: list.currentUserRole,
     items: (list.items ?? []).map(normalizeItem),
     version: list.version || 0,
 });
@@ -201,6 +207,34 @@ const removeItemFromList = (
     });
 };
 
+const removeCollaboratorFromList = (
+    list: ShoppingList,
+    listId: string,
+    userId: number,
+): ShoppingList => {
+    if (list.id !== listId) return list;
+    return {
+        ...list,
+        collaborators: (list.collaborators ?? []).filter(
+            (c) => c.userId !== userId,
+        ),
+    };
+};
+
+const updateCurrentListCollaborators = (
+    currentList: ShoppingList | null,
+    listId: string,
+    userId: number,
+): ShoppingList | null => {
+    if (currentList?.id !== listId) return currentList;
+    return {
+        ...currentList,
+        collaborators: (currentList.collaborators ?? []).filter(
+            (c) => c.userId !== userId,
+        ),
+    };
+};
+
 export const useListsStore = create<ListsState>((set, get) => ({
     lists: [],
     currentList: null,
@@ -210,6 +244,19 @@ export const useListsStore = create<ListsState>((set, get) => ({
     deletingListId: null,
     isHardSyncing: false,
     pendingInvitations: [],
+
+    addPendingInvitation: (invitation) => {
+        set((state) => {
+            if (
+                state.pendingInvitations.some((inv) => inv.id === invitation.id)
+            ) {
+                return state;
+            }
+            return {
+                pendingInvitations: [invitation, ...state.pendingInvitations],
+            };
+        });
+    },
 
     /**
      * Hard refresh a specific list from the REST API to ensure synchronization.
@@ -638,6 +685,81 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
+    removeCollaborator: async (listId: string, userId: number) => {
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/lists/${listId}/collaborators/${userId}`,
+                {
+                    method: "DELETE",
+                    headers: jsonHeaders(),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to remove collaborator (${response.status})`,
+                );
+            }
+
+            set((state) => ({
+                lists: state.lists.map((list) =>
+                    removeCollaboratorFromList(list, listId, userId),
+                ),
+                currentList: updateCurrentListCollaborators(
+                    state.currentList,
+                    listId,
+                    userId,
+                ),
+            }));
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to remove collaborator",
+            });
+            return false;
+        }
+    },
+
+    leaveList: async (listId: string) => {
+        try {
+            const response = await fetch(
+                `${getBaseUrl()}/api/lists/${listId}/collaborators/me`,
+                {
+                    method: "DELETE",
+                    headers: jsonHeaders(),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                throw new Error(`Failed to leave list (${response.status})`);
+            }
+
+            set((state) => ({
+                lists: state.lists.filter((l) => l.id !== listId),
+                currentList:
+                    state.currentList?.id === listId ? null : state.currentList,
+            }));
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to leave list",
+            });
+            return false;
+        }
+    },
+
     fetchPendingInvitations: async () => {
         try {
             const response = await fetch(`${getBaseUrl()}/api/invitations`, {
@@ -753,5 +875,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
     getListById: (id: string) => get().lists.find((list) => list.id === id),
 
     /** Clears all lists from the store and resets state. */
-    clearLists: () => set({ lists: [], currentList: null, error: null }),
+    clearLists: () =>
+        set({
+            lists: [],
+            currentList: null,
+            error: null,
+            pendingInvitations: [],
+        }),
 }));
