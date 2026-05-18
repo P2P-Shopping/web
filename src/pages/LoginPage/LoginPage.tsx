@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useStore } from "../../context/useStore";
 import { loginRequest } from "../../services/authService";
 
@@ -29,6 +30,7 @@ const LoginPage = () => {
                 );
             }
             setAuth(result, result.token);
+            toast.success("Welcome back!");
             navigate("/dashboard");
         } catch (err: unknown) {
             let message = "Login failed. Please try again.";
@@ -59,7 +61,7 @@ const LoginPage = () => {
             </p>
 
             <div className="flex p-1 bg-bg-muted rounded-lg mb-8">
-                <div className="flex-1 py-2 text-sm font-bold bg-surface text-text-strong rounded-md shadow-sm text-center">
+                <div className="flex-1 py-2 text-sm font-bold bg-accent text-text-on-accent rounded-md shadow-md text-center">
                     Login
                 </div>
                 <button

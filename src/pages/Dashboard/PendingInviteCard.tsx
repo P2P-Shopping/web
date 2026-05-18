@@ -1,4 +1,5 @@
 import { Check, Mail, X } from "lucide-react";
+import { toast } from "sonner";
 import { useListsStore } from "../../store/useListsStore";
 import type { PendingInvitation } from "../../types";
 
@@ -12,11 +13,17 @@ const PendingInviteCard: React.FC<PendingInviteCardProps> = ({
     const { acceptInvitation, declineInvitation } = useListsStore();
 
     const handleAccept = async () => {
-        await acceptInvitation(invitation.id);
+        const success = await acceptInvitation(invitation.id);
+        if (success) {
+            toast.success(`Joined "${invitation.listTitle}"`);
+        }
     };
 
     const handleDecline = async () => {
-        await declineInvitation(invitation.id);
+        const success = await declineInvitation(invitation.id);
+        if (success) {
+            toast.success(`Invitation for "${invitation.listTitle}" declined`);
+        }
     };
 
     return (

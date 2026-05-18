@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { Modal } from "../../components";
 
 interface ConfirmDeleteModalProps {
@@ -6,7 +7,7 @@ interface ConfirmDeleteModalProps {
     isDeleting: boolean;
     error: string | null;
     onCancel: () => void;
-    onConfirm: (listId: string) => void;
+    onConfirm: (listId: string) => void | Promise<void>;
 }
 
 const ConfirmDeleteModal = ({
@@ -35,7 +36,10 @@ const ConfirmDeleteModal = ({
                     <button
                         type="button"
                         className="inline-flex items-center justify-center px-6 py-2.5 bg-danger text-white border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={() => onConfirm(listId)}
+                        onClick={async () => {
+                            await onConfirm(listId);
+                            toast.success(`List "${listName}" deleted`);
+                        }}
                         disabled={isDeleting}
                         aria-busy={isDeleting}
                     >
