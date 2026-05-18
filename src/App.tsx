@@ -259,13 +259,17 @@ function App() {
         let subscription: StompSubscription | null = null;
         let invitationSubscription: StompSubscription | null = null;
 
-        if (token) {
-            stompClient.connectHeaders = {
-                Authorization: `Bearer ${token}`,
-            };
-        } else {
-            stompClient.connectHeaders = {};
+        if (!token) {
+            stompClient.reconnectDelay = 0;
+            stompClient.deactivate().catch(() => {});
+            setServerConnected(false);
+            return;
         }
+
+        stompClient.connectHeaders = {
+            Authorization: `Bearer ${token}`,
+        };
+        stompClient.reconnectDelay = 3000;
 
         stompClient.onConnect = () => {
             setServerConnected(true);
@@ -324,6 +328,7 @@ function App() {
             stompClient.onConnect = () => {};
             stompClient.onWebSocketClose = () => {};
             stompClient.onStompError = () => {};
+            stompClient.reconnectDelay = 0;
             (async () => {
                 try {
                     await stompClient.deactivate();

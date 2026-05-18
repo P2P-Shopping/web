@@ -60,7 +60,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         if (eventType === "ROSTER_UPDATE" && activeUsers) {
             set({
                 activeUsers: new Set(activeUsers),
-                displayNames: displayNames ?? {},
+                displayNames: displayNames ?? get().displayNames,
             });
         } else if (eventType === "JOIN") {
             set((state) => {

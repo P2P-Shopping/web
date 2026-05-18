@@ -10,6 +10,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ImportItemsModal, ListCard } from "../../components";
+import { useStore } from "../../context/useStore";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item, ListCategory, ShoppingList } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
@@ -101,6 +102,7 @@ interface ListCategorySectionProps {
         name: string,
     ) => void;
     deletingListId: string | null;
+    userEmail?: string;
 }
 
 const ListCategorySection: React.FC<ListCategorySectionProps> = ({
@@ -117,6 +119,7 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
     onCardClick,
     onDeleteList,
     deletingListId,
+    userEmail,
 }) => (
     <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between border-b border-border pb-3">
@@ -166,8 +169,10 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
                         <ListCard
                             list={list}
                             onClick={() => onCardClick(list.id)}
-                            onDelete={(e) =>
-                                onDeleteList(e, list.id, list.name)
+                            onDelete={
+                                list.ownerEmail === userEmail
+                                    ? (e) => onDeleteList(e, list.id, list.name)
+                                    : undefined
                             }
                             isDeleting={deletingListId === list.id}
                         />
@@ -624,6 +629,7 @@ interface DashboardTabsViewProps {
     setDragOverListId: (id: string | null) => void;
     dragOverListId: string | null;
     getTabClassName: (section: string) => string;
+    userEmail?: string;
 }
 
 const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
@@ -645,6 +651,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
     setDragOverListId,
     dragOverListId,
     getTabClassName,
+    userEmail,
 }) => (
     <div className="flex flex-col gap-6">
         <div className="flex items-center gap-2 border border-border p-1 bg-surface rounded-xl sticky top-[-28px] z-20 shadow-sm overflow-x-auto scrollbar-none w-fit mx-auto">
@@ -709,8 +716,10 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                         <ListCard
                             list={list}
                             onClick={() => onCardClick(list.id)}
-                            onDelete={(e) =>
-                                onDeleteList(e, list.id, list.name)
+                            onDelete={
+                                list.ownerEmail === userEmail
+                                    ? (e) => onDeleteList(e, list.id, list.name)
+                                    : undefined
                             }
                             isDeleting={deletingListId === list.id}
                         />
@@ -749,6 +758,7 @@ interface DashboardSplitViewProps {
         name: string,
     ) => void;
     deletingListId: string | null;
+    userEmail?: string;
 }
 
 const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
@@ -766,6 +776,7 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
     onCardClick,
     onDeleteList,
     deletingListId,
+    userEmail,
 }) => (
     <div className="flex flex-col gap-8 pb-4">
         {sectionOrder.map((section) => (
@@ -797,6 +808,7 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                 onCardClick={onCardClick}
                 onDeleteList={onDeleteList}
                 deletingListId={deletingListId}
+                userEmail={userEmail}
             />
         ))}
     </div>
@@ -807,6 +819,7 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
  */
 const Dashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const user = useStore((state) => state.user);
 
     const {
         lists,
@@ -997,6 +1010,7 @@ const Dashboard = () => {
                             setDragOverListId={setDragOverListId}
                             dragOverListId={dragOverListId}
                             getTabClassName={getTabClassName}
+                            userEmail={user?.email}
                         />
                     ) : (
                         <DashboardSplitView
@@ -1015,6 +1029,7 @@ const Dashboard = () => {
                             onCardClick={handleCardClick}
                             onDeleteList={handleDeleteList}
                             deletingListId={deletingListId}
+                            userEmail={user?.email}
                         />
                     )}
                 </div>
@@ -1030,8 +1045,15 @@ const Dashboard = () => {
                             <ListCard
                                 list={list}
                                 onClick={() => handleCardClick(list.id)}
-                                onDelete={(e) =>
-                                    handleDeleteList(e, list.id, list.name)
+                                onDelete={
+                                    list.ownerEmail === user?.email
+                                        ? (e) =>
+                                              handleDeleteList(
+                                                  e,
+                                                  list.id,
+                                                  list.name,
+                                              )
+                                        : undefined
                                 }
                                 isDeleting={deletingListId === list.id}
                             />

@@ -5,7 +5,7 @@ import {
     ChevronDown,
     Plus,
     Settings,
-    UserPlus,
+    Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -32,7 +32,7 @@ import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import type { ListCategory } from "../../types";
 
-import ShareListModal from "../Dashboard/ShareListModal";
+import ListMembersModal from "../Dashboard/ListMembersModal";
 import { useImportItems } from "./useImportItems";
 
 interface Item {
@@ -68,7 +68,7 @@ interface ApiShoppingList {
     category?: ListCategory;
     items?: ApiListItem[];
     ownerEmail?: string;
-    collaboratorEmails?: string[];
+    collaborators?: import("../../types").CollaboratorInfo[];
 }
 
 interface ListDetailProps {
@@ -126,39 +126,24 @@ const handleAdd: SyncActionHandler = (prev, payload) => {
 
 const handleClaim: SyncActionHandler = (prev, payload) => {
     if (!payload.itemId) return prev;
+    let claimedBy = payload.claimedBy;
+    let claimedAt = payload.timestamp;
     if (payload.content) {
         try {
-            const updated = JSON.parse(payload.content) as Item;
-            return prev.map((item) =>
-                item.id === payload.itemId ? { ...item, ...updated } : item,
-            );
+            const parsed = JSON.parse(payload.content) as Partial<Item>;
+            claimedBy = parsed.claimedBy ?? claimedBy;
+            claimedAt = parsed.claimedAt ?? claimedAt;
         } catch (_) {
-            // fall through to top-level claimedBy
+            // fall through to top-level values
         }
     }
     return prev.map((item) =>
-        item.id === payload.itemId
-            ? {
-                  ...item,
-                  claimedBy: payload.claimedBy,
-                  claimedAt: payload.timestamp,
-              }
-            : item,
+        item.id === payload.itemId ? { ...item, claimedBy, claimedAt } : item,
     );
 };
 
 const handleUnclaim: SyncActionHandler = (prev, payload) => {
     if (!payload.itemId) return prev;
-    if (payload.content) {
-        try {
-            const updated = JSON.parse(payload.content) as Item;
-            return prev.map((item) =>
-                item.id === payload.itemId ? { ...item, ...updated } : item,
-            );
-        } catch (_) {
-            // fall through to clearing claim
-        }
-    }
     return prev.map((item) =>
         item.id === payload.itemId
             ? { ...item, claimedBy: undefined, claimedAt: undefined }
@@ -274,12 +259,12 @@ const useListItems = (effectiveListId: string | undefined) => {
                 if (
                     currentList.category ||
                     currentList.ownerEmail ||
-                    currentList.collaboratorEmails
+                    currentList.collaborators
                 ) {
                     useListsStore.getState().updateList(targetListId, {
                         category: currentList.category,
                         ownerEmail: currentList.ownerEmail,
-                        collaboratorEmails: currentList.collaboratorEmails,
+                        collaborators: currentList.collaborators,
                     });
                 }
                 syncListItemsInStore(mappedItems, targetListId);
@@ -893,6 +878,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             }
             lastSyncTimestamp.current = timestamp;
 
+            pendingSyncItems.current.add(itemId);
             stompClient.publish({
                 destination: `/app/list/${effectiveListId}/update`,
                 body: JSON.stringify({
@@ -945,6 +931,7 @@ const useListItems = (effectiveListId: string | undefined) => {
             }
             lastSyncTimestamp.current = timestamp;
 
+            pendingSyncItems.current.add(itemId);
             stompClient.publish({
                 destination: `/app/list/${effectiveListId}/update`,
                 body: JSON.stringify({
@@ -1021,6 +1008,13 @@ const useListPresence = (effectiveListId: string | undefined) => {
             handlePresenceMessage,
         );
 
+        const membersSubscription = stompClient.subscribe(
+            `/topic/lists/${effectiveListId}/members`,
+            () => {
+                useListsStore.getState().fetchLists();
+            },
+        );
+
         if (stompClient.connected) {
             const joinEvent = {
                 eventType: "JOIN" as const,
@@ -1051,6 +1045,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
                 console.debug("[ws] sent presence LEAVE", username);
             }
             presenceSubscription?.unsubscribe();
+            membersSubscription?.unsubscribe();
             clearPresence();
         };
     }, [
@@ -1845,8 +1840,8 @@ const ListDetail = ({
 
         const users = new Set<string>();
         if (current.ownerEmail) users.add(current.ownerEmail);
-        for (const email of current.collaboratorEmails || []) {
-            users.add(email);
+        for (const c of current.collaborators || []) {
+            users.add(c.email);
         }
         return Array.from(users);
     }, [activeList]);
@@ -2117,7 +2112,8 @@ const ListDetail = ({
                                                 }
                                             }}
                                         />
-                                    ) : (
+                                    ) : activeList?.currentUserRole ===
+                                      "ADMIN" ? (
                                         <button
                                             type="button"
                                             onClick={() =>
@@ -2129,6 +2125,11 @@ const ListDetail = ({
                                             {activeList?.name ||
                                                 "Shopping List"}
                                         </button>
+                                    ) : (
+                                        <h1 className="text-2xl font-black text-text-strong tracking-tight">
+                                            {activeList?.name ||
+                                                "Shopping List"}
+                                        </h1>
                                     )}
                                     <div className="flex flex-col">
                                         <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
@@ -2141,6 +2142,21 @@ const ListDetail = ({
                                                     activeCollaborationUsers
                                                 }
                                             />
+                                            {activeList?.currentUserRole && (
+                                                <span
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                        activeList.currentUserRole ===
+                                                        "ADMIN"
+                                                            ? "bg-accent-subtle text-accent"
+                                                            : "bg-bg-muted text-text-muted border border-border"
+                                                    }`}
+                                                >
+                                                    {activeList.currentUserRole ===
+                                                    "ADMIN"
+                                                        ? "Admin"
+                                                        : "Editor"}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -2177,8 +2193,18 @@ const ListDetail = ({
                                         onClick={() => setShowShareModal(true)}
                                         className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
                                     >
-                                        <UserPlus size={14} strokeWidth={2.5} />
-                                        Invite
+                                        <Users size={14} strokeWidth={2.5} />
+                                        Members
+                                        {activeList?.collaborators &&
+                                            activeList.collaborators.length >
+                                                0 && (
+                                                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-accent/15 text-[10px] font-bold">
+                                                    {
+                                                        activeList.collaborators
+                                                            .length
+                                                    }
+                                                </span>
+                                            )}
                                     </button>
                                 </div>
                             </div>
@@ -2439,13 +2465,16 @@ const ListDetail = ({
             />
 
             {showShareModal && (
-                <ShareListModal
+                <ListMembersModal
                     listId={effectiveListId ?? ""}
                     listName={
                         lists.find((l) => l.id === effectiveListId)?.name ||
                         "Shopping List"
                     }
+                    collaborators={activeList?.collaborators ?? []}
+                    currentUserRole={activeList?.currentUserRole}
                     onClose={() => setShowShareModal(false)}
+                    onLeaveSuccess={() => navigate("/dashboard")}
                 />
             )}
         </div>

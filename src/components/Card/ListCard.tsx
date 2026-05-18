@@ -11,6 +11,7 @@ interface ListCardProps {
     onClick?: () => void;
     onDelete?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     isDeleting?: boolean;
+    canDelete?: boolean;
 }
 
 const PREVIEW_LIMIT = 2;
@@ -24,6 +25,7 @@ export default function ListCard({
     onClick,
     onDelete,
     isDeleting,
+    canDelete = true,
 }: Readonly<ListCardProps>) {
     const currentUser = useStore((state) => state.user);
     const totalItems = (list.items || []).length;
@@ -209,7 +211,7 @@ export default function ListCard({
                 </div>
             </button>
 
-            {onDelete && (
+            {onDelete && canDelete && (
                 <button
                     type="button"
                     className={`absolute top-5 right-5 flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 z-10 ${

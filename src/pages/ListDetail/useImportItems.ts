@@ -87,6 +87,7 @@ export const useImportItems = ({
             throw new Error("Failed to create the new list.");
         }
 
+        setSelectedTargetListId(newList.id);
         return newList.id;
     };
 
@@ -98,10 +99,22 @@ export const useImportItems = ({
             ]),
         );
 
+        const aggregated = new Map<string, GlobalItem>();
         for (const item of items) {
             if (!selectedImportItemIds.has(item.id)) continue;
-
             const dupKey = buildItemDuplicateKey(item);
+            const existing = aggregated.get(dupKey);
+            if (existing) {
+                aggregated.set(dupKey, {
+                    ...existing,
+                    quantity: mergeQuantities(existing.quantity, item.quantity),
+                });
+            } else {
+                aggregated.set(dupKey, item);
+            }
+        }
+
+        for (const [dupKey, item] of aggregated) {
             const existingItem = existingMap.get(dupKey);
 
             if (existingItem) {
