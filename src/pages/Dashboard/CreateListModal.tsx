@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { type SubmitEvent, useId, useState } from "react";
+import { toast } from "sonner";
 import { Modal } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 
@@ -53,6 +54,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
         try {
             const newList = await addList(trimmedName, listCategory);
             if (newList) {
+                toast.success(`List "${trimmedName}" created!`);
                 onClose();
             }
         } catch (error) {

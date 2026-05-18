@@ -10,6 +10,7 @@ import {
     X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
     type ReviewItem,
     type ReviewSubmission,
@@ -515,6 +516,14 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                     initialListName={suggestedListName}
                     onClose={() => setIsReviewOpen(false)}
                     onConfirm={handleConfirmReview}
+                />
+            )}
+        </div>
+    );
+};
+
+export default AiImportModal;
+w}
                 />
             )}
         </div>
