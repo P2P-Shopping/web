@@ -30,13 +30,10 @@ import api, {
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import type {
-    Item as GlobalItem,
-    ListCategory,
-    ShoppingList,
-} from "../../types";
-import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
+import type { ListCategory } from "../../types";
+
 import ShareListModal from "../Dashboard/ShareListModal";
+import { useImportItems } from "./useImportItems";
 
 interface Item {
     id: string;
@@ -1616,13 +1613,6 @@ const ListDetail = ({
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
-    const [showImportModal, setShowImportModal] = useState(false);
-    const [selectedTargetListId, setSelectedTargetListId] = useState("");
-    const [selectedImportItemIds, setSelectedImportItemIds] = useState<
-        Set<string>
-    >(new Set());
-    const [isImportingItems, setIsImportingItems] = useState(false);
-    const [importNewListName, setImportNewListName] = useState("");
 
     const [detailName, setDetailName] = useState("");
     const [detailQuantity, setDetailQuantity] = useState("");
@@ -1668,6 +1658,28 @@ const ListDetail = ({
     const canImportIntoNormalList =
         (isRecipeList || activeList?.category === "FREQUENT") &&
         items.length > 0;
+
+    const {
+        showImportModal,
+        selectedTargetListId,
+        setSelectedTargetListId,
+        selectedImportItemIds,
+        setSelectedImportItemIds,
+        isImportingItems,
+        importNewListName,
+        setImportNewListName,
+        openImportModal,
+        toggleImportSelection,
+        clearImportState,
+        handleImportIntoNormalList,
+    } = useImportItems({
+        effectiveListId,
+        isRecipeList,
+        activeList,
+        items,
+        setError,
+        fetchLists,
+    });
     useEffect(() => {
         if (activeList?.name) {
             setEditedName(activeList.name);
@@ -1759,7 +1771,12 @@ const ListDetail = ({
         }
 
         setSelectedTargetListId(normalLists[0].id);
-    }, [normalLists, selectedTargetListId, showImportModal]);
+    }, [
+        normalLists,
+        selectedTargetListId,
+        showImportModal,
+        setSelectedTargetListId,
+    ]);
 
     const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
@@ -1832,144 +1849,6 @@ const ListDetail = ({
         ? "w-full flex flex-col h-full bg-surface/50"
         : "flex justify-center items-start p-20px bg-bg";
     const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`;
-
-    const openImportModal = () => {
-        const refreshedLists = useListsStore.getState().lists;
-        const refreshedNormalLists = refreshedLists.filter(
-            (list) =>
-                list.id !== effectiveListId &&
-                (list.category ?? "NORMAL") === "NORMAL",
-        );
-
-        setSelectedTargetListId((currentId) => {
-            if (isRecipeList) return "NEW_LIST";
-            if (refreshedNormalLists.some((list) => list.id === currentId)) {
-                return currentId;
-            }
-            return refreshedNormalLists.length > 0
-                ? refreshedNormalLists[0].id
-                : "NEW_LIST";
-        });
-
-        setImportNewListName(activeList?.name ? `${activeList.name}` : "");
-        setSelectedImportItemIds(new Set(items.map((item) => item.id)));
-        setShowImportModal(true);
-    };
-
-    const toggleImportSelection = (itemId: string) => {
-        setSelectedImportItemIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(itemId)) {
-                next.delete(itemId);
-            } else {
-                next.add(itemId);
-            }
-            return next;
-        });
-    };
-
-    const clearImportState = () => {
-        setShowImportModal(false);
-        setSelectedImportItemIds(new Set());
-        setIsImportingItems(false);
-        setImportNewListName("");
-    };
-
-    const handleImportIntoNormalList = async () => {
-        if (!selectedTargetListId) return;
-
-        setIsImportingItems(true);
-        setError(null);
-
-        try {
-            const targetListId = await resolveTargetListId();
-            const targetList = useListsStore
-                .getState()
-                .lists.find((list) => list.id === targetListId);
-
-            if (!targetList) {
-                throw new Error("Target list could not be found.");
-            }
-
-            await performItemsImport(targetList);
-            await fetchLists();
-            clearImportState();
-        } catch (importError) {
-            const errorMessage =
-                importError instanceof Error
-                    ? importError.message
-                    : "Failed to import the selected items.";
-            setError(errorMessage);
-            setIsImportingItems(false);
-        }
-    };
-
-    const resolveTargetListId = async (): Promise<string> => {
-        if (selectedTargetListId !== "NEW_LIST") {
-            return selectedTargetListId;
-        }
-
-        if (!importNewListName.trim()) {
-            throw new Error("Please enter a name for the new list.");
-        }
-
-        const newList = await useListsStore
-            .getState()
-            .addList(importNewListName.trim(), "NORMAL");
-
-        if (!newList) {
-            throw new Error("Failed to create the new list.");
-        }
-
-        return newList.id;
-    };
-
-    const performItemsImport = async (targetList: ShoppingList) => {
-        const existingMap = new Map(
-            targetList.items.map((item: GlobalItem) => [
-                buildItemDuplicateKey(item),
-                item,
-            ]),
-        );
-
-        for (const item of items) {
-            if (!selectedImportItemIds.has(item.id)) continue;
-
-            const dupKey = buildItemDuplicateKey(item);
-            const existingItem = existingMap.get(dupKey);
-
-            if (existingItem) {
-                const mergedQty = mergeQuantities(
-                    existingItem.quantity,
-                    item.quantity,
-                );
-                const updated = await useListsStore
-                    .getState()
-                    .updateItem(targetList.id, existingItem.id, {
-                        quantity: mergedQty,
-                    });
-                if (!updated) {
-                    throw new Error(`Failed to update ${item.name}`);
-                }
-            } else {
-                const added = await useListsStore
-                    .getState()
-                    .addItem(targetList.id, {
-                        name: item.name,
-                        checked: false,
-                        brand: item.brand,
-                        quantity: item.quantity,
-                        price: item.price,
-                        category: item.category,
-                        isRecurrent: targetList.category === "FREQUENT",
-                    });
-
-                if (!added) {
-                    throw new Error(`Failed to add ${item.name}`);
-                }
-            }
-        }
-    };
 
     const handleInstantAdd = (suggestion: ProductSuggestion) => {
         const finalPrice =
