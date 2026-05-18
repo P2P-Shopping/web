@@ -15,8 +15,9 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, GripVertical, Pencil, Trash2 } from "lucide-react";
+import { Check, GripVertical, Hand, Pencil, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useRef } from "react";
+import { stringToColor } from "../../utils/colorUtils";
 
 interface Item {
     id: string;
@@ -27,6 +28,8 @@ interface Item {
     price?: number;
     category?: string;
     positionIndex?: number;
+    claimedBy?: string;
+    claimedAt?: number;
 }
 
 interface Props {
@@ -39,6 +42,10 @@ interface Props {
     checkable?: boolean;
     sortMode?: "alphabetical" | "chronological" | "custom";
     onReorder?: (newItems: Item[], movedItem: Item) => void;
+    onClaim?: (id: string) => void;
+    onUnclaim?: (id: string) => void;
+    currentUserEmail?: string;
+    displayNames?: Record<string, string>;
 }
 
 const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
@@ -85,6 +92,10 @@ interface SortableItemRowProps {
     onDelete?: (id: string) => void;
     onEdit?: (item: Item) => void;
     isDraggable: boolean;
+    onClaim?: (id: string) => void;
+    onUnclaim?: (id: string) => void;
+    currentUserEmail?: string;
+    displayNames?: Record<string, string>;
 }
 
 const SortableItemRow = ({
@@ -95,6 +106,10 @@ const SortableItemRow = ({
     onDelete,
     onEdit,
     isDraggable,
+    onClaim,
+    onUnclaim,
+    currentUserEmail,
+    displayNames,
 }: SortableItemRowProps) => {
     const {
         attributes,
@@ -110,6 +125,12 @@ const SortableItemRow = ({
         transition,
         opacity: isDragging ? 0.5 : undefined,
         zIndex: isDragging ? 10 : undefined,
+        ...(item.claimedBy
+            ? {
+                  borderLeftColor: stringToColor(item.claimedBy),
+                  borderLeftWidth: "3px",
+              }
+            : {}),
     };
 
     return (
@@ -156,6 +177,21 @@ const SortableItemRow = ({
                             {item.name}
                         </span>
                         <ItemMetadata item={item} />
+                        {item.claimedBy && (
+                            <span
+                                className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white w-fit"
+                                style={{
+                                    backgroundColor: stringToColor(
+                                        item.claimedBy,
+                                    ),
+                                }}
+                            >
+                                {item.claimedBy === currentUserEmail
+                                    ? "You"
+                                    : displayNames?.[item.claimedBy] ||
+                                      item.claimedBy.split("@")[0]}
+                            </span>
+                        )}
                     </div>
                 </label>
             ) : (
@@ -168,9 +204,61 @@ const SortableItemRow = ({
                             {item.name}
                         </span>
                         <ItemMetadata item={item} />
+                        {item.claimedBy && (
+                            <span
+                                className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white w-fit"
+                                style={{
+                                    backgroundColor: stringToColor(
+                                        item.claimedBy,
+                                    ),
+                                }}
+                            >
+                                {item.claimedBy === currentUserEmail
+                                    ? "You"
+                                    : displayNames?.[item.claimedBy] ||
+                                      item.claimedBy.split("@")[0]}
+                            </span>
+                        )}
                     </div>
                 </div>
             )}
+            {!item.checked && onClaim && !item.claimedBy && (
+                <button
+                    type="button"
+                    className="flex items-center justify-center w-8 h-8 rounded-lg text-text-muted opacity-0 group-hover:opacity-100 transition-all hover:bg-accent-subtle hover:text-accent shrink-0 outline-none"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClaim(item.id);
+                    }}
+                    disabled={disabled}
+                    aria-label={`Claim ${item.name}`}
+                    title="I'll get this"
+                >
+                    <Hand size={16} />
+                </button>
+            )}
+            {!item.checked &&
+                item.claimedBy === currentUserEmail &&
+                onUnclaim && (
+                    <button
+                        type="button"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg opacity-0 group-hover:opacity-100 transition-all shrink-0 outline-none"
+                        style={{
+                            color: item.claimedBy
+                                ? stringToColor(item.claimedBy)
+                                : undefined,
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onUnclaim(item.id);
+                        }}
+                        disabled={disabled}
+                        aria-label={`Unclaim ${item.name}`}
+                        title="Release claim"
+                    >
+                        <Hand size={16} />
+                    </button>
+                )}
             {onDelete && (
                 <button
                     type="button"
@@ -212,6 +300,10 @@ const ShoppingListItems: React.FC<Props> = ({
     checkable = true,
     sortMode = "chronological",
     onReorder,
+    onClaim,
+    onUnclaim,
+    currentUserEmail,
+    displayNames,
 }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -354,6 +446,10 @@ const ShoppingListItems: React.FC<Props> = ({
                                     onDelete={onDelete}
                                     onEdit={onEdit}
                                     isDraggable={!disabled}
+                                    onClaim={onClaim}
+                                    onUnclaim={onUnclaim}
+                                    currentUserEmail={currentUserEmail}
+                                    displayNames={displayNames}
                                 />
                             ))}
                         </ul>
@@ -398,6 +494,10 @@ const ShoppingListItems: React.FC<Props> = ({
                                 onDelete={onDelete}
                                 onEdit={onEdit}
                                 isDraggable={false}
+                                onClaim={onClaim}
+                                onUnclaim={onUnclaim}
+                                currentUserEmail={currentUserEmail}
+                                displayNames={displayNames}
                             />
                         ))}
                     </ul>

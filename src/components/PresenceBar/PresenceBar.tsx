@@ -1,19 +1,7 @@
 import type React from "react";
 import { usePresenceStore } from "../../context/usePresenceStore";
 import { useStore } from "../../context/useStore";
-
-const stringToColor = (name: string): string => {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash = (name.codePointAt(i) || 0) + ((hash << 5) - hash);
-    }
-    let color = "#";
-    for (let i = 0; i < 3; i++) {
-        const value = (hash >> (i * 8)) & 0xff;
-        color += `00${value.toString(16)}`.slice(-2);
-    }
-    return color;
-};
+import { stringToColor } from "../../utils/colorUtils";
 
 const normalizeUsername = (name: string): string => name.trim().toLowerCase();
 

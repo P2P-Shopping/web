@@ -45,6 +45,8 @@ interface Item {
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
+    claimedBy?: string;
+    claimedAt?: number;
 }
 
 interface ApiListItem {
@@ -57,6 +59,8 @@ interface ApiListItem {
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
+    claimedBy?: string;
+    claimedAt?: number;
 }
 
 interface ApiShoppingList {
@@ -120,12 +124,56 @@ const handleAdd: SyncActionHandler = (prev, payload) => {
     return prev;
 };
 
+const handleClaim: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    if (payload.content) {
+        try {
+            const updated = JSON.parse(payload.content) as Item;
+            return prev.map((item) =>
+                item.id === payload.itemId ? { ...item, ...updated } : item,
+            );
+        } catch (_) {
+            // fall through to top-level claimedBy
+        }
+    }
+    return prev.map((item) =>
+        item.id === payload.itemId
+            ? {
+                  ...item,
+                  claimedBy: payload.claimedBy,
+                  claimedAt: payload.timestamp,
+              }
+            : item,
+    );
+};
+
+const handleUnclaim: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    if (payload.content) {
+        try {
+            const updated = JSON.parse(payload.content) as Item;
+            return prev.map((item) =>
+                item.id === payload.itemId ? { ...item, ...updated } : item,
+            );
+        } catch (_) {
+            // fall through to clearing claim
+        }
+    }
+    return prev.map((item) =>
+        item.id === payload.itemId
+            ? { ...item, claimedBy: undefined, claimedAt: undefined }
+            : item,
+    );
+};
+
 const SYNC_ACTION_HANDLERS: Record<string, SyncActionHandler> = {
     CHECK_OFF: handleCheckOff,
     UPDATE: handleUpdate,
     DELETE: handleDelete,
     BULK_DELETE: handleBulkDelete,
     ADD: handleAdd,
+    CLAIM_ITEM: handleClaim,
+    UNCLAIM_ITEM: handleUnclaim,
 };
 
 const useListItems = (effectiveListId: string | undefined) => {
@@ -219,6 +267,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                     category: item.category,
                     isRecurrent: item.isRecurrent,
                     positionIndex: item.positionIndex,
+                    claimedBy: item.claimedBy,
+                    claimedAt: item.claimedAt,
                 }));
                 setItems(mappedItems);
                 if (
@@ -812,6 +862,103 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const claimItem = useCallback(
+        (itemId: string) => {
+            const currentUser = useStore.getState().user;
+            if (
+                !currentUser?.email ||
+                !effectiveListId ||
+                !stompClient.connected
+            )
+                return;
+            const claimedBy = currentUser.email;
+
+            setItems((prev) => {
+                const next = prev.map((item) =>
+                    item.id === itemId
+                        ? { ...item, claimedBy, claimedAt: Date.now() }
+                        : item,
+                );
+                syncListItemsInStore(next);
+                return next;
+            });
+
+            const item = items.find((i) => i.id === itemId);
+            if (!item) return;
+
+            const updatedItem = { ...item, claimedBy, claimedAt: Date.now() };
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action: "CLAIM_ITEM",
+                    itemId,
+                    claimedBy,
+                    content: JSON.stringify(updatedItem),
+                    timestamp,
+                }),
+            });
+        },
+        [effectiveListId, items, syncListItemsInStore],
+    );
+
+    const unclaimItem = useCallback(
+        (itemId: string) => {
+            const currentUser = useStore.getState().user;
+            if (
+                !currentUser?.email ||
+                !effectiveListId ||
+                !stompClient.connected
+            )
+                return;
+
+            setItems((prev) => {
+                const next = prev.map((item) =>
+                    item.id === itemId
+                        ? {
+                              ...item,
+                              claimedBy: undefined,
+                              claimedAt: undefined,
+                          }
+                        : item,
+                );
+                syncListItemsInStore(next);
+                return next;
+            });
+
+            const item = items.find((i) => i.id === itemId);
+            if (!item) return;
+
+            const updatedItem = {
+                ...item,
+                claimedBy: undefined,
+                claimedAt: undefined,
+            };
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action: "UNCLAIM_ITEM",
+                    itemId,
+                    claimedBy: null,
+                    content: JSON.stringify(updatedItem),
+                    timestamp,
+                }),
+            });
+        },
+        [effectiveListId, items, syncListItemsInStore],
+    );
+
     return {
         items,
         isLoading,
@@ -823,6 +970,8 @@ const useListItems = (effectiveListId: string | undefined) => {
         deleteItem,
         clearCompletedItems,
         reorderItem,
+        claimItem,
+        unclaimItem,
         setError,
         handleAiImport,
         isReviewModalOpen,
@@ -1600,6 +1749,8 @@ const ListDetail = ({
         deleteItem,
         clearCompletedItems,
         reorderItem,
+        claimItem,
+        unclaimItem,
         setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
@@ -1608,6 +1759,9 @@ const ListDetail = ({
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
+
+    const user = useStore((state) => state.user);
+    const displayNames = usePresenceStore((state) => state.displayNames);
 
     const [newItemName, setNewItemName] = useState("");
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -2086,6 +2240,10 @@ const ListDetail = ({
                                         checkable={!isTemplateList}
                                         sortMode={sortMode}
                                         onReorder={reorderItem}
+                                        onClaim={claimItem}
+                                        onUnclaim={unclaimItem}
+                                        currentUserEmail={user?.email}
+                                        displayNames={displayNames}
                                     />
                                     {items.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
