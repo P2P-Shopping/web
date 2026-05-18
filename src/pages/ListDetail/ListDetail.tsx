@@ -1642,6 +1642,10 @@ const ListDetail = ({
     >("chronological");
     const [isScrolled, setIsScrolled] = useState(false);
 
+    const scrolledPaddingClass = isEmbedded
+        ? " -mt-6 pt-6 pb-3"
+        : " -mt-3 pt-3 pb-3";
+
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
         () => lists.find((list) => list.id === effectiveListId) ?? null,
@@ -1983,6 +1987,37 @@ const ListDetail = ({
         setNewItemName("");
     };
 
+    const isFinishDisabled =
+        !finishStoreName.trim() ||
+        isFinishing ||
+        !effectiveListId ||
+        effectiveListId === "default";
+
+    const handleFinishShopping = async () => {
+        if (!effectiveListId || effectiveListId === "default") return;
+        setIsFinishing(true);
+        try {
+            await finishShoppingRequest({
+                storeName: finishStoreName.trim(),
+                receiptImage,
+                listId: effectiveListId,
+            });
+            setShowFinishModal(false);
+            setFinishStoreName("");
+            setReceiptImage(null);
+            navigate("/dashboard");
+        } catch (_err) {
+            const errorMessage =
+                _err instanceof Error
+                    ? _err.message
+                    : "Failed to complete shopping.";
+            console.error("Failed to complete shopping:", _err);
+            setError(errorMessage);
+        } finally {
+            setIsFinishing(false);
+        }
+    };
+
     return (
         <div className={wrapperClassName}>
             <div className={contentClassName}>
@@ -2024,11 +2059,7 @@ const ListDetail = ({
                             } ${
                                 isScrolled
                                     ? "bg-bg/85 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] border-b border-border/50" +
-                                      (
-                                          isEmbedded
-                                              ? " -mt-6 pt-6 pb-3"
-                                              : " -mt-3 pt-3 pb-3"
-                                      )
+                                      scrolledPaddingClass
                                     : ""
                             }`}
                         >
@@ -2327,43 +2358,8 @@ const ListDetail = ({
                         </button>
                         <button
                             type="button"
-                            disabled={
-                                !finishStoreName.trim() ||
-                                isFinishing ||
-                                !effectiveListId ||
-                                effectiveListId === "default"
-                            }
-                            onClick={async () => {
-                                if (
-                                    !effectiveListId ||
-                                    effectiveListId === "default"
-                                )
-                                    return;
-                                setIsFinishing(true);
-                                try {
-                                    await finishShoppingRequest({
-                                        storeName: finishStoreName.trim(),
-                                        receiptImage,
-                                        listId: effectiveListId,
-                                    });
-                                    setShowFinishModal(false);
-                                    setFinishStoreName("");
-                                    setReceiptImage(null);
-                                    navigate("/dashboard");
-                                } catch (_err) {
-                                    const errorMessage =
-                                        _err instanceof Error
-                                            ? _err.message
-                                            : "Failed to complete shopping.";
-                                    console.error(
-                                        "Failed to complete shopping:",
-                                        _err,
-                                    );
-                                    setError(errorMessage);
-                                } finally {
-                                    setIsFinishing(false);
-                                }
-                            }}
+                            disabled={isFinishDisabled}
+                            onClick={handleFinishShopping}
                             className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
                         >
                             {isFinishing ? "Processing..." : "Complete"}
