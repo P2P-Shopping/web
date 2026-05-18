@@ -308,8 +308,9 @@ function App() {
     const isAiImport = searchParams.get("import") === "ai";
     const isAuthPage =
         location.pathname === "/login" || location.pathname === "/register";
-    const showNavbar =
-        isAuthenticated && !isAuthPage && !isAiImport && !isWebView();
+    // The full navigation bar is shown in the Android WebView too, so Map /
+    // My Lists and the "More" menu (Theme / Account / Logout) stay reachable.
+    const showNavbar = isAuthenticated && !isAuthPage && !isAiImport;
 
     return (
         <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">
