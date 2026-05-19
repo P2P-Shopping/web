@@ -987,6 +987,8 @@ const UnifiedMap: React.FC = () => {
     const setTargetStoreLocation = useStore(
         (state) => state.setTargetStoreLocation,
     );
+    const targetStoreId = useStore((state) => state.targetStoreId);
+    const setTargetStoreId = useStore((state) => state.setTargetStoreId);
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const setTargetStoreTransit = useStore(
         (state) => state.setTargetStoreTransit,
@@ -1087,13 +1089,16 @@ const UnifiedMap: React.FC = () => {
             currentUserLocation.lat,
             currentUserLocation.lng,
             activeIndoorItems.filter((item) => !item.checked),
+            targetStoreId || undefined,
         );
     }, [
         navigationMode,
         selectedListId,
+        remainingIndoorItemIds.length,
         activeIndoorItems,
-        remainingIndoorItemIds,
         setItems,
+        targetStoreId,
+        remainingIndoorItemIds,
     ]);
 
     useEffect(() => {
@@ -1150,6 +1155,7 @@ const UnifiedMap: React.FC = () => {
             userLocation.lat,
             userLocation.lng,
             activeIndoorItems.filter((item) => !item.checked),
+            targetStoreId || undefined,
         );
     }, [
         navigationMode,
@@ -1157,6 +1163,7 @@ const UnifiedMap: React.FC = () => {
         route,
         userLocation,
         activeIndoorItems,
+        targetStoreId,
     ]);
 
     // --- AUDIO NAVIGATION LOGIC ---
@@ -1245,6 +1252,7 @@ const UnifiedMap: React.FC = () => {
 
     const handleStartRoute = async (store: StoreRecommendation) => {
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
+        setTargetStoreId(store.id);
         setTargetStoreTransit(store.transit);
 
         try {
@@ -1667,6 +1675,7 @@ const UnifiedMap: React.FC = () => {
                                     loc.lat,
                                     loc.lng,
                                     currentItems,
+                                    targetStoreId || undefined,
                                 );
                             }}
                             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-xs font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"
