@@ -17,8 +17,9 @@ export const loadRoute = async (
     userLat: number,
     userLng: number,
     fallbackItems: { id: string; name: string }[] = [],
+    storeId?: string,
 ) => {
-    const { setRoute, setStatus } = useStore.getState();
+    const { setRoute, setStatus, setRouteWarnings } = useStore.getState();
     setStatus("Calculating route...");
 
     try {
@@ -27,6 +28,8 @@ export const loadRoute = async (
             userLat,
             userLng,
             productIds,
+            storeId,
+            lazyN: 0,
         });
 
         if (
@@ -35,6 +38,7 @@ export const loadRoute = async (
         ) {
             console.log("[loadRoute] Successfully received route from server API");
             setRoute(serverData.route);
+            setRouteWarnings(serverData.warnings ?? []);
             setStatus(
                 serverData.partial
                     ? "Partial route loaded. Optimizing..."
@@ -63,6 +67,14 @@ export const loadRoute = async (
             }
             return;
         }
+
+        if ((serverData?.warnings?.length ?? 0) > 0) {
+            setRouteWarnings(serverData.warnings);
+            setRoute([]);
+            setStatus("Unele produse nu au fost gasite.");
+            return;
+        }
+
         console.warn("[loadRoute] Server returned empty route or non-success.");
     } catch (err) {
         console.error("[loadRoute] Server API call failed:", err);
@@ -74,7 +86,7 @@ export const loadRoute = async (
 
     // Baza de la care începem să distribuim produsele de test
     // Am modificat coordonatele pentru a fi mai "sus" și mai "la dreapta", exact în centrul magazinului
-    const baseLat = 47.151820; 
+    const baseLat = 47.151820;
     const baseLng = 27.587850;
     let testItemIndex = 0;
 
@@ -122,11 +134,11 @@ export const loadRoute = async (
     });
 
     const mockInstructions = [
-        "În 5 metri, ia-o la dreapta spre raionul de lactate.",
-        "Mergi înainte 10 metri pe acest culoar.",
-        "Ia-o la stânga și oprește-te în fața raftului.",
-        "Întoarce-te, produsul este exact în spatele tău.",
-        "Ai ajuns la destinația finală din lista ta.",
+        "\u00cen 5 metri, ia-o la dreapta spre raionul de lactate.",
+        "Mergi \u00eenainte 10 metri pe acest culoar.",
+        "Ia-o la st\u00e2nga \u0219i opre\u0219te-te \u00een fa\u021ba raftului.",
+        "\u00centoarce-te, produsul este exact \u00een spatele t\u0103u.",
+        "Ai ajuns la destina\u021bia final\u0103 din lista ta.",
     ];
 
     orderedRoute.forEach((point, index) => {
@@ -136,6 +148,7 @@ export const loadRoute = async (
     });
 
     setRoute(orderedRoute);
+    setRouteWarnings([]);
     setStatus("Indoor mock TSP route ready (Fallback).");
     if (activePollCleanup) {
         activePollCleanup();

@@ -22,14 +22,16 @@ export type PresenceEventType =
  * Maps incoming STOMP presence messages from the server.
  */
 export interface PresencePayload {
-    /** The username of the user triggering the event */
+    /** The username (email) of the user triggering the event */
     username: string;
+    /** A human-friendly display name for the user (e.g. firstName or email prefix) */
+    displayName?: string;
     /** The action the user is performing */
     eventType: PresenceEventType;
     /** The list ID this presence event corresponds to */
     listId: string;
-    /** * Master roster of active users.
-     * This is populated by the server during a ROSTER_UPDATE event.
-     */
+    /** Master roster of active users (emails). */
     activeUsers?: string[];
+    /** Map of email → display name for all users in the room. */
+    displayNames?: Record<string, string>;
 }

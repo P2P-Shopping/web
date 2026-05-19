@@ -32,6 +32,9 @@ export interface AppState {
     targetStoreLocation: Coordinate | null;
     setTargetStoreLocation: (loc: Coordinate | null) => void;
 
+    targetStoreId: string | null;
+    setTargetStoreId: (id: string | null) => void;
+
     targetStoreTransit: {
         driving: { timeMins: number; distanceKm: string | number };
         walking: { timeMins: number; distanceKm: string | number };
@@ -49,6 +52,7 @@ export interface AppState {
     isMockGpsEnabled: boolean;
 
     route: RoutePoint[];
+    routeWarnings: string[];
     macroRouteGeometry: [number, number][];
     status: string;
     /** Current list of items */
@@ -84,6 +88,8 @@ export interface AppState {
     /** Manually triggers indoor mode and cross-geofence logic */
     forceIndoorMode: () => void;
 
+    /** Sets route warnings from backend */
+    setRouteWarnings: (warnings: string[]) => void;
     /** Sets the map route */
     setRoute: (route: RoutePoint[]) => void;
     setMacroRouteGeometry: (geometry: [number, number][]) => void;
@@ -120,6 +126,9 @@ export const useStore = create<AppState>()(
             targetStoreLocation: null,
             setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
 
+            targetStoreId: null,
+            setTargetStoreId: (id) => set({ targetStoreId: id }),
+
             targetStoreTransit: null,
             setTargetStoreTransit: (transit) =>
                 set({ targetStoreTransit: transit }),
@@ -130,6 +139,7 @@ export const useStore = create<AppState>()(
             isAutoCenterEnabled: true,
             isMockGpsEnabled: true,
             route: [],
+            routeWarnings: [],
             macroRouteGeometry: [],
             status: "idle",
             items: [],
@@ -158,6 +168,7 @@ export const useStore = create<AppState>()(
                 });
             },
             setRoute: (route) => set({ route }),
+            setRouteWarnings: (routeWarnings) => set({ routeWarnings }),
             setMacroRouteGeometry: (geometry) =>
                 set({ macroRouteGeometry: geometry }),
             setStatus: (status) => set({ status }),
@@ -239,6 +250,9 @@ export const useStore = create<AppState>()(
                 isAuthenticated: state.isAuthenticated,
                 token: state.token,
                 offlineQueue: state.offlineQueue,
+                targetStoreId: state.targetStoreId,
+                targetStoreLocation: state.targetStoreLocation,
+                targetStoreTransit: state.targetStoreTransit,
             }),
         },
     ),
