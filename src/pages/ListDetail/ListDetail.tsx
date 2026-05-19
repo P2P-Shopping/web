@@ -45,6 +45,7 @@ interface Item {
     brand?: string;
     quantity?: string;
     price?: number;
+    storeName?: string;
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
@@ -57,6 +58,7 @@ interface ApiListItem {
     brand?: string;
     quantity?: string;
     price?: number;
+    storeName?: string;
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
@@ -218,6 +220,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     checked: Boolean(item.isChecked),
                     brand: item.brand,
                     price: item.price,
+                    storeName: item.storeName,
                     quantity: item.quantity,
                     category: item.category,
                     isRecurrent: item.isRecurrent,
@@ -1217,7 +1220,14 @@ const SuggestionsDropdown = ({
                             onSelect(suggestion);
                         }}
                     >
-                        <span className="font-bold">{suggestion.name}</span>
+                        <div className="flex flex-col gap-0.5">
+                            <span className="font-bold">{suggestion.name}</span>
+                            {suggestion.storeName && (
+                                <span className="text-[10px] text-accent font-bold italic">
+                                    at {suggestion.storeName}
+                                </span>
+                            )}
+                        </div>
                         <div className="flex items-center gap-3 text-[11px]">
                             {suggestion.brand && (
                                 <span className="text-text-muted uppercase opacity-70 tracking-wider">
@@ -1299,7 +1309,12 @@ const ItemNameField = ({
                 maxLength={100}
                 value={value}
                 onChange={(e) => {
-                    onChange(e.target.value);
+                    onChange(
+                        e.target.value.replace(
+                            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                            "",
+                        ),
+                    );
                     onTyping?.();
                 }}
                 onFocus={() => {
@@ -1413,12 +1428,21 @@ const ItemDetailsFields = ({
                 min="0"
                 max="999999999.99"
                 value={price}
-                onChange={(e) => {
-                    const val = e.target.value;
-                    if (val && Number(val) > 999999999.99) {
-                        return;
+                onKeyDown={(e) => {
+                    if (["e", "E", "+", "-"].includes(e.key)) {
+                        e.preventDefault();
                     }
-                    setPrice(val);
+                }}
+                onChange={(e) => {
+                    const val = e.target.value.trim();
+                    if (
+                        val === "" ||
+                        (/^\d*(\.\d*)?$/.test(val) &&
+                            val.length <= 10 &&
+                            (val === "" || Number(val) <= 999999999.99))
+                    ) {
+                        setPrice(val);
+                    }
                 }}
                 placeholder={isMobile ? "0.00" : "e.g., 4.99"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
@@ -1438,7 +1462,14 @@ const ItemDetailsFields = ({
                 type="text"
                 maxLength={50}
                 value={brand}
-                onChange={(e) => setBrand(e.target.value)}
+                onChange={(e) =>
+                    setBrand(
+                        e.target.value.replace(
+                            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                            "",
+                        ),
+                    )
+                }
                 placeholder={isMobile ? "e.g. Zuzu" : "e.g., Organic Valley"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -2458,7 +2489,14 @@ const ListDetail = ({
                             type="text"
                             maxLength={50}
                             value={finishStoreName}
-                            onChange={(e) => setFinishStoreName(e.target.value)}
+                            onChange={(e) =>
+                                setFinishStoreName(
+                                    e.target.value.replace(
+                                        /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                                        "",
+                                    ),
+                                )
+                            }
                             placeholder="e.g. Lidl"
                             className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
                         />
