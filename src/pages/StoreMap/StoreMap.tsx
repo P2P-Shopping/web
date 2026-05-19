@@ -30,6 +30,7 @@ interface CameraState {
 
 interface ThemeColors {
     product: string;
+    productNotFound: string;
     user: string;
     route: string;
 }
@@ -46,6 +47,7 @@ interface CameraBounds {
     maxY: number;
 }
 
+
 const MAP_CONFIG = {
     METERS_PER_DEGREE_LAT: 111320,
     PIXELS_PER_METER: 20,
@@ -56,6 +58,40 @@ const MAP_CONFIG = {
 };
 
 const USER_GPS_DEFAULT = { lat: 47.151726, lng: 27.587914 };
+
+// --- ADAUGĂ ACEST BLOC ---
+// Reprezentăm colțurile fizice ale hărții SVG în coordonate GPS
+// (Aliniat cu datele din 99-demo-sprint.sql, Latitudine 47.155 - 47.157)
+const STORE_BOUNDS = {
+    bl: { lat: 47.155000, lng: 27.585500 }, // Stânga-Jos (Aliniat cu DB)
+    tr: { lat: 47.157500, lng: 27.588500 }  // Dreapta-Sus (Aliniat cu DB)
+};
+
+// --- ADAUGĂ ACEST BLOC ---
+// Design SVG modern, dark mode, pentru layout-ul magazinului.
+const STORE_SVG = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500">
+  <rect width="400" height="500" fill="#1e1e26" rx="12" stroke="#3D3D4A" stroke-width="4"/>
+  
+  <rect x="150" y="490" width="100" height="10" fill="#00D4FF" />
+  <text x="200" y="480" fill="#00D4FF" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle" letter-spacing="2">INTRARE</text>
+
+  <rect x="30" y="50" width="40" height="350" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
+  <rect x="100" y="50" width="40" height="350" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
+
+  <rect x="180" y="80" width="180" height="40" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
+  <rect x="180" y="160" width="180" height="40" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
+  <rect x="180" y="240" width="180" height="40" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
+
+  <circle cx="320" cy="340" r="30" fill="#2D2D3A" stroke="#4A4A5A" stroke-width="2"/>
+  <circle cx="250" cy="340" r="30" fill="#2D2D3A" stroke="#4A4A5A" stroke-width="2"/>
+  <text x="285" y="345" fill="#555566" font-family="sans-serif" font-size="12" font-weight="bold" text-anchor="middle">FRUCTE</text>
+
+  <rect x="250" y="440" width="100" height="20" fill="#3D3D4A" rx="4" />
+  <rect x="250" y="410" width="100" height="20" fill="#3D3D4A" rx="4" />
+  <text x="300" y="475" fill="#555566" font-family="sans-serif" font-size="12" font-weight="bold" text-anchor="middle">CASE DE MARCAT</text>
+</svg>
+`)}`;
 
 const getRelativePixels = (
     target: Coordinate,
@@ -71,38 +107,6 @@ const getRelativePixels = (
         -(dLat * MAP_CONFIG.METERS_PER_DEGREE_LAT) *
         MAP_CONFIG.PIXELS_PER_METER;
     return { x, y };
-};
-
-const generateLocalProducts = (centerGps: Coordinate): RoutePoint[] => {
-    const latOffset = 0.00015;
-    const lngOffset = 0.00015;
-
-    return [
-        {
-            itemId: "1",
-            lat: centerGps.lat + latOffset,
-            lng: centerGps.lng + lngOffset,
-            name: "Milk",
-        },
-        {
-            itemId: "2",
-            lat: centerGps.lat - latOffset,
-            lng: centerGps.lng - lngOffset,
-            name: "Bread",
-        },
-        {
-            itemId: "3",
-            lat: centerGps.lat + latOffset * 1.5,
-            lng: centerGps.lng - lngOffset * 0.5,
-            name: "Apples",
-        },
-        {
-            itemId: "4",
-            lat: centerGps.lat - latOffset * 0.8,
-            lng: centerGps.lng + lngOffset * 1.2,
-            name: "Coffee",
-        },
-    ];
 };
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -147,13 +151,6 @@ const getCameraConstraints = (
     };
 };
 
-interface RoutePoint {
-    itemId: string;
-    name: string;
-    lat: number;
-    lng: number;
-}
-
 const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const [isDragging, setIsDragging] = useState(false);
     const [hasLocationLock, setHasLocationLock] = useState(false);
@@ -163,7 +160,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const originGps = useRef<Coordinate | null>(null);
     const targetGps = useRef<Coordinate>({ lat: 0, lng: 0 });
     const currentRenderedGps = useRef<Coordinate>({ lat: 0, lng: 0 });
-    const routePoints = useRef<RoutePoint[]>([]);
     const isFirstLocationUpdate = useRef(true);
     const camera = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
     const userLocation = useStore((state) => state.userLocation);
@@ -174,6 +170,16 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         initialZoom: number;
         initialPinchWorld: Point | null;
     }>({ initialDist: 0, initialZoom: 1, initialPinchWorld: null });
+
+    // --- ADAUGĂ ACEST BLOC ---
+    // NOU: Încarcă SVG-ul în memorie o singură dată
+    const storeImgRef = useRef<HTMLImageElement | null>(null);
+    useEffect(() => {
+        const img = new Image();
+        img.src = STORE_SVG;
+        img.onload = () => { storeImgRef.current = img; };
+    }, []);
+    // -------------------------
 
     const clampCameraPosition = (
         nextX: number,
@@ -199,8 +205,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         };
 
         const pointsToBound = [];
-        if (routePoints.current.length > 0) {
-            for (const p of routePoints.current) {
+        if (storeRoute.length > 0) {
+            for (const p of storeRoute) {
                 pointsToBound.push(getRelativePixels(p, anchor));
             }
         }
@@ -227,13 +233,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
     useEffect(() => {
         if (!hasLocationLock) return;
-
-        if (navigationMode === "indoor") {
-            routePoints.current = storeRoute.length > 0 ? storeRoute : [];
-        } else if (originGps.current) {
-            routePoints.current = generateLocalProducts(originGps.current);
-        }
-
         setIsRouting(false);
     }, [hasLocationLock, navigationMode, storeRoute]);
 
@@ -249,6 +248,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
             product:
                 rootStyles.getPropertyValue("--color-accent").trim() ||
                 "#FF3366",
+            productNotFound: "#555566", // GRI pentru 0% Confidence
             user:
                 rootStyles.getPropertyValue("--color-blue-neon").trim() ||
                 "#00D4FF",
@@ -317,37 +317,78 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     anchor,
                 );
 
-                if (routePoints.current.length > 0) {
+                // --- ADAUGĂ ACEST BLOC ---
+                // --- NOU: Desenează Harta (Background SVG) CALIBRATĂ PERFECT ---
+                if (storeImgRef.current) {
+                    const bl = getRelativePixels(STORE_BOUNDS.bl, anchor);
+                    const tr = getRelativePixels(STORE_BOUNDS.tr, anchor);
+                    const width = tr.x - bl.x;
+                    const height = bl.y - tr.y;
+                    ctx.drawImage(storeImgRef.current, bl.x, tr.y, width, height);
+                }
+                // ---------------------------------------------------------------
+
+                // --- MODIFICARE: Logica de afisare Traseu cu Săgeți ---
+                if (storeRoute.length > 0) {
+                    const pulseIntensity = Math.abs(Math.sin(timestamp / 500)) / 2 + 0.5; // Pulsează între 0.5 și 1
+
                     ctx.beginPath();
                     ctx.strokeStyle = theme.route;
                     ctx.lineWidth = 4 / camera.current.zoom;
+                    ctx.globalAlpha = pulseIntensity;
                     ctx.setLineDash([
                         10 / camera.current.zoom,
                         10 / camera.current.zoom,
                     ]);
                     ctx.moveTo(userPos.x, userPos.y);
-                    routePoints.current.forEach((product) => {
+                    
+                    // Desenăm linia
+                    storeRoute.forEach((product) => {
                         const { x, y } = getRelativePixels(product, anchor);
                         ctx.lineTo(x, y);
                     });
                     ctx.stroke();
                     ctx.setLineDash([]);
+                    ctx.globalAlpha = 1;
+
+                    // Adăugăm săgeți de direcție pe linia punctată (simplificat)
+                    if (camera.current.zoom > 1.2) {
+                        ctx.fillStyle = theme.route;
+                        storeRoute.forEach((product) => {
+                            const { x, y } = getRelativePixels(product, anchor);
+                            ctx.beginPath();
+                            ctx.arc(x, y, 10 / camera.current.zoom, 0, Math.PI * 2);
+                            ctx.fill();
+                        });
+                    }
                 }
 
-                routePoints.current.forEach((product) => {
+                // --- MODIFICARE: Logica de afisare Produse ---
+                storeRoute.forEach((product) => {
                     const { x, y } = getRelativePixels(product, anchor);
+                    const dotSize = 7 / camera.current.zoom;
+
                     ctx.beginPath();
-                    ctx.arc(x, y, 8 / camera.current.zoom, 0, Math.PI * 2);
-                    ctx.fillStyle = theme.product;
+                    ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+                    
+                    // NOU: Facem produsul GRI dacă are 0% Confidence (sau nu e localizat)
+                if ((product as any).confidence_score === 0.9595) {                        ctx.fillStyle = theme.product;
+                    } else {
+                        ctx.fillStyle = theme.productNotFound;
+                    }
+                    
                     ctx.fill();
 
-                    ctx.fillStyle = "white";
-                    ctx.font = `bold ${12 / camera.current.zoom}px Inter, sans-serif`;
-                    ctx.fillText(
-                        product.name,
-                        x + 12 / camera.current.zoom,
-                        y + 4 / camera.current.zoom,
-                    );
+                    // NOU: Afișăm textul doar la Zoom mai mare
+                    if (camera.current.zoom > 1.8) {
+                        ctx.fillStyle = "white";
+                        ctx.font = `bold ${10 / camera.current.zoom}px Inter, sans-serif`;
+                        ctx.fillText(
+                            product.name,
+                            x + dotSize + 4 / camera.current.zoom,
+                            y + dotSize / 2,
+                        );
+                    }
                 });
 
                 ctx.beginPath();
@@ -378,7 +419,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
         animationFrameId = requestAnimationFrame(renderLoop);
         return () => cancelAnimationFrame(animationFrameId);
-    }, [canvasRef, hasLocationLock]);
+    }, [canvasRef, hasLocationLock, storeRoute, isRouting]);
 
     useEffect(() => {
         if (!("geolocation" in navigator)) {
