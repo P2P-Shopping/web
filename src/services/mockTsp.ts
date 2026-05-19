@@ -59,7 +59,7 @@ export function calculateMockTspRoute(
                     audio_instruction: "Încadrează-te pe culoarul principal.",
                 } as unknown as RoutePoint);
             } else {
-                 // Ne mișcăm întâi pe axa Y (Latitudine), apoi pe X (Longitudine)
+                // Ne mișcăm întâi pe axa Y (Latitudine), apoi pe X (Longitudine)
                 orderedRoute.push({
                     itemId: `waypoint-${nextPoint.itemId}-2`,
                     name: "Culoar",

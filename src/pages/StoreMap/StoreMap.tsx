@@ -47,7 +47,6 @@ interface CameraBounds {
     maxY: number;
 }
 
-
 const MAP_CONFIG = {
     METERS_PER_DEGREE_LAT: 111320,
     PIXELS_PER_METER: 20,
@@ -59,39 +58,7 @@ const MAP_CONFIG = {
 
 const USER_GPS_DEFAULT = { lat: 47.151726, lng: 27.587914 };
 
-// --- ADAUGĂ ACEST BLOC ---
-// Reprezentăm colțurile fizice ale hărții SVG în coordonate GPS
-// (Aliniat cu datele din 99-demo-sprint.sql, Latitudine 47.155 - 47.157)
-const STORE_BOUNDS = {
-    bl: { lat: 47.155000, lng: 27.585500 }, // Stânga-Jos (Aliniat cu DB)
-    tr: { lat: 47.157500, lng: 27.588500 }  // Dreapta-Sus (Aliniat cu DB)
-};
-
-// --- ADAUGĂ ACEST BLOC ---
-// Design SVG modern, dark mode, pentru layout-ul magazinului.
-const STORE_SVG = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500">
-  <rect width="400" height="500" fill="#1e1e26" rx="12" stroke="#3D3D4A" stroke-width="4"/>
-  
-  <rect x="150" y="490" width="100" height="10" fill="#00D4FF" />
-  <text x="200" y="480" fill="#00D4FF" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle" letter-spacing="2">INTRARE</text>
-
-  <rect x="30" y="50" width="40" height="350" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
-  <rect x="100" y="50" width="40" height="350" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
-
-  <rect x="180" y="80" width="180" height="40" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
-  <rect x="180" y="160" width="180" height="40" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
-  <rect x="180" y="240" width="180" height="40" fill="#2D2D3A" rx="4" stroke="#4A4A5A" stroke-width="2"/>
-
-  <circle cx="320" cy="340" r="30" fill="#2D2D3A" stroke="#4A4A5A" stroke-width="2"/>
-  <circle cx="250" cy="340" r="30" fill="#2D2D3A" stroke="#4A4A5A" stroke-width="2"/>
-  <text x="285" y="345" fill="#555566" font-family="sans-serif" font-size="12" font-weight="bold" text-anchor="middle">FRUCTE</text>
-
-  <rect x="250" y="440" width="100" height="20" fill="#3D3D4A" rx="4" />
-  <rect x="250" y="410" width="100" height="20" fill="#3D3D4A" rx="4" />
-  <text x="300" y="475" fill="#555566" font-family="sans-serif" font-size="12" font-weight="bold" text-anchor="middle">CASE DE MARCAT</text>
-</svg>
-`)}`;
+// Removed hardcoded store bounds and SVG.
 
 const getRelativePixels = (
     target: Coordinate,
@@ -171,15 +138,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         initialPinchWorld: Point | null;
     }>({ initialDist: 0, initialZoom: 1, initialPinchWorld: null });
 
-    // --- ADAUGĂ ACEST BLOC ---
-    // NOU: Încarcă SVG-ul în memorie o singură dată
-    const storeImgRef = useRef<HTMLImageElement | null>(null);
-    useEffect(() => {
-        const img = new Image();
-        img.src = STORE_SVG;
-        img.onload = () => { storeImgRef.current = img; };
-    }, []);
-    // -------------------------
+    // Removed static SVG background.
 
     const clampCameraPosition = (
         nextX: number,
@@ -230,6 +189,107 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
     const storeRoute = useStore((state) => state.route);
     const navigationMode = useStore((state) => state.navigationMode);
+    const targetStoreId = useStore((state) => state.targetStoreId);
+
+    // --- NOU: Stare pentru Perimetrul Magazinului (GeoJSON Polygon) ---
+    const [storePolygon, setStorePolygon] = useState<Coordinate[] | null>(null);
+
+    useEffect(() => {
+        if (!targetStoreId) return;
+        const fetchPolygon = async () => {
+            try {
+                const apiBase =
+                    import.meta.env.VITE_API_URL ||
+                    import.meta.env.VITE_API_BASE_URL ||
+                    "http://localhost:8081";
+                const baseUrl = apiBase === "/" ? "" : apiBase;
+                const res = await fetch(
+                    `${baseUrl}/api/routing/store/${targetStoreId}/polygon`,
+                );
+                if (res.ok) {
+                    const geojsonStr = await res.text();
+                    const geojson = JSON.parse(geojsonStr);
+                    if (
+                        geojson.type === "Polygon" &&
+                        geojson.coordinates.length > 0
+                    ) {
+                        const coords = geojson.coordinates[0].map(
+                            (c: [number, number]) => ({
+                                lng: c[0],
+                                lat: c[1],
+                            }),
+                        );
+                        setStorePolygon(coords);
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not fetch store polygon", err);
+            }
+        };
+        fetchPolygon();
+    }, [targetStoreId]);
+
+    const centerOnPolygon = () => {
+        if (!storePolygon || storePolygon.length === 0 || !originGps.current)
+            return;
+        let sumLat = 0;
+        let sumLng = 0;
+        storePolygon.forEach((p) => {
+            sumLat += p.lat;
+            sumLng += p.lng;
+        });
+        const centerLat = sumLat / storePolygon.length;
+        const centerLng = sumLng / storePolygon.length;
+
+        const anchor = originGps.current;
+        const centerPixels = getRelativePixels(
+            { lat: centerLat, lng: centerLng },
+            anchor,
+        );
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        // Calculate bounds of polygon to determine zoom
+        let minX = Number.POSITIVE_INFINITY,
+            maxX = Number.NEGATIVE_INFINITY;
+        let minY = Number.POSITIVE_INFINITY,
+            maxY = Number.NEGATIVE_INFINITY;
+        storePolygon.forEach((coord) => {
+            const p = getRelativePixels(coord, anchor);
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+        });
+
+        const polyWidth = maxX - minX;
+        const polyHeight = maxY - minY;
+
+        let newZoom = camera.current.zoom;
+        if (polyWidth > 0 && polyHeight > 0) {
+            const zoomX = rect.width / (polyWidth * 1.2);
+            const zoomY = rect.height / (polyHeight * 1.2);
+            newZoom = clamp(
+                Math.min(zoomX, zoomY),
+                MAP_CONFIG.MIN_ZOOM,
+                MAP_CONFIG.MAX_ZOOM,
+            );
+        }
+
+        camera.current.zoom = newZoom;
+        clampCameraPosition(
+            -centerPixels.x * newZoom,
+            -centerPixels.y * newZoom,
+            newZoom,
+        );
+    };
+
+    // Recalculează bounds-urile magazinului
+    useEffect(() => {
+        if (storePolygon && storePolygon.length > 0 && hasLocationLock) {
+            centerOnPolygon();
+        }
+    }, [storePolygon, hasLocationLock]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
@@ -247,7 +307,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         const theme: ThemeColors = {
             product:
                 rootStyles.getPropertyValue("--color-accent").trim() ||
-                "#FF3366",
+                "#e024c5", // Roz / Mov
             productNotFound: "#555566", // GRI pentru 0% Confidence
             user:
                 rootStyles.getPropertyValue("--color-blue-neon").trim() ||
@@ -317,20 +377,88 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     anchor,
                 );
 
-                // --- ADAUGĂ ACEST BLOC ---
-                // --- NOU: Desenează Harta (Background SVG) CALIBRATĂ PERFECT ---
-                if (storeImgRef.current) {
-                    const bl = getRelativePixels(STORE_BOUNDS.bl, anchor);
-                    const tr = getRelativePixels(STORE_BOUNDS.tr, anchor);
-                    const width = tr.x - bl.x;
-                    const height = bl.y - tr.y;
-                    ctx.drawImage(storeImgRef.current, bl.x, tr.y, width, height);
+                // --- NOU: Desenează Perimetrul Magazinului ---
+                if (storePolygon && storePolygon.length > 0) {
+                    ctx.beginPath();
+                    storePolygon.forEach((coord, idx) => {
+                        const p = getRelativePixels(coord, anchor);
+                        if (idx === 0) ctx.moveTo(p.x, p.y);
+                        else ctx.lineTo(p.x, p.y);
+                    });
+                    ctx.closePath();
+                    // Umplem cu culoarea de suprafață a magazinului
+                    ctx.fillStyle = "#1e1e26";
+                    ctx.fill();
+                    ctx.lineWidth = 4 / camera.current.zoom;
+                    ctx.strokeStyle = "#3D3D4A";
+                    ctx.stroke();
+                }
+
+                // --- NOU: Desenează Rafturi Dinamice bazate pe produse ---
+                if (storeRoute.length > 0) {
+                    ctx.save();
+                    // Clip to store polygon if it exists
+                    if (storePolygon && storePolygon.length > 0) {
+                        ctx.beginPath();
+                        storePolygon.forEach((coord, idx) => {
+                            const p = getRelativePixels(coord, anchor);
+                            if (idx === 0) ctx.moveTo(p.x, p.y);
+                            else ctx.lineTo(p.x, p.y);
+                        });
+                        ctx.closePath();
+                        ctx.clip();
+                    }
+
+                    ctx.fillStyle = "#2D2D3A";
+                    ctx.strokeStyle = "#4A4A5A";
+                    ctx.lineWidth = 2 / camera.current.zoom;
+
+                    storeRoute.forEach((product) => {
+                        const { x, y } = getRelativePixels(product, anchor);
+                        const instruction = (
+                            product.audio_instruction || ""
+                        ).toLowerCase();
+
+                        const shelfWidth = 40 / camera.current.zoom;
+                        const shelfHeight = 80 / camera.current.zoom;
+                        const shelfRadius = 4 / camera.current.zoom;
+                        let shelfX = x;
+                        let shelfY = y;
+
+                        if (instruction.includes("dreapta")) {
+                            shelfX = x - 5 / camera.current.zoom;
+                            shelfY = y - shelfHeight / 2;
+                        } else if (
+                            instruction.includes("stânga") ||
+                            instruction.includes("stanga")
+                        ) {
+                            shelfX = x - shelfWidth + 5 / camera.current.zoom;
+                            shelfY = y - shelfHeight / 2;
+                        } else {
+                            // Default behind the product
+                            shelfX = x - shelfWidth / 2;
+                            shelfY = y - shelfHeight + 5 / camera.current.zoom;
+                        }
+
+                        ctx.beginPath();
+                        ctx.roundRect(
+                            shelfX,
+                            shelfY,
+                            shelfWidth,
+                            shelfHeight,
+                            shelfRadius,
+                        );
+                        ctx.fill();
+                        ctx.stroke();
+                    });
+                    ctx.restore();
                 }
                 // ---------------------------------------------------------------
 
                 // --- MODIFICARE: Logica de afisare Traseu cu Săgeți ---
                 if (storeRoute.length > 0) {
-                    const pulseIntensity = Math.abs(Math.sin(timestamp / 500)) / 2 + 0.5; // Pulsează între 0.5 și 1
+                    const pulseIntensity =
+                        Math.abs(Math.sin(timestamp / 500)) / 2 + 0.5; // Pulsează între 0.5 și 1
 
                     ctx.beginPath();
                     ctx.strokeStyle = theme.route;
@@ -341,11 +469,15 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                         10 / camera.current.zoom,
                     ]);
                     ctx.moveTo(userPos.x, userPos.y);
-                    
-                    // Desenăm linia
+
+                    // Desenăm linia (mai logică vizual - ortogonală pentru a sugera culoare)
+                    let lastP = userPos;
                     storeRoute.forEach((product) => {
                         const { x, y } = getRelativePixels(product, anchor);
+                        // Ne mutăm mai întâi pe axa Y (sau X), pentru a simula "culoare" de magazin
+                        ctx.lineTo(lastP.x, y);
                         ctx.lineTo(x, y);
+                        lastP = { x, y };
                     });
                     ctx.stroke();
                     ctx.setLineDash([]);
@@ -357,7 +489,13 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                         storeRoute.forEach((product) => {
                             const { x, y } = getRelativePixels(product, anchor);
                             ctx.beginPath();
-                            ctx.arc(x, y, 10 / camera.current.zoom, 0, Math.PI * 2);
+                            ctx.arc(
+                                x,
+                                y,
+                                10 / camera.current.zoom,
+                                0,
+                                Math.PI * 2,
+                            );
                             ctx.fill();
                         });
                     }
@@ -370,13 +508,20 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
                     ctx.beginPath();
                     ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-                    
+
                     // NOU: Facem produsul GRI dacă are 0% Confidence (sau nu e localizat)
-                if ((product as any).confidence_score === 0.9595) {                        ctx.fillStyle = theme.product;
-                    } else {
+                    if ((product as any).confidence_score === 0.9595) {
+                        ctx.fillStyle = theme.product;
+                    } else if (
+                        (product as any).confidence_score !== undefined &&
+                        (product as any).confidence_score < 0.1
+                    ) {
                         ctx.fillStyle = theme.productNotFound;
+                    } else {
+                        // Default color
+                        ctx.fillStyle = theme.product;
                     }
-                    
+
                     ctx.fill();
 
                     // NOU: Afișăm textul doar la Zoom mai mare
@@ -642,7 +787,13 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         gpsError,
         isRouting,
         currentGps: currentRenderedGps.current,
-        recenterCamera,
+        recenterCamera: () => {
+            if (storePolygon && storePolygon.length > 0) {
+                centerOnPolygon();
+            } else {
+                recenterCamera();
+            }
+        },
         zoomIn,
         zoomOut,
         exitIndoor: () => setNavigationMode("city"),
@@ -791,7 +942,7 @@ const StoreMap: React.FC<StoreMapProps> = ({
             </div>
 
             {/* Map Control Bar - Separated from map view */}
-            <div className="relative z-[3000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
+            <div className="relative z-3000 bg-surface/80 backdrop-blur-xl border-t border-border h-21 px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
                 <div className="flex items-center gap-4">
                     <button
                         type="button"

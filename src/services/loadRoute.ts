@@ -6,11 +6,24 @@ import { calculateRoute, pollFullRoute } from "./routingService";
 
 let activePollCleanup: (() => void) | null = null;
 
-const PALAS_ITEMS: Record<string, { name: string; lat: number; lng: number }> = {
-    "aaaa1111-1111-1111-1111-111111111111": { name: "Lapte Test", lat: 47.15700, lng: 27.58606 },
-    "aaaa2222-2222-2222-2222-222222222222": { name: "Pâine Test", lat: 47.15685, lng: 27.58752 },
-    "aaaa3333-3333-3333-3333-333333333333": { name: "Mere Test", lat: 47.15600, lng: 27.58771 },
-};
+const PALAS_ITEMS: Record<string, { name: string; lat: number; lng: number }> =
+    {
+        "aaaa1111-1111-1111-1111-111111111111": {
+            name: "Lapte Test",
+            lat: 47.157,
+            lng: 27.58606,
+        },
+        "aaaa2222-2222-2222-2222-222222222222": {
+            name: "Pâine Test",
+            lat: 47.15685,
+            lng: 27.58752,
+        },
+        "aaaa3333-3333-3333-3333-333333333333": {
+            name: "Mere Test",
+            lat: 47.156,
+            lng: 27.58771,
+        },
+    };
 
 export const loadRoute = async (
     productIds: string[],
@@ -36,7 +49,9 @@ export const loadRoute = async (
             serverData?.status === "success" &&
             (serverData?.route?.length ?? 0) > 0
         ) {
-            console.log("[loadRoute] Successfully received route from server API");
+            console.log(
+                "[loadRoute] Successfully received route from server API",
+            );
             setRoute(serverData.route);
             setRouteWarnings(serverData.warnings ?? []);
             setStatus(
@@ -59,7 +74,10 @@ export const loadRoute = async (
                         activePollCleanup = null;
                     },
                     (error) => {
-                        console.warn("[loadRoute] Full route polling failed:", error);
+                        console.warn(
+                            "[loadRoute] Full route polling failed:",
+                            error,
+                        );
                         setStatus("Partial route loaded from server.");
                         activePollCleanup = null;
                     },
@@ -86,8 +104,8 @@ export const loadRoute = async (
 
     // Baza de la care începem să distribuim produsele de test
     // Am modificat coordonatele pentru a fi mai "sus" și mai "la dreapta", exact în centrul magazinului
-    const baseLat = 47.151820;
-    const baseLng = 27.587850;
+    const baseLat = 47.15182;
+    const baseLng = 27.58785;
     let testItemIndex = 0;
 
     for (const id of ids) {
@@ -143,7 +161,8 @@ export const loadRoute = async (
 
     orderedRoute.forEach((point, index) => {
         if (!point.audio_instruction) {
-             point.audio_instruction = mockInstructions[index] || mockInstructions.at(-1);
+            point.audio_instruction =
+                mockInstructions[index] || mockInstructions.at(-1);
         }
     });
 
