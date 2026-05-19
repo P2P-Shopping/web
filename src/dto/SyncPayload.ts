@@ -7,6 +7,8 @@ export type ActionType =
     | "DELETE"
     | "BULK_DELETE"
     | "CHECK_OFF"
+    | "CLAIM_ITEM"
+    | "UNCLAIM_ITEM"
     | "TYPING"
     | "UNKNOWN";
 
@@ -38,6 +40,9 @@ export interface SyncPayload {
 
     /** Status of the operation, returned by the server. */
     status?: "Success" | "Rejection";
+
+    /** The email of the user who claimed the item (used for CLAIM_ITEM/UNCLAIM_ITEM). */
+    claimedBy?: string;
 }
 
 /**
