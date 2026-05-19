@@ -1,7 +1,7 @@
 import polyline from "@mapbox/polyline";
 import L from "leaflet";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Circle,
     MapContainer,
@@ -114,13 +114,12 @@ const geocodeStore = async (
     return null;
 };
 
-const mapApiStoreToRecommendation = async (
-    store: ApiStoreMatch,
+const fetchMacroTransit = async (
+    storeId: string,
     userLocation: { lat: number; lng: number },
     baseUrl: string,
-    itemCount: number,
-): Promise<StoreRecommendation> => {
-    const realTransit = {
+) => {
+    const transit = {
         driving: { timeMins: 10, distanceKm: "2.0" },
         walking: { timeMins: 30, distanceKm: "2.0" },
     };
@@ -129,32 +128,31 @@ const mapApiStoreToRecommendation = async (
         const params = new URLSearchParams({
             userLat: String(userLocation.lat),
             userLng: String(userLocation.lng),
-            storeId: store.storeId,
+            storeId,
         });
-        const macroRes = await fetch(`${baseUrl}/api/routing/macro?${params}`);
-        if (macroRes.ok) {
-            const macroData = await macroRes.json();
-            if (macroData.driving) {
-                realTransit.driving = {
-                    timeMins: Math.round(
-                        macroData.driving.durationSeconds / 60,
-                    ),
-                    distanceKm: (macroData.driving.distanceM / 1000).toFixed(1),
-                };
-            }
-            if (macroData.walking) {
-                realTransit.walking = {
-                    timeMins: Math.round(
-                        macroData.walking.durationSeconds / 60,
-                    ),
-                    distanceKm: (macroData.walking.distanceM / 1000).toFixed(1),
-                };
-            }
+        const res = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+        if (!res.ok) return transit;
+
+        const data = await res.json();
+        if (data.driving) {
+            transit.driving = {
+                timeMins: Math.round(data.driving.durationSeconds / 60),
+                distanceKm: (data.driving.distanceM / 1000).toFixed(1),
+            };
+        }
+        if (data.walking) {
+            transit.walking = {
+                timeMins: Math.round(data.walking.durationSeconds / 60),
+                distanceKm: (data.walking.distanceM / 1000).toFixed(1),
+            };
         }
     } catch (err) {
         console.warn("Could not fetch macro-routing", err);
     }
+    return transit;
+};
 
+const extractCoordsFromStore = (store: ApiStoreMatch) => {
     const parseNumber = (v: unknown) =>
         v != null && v !== "" ? Number(v) : Number.NaN;
 
@@ -166,6 +164,7 @@ const mapApiStoreToRecommendation = async (
         store.point?.lat ??
         store.y ??
         store.py;
+
     const rawLng =
         store.lng ??
         store.longitude ??
@@ -178,8 +177,22 @@ const mapApiStoreToRecommendation = async (
         store.px ??
         store.lon;
 
-    let lat = parseNumber(rawLat);
-    let lng = parseNumber(rawLng);
+    return { lat: parseNumber(rawLat), lng: parseNumber(rawLng) };
+};
+
+const mapApiStoreToRecommendation = async (
+    store: ApiStoreMatch,
+    userLocation: { lat: number; lng: number },
+    baseUrl: string,
+    itemCount: number,
+): Promise<StoreRecommendation> => {
+    const realTransit = await fetchMacroTransit(
+        store.storeId,
+        userLocation,
+        baseUrl,
+    );
+
+    let { lat, lng } = extractCoordsFromStore(store);
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) {
         const coords = await geocodeStore(
@@ -680,7 +693,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
 
         setDisappearingItemIds((prev) => new Set(prev).add(item.id));
 
-        window.setTimeout(async () => {
+        globalThis.setTimeout(async () => {
             const updatedItems = items.map((entry) =>
                 entry.id === item.id ? { ...entry, checked: true } : entry,
             );
@@ -702,10 +715,11 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
 
     useEffect(() => {
         setDisappearingItemIds((prev) => {
+            const activeUncheckedIds = new Set(
+                items.filter((i) => !i.checked).map((i) => i.id),
+            );
             const next = new Set(
-                [...prev].filter((itemId) =>
-                    items.some((item) => item.id === itemId && !item.checked),
-                ),
+                [...prev].filter((id) => activeUncheckedIds.has(id)),
             );
             return next.size === prev.size ? prev : next;
         });
@@ -862,6 +876,85 @@ const useStoreFootprint = (activeTarget: { lat: number; lng: number }) => {
     return footprint;
 };
 
+const useAudioNavigation = (
+    userLocation: Coordinate,
+    route: RoutePoint[],
+    navigationMode: "city" | "indoor",
+    isAudioEnabled: boolean,
+) => {
+    const spokenNodesRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (
+            !isAudioEnabled ||
+            navigationMode !== "indoor" ||
+            route.length === 0
+        ) {
+            return;
+        }
+
+        if (!("speechSynthesis" in globalThis)) {
+            console.warn("Browser does not support speech synthesis.");
+            return;
+        }
+
+        route.forEach((point) => {
+            const distance = getDistanceMeters(userLocation, {
+                lat: point.lat,
+                lng: point.lng,
+            });
+            const nodeId = point.itemId || `${point.lat}-${point.lng}`;
+
+            if (distance <= 4 && !spokenNodesRef.current.has(nodeId)) {
+                spokenNodesRef.current.add(nodeId);
+
+                const instructionText =
+                    point.audio_instruction || `Te apropii de ${point.name}`;
+
+                try {
+                    const AudioCtxConstructor =
+                        globalThis.AudioContext ??
+                        (
+                            globalThis as {
+                                webkitAudioContext?: typeof AudioContext;
+                            }
+                        ).webkitAudioContext;
+                    if (!AudioCtxConstructor) return;
+                    const audioCtx = new AudioCtxConstructor();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.type = "sine";
+                    oscillator.frequency.setValueAtTime(
+                        880,
+                        audioCtx.currentTime,
+                    );
+                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.1);
+                } catch (e) {
+                    console.warn("Audio beep failed", e);
+                }
+
+                const utterance = new SpeechSynthesisUtterance(instructionText);
+                utterance.lang = "ro-RO";
+                utterance.rate = 1;
+
+                setTimeout(() => {
+                    globalThis.speechSynthesis.speak(utterance);
+                }, 150);
+            }
+        });
+    }, [userLocation, route, navigationMode, isAudioEnabled]);
+
+    const resetSpokenNodes = useCallback(() => {
+        spokenNodesRef.current.clear();
+    }, []);
+
+    return { resetSpokenNodes };
+};
+
 const UnifiedMap: React.FC = () => {
     const userLocation = useStore((state) => state.userLocation);
     const setUserLocation = useStore((state) => state.setUserLocation);
@@ -899,9 +992,15 @@ const UnifiedMap: React.FC = () => {
         "driving",
     );
     const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-    const spokenNodesRef = useRef<Set<string>>(new Set());
     const routeOriginRef = useRef<Coordinate | null>(null);
     const lastDeviationRecalcRef = useRef<Coordinate | null>(null);
+
+    const { resetSpokenNodes } = useAudioNavigation(
+        userLocation,
+        route,
+        navigationMode,
+        isAudioEnabled,
+    );
     const isMicroView = navigationMode === "indoor";
 
     const activeTarget = targetStoreLocation || DEMO_STORE_LOCATION;
@@ -1036,72 +1135,7 @@ const UnifiedMap: React.FC = () => {
     ]);
 
     // --- AUDIO NAVIGATION LOGIC ---
-    useEffect(() => {
-        if (
-            navigationMode !== "indoor" ||
-            route.length === 0 ||
-            !isAudioEnabled
-        ) {
-            return;
-        }
-
-        if (!("speechSynthesis" in globalThis)) {
-            console.warn("Browser does not support speech synthesis.");
-            return;
-        }
-
-        route.forEach((point) => {
-            const distance = getDistanceMeters(userLocation, {
-                lat: point.lat,
-                lng: point.lng,
-            });
-            const nodeId = point.itemId || `${point.lat}-${point.lng}`;
-
-            if (distance <= 4 && !spokenNodesRef.current.has(nodeId)) {
-                spokenNodesRef.current.add(nodeId);
-
-                // CORECTURĂ: Folosim proprietatea camelCase trimisă de Spring Boot
-                const instructionText =
-                    point.audio_instruction || `Te apropii de ${point.name}`;
-                // SUNET DE NOTIFICARE (Beep) înainte de vorbire
-                try {
-                    const AudioCtxConstructor =
-                        globalThis.AudioContext ??
-                        (
-                            globalThis as {
-                                webkitAudioContext?: typeof AudioContext;
-                            }
-                        ).webkitAudioContext;
-                    if (!AudioCtxConstructor) return;
-                    const audioCtx = new AudioCtxConstructor();
-                    const oscillator = audioCtx.createOscillator();
-                    const gainNode = audioCtx.createGain();
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    oscillator.type = "sine";
-                    oscillator.frequency.setValueAtTime(
-                        880,
-                        audioCtx.currentTime,
-                    );
-                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                    oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.1);
-                } catch (e) {
-                    console.warn("Audio beep failed", e);
-                }
-
-                const utterance = new SpeechSynthesisUtterance(instructionText);
-                utterance.lang = "ro-RO"; // Setăm limba română pentru textele din backend
-                utterance.rate = 1;
-
-                // Mic delay pentru a lăsa beep-ul să se audă primul
-                setTimeout(() => {
-                    globalThis.speechSynthesis.speak(utterance);
-                }, 150);
-            }
-        });
-    }, [userLocation, route, navigationMode, isAudioEnabled]);
-
+    // Extracting audio logic to useAudioNavigation hook...
     const handleListSelect = (listId: string) => {
         const selectedList = lists.find((l) => l.id === listId);
         if (!selectedList) return;
@@ -1471,7 +1505,7 @@ const UnifiedMap: React.FC = () => {
                                     if (isAudioEnabled) {
                                         globalThis.speechSynthesis.cancel();
                                     } else {
-                                        spokenNodesRef.current.clear();
+                                        resetSpokenNodes();
                                     }
                                     setIsAudioEnabled(!isAudioEnabled);
                                 }}
