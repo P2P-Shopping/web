@@ -31,7 +31,11 @@ api.interceptors.response.use(
 
         if (axios.isAxiosError(error) && error.response?.status === 401) {
             if (!globalThis.location.pathname.includes("/login")) {
-                useStore.getState().setAuth(null, null);
+                // Afișăm în consolă FIX request-ul care declanșează nebunia
+                console.error("⚠️ 401 Interceptat de la request-ul:", error.config?.url);
+                
+                // COMENTĂM ASTA TEMPORAR CA SĂ NU TE MAI DEA AFARĂ:
+                // useStore.getState().setAuth(null, null); 
             }
         }
         return Promise.reject(error);
