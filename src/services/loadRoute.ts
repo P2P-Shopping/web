@@ -4,55 +4,24 @@ import { useStore } from "../context/useStore";
 import { calculateMockTspRoute, type MockRouteSeed } from "./mockTsp";
 import { calculateRoute, pollFullRoute } from "./routingService";
 
-// Module-level cleanup to prevent multiple polling loops from accumulating
 let activePollCleanup: (() => void) | null = null;
 
 const PALAS_ITEMS: Record<string, { name: string; lat: number; lng: number }> =
     {
-        "11111111-a1b2-c3d4-e5f6-1234567890ab": {
-            name: "Produs 1",
-            lat: 47.155432,
-            lng: 27.586797,
+        "aaaa1111-1111-1111-1111-111111111111": {
+            name: "Lapte Test",
+            lat: 47.157,
+            lng: 27.58606,
         },
-        "22222222-b2c3-d4e5-f6a7-2345678901bc": {
-            name: "Produs 2",
-            lat: 47.155503,
-            lng: 27.587166,
+        "aaaa2222-2222-2222-2222-222222222222": {
+            name: "Pâine Test",
+            lat: 47.15685,
+            lng: 27.58752,
         },
-        "33333333-c3d4-e5f6-a7b8-3456789012cd": {
-            name: "Produs 3",
-            lat: 47.155898,
-            lng: 27.587173,
-        },
-        "44444444-d4e5-f6a7-b8c9-4567890123de": {
-            name: "Produs 4",
-            lat: 47.155387,
-            lng: 27.587615,
-        },
-        "55555555-e5f6-a7b8-c9d0-5678901234ef": {
-            name: "Produs 5",
-            lat: 47.155998,
-            lng: 27.586752,
-        },
-        "66666666-f6a7-b8c9-d0e1-6789012345f0": {
-            name: "Produs 6",
-            lat: 47.155574,
-            lng: 27.587692,
-        },
-        "77777777-a7b8-c9d0-e1f2-789012345601": {
-            name: "Produs 7",
-            lat: 47.155734,
-            lng: 27.58652,
-        },
-        "88888888-b8c9-d0e1-f2a3-890123456712": {
-            name: "Produs 8",
-            lat: 47.15671,
-            lng: 27.587186,
-        },
-        "99999999-c9d0-e1f2-a3b4-901234567823": {
-            name: "Produs 9",
-            lat: 47.155495,
-            lng: 27.587053,
+        "aaaa3333-3333-3333-3333-333333333333": {
+            name: "Mere Test",
+            lat: 47.156,
+            lng: 27.58771,
         },
     };
 
@@ -129,10 +98,15 @@ export const loadRoute = async (
         console.error("[loadRoute] Server API call failed:", err);
     }
 
-    // Fallback: Local mock logic
     console.debug("[loadRoute] Falling back to local mock TSP calculation...");
     const points: MockRouteSeed[] = [];
     const ids = productIds.length > 0 ? productIds : Object.keys(PALAS_ITEMS);
+
+    // Baza de la care începem să distribuim produsele de test
+    // Am modificat coordonatele pentru a fi mai "sus" și mai "la dreapta", exact în centrul magazinului
+    const baseLat = 47.15182;
+    const baseLng = 27.58785;
+    let testItemIndex = 0;
 
     for (const id of ids) {
         const item = PALAS_ITEMS[id];
@@ -146,17 +120,21 @@ export const loadRoute = async (
         } else {
             const fallbackItem = fallbackItems.find((entry) => entry.id === id);
             if (fallbackItem) {
-                const index = points.length;
-                const ring = Math.floor(index / 6) + 1;
-                const angle = (index % 6) * (Math.PI / 3);
-                const latOffset = Math.cos(angle) * 0.00008 * ring;
-                const lngOffset = Math.sin(angle) * 0.0001 * ring;
+                // Am micșorat drastic spațierea: 0.00002 înseamnă aprox. 2 metri în realitate
+                const aisleSpaceLat = 0.00002;
+                const aisleSpaceLng = 0.00003;
+
+                // Le așezăm pe 2 coloane (ca și cum ar fi pe ambele părți ale unui culoar)
+                const latOffset = Math.floor(testItemIndex / 2) * aisleSpaceLat;
+                const lngOffset = (testItemIndex % 2) * aisleSpaceLng;
+
                 points.push({
                     itemId: fallbackItem.id,
                     name: fallbackItem.name,
-                    lat: userLat + latOffset,
-                    lng: userLng + lngOffset,
+                    lat: baseLat - latOffset, // Mergem în jos (minus) de la bază pe culoar
+                    lng: baseLng + lngOffset,
                 });
+                testItemIndex++;
             }
         }
     }
@@ -182,8 +160,10 @@ export const loadRoute = async (
     ];
 
     orderedRoute.forEach((point, index) => {
-        point.audio_instruction =
-            mockInstructions[index] || mockInstructions.at(-1);
+        if (!point.audio_instruction) {
+            point.audio_instruction =
+                mockInstructions[index] || mockInstructions.at(-1);
+        }
     });
 
     setRoute(orderedRoute);
