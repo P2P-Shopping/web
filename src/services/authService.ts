@@ -27,6 +27,7 @@ export const registerRequest = async (data: Record<string, unknown>) => {
     const response = await api.post("/api/auth/register", data);
     return response.data;
 };
+
 export const checkAuthRequest = async () => {
     try {
         // Luăm token-ul curent din store

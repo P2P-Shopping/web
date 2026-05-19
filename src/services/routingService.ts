@@ -12,6 +12,7 @@ export interface CalculateRouteRequest {
     userLat: number;
     userLng: number;
     productIds: string[];
+    storeId?: string;
     lazyN?: number;
 }
 

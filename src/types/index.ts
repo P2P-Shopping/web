@@ -11,10 +11,24 @@ export interface Item {
     quantity?: string;
     category?: string;
     price?: number;
+    storeName?: string;
     isRecurrent?: boolean;
+    catalogId?: string;
+    // Claim fields
+    claimedBy?: string;
+    claimedAt?: number;
 }
 
 export type ListCategory = "NORMAL" | "RECIPE" | "FREQUENT";
+
+export type ListRole = "ADMIN" | "EDITOR";
+
+export interface CollaboratorInfo {
+    userId: number;
+    email: string;
+    name: string;
+    role: ListRole;
+}
 
 /**
  * Supported types of actions that can be queued while offline.
@@ -64,7 +78,8 @@ export interface ShoppingList {
     userId?: string;
     ownerName?: string;
     ownerEmail?: string;
-    collaboratorEmails?: string[];
+    collaborators?: CollaboratorInfo[];
+    currentUserRole?: ListRole;
     version?: number;
 }
 

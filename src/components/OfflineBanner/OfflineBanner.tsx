@@ -15,8 +15,9 @@ export const OfflineBanner: React.FC<{ isAuthPage?: boolean }> = ({
 }) => {
     const isOnline = useStore((state) => state.isOnline);
     const isServerConnected = useStore((state) => state.isServerConnected);
+    const isAuthenticated = useStore((state) => state.isAuthenticated);
 
-    const showBanner = !isOnline || !isServerConnected;
+    const showBanner = !isOnline || (!isServerConnected && isAuthenticated);
 
     if (!showBanner) return null;
 
