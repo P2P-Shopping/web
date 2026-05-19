@@ -5,7 +5,7 @@ import {
     ChevronDown,
     Plus,
     Settings,
-    UserPlus,
+    Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,17 +26,16 @@ import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
     fetchProductSuggestions,
-    finishShoppingRequest,
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import type {
-    Item as GlobalItem,
-    ListCategory,
-    ShoppingList,
-} from "../../types";
+import type { ListCategory } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
-import ShareListModal from "../Dashboard/ShareListModal";
+
+import ListMembersModal from "../Dashboard/ListMembersModal";
+import { useFinishShopping } from "./useFinishShopping";
+import { useImportItems } from "./useImportItems";
+import { useListPageEffects } from "./useListPageEffects";
 
 interface Item {
     id: string;
@@ -49,6 +48,8 @@ interface Item {
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
+    claimedBy?: string;
+    claimedAt?: number;
 }
 
 interface ApiListItem {
@@ -62,6 +63,8 @@ interface ApiListItem {
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
+    claimedBy?: string;
+    claimedAt?: number;
 }
 
 interface ApiShoppingList {
@@ -69,7 +72,7 @@ interface ApiShoppingList {
     category?: ListCategory;
     items?: ApiListItem[];
     ownerEmail?: string;
-    collaboratorEmails?: string[];
+    collaborators?: import("../../types").CollaboratorInfo[];
 }
 
 interface ListDetailProps {
@@ -125,12 +128,43 @@ const handleAdd: SyncActionHandler = (prev, payload) => {
     return prev;
 };
 
+const handleClaim: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    let claimedBy = payload.claimedBy;
+    let claimedAt = payload.timestamp;
+    if (payload.content) {
+        try {
+            const parsed = JSON.parse(payload.content) as Partial<Item>;
+            claimedBy = parsed.claimedBy ?? claimedBy;
+            claimedAt = parsed.claimedAt ?? claimedAt;
+        } catch {
+            console.debug(
+                "Failed to parse claim content JSON, using top-level values",
+            );
+        }
+    }
+    return prev.map((item) =>
+        item.id === payload.itemId ? { ...item, claimedBy, claimedAt } : item,
+    );
+};
+
+const handleUnclaim: SyncActionHandler = (prev, payload) => {
+    if (!payload.itemId) return prev;
+    return prev.map((item) =>
+        item.id === payload.itemId
+            ? { ...item, claimedBy: undefined, claimedAt: undefined }
+            : item,
+    );
+};
+
 const SYNC_ACTION_HANDLERS: Record<string, SyncActionHandler> = {
     CHECK_OFF: handleCheckOff,
     UPDATE: handleUpdate,
     DELETE: handleDelete,
     BULK_DELETE: handleBulkDelete,
     ADD: handleAdd,
+    CLAIM_ITEM: handleClaim,
+    UNCLAIM_ITEM: handleUnclaim,
 };
 
 const useListItems = (effectiveListId: string | undefined) => {
@@ -225,17 +259,19 @@ const useListItems = (effectiveListId: string | undefined) => {
                     category: item.category,
                     isRecurrent: item.isRecurrent,
                     positionIndex: item.positionIndex,
+                    claimedBy: item.claimedBy,
+                    claimedAt: item.claimedAt,
                 }));
                 setItems(mappedItems);
                 if (
                     currentList.category ||
                     currentList.ownerEmail ||
-                    currentList.collaboratorEmails
+                    currentList.collaborators
                 ) {
                     useListsStore.getState().updateList(targetListId, {
                         category: currentList.category,
                         ownerEmail: currentList.ownerEmail,
-                        collaboratorEmails: currentList.collaboratorEmails,
+                        collaborators: currentList.collaborators,
                     });
                 }
                 syncListItemsInStore(mappedItems, targetListId);
@@ -595,7 +631,6 @@ const useListItems = (effectiveListId: string | undefined) => {
         );
 
         if (existingItem) {
-            // Păstrăm logica de îmbinare a cantităților (Smart Merge)
             const existingQty = existingItem.quantity?.trim()
                 ? existingItem.quantity.trim()
                 : "1";
@@ -875,6 +910,105 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const claimItem = useCallback(
+        (itemId: string) => {
+            const currentUser = useStore.getState().user;
+            if (
+                !currentUser?.email ||
+                !effectiveListId ||
+                !stompClient.connected
+            )
+                return;
+            const claimedBy = currentUser.email;
+
+            setItems((prev) => {
+                const next = prev.map((item) =>
+                    item.id === itemId
+                        ? { ...item, claimedBy, claimedAt: Date.now() }
+                        : item,
+                );
+                syncListItemsInStore(next);
+                return next;
+            });
+
+            const item = items.find((i) => i.id === itemId);
+            if (!item) return;
+
+            const updatedItem = { ...item, claimedBy, claimedAt: Date.now() };
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
+            pendingSyncItems.current.add(itemId);
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action: "CLAIM_ITEM",
+                    itemId,
+                    claimedBy,
+                    content: JSON.stringify(updatedItem),
+                    timestamp,
+                }),
+            });
+        },
+        [effectiveListId, items, syncListItemsInStore],
+    );
+
+    const unclaimItem = useCallback(
+        (itemId: string) => {
+            const currentUser = useStore.getState().user;
+            if (
+                !currentUser?.email ||
+                !effectiveListId ||
+                !stompClient.connected
+            )
+                return;
+
+            setItems((prev) => {
+                const next = prev.map((item) =>
+                    item.id === itemId
+                        ? {
+                              ...item,
+                              claimedBy: undefined,
+                              claimedAt: undefined,
+                          }
+                        : item,
+                );
+                syncListItemsInStore(next);
+                return next;
+            });
+
+            const item = items.find((i) => i.id === itemId);
+            if (!item) return;
+
+            const updatedItem = {
+                ...item,
+                claimedBy: undefined,
+                claimedAt: undefined,
+            };
+            let timestamp = Date.now();
+            if (timestamp <= lastSyncTimestamp.current) {
+                timestamp = lastSyncTimestamp.current + 1;
+            }
+            lastSyncTimestamp.current = timestamp;
+
+            pendingSyncItems.current.add(itemId);
+            stompClient.publish({
+                destination: `/app/list/${effectiveListId}/update`,
+                body: JSON.stringify({
+                    action: "UNCLAIM_ITEM",
+                    itemId,
+                    claimedBy: null,
+                    content: JSON.stringify(updatedItem),
+                    timestamp,
+                }),
+            });
+        },
+        [effectiveListId, items, syncListItemsInStore],
+    );
+
     const updateItem = async (
         itemId: string,
         payload: Record<string, unknown>,
@@ -920,6 +1054,8 @@ const useListItems = (effectiveListId: string | undefined) => {
         deleteItem,
         clearCompletedItems,
         reorderItem,
+        claimItem,
+        unclaimItem,
         setError,
         handleAiImport,
         isReviewModalOpen,
@@ -962,6 +1098,8 @@ const useListPresence = (effectiveListId: string | undefined) => {
             return;
         }
         const username = user?.email || "Anonymous";
+        const displayName =
+            user?.firstName?.trim() || user?.email?.split("@")[0] || undefined;
 
         console.debug("[ws] subscribing list presence", effectiveListId);
         const presenceSubscription = stompClient.subscribe(
@@ -969,10 +1107,18 @@ const useListPresence = (effectiveListId: string | undefined) => {
             handlePresenceMessage,
         );
 
+        const membersSubscription = stompClient.subscribe(
+            `/topic/lists/${effectiveListId}/members`,
+            () => {
+                useListsStore.getState().fetchLists();
+            },
+        );
+
         if (stompClient.connected) {
             const joinEvent = {
                 eventType: "JOIN" as const,
                 username,
+                displayName,
                 listId: effectiveListId,
             };
 
@@ -991,18 +1137,20 @@ const useListPresence = (effectiveListId: string | undefined) => {
                     body: JSON.stringify({
                         eventType: "LEAVE",
                         username,
+                        displayName,
                         listId: effectiveListId,
                     }),
                 });
                 console.debug("[ws] sent presence LEAVE", username);
             }
             presenceSubscription?.unsubscribe();
+            membersSubscription?.unsubscribe();
             clearPresence();
         };
     }, [
         effectiveListId,
         clearPresence,
-        user?.email,
+        user,
         handlePresenceMessage,
         isServerConnected,
     ]);
@@ -1018,10 +1166,15 @@ const useListPresence = (effectiveListId: string | undefined) => {
         const now = Date.now();
         if (now - lastTypingSentRef.current > 1500) {
             const username = user?.email || "Anonymous";
+            const displayName =
+                user?.firstName?.trim() ||
+                user?.email?.split("@")[0] ||
+                undefined;
 
             const typingEvent = {
                 eventType: "TYPING" as const,
                 username,
+                displayName,
                 listId: effectiveListId,
             };
             stompClient.publish({
@@ -1030,7 +1183,7 @@ const useListPresence = (effectiveListId: string | undefined) => {
             });
             lastTypingSentRef.current = now;
         }
-    }, [effectiveListId, user?.email]);
+    }, [effectiveListId, user]);
 
     return { sendTypingEvent };
 };
@@ -1720,6 +1873,59 @@ const InlineAddForm = ({
     );
 };
 
+interface ListTitleProps {
+    isEditingName: boolean;
+    editedName: string;
+    setEditedName: (name: string) => void;
+    onBlur: () => void;
+    onKeyDown: (e: React.KeyboardEvent) => void;
+    onClickEdit: () => void;
+    activeListName: string;
+    currentUserRole?: "ADMIN" | "EDITOR";
+    isReadOnly: boolean;
+}
+
+const ListTitle = ({
+    isEditingName,
+    editedName,
+    setEditedName,
+    onBlur,
+    onKeyDown,
+    onClickEdit,
+    activeListName,
+    currentUserRole,
+    isReadOnly,
+}: ListTitleProps) => {
+    if (isEditingName) {
+        return (
+            <input
+                className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={onBlur}
+                onKeyDown={onKeyDown}
+            />
+        );
+    }
+    if (currentUserRole === "ADMIN") {
+        return (
+            <button
+                type="button"
+                onClick={onClickEdit}
+                disabled={isReadOnly}
+                className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
+            >
+                {activeListName || "Shopping List"}
+            </button>
+        );
+    }
+    return (
+        <h1 className="text-2xl font-black text-text-strong tracking-tight">
+            {activeListName || "Shopping List"}
+        </h1>
+    );
+};
+
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
@@ -1766,6 +1972,8 @@ const ListDetail = ({
         deleteItem,
         clearCompletedItems,
         reorderItem,
+        claimItem,
+        unclaimItem,
         setError,
         isReviewModalOpen,
         setIsReviewModalOpen,
@@ -1776,34 +1984,43 @@ const ListDetail = ({
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
 
+    const user = useStore((state) => state.user);
+    const displayNames = usePresenceStore((state) => state.displayNames);
+
     const [newItemName, setNewItemName] = useState("");
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showMobileAddModal, setShowMobileAddModal] = useState(false);
     const [showExpandedDetails, setShowExpandedDetails] = useState(false);
-    const [showImportModal, setShowImportModal] = useState(false);
-    const [selectedTargetListId, setSelectedTargetListId] = useState("");
-    const [selectedImportItemIds, setSelectedImportItemIds] = useState<
-        Set<string>
-    >(new Set());
-    const [isImportingItems, setIsImportingItems] = useState(false);
-    const [importNewListName, setImportNewListName] = useState("");
 
     const [detailName, setDetailName] = useState("");
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
     const [detailCategory, setDetailCategory] = useState("");
-    const [isFinishing, setIsFinishing] = useState(false);
-    const [showFinishModal, setShowFinishModal] = useState(false);
-    const [finishStoreName, setFinishStoreName] = useState("");
-    const [receiptImage, setReceiptImage] = useState<File | null>(null);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
-    const [permissionStatus, setPermissionStatus] =
-        useState<PermissionState | null>(null);
-    const [showBanner, setShowBanner] = useState(true);
+
+    const {
+        isFinishing,
+        showFinishModal,
+        setShowFinishModal,
+        finishStoreName,
+        setFinishStoreName,
+        receiptImage,
+        setReceiptImage,
+        isFinishDisabled,
+        handleFinishShopping,
+    } = useFinishShopping({ effectiveListId, setError });
+
+    const { permissionStatus, showBanner, setShowBanner, isScrolled } =
+        useListPageEffects();
+
     const [sortMode, setSortMode] = useState<
         "alphabetical" | "chronological" | "custom"
     >("chronological");
+
+    const scrolledPaddingClass = isEmbedded
+        ? " -mt-6 pt-6 pb-3"
+        : " -mt-3 pt-3 pb-3";
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
@@ -1827,6 +2044,29 @@ const ListDetail = ({
     const canImportIntoNormalList =
         (isRecipeList || activeList?.category === "FREQUENT") &&
         items.length > 0;
+
+    const {
+        showImportModal,
+        selectedTargetListId,
+        setSelectedTargetListId,
+        selectedImportItemIds,
+        setSelectedImportItemIds,
+        isImportingItems,
+        importNewListName,
+        setImportNewListName,
+        openImportModal,
+        toggleImportSelection,
+        clearImportState,
+        handleImportIntoNormalList,
+    } = useImportItems({
+        effectiveListId,
+        isRecipeList,
+        activeList,
+        items,
+        normalLists,
+        setError,
+        fetchLists,
+    });
     useEffect(() => {
         if (activeList?.name) {
             setEditedName(activeList.name);
@@ -1838,8 +2078,8 @@ const ListDetail = ({
 
         const users = new Set<string>();
         if (current.ownerEmail) users.add(current.ownerEmail);
-        for (const email of current.collaboratorEmails || []) {
-            users.add(email);
+        for (const c of current.collaborators || []) {
+            users.add(c.email);
         }
         return Array.from(users);
     }, [activeList]);
@@ -1857,55 +2097,10 @@ const ListDetail = ({
     }, [items]);
 
     useEffect(() => {
-        let isMounted = true;
-        let permResult: PermissionStatus | null = null;
-
-        const handler = () => {
-            if (isMounted && permResult) setPermissionStatus(permResult.state);
-        };
-
-        if (navigator.permissions) {
-            navigator.permissions
-                .query({ name: "geolocation" })
-                .then((result) => {
-                    if (!isMounted) return;
-                    permResult = result;
-                    setPermissionStatus(result.state);
-                    result.addEventListener("change", handler);
-                })
-                .catch(() => {});
-        }
-
-        return () => {
-            isMounted = false;
-            permResult?.removeEventListener("change", handler);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (permissionStatus === "denied") {
-            setShowBanner(true);
-        }
-    }, [permissionStatus]);
-
-    useEffect(() => {
         if (lists.length === 0) {
             fetchLists();
         }
     }, [lists.length, fetchLists]);
-
-    useEffect(() => {
-        if (
-            !showImportModal ||
-            selectedTargetListId === "NEW_LIST" ||
-            normalLists.length === 0 ||
-            normalLists.some((list) => list.id === selectedTargetListId)
-        ) {
-            return;
-        }
-
-        setSelectedTargetListId(normalLists[0].id);
-    }, [normalLists, selectedTargetListId, showImportModal]);
 
     const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
@@ -1938,14 +2133,13 @@ const ListDetail = ({
 
     const openDetailsModal = (suggestion?: ProductSuggestion | null) => {
         setDetailName(newItemName);
-
         if (suggestion) {
-            setDetailQuantity(suggestion.quantity || "1");
-            setDetailBrand(suggestion.brand || "");
+            setDetailQuantity(suggestion.quantity ?? "1");
+            setDetailBrand(suggestion.brand ?? "");
             setDetailPrice(
-                suggestion.price !== null && suggestion.price !== undefined
-                    ? String(suggestion.price)
-                    : "",
+                suggestion.price === null || suggestion.price === undefined
+                    ? ""
+                    : String(suggestion.price),
             );
             setDetailCategory(suggestion.category || "");
             if (suggestion.brand || suggestion.price || suggestion.category) {
@@ -1957,7 +2151,6 @@ const ListDetail = ({
             setDetailPrice("");
             setDetailCategory("");
         }
-
         setShowDetailsModal(true);
     };
 
@@ -2024,144 +2217,6 @@ const ListDetail = ({
         : "flex justify-center items-start p-20px bg-bg";
     const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`;
 
-    const openImportModal = () => {
-        const refreshedLists = useListsStore.getState().lists;
-        const refreshedNormalLists = refreshedLists.filter(
-            (list) =>
-                list.id !== effectiveListId &&
-                (list.category ?? "NORMAL") === "NORMAL",
-        );
-
-        setSelectedTargetListId((currentId) => {
-            if (isRecipeList) return "NEW_LIST";
-            if (refreshedNormalLists.some((list) => list.id === currentId)) {
-                return currentId;
-            }
-            return refreshedNormalLists.length > 0
-                ? refreshedNormalLists[0].id
-                : "NEW_LIST";
-        });
-
-        setImportNewListName(activeList?.name ? `${activeList.name}` : "");
-        setSelectedImportItemIds(new Set(items.map((item) => item.id)));
-        setShowImportModal(true);
-    };
-
-    const toggleImportSelection = (itemId: string) => {
-        setSelectedImportItemIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(itemId)) {
-                next.delete(itemId);
-            } else {
-                next.add(itemId);
-            }
-            return next;
-        });
-    };
-
-    const clearImportState = () => {
-        setShowImportModal(false);
-        setSelectedImportItemIds(new Set());
-        setIsImportingItems(false);
-        setImportNewListName("");
-    };
-
-    const handleImportIntoNormalList = async () => {
-        if (!selectedTargetListId) return;
-
-        setIsImportingItems(true);
-        setError(null);
-
-        try {
-            const targetListId = await resolveTargetListId();
-            const targetList = useListsStore
-                .getState()
-                .lists.find((list) => list.id === targetListId);
-
-            if (!targetList) {
-                throw new Error("Target list could not be found.");
-            }
-
-            await performItemsImport(targetList);
-            await fetchLists();
-            clearImportState();
-        } catch (importError) {
-            const errorMessage =
-                importError instanceof Error
-                    ? importError.message
-                    : "Failed to import the selected items.";
-            setError(errorMessage);
-            setIsImportingItems(false);
-        }
-    };
-
-    const resolveTargetListId = async (): Promise<string> => {
-        if (selectedTargetListId !== "NEW_LIST") {
-            return selectedTargetListId;
-        }
-
-        if (!importNewListName.trim()) {
-            throw new Error("Please enter a name for the new list.");
-        }
-
-        const newList = await useListsStore
-            .getState()
-            .addList(importNewListName.trim(), "NORMAL");
-
-        if (!newList) {
-            throw new Error("Failed to create the new list.");
-        }
-
-        return newList.id;
-    };
-
-    const performItemsImport = async (targetList: ShoppingList) => {
-        const existingMap = new Map(
-            targetList.items.map((item: GlobalItem) => [
-                buildItemDuplicateKey(item),
-                item,
-            ]),
-        );
-
-        for (const item of items) {
-            if (!selectedImportItemIds.has(item.id)) continue;
-
-            const dupKey = buildItemDuplicateKey(item);
-            const existingItem = existingMap.get(dupKey);
-            const itemQty = item.quantity?.trim() ? item.quantity.trim() : "1";
-            if (existingItem) {
-                const existingQty = existingItem.quantity?.trim()
-                    ? existingItem.quantity.trim()
-                    : "1";
-                const mergedQty = mergeQuantities(existingQty, itemQty);
-                const updated = await useListsStore
-                    .getState()
-                    .updateItem(targetList.id, existingItem.id, {
-                        quantity: mergedQty,
-                    });
-                if (!updated) {
-                    throw new Error(`Failed to update ${item.name}`);
-                }
-            } else {
-                const added = await useListsStore
-                    .getState()
-                    .addItem(targetList.id, {
-                        name: item.name,
-                        checked: false,
-                        brand: item.brand,
-                        quantity: itemQty,
-                        price: item.price,
-                        category: item.category,
-                        isRecurrent: targetList.category === "FREQUENT",
-                    });
-
-                if (!added) {
-                    throw new Error(`Failed to add ${item.name}`);
-                }
-            }
-        }
-    };
-
     const handleInstantAdd = (suggestion: ProductSuggestion) => {
         const finalPrice =
             suggestion.price !== null && suggestion.price !== undefined
@@ -2178,6 +2233,26 @@ const ListDetail = ({
 
         setNewItemName("");
     };
+
+    const listNameDisplay = (
+        <ListTitle
+            isEditingName={isEditingName}
+            editedName={editedName}
+            setEditedName={setEditedName}
+            onBlur={handleRenameSubmit}
+            onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameSubmit();
+                if (e.key === "Escape") {
+                    setEditedName(activeList?.name || "");
+                    setIsEditingName(false);
+                }
+            }}
+            onClickEdit={() => setIsEditingName(true)}
+            activeListName={activeList?.name || ""}
+            currentUserRole={activeList?.currentUserRole}
+            isReadOnly={isReadOnly}
+        />
+    );
 
     const handleEditClick = (item: Item) => {
         setEditingItemId(item.id);
@@ -2226,41 +2301,19 @@ const ListDetail = ({
                     />
                 ) : (
                     <>
-                        <div className="flex flex-col gap-3">
+                        <div
+                            className={`sticky top-0 z-30 flex flex-col gap-3 transition-all duration-200 ${
+                                isEmbedded ? "-mx-6 px-6" : ""
+                            } ${
+                                isScrolled
+                                    ? "bg-bg/85 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] border-b border-border/50" +
+                                      scrolledPaddingClass
+                                    : ""
+                            }`}
+                        >
                             <div className="flex justify-between items-end px-1">
                                 <div className="flex flex-col gap-1">
-                                    {isEditingName ? (
-                                        <input
-                                            className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
-                                            value={editedName}
-                                            onChange={(e) =>
-                                                setEditedName(e.target.value)
-                                            }
-                                            onBlur={handleRenameSubmit}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter")
-                                                    handleRenameSubmit();
-                                                if (e.key === "Escape") {
-                                                    setEditedName(
-                                                        activeList?.name || "",
-                                                    );
-                                                    setIsEditingName(false);
-                                                }
-                                            }}
-                                        />
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setIsEditingName(true)
-                                            }
-                                            disabled={isReadOnly}
-                                            className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
-                                        >
-                                            {activeList?.name ||
-                                                "Shopping List"}
-                                        </button>
-                                    )}
+                                    {listNameDisplay}
                                     <div className="flex flex-col">
                                         <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
                                             Collaboration
@@ -2272,6 +2325,21 @@ const ListDetail = ({
                                                     activeCollaborationUsers
                                                 }
                                             />
+                                            {activeList?.currentUserRole && (
+                                                <span
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                        activeList.currentUserRole ===
+                                                        "ADMIN"
+                                                            ? "bg-accent-subtle text-accent"
+                                                            : "bg-bg-muted text-text-muted border border-border"
+                                                    }`}
+                                                >
+                                                    {activeList.currentUserRole ===
+                                                    "ADMIN"
+                                                        ? "Admin"
+                                                        : "Editor"}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -2308,8 +2376,18 @@ const ListDetail = ({
                                         onClick={() => setShowShareModal(true)}
                                         className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
                                     >
-                                        <UserPlus size={14} strokeWidth={2.5} />
-                                        Invite
+                                        <Users size={14} strokeWidth={2.5} />
+                                        Members
+                                        {activeList?.collaborators &&
+                                            activeList.collaborators.length >
+                                                0 && (
+                                                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-accent/15 text-[10px] font-bold">
+                                                    {
+                                                        activeList.collaborators
+                                                            .length
+                                                    }
+                                                </span>
+                                            )}
                                     </button>
                                 </div>
                             </div>
@@ -2372,6 +2450,10 @@ const ListDetail = ({
                                         checkable={!isTemplateList}
                                         sortMode={sortMode}
                                         onReorder={reorderItem}
+                                        onClaim={claimItem}
+                                        onUnclaim={unclaimItem}
+                                        currentUserEmail={user?.email}
+                                        displayNames={displayNames}
                                     />
                                     {items.length > 0 && (
                                         <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
@@ -2541,43 +2623,8 @@ const ListDetail = ({
                         </button>
                         <button
                             type="button"
-                            disabled={
-                                !finishStoreName.trim() ||
-                                isFinishing ||
-                                !effectiveListId ||
-                                effectiveListId === "default"
-                            }
-                            onClick={async () => {
-                                if (
-                                    !effectiveListId ||
-                                    effectiveListId === "default"
-                                )
-                                    return;
-                                setIsFinishing(true);
-                                try {
-                                    await finishShoppingRequest({
-                                        storeName: finishStoreName.trim(),
-                                        receiptImage,
-                                        listId: effectiveListId,
-                                    });
-                                    setShowFinishModal(false);
-                                    setFinishStoreName("");
-                                    setReceiptImage(null);
-                                    navigate("/dashboard");
-                                } catch (_err) {
-                                    const errorMessage =
-                                        _err instanceof Error
-                                            ? _err.message
-                                            : "Failed to complete shopping.";
-                                    console.error(
-                                        "Failed to complete shopping:",
-                                        _err,
-                                    );
-                                    setError(errorMessage);
-                                } finally {
-                                    setIsFinishing(false);
-                                }
-                            }}
+                            disabled={isFinishDisabled}
+                            onClick={handleFinishShopping}
                             className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
                         >
                             {isFinishing ? "Processing..." : "Complete"}
@@ -2620,13 +2667,16 @@ const ListDetail = ({
             />
 
             {showShareModal && (
-                <ShareListModal
+                <ListMembersModal
                     listId={effectiveListId ?? ""}
                     listName={
                         lists.find((l) => l.id === effectiveListId)?.name ||
                         "Shopping List"
                     }
+                    collaborators={activeList?.collaborators ?? []}
+                    currentUserRole={activeList?.currentUserRole}
                     onClose={() => setShowShareModal(false)}
+                    onLeaveSuccess={() => navigate("/dashboard")}
                 />
             )}
         </div>
