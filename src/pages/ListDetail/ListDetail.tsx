@@ -30,6 +30,7 @@ import api, {
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import type { ListCategory } from "../../types";
+import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 
 import ListMembersModal from "../Dashboard/ListMembersModal";
 import { useFinishShopping } from "./useFinishShopping";
@@ -43,6 +44,7 @@ interface Item {
     brand?: string;
     quantity?: string;
     price?: number;
+    storeName?: string;
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
@@ -57,6 +59,7 @@ interface ApiListItem {
     brand?: string;
     quantity?: string;
     price?: number;
+    storeName?: string;
     category?: string;
     isRecurrent?: boolean;
     positionIndex?: number;
@@ -251,6 +254,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                     checked: Boolean(item.isChecked),
                     brand: item.brand,
                     price: item.price,
+                    storeName: item.storeName,
                     quantity: item.quantity,
                     category: item.category,
                     isRecurrent: item.isRecurrent,
@@ -544,6 +548,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
+        category?: string,
     ) => {
         const newItem: Item = {
             id: crypto.randomUUID(),
@@ -552,7 +557,8 @@ const useListItems = (effectiveListId: string | undefined) => {
             brand: brand || undefined,
             quantity: quantity || undefined,
             price: price ?? undefined,
-            positionIndex: Date.now(), // Fallback optimistic position
+            category: category || undefined,
+            positionIndex: Date.now(), // Fallback optimistic position pentru Drag & Drop
         };
 
         const optimisticItems = [...items, newItem];
@@ -592,6 +598,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                         brand: newItem.brand,
                         quantity: newItem.quantity,
                         price: newItem.price,
+                        category: newItem.category,
                         positionIndex: newItem.positionIndex,
                     },
                     timestamp: Date.now(),
@@ -613,11 +620,64 @@ const useListItems = (effectiveListId: string | undefined) => {
         quantity?: string,
         brand?: string,
         price?: number,
+        category?: string,
     ) => {
         if (!effectiveListId || effectiveListId === "default") return;
         if (!name.trim()) return;
+        const finalQuantity = quantity?.trim() ? quantity.trim() : "1";
+        const dupKey = buildItemDuplicateKey({ name, brand });
+        const existingItem = items.find(
+            (it) => buildItemDuplicateKey(it) === dupKey,
+        );
 
-        await createNewItem(effectiveListId, name, quantity, brand, price);
+        if (existingItem) {
+            const existingQty = existingItem.quantity?.trim()
+                ? existingItem.quantity.trim()
+                : "1";
+            const mergedQty = mergeQuantities(existingQty, finalQuantity);
+
+            try {
+                const payload = {
+                    name: existingItem.name,
+                    brand: existingItem.brand ?? null,
+                    quantity: mergedQty,
+                    price: existingItem.price ?? null,
+                    category: existingItem.category ?? null,
+                    isChecked: existingItem.checked,
+                    isRecurrent: existingItem.isRecurrent ?? false,
+                    positionIndex: existingItem.positionIndex ?? Date.now(),
+                    timestamp: Date.now(),
+                };
+
+                await api.put(`/api/items/${existingItem.id}`, payload);
+                await fetchListData(effectiveListId);
+                publishSync("UPDATE", {
+                    id: existingItem.id,
+                    name: existingItem.name,
+                    checked: existingItem.checked,
+                    brand: existingItem.brand,
+                    quantity: mergedQty,
+                    price: existingItem.price,
+                    category: existingItem.category,
+                    isRecurrent: existingItem.isRecurrent,
+                    positionIndex: existingItem.positionIndex,
+                });
+                toast.success(`Updated quantity for "${name}"`);
+            } catch (err) {
+                console.error("Failed to merge quantities:", err);
+                setError("Failed to update existing item quantity.");
+            }
+            return;
+        }
+
+        await createNewItem(
+            effectiveListId,
+            name,
+            finalQuantity,
+            brand,
+            price,
+            category,
+        );
     };
 
     const toggleItem = async (itemId: string) => {
@@ -949,6 +1009,40 @@ const useListItems = (effectiveListId: string | undefined) => {
         [effectiveListId, items, syncListItemsInStore],
     );
 
+    const updateItem = async (
+        itemId: string,
+        payload: Record<string, unknown>,
+    ) => {
+        const existingItem = items.find((i) => i.id === itemId);
+        const updatedItem: Item = {
+            id: itemId,
+            name: (payload.name as string) ?? existingItem?.name ?? "",
+            checked:
+                (payload.isChecked as boolean) ??
+                existingItem?.checked ??
+                false,
+            brand: (payload.brand as string | undefined) ?? existingItem?.brand,
+            quantity:
+                (payload.quantity as string | undefined) ??
+                existingItem?.quantity,
+            price:
+                (payload.price as number | null | undefined) ??
+                existingItem?.price,
+            category:
+                (payload.category as string | undefined) ??
+                existingItem?.category,
+            isRecurrent:
+                (payload.isRecurrent as boolean | undefined) ??
+                existingItem?.isRecurrent,
+            positionIndex:
+                (payload.positionIndex as number | undefined) ??
+                existingItem?.positionIndex,
+        };
+        await api.put(`/api/items/${itemId}`, payload);
+        await fetchListData(effectiveListId);
+        publishSync("UPDATE", updatedItem);
+    };
+
     return {
         items,
         isLoading,
@@ -968,6 +1062,8 @@ const useListItems = (effectiveListId: string | undefined) => {
         setIsReviewModalOpen,
         reviewItems,
         handleReviewConfirm,
+        fetchListData,
+        updateItem,
     };
 };
 
@@ -1153,10 +1249,13 @@ interface AddItemModalProps {
     setBrand: (val: string) => void;
     price: string;
     setPrice: (val: string) => void;
+    category?: string;
+    setCategory?: (val: string) => void;
     onTyping?: () => void;
     isMobile?: boolean;
     showExpanded?: boolean;
     setShowExpanded?: (val: boolean) => void;
+    submitLabel?: string;
 }
 
 /**
@@ -1274,7 +1373,14 @@ const SuggestionsDropdown = ({
                             onSelect(suggestion);
                         }}
                     >
-                        <span className="font-bold">{suggestion.name}</span>
+                        <div className="flex flex-col gap-0.5">
+                            <span className="font-bold">{suggestion.name}</span>
+                            {suggestion.storeName && (
+                                <span className="text-[10px] text-accent font-bold italic">
+                                    at {suggestion.storeName}
+                                </span>
+                            )}
+                        </div>
                         <div className="flex items-center gap-3 text-[11px]">
                             {suggestion.brand && (
                                 <span className="text-text-muted uppercase opacity-70 tracking-wider">
@@ -1353,9 +1459,15 @@ const ItemNameField = ({
             <input
                 id={`${idPrefix}-item-name`}
                 type="text"
+                maxLength={100}
                 value={value}
                 onChange={(e) => {
-                    onChange(e.target.value);
+                    onChange(
+                        e.target.value.replace(
+                            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                            "",
+                        ),
+                    );
                     onTyping?.();
                 }}
                 onFocus={() => {
@@ -1410,6 +1522,8 @@ const ItemDetailsFields = ({
     setPrice,
     brand,
     setBrand,
+    category,
+    setCategory,
     isMobile,
 }: {
     idPrefix: string;
@@ -1419,6 +1533,8 @@ const ItemDetailsFields = ({
     setPrice: (val: string) => void;
     brand: string;
     setBrand: (val: string) => void;
+    category: string;
+    setCategory: (val: string) => void;
     isMobile: boolean;
 }) => (
     <div
@@ -1438,8 +1554,15 @@ const ItemDetailsFields = ({
             <input
                 id={`${idPrefix}-quantity`}
                 type="text"
+                maxLength={50}
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    if (val !== "" && !/^[\p{L}\p{N}\s.,/]*$/u.test(val)) {
+                        return;
+                    }
+                    setQuantity(val);
+                }}
                 placeholder={isMobile ? "e.g. 2 pcs" : "e.g., 2"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -1456,8 +1579,24 @@ const ItemDetailsFields = ({
                 type="number"
                 step="0.01"
                 min="0"
+                max="999999999.99"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onKeyDown={(e) => {
+                    if (["e", "E", "+", "-"].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                }}
+                onChange={(e) => {
+                    const val = e.target.value.trim();
+                    if (
+                        val === "" ||
+                        (/^\d*(\.\d*)?$/.test(val) &&
+                            val.length <= 10 &&
+                            (val === "" || Number(val) <= 999999999.99))
+                    ) {
+                        setPrice(val);
+                    }
+                }}
                 placeholder={isMobile ? "0.00" : "e.g., 4.99"}
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
@@ -1474,9 +1613,36 @@ const ItemDetailsFields = ({
             <input
                 id={`${idPrefix}-brand`}
                 type="text"
+                maxLength={50}
                 value={brand}
-                onChange={(e) => setBrand(e.target.value)}
+                onChange={(e) =>
+                    setBrand(
+                        e.target.value.replace(
+                            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                            "",
+                        ),
+                    )
+                }
                 placeholder={isMobile ? "e.g. Zuzu" : "e.g., Organic Valley"}
+                className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
+            />
+        </div>
+        <div
+            className={`flex flex-col gap-1.5 ${isMobile ? "" : "col-span-2"}`}
+        >
+            <label
+                htmlFor={`${idPrefix}-category`}
+                className={`text-[13px] font-semibold ${isMobile ? "text-text-muted" : "text-text-strong"}`}
+            >
+                Category (Optional)
+            </label>
+            <input
+                id={`${idPrefix}-category`}
+                type="text"
+                maxLength={50}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="e.g., Dairy"
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
         </div>
@@ -1498,10 +1664,13 @@ const AddItemDetailsModal = ({
     setBrand,
     price,
     setPrice,
+    category,
+    setCategory,
     onTyping,
     isMobile = false,
     showExpanded = true,
     setShowExpanded,
+    submitLabel,
 }: AddItemModalProps) => {
     return (
         <Modal
@@ -1524,7 +1693,7 @@ const AddItemDetailsModal = ({
                         form={`${idPrefix}-details-form`}
                         className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
                     >
-                        {isMobile ? "Add" : "Add Item"}
+                        {submitLabel ?? (isMobile ? "Add" : "Add Item")}
                     </button>
                 </div>
             }
@@ -1561,6 +1730,8 @@ const AddItemDetailsModal = ({
                         setPrice={setPrice}
                         brand={brand}
                         setBrand={setBrand}
+                        category={category || ""}
+                        setCategory={setCategory || (() => {})}
                         isMobile={isMobile}
                     />
                 )}
@@ -1659,6 +1830,7 @@ const InlineAddForm = ({
             <input
                 ref={addInputRef}
                 type="text"
+                maxLength={100}
                 value={newItemName}
                 onChange={(e) => {
                     onNameChange(e.target.value);
@@ -1807,6 +1979,7 @@ const ListDetail = ({
         setIsReviewModalOpen,
         reviewItems,
         handleReviewConfirm,
+        updateItem,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -1823,6 +1996,8 @@ const ListDetail = ({
     const [detailQuantity, setDetailQuantity] = useState("");
     const [detailBrand, setDetailBrand] = useState("");
     const [detailPrice, setDetailPrice] = useState("");
+    const [detailCategory, setDetailCategory] = useState("");
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
     const {
         isFinishing,
@@ -1936,6 +2111,8 @@ const ListDetail = ({
         setDetailQuantity("");
         setDetailBrand("");
         setDetailPrice("");
+        setDetailCategory("");
+        setEditingItemId(null);
     }, []);
 
     useEffect(() => {
@@ -1964,21 +2141,62 @@ const ListDetail = ({
                     ? ""
                     : String(suggestion.price),
             );
-            if (suggestion.brand || suggestion.price) {
+            setDetailCategory(suggestion.category || "");
+            if (suggestion.brand || suggestion.price || suggestion.category) {
                 setShowExpandedDetails(true);
             }
         } else {
             setDetailQuantity("");
             setDetailBrand("");
             setDetailPrice("");
+            setDetailCategory("");
         }
         setShowDetailsModal(true);
     };
 
-    const handleDetailsSubmit = (e: React.FormEvent) => {
+    const handleDetailsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const price = detailPrice ? Number.parseFloat(detailPrice) : undefined;
-        addItem(detailName, detailQuantity, detailBrand, price);
+        const trimmedName = detailName.trim();
+        if (!trimmedName) {
+            setError("Name is required");
+            return;
+        }
+
+        const priceNum = detailPrice
+            ? Number.parseFloat(detailPrice)
+            : undefined;
+
+        if (editingItemId) {
+            try {
+                const existingItem = items.find((i) => i.id === editingItemId);
+                const payload = {
+                    name: trimmedName,
+                    brand: detailBrand || null,
+                    quantity: detailQuantity || "1",
+                    price: priceNum ?? null,
+                    category: detailCategory || null,
+                    isChecked: existingItem?.checked ?? false,
+                    isRecurrent: existingItem?.isRecurrent ?? false,
+                    positionIndex: existingItem?.positionIndex ?? Date.now(),
+                    timestamp: Date.now(),
+                };
+
+                await updateItem(editingItemId, payload);
+                toast.success("Item updated successfully");
+            } catch (err) {
+                console.error("Edit error:", err);
+                setError("Failed to update item.");
+                toast.error("Failed to update item.");
+            }
+        } else {
+            addItem(
+                trimmedName,
+                detailQuantity,
+                detailBrand,
+                priceNum,
+                detailCategory,
+            );
+        }
 
         setShowDetailsModal(false);
         setShowMobileAddModal(false);
@@ -1988,7 +2206,9 @@ const ListDetail = ({
         setDetailQuantity("");
         setDetailBrand("");
         setDetailPrice("");
+        setDetailCategory("");
         setNewItemName("");
+        setEditingItemId(null);
     };
 
     const isReadOnly = authFailed;
@@ -2008,6 +2228,7 @@ const ListDetail = ({
             suggestion.quantity || "1",
             suggestion.brand || undefined,
             finalPrice,
+            suggestion.category || undefined,
         );
 
         setNewItemName("");
@@ -2032,6 +2253,18 @@ const ListDetail = ({
             isReadOnly={isReadOnly}
         />
     );
+
+    const handleEditClick = (item: Item) => {
+        setEditingItemId(item.id);
+        setDetailName(item.name);
+        setDetailQuantity(item.quantity || "");
+        setDetailBrand(item.brand || "");
+        setDetailPrice(item.price ? String(item.price) : "");
+        setDetailCategory(item.category || "");
+
+        setShowExpandedDetails(true);
+        setShowDetailsModal(true);
+    };
 
     return (
         <div className={wrapperClassName}>
@@ -2212,6 +2445,7 @@ const ListDetail = ({
                                         items={items}
                                         onCheck={toggleItem}
                                         onDelete={deleteItem}
+                                        onEdit={handleEditClick}
                                         disabled={isReadOnly}
                                         checkable={!isTemplateList}
                                         sortMode={sortMode}
@@ -2274,7 +2508,7 @@ const ListDetail = ({
                 isOpen={showMobileAddModal}
                 onClose={resetDetailFields}
                 onSubmit={handleDetailsSubmit}
-                title="Add Item"
+                title={editingItemId ? "Edit Item" : "Add Item"}
                 idPrefix="mobile"
                 itemName={detailName}
                 setItemName={setDetailName}
@@ -2284,18 +2518,25 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
+                category={detailCategory}
+                setCategory={setDetailCategory}
                 onTyping={sendTypingEvent}
                 isMobile={true}
                 showExpanded={showExpandedDetails}
                 setShowExpanded={setShowExpandedDetails}
+                submitLabel={editingItemId ? "Save" : undefined}
             />
 
             <AddItemDetailsModal
                 isOpen={showDetailsModal}
                 onClose={resetDetailFields}
                 onSubmit={handleDetailsSubmit}
-                title="Add Item Details"
-                subtitle="Add optional details like quantity, brand, and price"
+                title={editingItemId ? "Edit Item Details" : "Add Item Details"}
+                subtitle={
+                    editingItemId
+                        ? "Edit optional details like quantity, brand, and price"
+                        : "Add optional details like quantity, brand, and price"
+                }
                 idPrefix="ld"
                 itemName={detailName}
                 setItemName={setDetailName}
@@ -2305,7 +2546,10 @@ const ListDetail = ({
                 setBrand={setDetailBrand}
                 price={detailPrice}
                 setPrice={setDetailPrice}
+                category={detailCategory}
+                setCategory={setDetailCategory}
                 onTyping={sendTypingEvent}
+                submitLabel={editingItemId ? "Save" : undefined}
             />
 
             <Modal
@@ -2325,8 +2569,16 @@ const ListDetail = ({
                         <input
                             id="store-name-input"
                             type="text"
+                            maxLength={50}
                             value={finishStoreName}
-                            onChange={(e) => setFinishStoreName(e.target.value)}
+                            onChange={(e) =>
+                                setFinishStoreName(
+                                    e.target.value.replace(
+                                        /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+                                        "",
+                                    ),
+                                )
+                            }
                             placeholder="e.g. Lidl"
                             className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
                         />
