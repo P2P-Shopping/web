@@ -188,7 +188,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     };
 
     const storeRoute = useStore((state) => state.route);
-    const _navigationMode = useStore((state) => state.navigationMode);
     const targetStoreId = useStore((state) => state.targetStoreId);
 
     // --- NOU: Stare pentru Perimetrul Magazinului (GeoJSON Polygon) ---
@@ -514,17 +513,12 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                         confidence_score?: number;
                     };
 
-                    if (
-                        (product as ProductWithConfidence).confidence_score ===
-                        0.9595
-                    ) {
+                    const confScore = (product as ProductWithConfidence)
+                        .confidence_score;
+
+                    if (confScore === 0.9595) {
                         ctx.fillStyle = theme.product;
-                    } else if (
-                        (product as ProductWithConfidence).confidence_score !==
-                            undefined &&
-                        (product as ProductWithConfidence).confidence_score <
-                            0.1
-                    ) {
+                    } else if (confScore !== undefined && confScore < 0.1) {
                         ctx.fillStyle = theme.productNotFound;
                     }
 
