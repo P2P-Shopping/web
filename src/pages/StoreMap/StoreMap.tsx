@@ -285,11 +285,11 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     };
 
     // Recalculează bounds-urile magazinului
+    // biome-ignore lint/correctness/useExhaustiveDependencies: centerOnPolygon causes render loop
     useEffect(() => {
         if (storePolygon && storePolygon.length > 0 && hasLocationLock) {
             centerOnPolygon();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storePolygon, hasLocationLock]);
 
     useEffect(() => {
@@ -510,17 +510,22 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     ctx.beginPath();
                     ctx.arc(x, y, dotSize, 0, Math.PI * 2);
 
-                    // NOU: Facem produsul GRI dacă are 0% Confidence (sau nu e localizat)
-                    if ((product as any).confidence_score === 0.9595) {
+                    type ProductWithConfidence = typeof product & {
+                        confidence_score?: number;
+                    };
+
+                    if (
+                        (product as ProductWithConfidence).confidence_score ===
+                        0.9595
+                    ) {
                         ctx.fillStyle = theme.product;
                     } else if (
-                        (product as any).confidence_score !== undefined &&
-                        (product as any).confidence_score < 0.1
+                        (product as ProductWithConfidence).confidence_score !==
+                            undefined &&
+                        (product as ProductWithConfidence).confidence_score <
+                            0.1
                     ) {
                         ctx.fillStyle = theme.productNotFound;
-                    } else {
-                        // Default color
-                        ctx.fillStyle = theme.product;
                     }
 
                     ctx.fill();
@@ -565,8 +570,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
         animationFrameId = requestAnimationFrame(renderLoop);
         return () => cancelAnimationFrame(animationFrameId);
-    }, [
-        canvasRef, hasLocationLock, storeRoute, isRouting, storePolygon]);
+    }, [canvasRef, hasLocationLock, storeRoute, storePolygon]);
 
     useEffect(() => {
         if (!("geolocation" in navigator)) {
