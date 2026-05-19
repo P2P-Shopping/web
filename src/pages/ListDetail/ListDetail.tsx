@@ -559,6 +559,7 @@ const useListItems = (effectiveListId: string | undefined) => {
                         brand: newItem.brand,
                         quantity: newItem.quantity,
                         price: newItem.price,
+                        category: newItem.category,
                         positionIndex: newItem.positionIndex,
                     },
                     timestamp: Date.now(),
@@ -600,18 +601,29 @@ const useListItems = (effectiveListId: string | undefined) => {
             try {
                 const payload = {
                     name: existingItem.name,
-                    brand: existingItem.brand || null,
+                    brand: existingItem.brand ?? null,
                     quantity: mergedQty,
-                    price: existingItem.price || null,
-                    category: existingItem.category || null,
+                    price: existingItem.price ?? null,
+                    category: existingItem.category ?? null,
                     isChecked: existingItem.checked,
-                    isRecurrent: existingItem.isRecurrent || false,
-                    positionIndex: existingItem.positionIndex || Date.now(),
+                    isRecurrent: existingItem.isRecurrent ?? false,
+                    positionIndex: existingItem.positionIndex ?? Date.now(),
                     timestamp: Date.now(),
                 };
 
                 await api.put(`/api/items/${existingItem.id}`, payload);
-                await fetchListData(effectiveListId); // Facem refresh ca să se vadă instant
+                await fetchListData(effectiveListId);
+                publishSync("UPDATE", {
+                    id: existingItem.id,
+                    name: existingItem.name,
+                    checked: existingItem.checked,
+                    brand: existingItem.brand,
+                    quantity: mergedQty,
+                    price: existingItem.price,
+                    category: existingItem.category,
+                    isRecurrent: existingItem.isRecurrent,
+                    positionIndex: existingItem.positionIndex,
+                });
                 toast.success(`Updated quantity for "${name}"`);
             } catch (err) {
                 console.error("Failed to merge quantities:", err);
@@ -860,6 +872,40 @@ const useListItems = (effectiveListId: string | undefined) => {
         }
     };
 
+    const updateItem = async (
+        itemId: string,
+        payload: Record<string, unknown>,
+    ) => {
+        const existingItem = items.find((i) => i.id === itemId);
+        const updatedItem: Item = {
+            id: itemId,
+            name: (payload.name as string) ?? existingItem?.name ?? "",
+            checked:
+                (payload.isChecked as boolean) ??
+                existingItem?.checked ??
+                false,
+            brand: (payload.brand as string | undefined) ?? existingItem?.brand,
+            quantity:
+                (payload.quantity as string | undefined) ??
+                existingItem?.quantity,
+            price:
+                (payload.price as number | null | undefined) ??
+                existingItem?.price,
+            category:
+                (payload.category as string | undefined) ??
+                existingItem?.category,
+            isRecurrent:
+                (payload.isRecurrent as boolean | undefined) ??
+                existingItem?.isRecurrent,
+            positionIndex:
+                (payload.positionIndex as number | undefined) ??
+                existingItem?.positionIndex,
+        };
+        await api.put(`/api/items/${itemId}`, payload);
+        await fetchListData(effectiveListId);
+        publishSync("UPDATE", updatedItem);
+    };
+
     return {
         items,
         isLoading,
@@ -878,6 +924,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         reviewItems,
         handleReviewConfirm,
         fetchListData,
+        updateItem,
     };
 };
 
@@ -1052,6 +1099,7 @@ interface AddItemModalProps {
     isMobile?: boolean;
     showExpanded?: boolean;
     setShowExpanded?: (val: boolean) => void;
+    submitLabel?: string;
 }
 
 /**
@@ -1367,9 +1415,6 @@ const ItemDetailsFields = ({
                 value={price}
                 onChange={(e) => {
                     const val = e.target.value;
-                    if (val.length > 10) {
-                        return;
-                    }
                     if (val && Number(val) > 999999999.99) {
                         return;
                     }
@@ -1413,7 +1458,7 @@ const ItemDetailsFields = ({
                 maxLength={50}
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g., Diary"
+                placeholder="e.g., Dairy"
                 className={`w-full ${isMobile ? "px-3 py-2 bg-surface" : "px-3.5 py-2.5 bg-bg-muted"} border border-border rounded-md text-sm text-text-strong outline-none focus:border-accent transition-all`}
             />
         </div>
@@ -1441,6 +1486,7 @@ const AddItemDetailsModal = ({
     isMobile = false,
     showExpanded = true,
     setShowExpanded,
+    submitLabel,
 }: AddItemModalProps) => {
     return (
         <Modal
@@ -1463,7 +1509,7 @@ const AddItemDetailsModal = ({
                         form={`${idPrefix}-details-form`}
                         className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
                     >
-                        {isMobile ? "Add" : "Add Item"}
+                        {submitLabel ?? (isMobile ? "Add" : "Add Item")}
                     </button>
                 </div>
             }
@@ -1694,7 +1740,7 @@ const ListDetail = ({
         setIsReviewModalOpen,
         reviewItems,
         handleReviewConfirm,
-        fetchListData,
+        updateItem,
     } = useListItems(effectiveListId);
 
     const { sendTypingEvent } = useListPresence(effectiveListId);
@@ -1840,6 +1886,7 @@ const ListDetail = ({
         setDetailBrand("");
         setDetailPrice("");
         setDetailCategory("");
+        setEditingItemId(null);
     }, []);
 
     useEffect(() => {
@@ -1885,34 +1932,41 @@ const ListDetail = ({
 
     const handleDetailsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const trimmedName = detailName.trim();
+        if (!trimmedName) {
+            setError("Name is required");
+            return;
+        }
+
         const priceNum = detailPrice
             ? Number.parseFloat(detailPrice)
             : undefined;
 
         if (editingItemId) {
             try {
+                const existingItem = items.find((i) => i.id === editingItemId);
                 const payload = {
-                    name: detailName,
+                    name: trimmedName,
                     brand: detailBrand || null,
                     quantity: detailQuantity || "1",
-                    price: priceNum || null,
+                    price: priceNum ?? null,
                     category: detailCategory || null,
-                    isChecked:
-                        items.find((i) => i.id === editingItemId)?.checked ||
-                        false,
+                    isChecked: existingItem?.checked ?? false,
+                    isRecurrent: existingItem?.isRecurrent ?? false,
+                    positionIndex: existingItem?.positionIndex ?? Date.now(),
                     timestamp: Date.now(),
                 };
 
-                await api.put(`/api/items/${editingItemId}`, payload);
-                await fetchListData(effectiveListId);
+                await updateItem(editingItemId, payload);
                 toast.success("Item updated successfully");
             } catch (err) {
                 console.error("Edit error:", err);
                 setError("Failed to update item.");
+                toast.error("Failed to update item.");
             }
         } else {
             addItem(
-                detailName,
+                trimmedName,
                 detailQuantity,
                 detailBrand,
                 priceNum,
@@ -2088,6 +2142,7 @@ const ListDetail = ({
             suggestion.quantity || "1",
             suggestion.brand || undefined,
             finalPrice,
+            suggestion.category || undefined,
         );
 
         setNewItemName("");
@@ -2340,7 +2395,7 @@ const ListDetail = ({
                 isOpen={showMobileAddModal}
                 onClose={resetDetailFields}
                 onSubmit={handleDetailsSubmit}
-                title="Add Item"
+                title={editingItemId ? "Edit Item" : "Add Item"}
                 idPrefix="mobile"
                 itemName={detailName}
                 setItemName={setDetailName}
@@ -2356,14 +2411,19 @@ const ListDetail = ({
                 isMobile={true}
                 showExpanded={showExpandedDetails}
                 setShowExpanded={setShowExpandedDetails}
+                submitLabel={editingItemId ? "Save" : undefined}
             />
 
             <AddItemDetailsModal
                 isOpen={showDetailsModal}
                 onClose={resetDetailFields}
                 onSubmit={handleDetailsSubmit}
-                title="Add Item Details"
-                subtitle="Add optional details like quantity, brand, and price"
+                title={editingItemId ? "Edit Item Details" : "Add Item Details"}
+                subtitle={
+                    editingItemId
+                        ? "Edit optional details like quantity, brand, and price"
+                        : "Add optional details like quantity, brand, and price"
+                }
                 idPrefix="ld"
                 itemName={detailName}
                 setItemName={setDetailName}
@@ -2376,6 +2436,7 @@ const ListDetail = ({
                 category={detailCategory}
                 setCategory={setDetailCategory}
                 onTyping={sendTypingEvent}
+                submitLabel={editingItemId ? "Save" : undefined}
             />
 
             <Modal
