@@ -27,12 +27,18 @@ export const registerRequest = async (data: Record<string, unknown>) => {
     const response = await api.post("/api/auth/register", data);
     return response.data;
 };
-
 export const checkAuthRequest = async () => {
     try {
+        // Luăm token-ul curent din store
+        const currentToken = useStore.getState().token;
+        
+        // Dacă nu avem deloc token local, nu are rost să mai batem backend-ul
+        if (!currentToken) return null;
+
         const response = await api.get("/api/auth/me", {
             headers: {
                 "X-Return-Token": "true",
+                "Authorization": `Bearer ${currentToken}` // Îi forțăm header-ul manual în caz că interceptorul dă rateu la init
             },
         });
         
@@ -42,9 +48,10 @@ export const checkAuthRequest = async () => {
         }
         
         return response.data;
-    } catch {
-        // Silently fail auth check as it's expected when not logged in
-        return null;
+    } catch (error) {
+        console.log("Auth check failed, keeping local session active.", error);
+        // În loc de return null care te dă afară, returnăm starea curentă din store ca să nu te deconecteze
+        return useStore.getState().user;
     }
 };
 
