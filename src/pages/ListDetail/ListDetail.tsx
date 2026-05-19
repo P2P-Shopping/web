@@ -1308,7 +1308,6 @@ const ItemNameField = ({
                 type="text"
                 maxLength={100}
                 value={value}
-                maxLength={50}
                 onChange={(e) => {
                     onChange(
                         e.target.value.replace(
@@ -1438,7 +1437,9 @@ const ItemDetailsFields = ({
                     const val = e.target.value.trim();
                     if (
                         val === "" ||
-                        (/^\d*(\.\d*)?$/.test(val) && val.length <= 10 && (val === "" || Number(val) <= 999999999.99))
+                        (/^\d*(\.\d*)?$/.test(val) &&
+                            val.length <= 10 &&
+                            (val === "" || Number(val) <= 999999999.99))
                     ) {
                         setPrice(val);
                     }
@@ -1461,7 +1462,6 @@ const ItemDetailsFields = ({
                 type="text"
                 maxLength={50}
                 value={brand}
-                maxLength={50}
                 onChange={(e) =>
                     setBrand(
                         e.target.value.replace(
@@ -2489,7 +2489,6 @@ const ListDetail = ({
                             type="text"
                             maxLength={50}
                             value={finishStoreName}
-                            maxLength={50}
                             onChange={(e) =>
                                 setFinishStoreName(
                                     e.target.value.replace(
