@@ -32,6 +32,9 @@ export interface AppState {
     targetStoreLocation: Coordinate | null;
     setTargetStoreLocation: (loc: Coordinate | null) => void;
 
+    targetStoreId: string | null;
+    setTargetStoreId: (id: string | null) => void;
+
     targetStoreTransit: {
         driving: { timeMins: number; distanceKm: string | number };
         walking: { timeMins: number; distanceKm: string | number };
@@ -122,6 +125,9 @@ export const useStore = create<AppState>()(
 
             targetStoreLocation: null,
             setTargetStoreLocation: (loc) => set({ targetStoreLocation: loc }),
+
+            targetStoreId: null,
+            setTargetStoreId: (id) => set({ targetStoreId: id }),
 
             targetStoreTransit: null,
             setTargetStoreTransit: (transit) =>
@@ -244,6 +250,9 @@ export const useStore = create<AppState>()(
                 isAuthenticated: state.isAuthenticated,
                 token: state.token,
                 offlineQueue: state.offlineQueue,
+                targetStoreId: state.targetStoreId,
+                targetStoreLocation: state.targetStoreLocation,
+                targetStoreTransit: state.targetStoreTransit,
             }),
         },
     ),
