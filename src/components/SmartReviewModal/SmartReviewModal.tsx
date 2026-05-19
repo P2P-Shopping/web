@@ -47,10 +47,18 @@ const SmartReviewModal = ({
         prevIsOpen.current = isOpen;
     }, [isOpen, initialListName]);
 
+    const sanitizeValue = (val: string) => {
+        return val.replace(
+            /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+            "",
+        );
+    };
+
     const updateItem = (index: number, field: EditableField, value: string) => {
+        const sanitized = sanitizeValue(value);
         setEditedItems((prev) =>
             prev.map((item, i) =>
-                i === index ? { ...item, [field]: value } : item,
+                i === index ? { ...item, [field]: sanitized } : item,
             ),
         );
     };
@@ -114,7 +122,10 @@ const SmartReviewModal = ({
                             id="review-list-name"
                             className="w-full min-w-0 px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none"
                             value={listName}
-                            onChange={(e) => setListName(e.target.value)}
+                            maxLength={50}
+                            onChange={(e) =>
+                                setListName(sanitizeValue(e.target.value))
+                            }
                             placeholder="Give this list a name"
                         />
                     </div>
@@ -140,6 +151,7 @@ const SmartReviewModal = ({
                                 id={`item-${index}-name`}
                                 className="w-full min-w-0 break-words whitespace-normal px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none"
                                 value={item.name}
+                                maxLength={50}
                                 onChange={(e) =>
                                     updateItem(index, "name", e.target.value)
                                 }
@@ -157,6 +169,7 @@ const SmartReviewModal = ({
                                 id={`item-${index}-brand`}
                                 className="w-full min-w-0 break-words whitespace-normal px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none"
                                 value={item.brand || ""}
+                                maxLength={50}
                                 onChange={(e) =>
                                     updateItem(index, "brand", e.target.value)
                                 }
@@ -174,6 +187,7 @@ const SmartReviewModal = ({
                                 id={`item-${index}-quantity`}
                                 className="w-full min-w-0 break-words whitespace-normal px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none"
                                 value={item.quantity || ""}
+                                maxLength={20}
                                 onChange={(e) =>
                                     updateItem(
                                         index,
@@ -195,6 +209,7 @@ const SmartReviewModal = ({
                                 id={`item-${index}-category`}
                                 className="w-full min-w-0 break-words whitespace-normal px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:border-accent outline-none font-medium text-accent"
                                 value={item.category || ""}
+                                maxLength={50}
                                 onChange={(e) =>
                                     updateItem(
                                         index,

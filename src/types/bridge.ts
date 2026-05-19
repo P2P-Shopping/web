@@ -12,6 +12,11 @@ export interface P2PBridge {
      * Get the platform identifier (e.g., "android").
      */
     getPlatform?(): string;
+
+    /**
+     * Open the native camera for photo capture.
+     */
+    openNativeCamera?(requestId: string): void;
 }
 
 /**
