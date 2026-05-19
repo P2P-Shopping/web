@@ -6,9 +6,11 @@ import type { PresenceEventType } from "../dto/PresencePayload";
  */
 export interface PresenceEvent {
     username: string;
+    displayName?: string;
     eventType: PresenceEventType;
     listId: string;
     activeUsers?: string[];
+    displayNames?: Record<string, string>;
 }
 
 /**
@@ -16,13 +18,17 @@ export interface PresenceEvent {
  */
 interface PresenceState {
     /**
-     * Collection of actively connected users.
+     * Collection of actively connected users (emails).
      */
     activeUsers: Set<string>;
     /**
      * Map linking a typing username to their active javascript timeout ID.
      */
     typingUsers: Record<string, number>;
+    /**
+     * Map of email → display name for all users in the room.
+     */
+    displayNames: Record<string, string>;
 
     /**
      * Processes an incoming presence event and updates state.
@@ -44,18 +50,27 @@ interface PresenceState {
 export const usePresenceStore = create<PresenceState>((set, get) => ({
     activeUsers: new Set<string>(),
     typingUsers: {},
+    displayNames: {},
 
     handlePresenceEvent: (event: PresenceEvent) => {
-        const { username, eventType, activeUsers } = event;
+        const { username, eventType, activeUsers, displayName, displayNames } =
+            event;
 
         // CRITICAL: Handle the server-authoritative roster overwrite
         if (eventType === "ROSTER_UPDATE" && activeUsers) {
-            set({ activeUsers: new Set(activeUsers) });
+            set({
+                activeUsers: new Set(activeUsers),
+                displayNames: displayNames ?? get().displayNames,
+            });
         } else if (eventType === "JOIN") {
             set((state) => {
                 const newSet = new Set(state.activeUsers);
                 newSet.add(username);
-                return { activeUsers: newSet };
+                const newDisplayNames = { ...state.displayNames };
+                if (displayName) {
+                    newDisplayNames[username] = displayName;
+                }
+                return { activeUsers: newSet, displayNames: newDisplayNames };
             });
         } else if (eventType === "LEAVE") {
             set((state) => {
@@ -67,7 +82,13 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                     globalThis.clearTimeout(newTyping[username]);
                     delete newTyping[username];
                 }
-                return { activeUsers: newSet, typingUsers: newTyping };
+                const newDisplayNames = { ...state.displayNames };
+                delete newDisplayNames[username];
+                return {
+                    activeUsers: newSet,
+                    typingUsers: newTyping,
+                    displayNames: newDisplayNames,
+                };
             });
         } else if (eventType === "TYPING") {
             const currentTyping = get().typingUsers;
@@ -86,12 +107,17 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
             set((state) => {
                 const newSet = new Set(state.activeUsers);
                 newSet.add(username);
+                const newDisplayNames = { ...state.displayNames };
+                if (displayName) {
+                    newDisplayNames[username] = displayName;
+                }
                 return {
                     activeUsers: newSet,
                     typingUsers: {
                         ...state.typingUsers,
                         [username]: timeoutId,
                     },
+                    displayNames: newDisplayNames,
                 };
             });
         }
@@ -102,6 +128,6 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         Object.values(currentTyping).forEach((id) => {
             globalThis.clearTimeout(id);
         });
-        set({ activeUsers: new Set(), typingUsers: {} });
+        set({ activeUsers: new Set(), typingUsers: {}, displayNames: {} });
     },
 }));

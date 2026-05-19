@@ -11,6 +11,15 @@ export const loginRequest = async (email: string, password: string) => {
             },
         },
     );
+
+    // Extragem tokenul și datele utilizatorului din răspuns
+    const { token, ...userData } = response.data;
+
+    // Îl salvăm în store ca interceptorul din api.ts să îl trimită la următoarele request-uri
+    if (token) {
+        useStore.getState().setAuth(token, userData);
+    }
+
     return response.data;
 };
 
@@ -26,6 +35,12 @@ export const checkAuthRequest = async () => {
                 "X-Return-Token": "true",
             },
         });
+
+        const { token, ...userData } = response.data;
+        if (token) {
+            useStore.getState().setAuth(token, userData);
+        }
+
         return response.data;
     } catch {
         // Silently fail auth check as it's expected when not logged in
