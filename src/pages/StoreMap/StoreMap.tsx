@@ -188,7 +188,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     };
 
     const storeRoute = useStore((state) => state.route);
-    const navigationMode = useStore((state) => state.navigationMode);
+    const _navigationMode = useStore((state) => state.navigationMode);
     const targetStoreId = useStore((state) => state.targetStoreId);
 
     // --- NOU: Stare pentru Perimetrul Magazinului (GeoJSON Polygon) ---
@@ -289,12 +289,13 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         if (storePolygon && storePolygon.length > 0 && hasLocationLock) {
             centerOnPolygon();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storePolygon, hasLocationLock]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
         setIsRouting(false);
-    }, [hasLocationLock, navigationMode, storeRoute]);
+    }, [hasLocationLock]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
@@ -564,7 +565,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
         animationFrameId = requestAnimationFrame(renderLoop);
         return () => cancelAnimationFrame(animationFrameId);
-    }, [canvasRef, hasLocationLock, storeRoute, isRouting]);
+    }, [
+        canvasRef, hasLocationLock, storeRoute, isRouting, storePolygon]);
 
     useEffect(() => {
         if (!("geolocation" in navigator)) {
