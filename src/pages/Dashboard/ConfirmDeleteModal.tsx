@@ -37,8 +37,15 @@ const ConfirmDeleteModal = ({
                         type="button"
                         className="inline-flex items-center justify-center px-6 py-2.5 bg-danger text-white border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={async () => {
-                            await onConfirm(listId);
-                            toast.success(`List "${listName}" deleted`);
+                            try {
+                                await onConfirm(listId);
+                                toast.success(`List "${listName}" deleted`);
+                            } catch (err) {
+                                console.error("Failed to delete list:", err);
+                                toast.error(
+                                    `Failed to delete "${listName}". Please try again.`,
+                                );
+                            }
                         }}
                         disabled={isDeleting}
                         aria-busy={isDeleting}
