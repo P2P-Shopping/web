@@ -1,8 +1,13 @@
 import { useStore } from "../context/useStore";
 import api from "./api";
 
+export interface AuthResponse {
+    token?: string;
+    [key: string]: any;
+}
+
 export const loginRequest = async (email: string, password: string) => {
-    const response = await api.post(
+    const response = await api.post<AuthResponse>(
         "/api/auth/login",
         { email, password },
         {
@@ -24,7 +29,7 @@ export const loginRequest = async (email: string, password: string) => {
 };
 
 export const registerRequest = async (data: Record<string, unknown>) => {
-    const response = await api.post("/api/auth/register", data);
+    const response = await api.post<AuthResponse>("/api/auth/register", data);
     return response.data;
 };
 
@@ -36,7 +41,7 @@ export const checkAuthRequest = async () => {
         // Dacă nu avem deloc token local, nu are rost să mai batem backend-ul
         if (!currentToken) return null;
 
-        const response = await api.get("/api/auth/me", {
+        const response = await api.get<AuthResponse>("/api/auth/me", {
             headers: {
                 "X-Return-Token": "true",
                 "Authorization": `Bearer ${currentToken}` // Îi forțăm header-ul manual în caz că interceptorul dă rateu la init
@@ -59,10 +64,10 @@ export const checkAuthRequest = async () => {
 export const logoutRequest = async () => {
     try {
         await api.post("/api/auth/logout", {});
-        useStore.getState().setAuth(null, null);
+        useStore.getState().setAuth(null as any, null as any);
     } catch (error) {
         console.error("Logout request failed:", error);
-        useStore.getState().setAuth(null, null);
+        useStore.getState().setAuth(null as any, null as any);
         throw error;
     }
 };
