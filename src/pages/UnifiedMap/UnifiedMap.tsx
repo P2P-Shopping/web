@@ -905,11 +905,10 @@ const useAudioNavigation = (
             });
             const nodeId = point.itemId || `${point.lat}-${point.lng}`;
 
-            if (distance <= 4 && !spokenNodesRef.current.has(nodeId)) {
+            if (distance <= 3 && !spokenNodesRef.current.has(nodeId)) {
                 spokenNodesRef.current.add(nodeId);
 
-                const instructionText =
-                    point.audio_instruction || `Te apropii de ${point.name}`;
+                if (!point.audio_instruction) return;
 
                 try {
                     const AudioCtxConstructor =
@@ -937,7 +936,7 @@ const useAudioNavigation = (
                     console.warn("Audio beep failed", e);
                 }
 
-                const utterance = new SpeechSynthesisUtterance(instructionText);
+                const utterance = new SpeechSynthesisUtterance(point.audio_instruction);
                 utterance.lang = "ro-RO";
                 utterance.rate = 1;
 
@@ -947,7 +946,6 @@ const useAudioNavigation = (
             }
         });
     }, [userLocation, route, navigationMode, isAudioEnabled]);
-
     const resetSpokenNodes = useCallback(() => {
         spokenNodesRef.current.clear();
     }, []);

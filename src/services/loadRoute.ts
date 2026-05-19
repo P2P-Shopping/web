@@ -92,6 +92,7 @@ export const loadRoute = async (
             console.log(
                 "[loadRoute] Successfully received route from server API",
             );
+            
             setRoute(serverData.route);
             setStatus(
                 serverData.partial
@@ -172,22 +173,6 @@ export const loadRoute = async (
         lat: userLat,
         lng: userLng,
     });
-
-    // --- HACK PENTRU TESTARE AUDIO PE MOCK ---
-    const mockInstructions = [
-        "În 5 metri, ia-o la dreapta spre raionul de lactate.",
-        "Mergi înainte 10 metri pe acest culoar.",
-        "Ia-o la stânga și oprește-te în fața raftului.",
-        "Întoarce-te, produsul este exact în spatele tău.",
-        "Ai ajuns la destinația finală din lista ta.",
-    ];
-
-    orderedRoute.forEach((point, index) => {
-        // Injectăm frazele în ordine. Dacă avem mai multe puncte decât fraze, o repetăm pe ultima.
-        point.audio_instruction =
-            mockInstructions[index] || mockInstructions.at(-1);
-    });
-    // ------------------------------------------
 
     setRoute(orderedRoute);
     setStatus("Indoor mock TSP route ready (Fallback).");
