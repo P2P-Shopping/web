@@ -92,7 +92,7 @@ export const loadRoute = async (
             console.log(
                 "[loadRoute] Successfully received route from server API",
             );
-            
+
             setRoute(serverData.route);
             setStatus(
                 serverData.partial

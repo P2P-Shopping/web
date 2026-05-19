@@ -936,7 +936,9 @@ const useAudioNavigation = (
                     console.warn("Audio beep failed", e);
                 }
 
-                const utterance = new SpeechSynthesisUtterance(point.audio_instruction);
+                const utterance = new SpeechSynthesisUtterance(
+                    point.audio_instruction,
+                );
                 utterance.lang = "ro-RO";
                 utterance.rate = 1;
 
