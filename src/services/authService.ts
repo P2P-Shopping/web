@@ -22,7 +22,7 @@ export const loginRequest = async (email: string, password: string) => {
     
     // Îl salvăm în store ca interceptorul din api.ts să îl trimită la următoarele request-uri
     if (token) {
-        useStore.getState().setAuth(token, userData);
+        useStore.getState().setAuth(userData, token);
     }
     
     return response.data;
@@ -50,7 +50,7 @@ export const checkAuthRequest = async () => {
         
         const { token, ...userData } = response.data;
         if (token) {
-            useStore.getState().setAuth(token, userData);
+            useStore.getState().setAuth(userData, token);
         }
         
         return response.data;
@@ -64,10 +64,10 @@ export const checkAuthRequest = async () => {
 export const logoutRequest = async () => {
     try {
         await api.post("/api/auth/logout", {});
-        useStore.getState().setAuth(null as any, null as any);
+        useStore.getState().setAuth(null, null);
     } catch (error) {
         console.error("Logout request failed:", error);
-        useStore.getState().setAuth(null as any, null as any);
+        useStore.getState().setAuth(null, null);
         throw error;
     }
 };
