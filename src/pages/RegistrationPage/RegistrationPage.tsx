@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { registerRequest } from "../../services/authService";
 
 const RegistrationPage = () => {
@@ -68,6 +69,7 @@ const RegistrationPage = () => {
         setIsSubmitting(true);
         try {
             await registerRequest(formData);
+            toast.success("Account created successfully! Please log in.");
             navigate("/login");
             // biome-ignore lint/suspicious/noExplicitAny: API error response format
         } catch (err: any) {
@@ -102,7 +104,7 @@ const RegistrationPage = () => {
                 </button>
                 <button
                     type="button"
-                    className="flex-1 py-2 text-sm font-bold bg-surface text-text-strong rounded-md shadow-sm transition-all"
+                    className="flex-1 py-2 text-sm font-bold bg-accent text-text-on-accent rounded-md shadow-md transition-all"
                 >
                     Register
                 </button>
