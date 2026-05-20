@@ -1,5 +1,8 @@
 // src/services/routingService.ts
 
+import { useStore } from "../context/useStore";
+import { getApiBaseUrl } from "./api";
+
 export interface BackendRoutePoint {
     itemId: string;
     name: string;
@@ -36,10 +39,14 @@ export interface MacroRoutingResponse {
     driving: MacroEstimate | null;
 }
 
-const getBaseUrl = () => {
-    const base =
-        import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
-    return base === "/" ? "" : base;
+const getBaseUrl = getApiBaseUrl;
+
+const authHeaders = (): HeadersInit => {
+    const token = useStore.getState().token;
+    return {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
 };
 
 const getRoutingUrl = (path = "") => `${getBaseUrl()}/api/routing${path}`;
@@ -68,9 +75,10 @@ export async function calculateRoute(
 ): Promise<CalculateRouteResponse> {
     const res = await fetch(getRoutingUrl("/calculate"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         // Order is deliberate: request.lazyN will override the default 5
         body: JSON.stringify({ lazyN: 5, ...request }),
+        credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
@@ -88,6 +96,8 @@ export async function getFullRoute(
 ): Promise<CalculateRouteResponse | null> {
     const safeRouteId = validateRouteId(routeId);
     const res = await fetch(getRoutingUrl(`/full/${safeRouteId}`), {
+        headers: { Authorization: `Bearer ${useStore.getState().token}` },
+        credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
@@ -112,6 +122,8 @@ export async function getMacroEstimates(
     });
 
     const res = await fetch(getRoutingUrl(`/macro?${params}`), {
+        headers: { Authorization: `Bearer ${useStore.getState().token}` },
+        credentials: "include",
         signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`Macro routing failed: ${res.status}`);

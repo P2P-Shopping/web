@@ -146,7 +146,7 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
         </div>
 
         {!isCollapsed && (
-            <ul 
+            <ul
                 className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]"
                 style={{ overflowAnchor: "auto" }}
             >
@@ -1068,7 +1068,10 @@ const Dashboard = () => {
     };
 
     return (
-        <div className="flex flex-col bg-bg min-h-svh" style={{ overflowAnchor: "auto" }}>
+        <div
+            className="flex flex-col bg-bg min-h-svh"
+            style={{ overflowAnchor: "auto" }}
+        >
             <DashboardHeader
                 selectedList={selectedList}
                 showAiImport={showAiImport}

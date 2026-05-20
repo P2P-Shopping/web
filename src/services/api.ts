@@ -1,7 +1,18 @@
 import axios from "axios";
 import { useStore } from "../context/useStore";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL;
+const DEFAULT_API_URL = "http://localhost:8081";
+
+export const getApiBaseUrl = () => {
+    const base =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        DEFAULT_API_URL;
+    if (base === "/") return "";
+    return base.endsWith("/") ? base.slice(0, -1) : base;
+};
+
+const API_URL = getApiBaseUrl();
 
 const api = axios.create({
     baseURL: API_URL,

@@ -1,7 +1,8 @@
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { getApiBaseUrl } from "./api";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "/ws";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || `${getApiBaseUrl()}/ws`;
 
 const stompClient = new Client({
     webSocketFactory: () => new SockJS(SOCKET_URL),

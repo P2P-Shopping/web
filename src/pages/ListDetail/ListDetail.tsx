@@ -203,10 +203,12 @@ const useListItems = (effectiveListId: string | undefined) => {
      */
     const getAuthHeaders = useCallback(
         (withContentType = false): HeadersInit => {
+            const token = useStore.getState().token;
             return {
                 ...(withContentType
                     ? { "Content-Type": "application/json" }
                     : {}),
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
             };
         },
         [],
@@ -2021,10 +2023,6 @@ const ListDetail = ({
         "alphabetical" | "chronological" | "custom"
     >("chronological");
 
-    const scrolledPaddingClass = isEmbedded
-        ? " -mt-6 pt-6 pb-3"
-        : " -mt-3 pt-3 pb-3";
-
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
         () => lists.find((list) => list.id === effectiveListId) ?? null,
@@ -2442,7 +2440,10 @@ const ListDetail = ({
                                     <p>Loading...</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/50 h-full p-4 flex flex-col" style={{ overflowAnchor: "auto" }}>
+                                <div
+                                    className="divide-y divide-border/50 h-full p-4 flex flex-col"
+                                    style={{ overflowAnchor: "auto" }}
+                                >
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}

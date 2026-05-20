@@ -132,7 +132,12 @@ const fetchMacroTransit = async (
             userLng: String(userLocation.lng),
             storeId,
         });
-        const res = await fetch(`${baseUrl}/api/routing/macro?${params}`);
+        const res = await fetch(`${baseUrl}/api/routing/macro?${params}`, {
+            headers: {
+                Authorization: `Bearer ${useStore.getState().token}`,
+            },
+            credentials: "include",
+        });
         if (!res.ok) return transit;
 
         const data = await res.json();
@@ -1220,7 +1225,11 @@ const UnifiedMap: React.FC = () => {
                 `${baseUrl}/api/routing/stores-match`,
                 {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${useStore.getState().token}`,
+                    },
+                    credentials: "include",
                     body: JSON.stringify({
                         userLat: userLocation.lat,
                         userLng: userLocation.lng,
@@ -1279,6 +1288,12 @@ const UnifiedMap: React.FC = () => {
             });
             const response = await fetch(
                 `${baseUrl}/api/routing/macro?${params}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${useStore.getState().token}`,
+                    },
+                    credentials: "include",
+                },
             );
             if (response.ok) {
                 const data = await response.json();
