@@ -16,15 +16,15 @@ export const loginRequest = async (email: string, password: string) => {
             },
         },
     );
-    
+
     // Extragem tokenul și datele utilizatorului din răspuns
     const { token, ...userData } = response.data;
-    
+
     // Îl salvăm în store ca interceptorul din api.ts să îl trimită la următoarele request-uri
     if (token) {
         useStore.getState().setAuth(userData, token);
     }
-    
+
     return response.data;
 };
 
@@ -37,22 +37,22 @@ export const checkAuthRequest = async () => {
     try {
         // Luăm token-ul curent din store
         const currentToken = useStore.getState().token;
-        
+
         // Dacă nu avem deloc token local, nu are rost să mai batem backend-ul
         if (!currentToken) return null;
 
         const response = await api.get<AuthResponse>("/api/auth/me", {
             headers: {
                 "X-Return-Token": "true",
-                "Authorization": `Bearer ${currentToken}` // Îi forțăm header-ul manual în caz că interceptorul dă rateu la init
+                Authorization: `Bearer ${currentToken}`, // Îi forțăm header-ul manual în caz că interceptorul dă rateu la init
             },
         });
-        
+
         const { token, ...userData } = response.data;
         if (token) {
             useStore.getState().setAuth(userData, token);
         }
-        
+
         return response.data;
     } catch (error) {
         console.log("Auth check failed, keeping local session active.", error);
