@@ -146,7 +146,10 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
         </div>
 
         {!isCollapsed && (
-            <ul className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]">
+            <ul
+                className="flex flex-row gap-5 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border items-stretch min-h-[200px]"
+                style={{ overflowAnchor: "auto" }}
+            >
                 {lists.map((list) => (
                     <li
                         key={list.id}
@@ -536,7 +539,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         : `${listsCount} ${listCountLabel}`;
 
     return (
-        <header className="flex items-center justify-between gap-4 px-7 py-5 bg-surface border-b border-border sticky top-0 z-100 max-[600px]:p-4 max-[600px]:flex-wrap">
+        <header className="flex items-center justify-between gap-4 px-7 py-5 bg-bg/95 backdrop-blur-md border-b border-border sticky top-0 z-100 mt-2 max-[600px]:p-4 max-[600px]:flex-wrap">
             {showDetailHeader ? (
                 <>
                     <button
@@ -1065,7 +1068,10 @@ const Dashboard = () => {
     };
 
     return (
-        <div className="flex flex-col bg-bg h-full overflow-hidden">
+        <div
+            className="flex flex-col bg-bg min-h-svh"
+            style={{ overflowAnchor: "auto" }}
+        >
             <DashboardHeader
                 selectedList={selectedList}
                 showAiImport={showAiImport}
@@ -1085,7 +1091,7 @@ const Dashboard = () => {
             />
 
             <main
-                className={`flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 ${showAiImport ? "overflow-hidden flex flex-col" : "overflow-y-auto scrollbar-thin"}`}
+                className={`flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 ${showAiImport ? "overflow-hidden flex flex-col h-[calc(100svh-80px)]" : "overflow-visible"}`}
             >
                 {renderDashboardContent()}
             </main>

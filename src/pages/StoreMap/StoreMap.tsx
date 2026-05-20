@@ -317,6 +317,12 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                 const baseUrl = getApiBaseUrl();
                 const res = await fetch(
                     `${baseUrl}/api/routing/store/${targetStoreId}/polygon`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${useStore.getState().token}`,
+                        },
+                        credentials: "include",
+                    },
                 );
                 if (res.ok) {
                     const geojsonStr = await res.text();

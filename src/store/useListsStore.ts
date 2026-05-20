@@ -88,9 +88,11 @@ const pickCurrentNormalList = (lists: ShoppingList[]) =>
                 new Date(left.updatedAt).getTime(),
         )[0] ?? null;
 
-const jsonHeaders = (withContentType = false): HeadersInit => {
+const authHeaders = (withContentType = false): HeadersInit => {
+    const token = useStore.getState().token;
     return {
         ...(withContentType ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 };
 
@@ -283,7 +285,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await fetch(`${getApiBaseUrl()}/api/lists`, {
-                headers: jsonHeaders(),
+                headers: authHeaders(),
                 credentials: "include",
             });
 
@@ -328,7 +330,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
             const response = await fetch(`${getApiBaseUrl()}/api/lists`, {
                 method: "POST",
-                headers: jsonHeaders(true),
+                headers: authHeaders(true),
                 body: JSON.stringify({ title: trimmedName, category }),
                 credentials: "include",
             });
@@ -392,7 +394,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
         try {
             const response = await fetch(`${getApiBaseUrl()}/api/lists/${id}`, {
                 method: "DELETE",
-                headers: jsonHeaders(),
+                headers: authHeaders(),
                 credentials: "include",
             });
 
@@ -442,7 +444,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
         try {
             const response = await fetch(`${getApiBaseUrl()}/api/lists/${id}`, {
                 method: "PATCH",
-                headers: jsonHeaders(true),
+                headers: authHeaders(true),
                 body: JSON.stringify({ title: trimmedName }),
                 credentials: "include",
             });
@@ -495,7 +497,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/lists/${listId}/items`,
                 {
                     method: "POST",
-                    headers: jsonHeaders(true),
+                    headers: authHeaders(true),
                     body: JSON.stringify(buildItemRequest(item)),
                     credentials: "include",
                 },
@@ -544,7 +546,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/items/${itemId}`,
                 {
                     method: "PUT",
-                    headers: jsonHeaders(true),
+                    headers: authHeaders(true),
                     body: JSON.stringify(buildItemRequest(merged)),
                     credentials: "include",
                 },
@@ -605,7 +607,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/items/${itemId}`,
                 {
                     method: "DELETE",
-                    headers: jsonHeaders(),
+                    headers: authHeaders(),
                     credentials: "include",
                 },
             );
@@ -640,7 +642,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/lists/${listId}/share`,
                 {
                     method: "POST",
-                    headers: jsonHeaders(true),
+                    headers: authHeaders(true),
                     body: JSON.stringify({ email }),
                     credentials: "include",
                 },
@@ -676,7 +678,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/lists/${listId}/collaborators/${userId}`,
                 {
                     method: "DELETE",
-                    headers: jsonHeaders(),
+                    headers: authHeaders(),
                     credentials: "include",
                 },
             );
@@ -717,7 +719,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/lists/${listId}/collaborators/me`,
                 {
                     method: "DELETE",
-                    headers: jsonHeaders(),
+                    headers: authHeaders(),
                     credentials: "include",
                 },
             );
@@ -748,7 +750,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     fetchPendingInvitations: async () => {
         try {
             const response = await fetch(`${getApiBaseUrl()}/api/invitations`, {
-                headers: jsonHeaders(),
+                headers: authHeaders(),
                 credentials: "include",
             });
 
@@ -778,7 +780,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/invitations/${invitationId}/accept`,
                 {
                     method: "POST",
-                    headers: jsonHeaders(),
+                    headers: authHeaders(),
                     credentials: "include",
                 },
             );
@@ -816,7 +818,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 `${getApiBaseUrl()}/api/invitations/${invitationId}/decline`,
                 {
                     method: "POST",
-                    headers: jsonHeaders(),
+                    headers: authHeaders(),
                     credentials: "include",
                 },
             );

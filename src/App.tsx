@@ -361,12 +361,12 @@ function App() {
     const showNavbar = isAuthenticated && !isAuthPage && !isAiImport;
 
     return (
-        <div className="h-svh flex flex-col bg-bg transition-colors duration-300 overflow-hidden">
+        <div className="fixed inset-0 flex flex-col bg-bg transition-colors duration-300 overflow-hidden pt-safe">
             <Toaster position="top-center" richColors />
             <OfflineBanner isAuthPage={isAuthPage || isWebView()} />
 
             <main
-                className={`flex-1 flex flex-col ${isAiImport ? "overflow-hidden" : "overflow-y-auto"} min-h-0 relative`}
+                className={`flex-1 flex flex-col ${isAiImport ? "overflow-hidden" : "overflow-y-auto"} min-h-0 relative scroll-pt-[80px] overscroll-behavior-y-contain`}
             >
                 <Routes>
                     <Route
