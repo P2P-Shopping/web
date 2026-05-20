@@ -3,6 +3,8 @@ import {
     List,
     LocateFixed,
     Navigation,
+    Play,
+    Square,
     X,
     ZoomIn,
     ZoomOut,
@@ -11,6 +13,10 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import Modal from "../../components/Modal/Modal";
 import { useStore } from "../../context/useStore";
+import {
+    startSimulation,
+    stopSimulation,
+} from "../../services/simulationService";
 
 interface Coordinate {
     lat: number;
@@ -524,16 +530,31 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
                     ctx.fill();
 
-                    // NOU: Afișăm textul doar la Zoom mai mare
-                    if (camera.current.zoom > 1.8) {
-                        ctx.fillStyle = "white";
-                        ctx.font = `bold ${10 / camera.current.zoom}px Inter, sans-serif`;
-                        ctx.fillText(
-                            product.name,
-                            x + dotSize + 4 / camera.current.zoom,
-                            y + dotSize / 2,
-                        );
-                    }
+                    // NOU: Afișăm textul MEREU cu un fundal de tip "pill" pentru lizibilitate maximă
+                    const fontSize = Math.max(12 / camera.current.zoom, 8);
+                    ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+                    const textWidth = ctx.measureText(product.name).width;
+                    const padding = 6 / camera.current.zoom;
+
+                    // Fundal pentru text
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                    ctx.beginPath();
+                    ctx.roundRect(
+                        x + dotSize + 2 / camera.current.zoom,
+                        y - fontSize / 1.5,
+                        textWidth + padding * 2,
+                        fontSize * 1.4,
+                        4 / camera.current.zoom,
+                    );
+                    ctx.fill();
+
+                    // Textul propriu-zis
+                    ctx.fillStyle = "white";
+                    ctx.fillText(
+                        product.name,
+                        x + dotSize + 2 / camera.current.zoom + padding,
+                        y + fontSize / 4,
+                    );
                 });
 
                 ctx.beginPath();
@@ -855,6 +876,8 @@ const StoreMap: React.FC<StoreMapProps> = ({
         return () => document.removeEventListener("keydown", handleEscape);
     }, [isSidebarExpanded, toggleSidebar]);
 
+    const isSimulationActive = useStore((state) => state.isSimulationActive);
+
     const {
         isDragging,
         hasLocationLock,
@@ -944,6 +967,30 @@ const StoreMap: React.FC<StoreMapProps> = ({
             {/* Map Control Bar - Separated from map view */}
             <div className="relative z-3000 bg-surface/80 backdrop-blur-xl border-t border-border h-21 px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
                 <div className="flex items-center gap-4">
+                    <button
+                        type="button"
+                        className={`w-12 h-12 flex items-center justify-center rounded-full shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${isSimulationActive ? "bg-orange-500 text-white animate-pulse" : "bg-blue-500 text-white"}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (isSimulationActive) {
+                                stopSimulation();
+                            } else {
+                                startSimulation();
+                            }
+                        }}
+                        title={
+                            isSimulationActive
+                                ? "Stop Simulation"
+                                : "Start Simulation"
+                        }
+                    >
+                        {isSimulationActive ? (
+                            <Square size={20} />
+                        ) : (
+                            <Play size={20} className="ml-0.5" />
+                        )}
+                    </button>
+
                     <button
                         type="button"
                         className="w-12 h-12 flex items-center justify-center bg-accent text-text-on-accent rounded-full shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
