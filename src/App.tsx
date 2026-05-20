@@ -155,9 +155,15 @@ function App() {
     }, [setAuth, authChecked]);
 
     const isMockGpsEnabled = useStore((state) => state.isMockGpsEnabled);
+    const isSimulationActive = useStore((state) => state.isSimulationActive);
     const setUserLocation = useStore((state) => state.setUserLocation);
 
     useEffect(() => {
+        if (isSimulationActive) {
+            // Simulation is driving the location updates
+            return;
+        }
+
         if (isMockGpsEnabled) {
             startMockEmitter();
             return () => stopMockEmitter();
@@ -186,7 +192,7 @@ function App() {
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
-    }, [isMockGpsEnabled, setUserLocation]);
+    }, [isMockGpsEnabled, setUserLocation, isSimulationActive]);
 
     useEffect(() => {
         if (

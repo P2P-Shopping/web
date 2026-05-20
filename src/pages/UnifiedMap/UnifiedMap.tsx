@@ -10,6 +10,7 @@ import {
     Polyline,
     Popup,
     TileLayer,
+    Tooltip,
     useMap,
     useMapEvents,
     ZoomControl,
@@ -906,8 +907,15 @@ const useAudioNavigation = (
     route: RoutePoint[],
     navigationMode: "city" | "indoor",
     isAudioEnabled: boolean,
+    isSimulationActive: boolean,
 ) => {
     const spokenNodesRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (isSimulationActive) {
+            spokenNodesRef.current.clear();
+        }
+    }, [isSimulationActive]);
 
     useEffect(() => {
         if (
@@ -930,11 +938,10 @@ const useAudioNavigation = (
             });
             const nodeId = point.itemId || `${point.lat}-${point.lng}`;
 
-            if (distance <= 4 && !spokenNodesRef.current.has(nodeId)) {
+            if (distance <= 3 && !spokenNodesRef.current.has(nodeId)) {
                 spokenNodesRef.current.add(nodeId);
 
-                const instructionText =
-                    point.audio_instruction || `Te apropii de ${point.name}`;
+                if (!point.audio_instruction) return;
 
                 try {
                     const AudioCtxConstructor =
@@ -962,7 +969,9 @@ const useAudioNavigation = (
                     console.warn("Audio beep failed", e);
                 }
 
-                const utterance = new SpeechSynthesisUtterance(instructionText);
+                const utterance = new SpeechSynthesisUtterance(
+                    point.audio_instruction,
+                );
                 utterance.lang = "ro-RO";
                 utterance.rate = 1;
 
@@ -972,7 +981,6 @@ const useAudioNavigation = (
             }
         });
     }, [userLocation, route, navigationMode, isAudioEnabled]);
-
     const resetSpokenNodes = useCallback(() => {
         spokenNodesRef.current.clear();
     }, []);
@@ -1018,7 +1026,9 @@ const UnifiedMap: React.FC = () => {
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
-    const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+    const isAudioEnabled = useStore((state) => state.isAudioEnabled);
+    const setIsAudioEnabled = useStore((state) => state.setIsAudioEnabled);
+    const isSimulationActive = useStore((state) => state.isSimulationActive);
     const routeOriginRef = useRef<Coordinate | null>(null);
     const lastDeviationRecalcRef = useRef<Coordinate | null>(null);
 
@@ -1027,6 +1037,7 @@ const UnifiedMap: React.FC = () => {
         route,
         navigationMode,
         isAudioEnabled,
+        isSimulationActive,
     );
     const isMicroView = navigationMode === "indoor";
 
@@ -1495,7 +1506,19 @@ const UnifiedMap: React.FC = () => {
                                             iconSize: [22, 22],
                                             iconAnchor: [11, 11],
                                         })}
-                                    />
+                                    >
+                                        <Popup>{point.name}</Popup>
+                                        <Tooltip
+                                            permanent
+                                            direction="top"
+                                            offset={[0, -10]}
+                                            className="custom-tooltip"
+                                        >
+                                            <span className="font-black uppercase text-[9px] tracking-tighter">
+                                                {point.name}
+                                            </span>
+                                        </Tooltip>
+                                    </Marker>
                                 ))}
                             </>
                         )}

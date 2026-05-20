@@ -50,6 +50,10 @@ export interface AppState {
     isAutoCenterEnabled: boolean;
     /** Whether to use mock GPS updates or real navigator.geolocation */
     isMockGpsEnabled: boolean;
+    /** Whether audio navigation is enabled */
+    isAudioEnabled: boolean;
+    /** Whether a user experience simulation is currently running */
+    isSimulationActive: boolean;
 
     route: RoutePoint[];
     routeWarnings: string[];
@@ -85,6 +89,10 @@ export interface AppState {
     setIsAutoCenterEnabled: (value: boolean) => void;
     /** Toggles between mock and real GPS */
     setIsMockGpsEnabled: (value: boolean) => void;
+    /** Toggles audio navigation */
+    setIsAudioEnabled: (value: boolean) => void;
+    /** Toggles simulation mode */
+    setIsSimulationActive: (value: boolean) => void;
     /** Manually triggers indoor mode and cross-geofence logic */
     forceIndoorMode: () => void;
 
@@ -138,6 +146,8 @@ export const useStore = create<AppState>()(
             isTransitioningToStore: false,
             isAutoCenterEnabled: true,
             isMockGpsEnabled: true,
+            isAudioEnabled: false,
+            isSimulationActive: false,
             route: [],
             routeWarnings: [],
             macroRouteGeometry: [],
@@ -160,6 +170,9 @@ export const useStore = create<AppState>()(
             setIsAutoCenterEnabled: (value) =>
                 set({ isAutoCenterEnabled: value }),
             setIsMockGpsEnabled: (value) => set({ isMockGpsEnabled: value }),
+            setIsAudioEnabled: (value) => set({ isAudioEnabled: value }),
+            setIsSimulationActive: (value) =>
+                set({ isSimulationActive: value }),
             forceIndoorMode: () => {
                 set({
                     navigationMode: "indoor",
