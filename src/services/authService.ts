@@ -3,7 +3,7 @@ import api from "./api";
 
 export interface AuthResponse {
     token?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export const loginRequest = async (email: string, password: string) => {

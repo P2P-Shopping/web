@@ -192,7 +192,7 @@ function App() {
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
-    }, [isMockGpsEnabled, setUserLocation]);
+    }, [isMockGpsEnabled, setUserLocation, isSimulationActive]);
 
     useEffect(() => {
         if (

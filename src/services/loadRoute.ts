@@ -99,12 +99,12 @@ export const loadRoute = async (
             // Adăugăm warning-uri pentru produse cu scor de încredere mic (< 0.1)
             const lowConfidenceWarnings = serverData.route
                 .filter(
-                    (p: any) =>
+                    (p) =>
                         p.confidence_score !== undefined &&
                         p.confidence_score < 0.1,
                 )
                 .map(
-                    (p: any) =>
+                    (p) =>
                         `Produsul "${p.name}" are o precizie scăzută a locației.`,
                 );
 
@@ -134,12 +134,12 @@ export const loadRoute = async (
 
                         const lowConf = fullRoute
                             .filter(
-                                (p: any) =>
+                                (p) =>
                                     p.confidence_score !== undefined &&
                                     p.confidence_score < 0.1,
                             )
                             .map(
-                                (p: any) =>
+                                (p) =>
                                     `Produsul "${p.name}" are o precizie scăzută a locației.`,
                             );
 
