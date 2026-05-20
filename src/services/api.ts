@@ -8,7 +8,8 @@ export const getApiBaseUrl = () => {
         import.meta.env.VITE_API_URL ||
         import.meta.env.VITE_API_BASE_URL ||
         DEFAULT_API_URL;
-    return base === "/" ? "" : base;
+    if (base === "/") return "";
+    return base.endsWith("/") ? base.slice(0, -1) : base;
 };
 
 const API_URL = getApiBaseUrl();
