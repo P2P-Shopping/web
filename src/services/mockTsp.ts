@@ -57,7 +57,7 @@ export function calculateMockTspRoute(
                     lat: cursor.lat,
                     lng: nextPoint.lng,
                     audio_instruction: "Încadrează-te pe culoarul principal.",
-                } as unknown as RoutePoint);
+                });
             } else {
                 // Ne mișcăm întâi pe axa Y (Latitudine), apoi pe X (Longitudine)
                 orderedRoute.push({
@@ -66,7 +66,7 @@ export function calculateMockTspRoute(
                     lat: nextPoint.lat,
                     lng: cursor.lng,
                     audio_instruction: "Fă o manevră printre rafturi.",
-                } as unknown as RoutePoint);
+                });
             }
         }
 

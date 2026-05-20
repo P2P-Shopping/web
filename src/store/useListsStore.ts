@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useStore } from "../context/useStore";
-import { fetchListByIdRequest } from "../services/api";
+import { fetchListByIdRequest, getApiBaseUrl } from "../services/api";
 import type {
     CollaboratorInfo,
     Item,
@@ -88,21 +88,6 @@ const pickCurrentNormalList = (lists: ShoppingList[]) =>
                 new Date(left.updatedAt).getTime(),
         )[0] ?? null;
 
-/**
- * Resolves the base URL for API requests from environment variables.
- * @returns The base URL string.
- */
-const getBaseUrl = () => {
-    const base =
-        import.meta.env.VITE_API_URL ||
-        import.meta.env.VITE_API_BASE_URL ||
-        "http://localhost:8081";
-    return base === "/" ? "" : base;
-};
-
-/**
- * Constructs standard headers for API requests.
- */
 const jsonHeaders = (withContentType = false): HeadersInit => {
     return {
         ...(withContentType ? { "Content-Type": "application/json" } : {}),
@@ -297,7 +282,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     fetchLists: async () => {
         set({ isLoading: true, error: null });
         try {
-            const response = await fetch(`${getBaseUrl()}/api/lists`, {
+            const response = await fetch(`${getApiBaseUrl()}/api/lists`, {
                 headers: jsonHeaders(),
                 credentials: "include",
             });
@@ -341,7 +326,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 throw new Error("List name cannot be empty");
             }
 
-            const response = await fetch(`${getBaseUrl()}/api/lists`, {
+            const response = await fetch(`${getApiBaseUrl()}/api/lists`, {
                 method: "POST",
                 headers: jsonHeaders(true),
                 body: JSON.stringify({ title: trimmedName, category }),
@@ -405,7 +390,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     deleteList: async (id: string) => {
         set({ deletingListId: id, error: null });
         try {
-            const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
+            const response = await fetch(`${getApiBaseUrl()}/api/lists/${id}`, {
                 method: "DELETE",
                 headers: jsonHeaders(),
                 credentials: "include",
@@ -455,7 +440,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
         set({ error: null });
         try {
-            const response = await fetch(`${getBaseUrl()}/api/lists/${id}`, {
+            const response = await fetch(`${getApiBaseUrl()}/api/lists/${id}`, {
                 method: "PATCH",
                 headers: jsonHeaders(true),
                 body: JSON.stringify({ title: trimmedName }),
@@ -507,7 +492,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     addItem: async (listId: string, item: Omit<Item, "id">) => {
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/lists/${listId}/items`,
+                `${getApiBaseUrl()}/api/lists/${listId}/items`,
                 {
                     method: "POST",
                     headers: jsonHeaders(true),
@@ -556,7 +541,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
         const merged = { ...item, ...updates };
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/items/${itemId}`,
+                `${getApiBaseUrl()}/api/items/${itemId}`,
                 {
                     method: "PUT",
                     headers: jsonHeaders(true),
@@ -617,7 +602,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     deleteItem: async (listId: string, itemId: string) => {
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/items/${itemId}`,
+                `${getApiBaseUrl()}/api/items/${itemId}`,
                 {
                     method: "DELETE",
                     headers: jsonHeaders(),
@@ -652,7 +637,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     shareList: async (listId: string, email: string) => {
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/lists/${listId}/share`,
+                `${getApiBaseUrl()}/api/lists/${listId}/share`,
                 {
                     method: "POST",
                     headers: jsonHeaders(true),
@@ -688,7 +673,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     removeCollaborator: async (listId: string, userId: number) => {
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/lists/${listId}/collaborators/${userId}`,
+                `${getApiBaseUrl()}/api/lists/${listId}/collaborators/${userId}`,
                 {
                     method: "DELETE",
                     headers: jsonHeaders(),
@@ -729,7 +714,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     leaveList: async (listId: string) => {
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/lists/${listId}/collaborators/me`,
+                `${getApiBaseUrl()}/api/lists/${listId}/collaborators/me`,
                 {
                     method: "DELETE",
                     headers: jsonHeaders(),
@@ -762,7 +747,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
     fetchPendingInvitations: async () => {
         try {
-            const response = await fetch(`${getBaseUrl()}/api/invitations`, {
+            const response = await fetch(`${getApiBaseUrl()}/api/invitations`, {
                 headers: jsonHeaders(),
                 credentials: "include",
             });
@@ -790,7 +775,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     acceptInvitation: async (invitationId: string) => {
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/invitations/${invitationId}/accept`,
+                `${getApiBaseUrl()}/api/invitations/${invitationId}/accept`,
                 {
                     method: "POST",
                     headers: jsonHeaders(),
@@ -828,7 +813,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     declineInvitation: async (invitationId: string) => {
         try {
             const response = await fetch(
-                `${getBaseUrl()}/api/invitations/${invitationId}/decline`,
+                `${getApiBaseUrl()}/api/invitations/${invitationId}/decline`,
                 {
                     method: "POST",
                     headers: jsonHeaders(),

@@ -7,6 +7,126 @@ import { calculateRoute, pollFullRoute } from "./routingService";
 // Module-level cleanup to prevent multiple polling loops from accumulating
 let activePollCleanup: (() => void) | null = null;
 
+function stopActivePoll() {
+    if (activePollCleanup) {
+        activePollCleanup();
+        activePollCleanup = null;
+    }
+}
+
+function collectLowConfidenceWarnings(
+    route: { name: string; confidence_score?: number }[],
+): string[] {
+    return route
+        .filter(
+            (p) => p.confidence_score !== undefined && p.confidence_score < 0.1,
+        )
+        .map((p) => `Produsul "${p.name}" are o precizie scăzută a locației.`);
+}
+
+function applyServerRoute(
+    serverData: Awaited<ReturnType<typeof calculateRoute>>,
+    setRoute: ReturnType<typeof useStore.getState>["setRoute"],
+    setStatus: ReturnType<typeof useStore.getState>["setStatus"],
+    setRouteWarnings: ReturnType<typeof useStore.getState>["setRouteWarnings"],
+): boolean {
+    if (
+        !(
+            serverData?.status === "success" &&
+            (serverData?.route?.length ?? 0) > 0
+        )
+    ) {
+        if ((serverData?.warnings?.length ?? 0) > 0) {
+            setRouteWarnings(serverData.warnings);
+            setRoute([]);
+            setStatus("Unele produse nu au fost găsite.");
+            return true;
+        }
+        console.warn("[loadRoute] Server returned empty route or non-success.");
+        return false;
+    }
+
+    console.log("[loadRoute] Successfully received route from server API");
+
+    const allWarnings = [
+        ...(serverData.warnings || []),
+        ...collectLowConfidenceWarnings(serverData.route),
+    ];
+
+    setRoute(serverData.route);
+    setRouteWarnings(allWarnings);
+    setStatus(
+        serverData.partial
+            ? "Partial route loaded. Optimizing..."
+            : "Optimized route loaded from server.",
+    );
+
+    stopActivePoll();
+
+    if (serverData.partial && serverData.routeId) {
+        activePollCleanup = pollFullRoute(
+            serverData.routeId,
+            (fullRoute, warnings) => {
+                setRoute(fullRoute);
+                setRouteWarnings([
+                    ...(warnings || []),
+                    ...collectLowConfidenceWarnings(fullRoute),
+                ]);
+                setStatus("Optimized route loaded from server.");
+                activePollCleanup = null;
+            },
+            (error) => {
+                console.warn("[loadRoute] Full route polling failed:", error);
+                setStatus("Partial route loaded from server.");
+                activePollCleanup = null;
+            },
+        );
+    }
+    return true;
+}
+
+function buildFallbackPoints(
+    productIds: string[],
+    fallbackItems: { id: string; name: string }[],
+    userLat: number,
+    userLng: number,
+): { points: MockRouteSeed[]; warnings: string[] } {
+    const points: MockRouteSeed[] = [];
+    const warnings: string[] = [];
+    const ids = productIds.length > 0 ? productIds : Object.keys(PALAS_ITEMS);
+
+    for (const id of ids) {
+        const item = PALAS_ITEMS[id];
+        if (item) {
+            points.push({
+                itemId: id,
+                name: item.name,
+                lat: item.lat,
+                lng: item.lng,
+            });
+            continue;
+        }
+
+        const fallbackItem = fallbackItems.find((entry) => entry.id === id);
+        if (!fallbackItem) continue;
+
+        warnings.push(
+            `Nu s-a găsit produsul "${fallbackItem.name}" în magazin.`,
+        );
+        const index = points.length;
+        const ring = Math.floor(index / 6) + 1;
+        const angle = (index % 6) * (Math.PI / 3);
+        points.push({
+            itemId: fallbackItem.id,
+            name: fallbackItem.name,
+            lat: userLat + Math.cos(angle) * 0.00008 * ring,
+            lng: userLng + Math.sin(angle) * 0.0001 * ring,
+        });
+    }
+
+    return { points, warnings };
+}
+
 /**
  * Coordinates for items inside Palas Mall (Iași) as seeded in the backend
  * init-scripts/99-populare.sql (raw_user_pings for store 8f3e1a2b-c4d5-6e7f-8a9b-0c1d2e3f4a5b).
@@ -76,7 +196,7 @@ export const loadRoute = async (
 ) => {
     const { setRoute, setStatus, setRouteWarnings } = useStore.getState();
     setStatus("Calculating route...");
-    setRouteWarnings([]); // Resetăm avertizările anterioare
+    setRouteWarnings([]);
 
     // Priority: Try to call the real SERVER API
     try {
@@ -89,125 +209,22 @@ export const loadRoute = async (
         });
 
         if (
-            serverData?.status === "success" &&
-            (serverData?.route?.length ?? 0) > 0
+            applyServerRoute(serverData, setRoute, setStatus, setRouteWarnings)
         ) {
-            console.log(
-                "[loadRoute] Successfully received route from server API",
-            );
-
-            // Adăugăm warning-uri pentru produse cu scor de încredere mic (< 0.1)
-            const lowConfidenceWarnings = serverData.route
-                .filter(
-                    (p) =>
-                        p.confidence_score !== undefined &&
-                        p.confidence_score < 0.1,
-                )
-                .map(
-                    (p) =>
-                        `Produsul "${p.name}" are o precizie scăzută a locației.`,
-                );
-
-            const allWarnings = [
-                ...(serverData.warnings || []),
-                ...lowConfidenceWarnings,
-            ];
-
-            setRoute(serverData.route);
-            setRouteWarnings(allWarnings);
-            setStatus(
-                serverData.partial
-                    ? "Partial route loaded. Optimizing..."
-                    : "Optimized route loaded from server.",
-            );
-
-            if (activePollCleanup) {
-                activePollCleanup();
-                activePollCleanup = null;
-            }
-
-            if (serverData.partial && serverData.routeId) {
-                activePollCleanup = pollFullRoute(
-                    serverData.routeId,
-                    (fullRoute, warnings) => {
-                        setRoute(fullRoute);
-
-                        const lowConf = fullRoute
-                            .filter(
-                                (p) =>
-                                    p.confidence_score !== undefined &&
-                                    p.confidence_score < 0.1,
-                            )
-                            .map(
-                                (p) =>
-                                    `Produsul "${p.name}" are o precizie scăzută a locației.`,
-                            );
-
-                        setRouteWarnings([...(warnings || []), ...lowConf]);
-                        setStatus("Optimized route loaded from server.");
-                        activePollCleanup = null;
-                    },
-                    (error) => {
-                        console.warn(
-                            "[loadRoute] Full route polling failed:",
-                            error,
-                        );
-                        setStatus("Partial route loaded from server.");
-                        activePollCleanup = null;
-                    },
-                );
-            }
             return;
         }
-
-        // Dacă serverul nu a găsit rute dar a trimis warning-uri (ex: produse lipsă în catalog)
-        if ((serverData?.warnings?.length ?? 0) > 0) {
-            setRouteWarnings(serverData.warnings);
-            setRoute([]);
-            setStatus("Unele produse nu au fost găsite.");
-            return;
-        }
-
-        console.warn("[loadRoute] Server returned empty route or non-success.");
     } catch (err) {
         console.error("[loadRoute] Server API call failed:", err);
     }
 
     // Fallback: Local mock logic
     console.debug("[loadRoute] Falling back to local mock TSP calculation...");
-    const points: MockRouteSeed[] = [];
-    const warnings: string[] = [];
-    const ids = productIds.length > 0 ? productIds : Object.keys(PALAS_ITEMS);
-
-    for (const id of ids) {
-        const item = PALAS_ITEMS[id];
-        if (item) {
-            points.push({
-                itemId: id,
-                name: item.name,
-                lat: item.lat,
-                lng: item.lng,
-            });
-        } else {
-            const fallbackItem = fallbackItems.find((entry) => entry.id === id);
-            if (fallbackItem) {
-                warnings.push(
-                    `Nu s-a găsit produsul "${fallbackItem.name}" în magazin.`,
-                );
-                const index = points.length;
-                const ring = Math.floor(index / 6) + 1;
-                const angle = (index % 6) * (Math.PI / 3);
-                const latOffset = Math.cos(angle) * 0.00008 * ring;
-                const lngOffset = Math.sin(angle) * 0.0001 * ring;
-                points.push({
-                    itemId: fallbackItem.id,
-                    name: fallbackItem.name,
-                    lat: userLat + latOffset,
-                    lng: userLng + lngOffset,
-                });
-            }
-        }
-    }
+    const { points, warnings } = buildFallbackPoints(
+        productIds,
+        fallbackItems,
+        userLat,
+        userLng,
+    );
 
     if (points.length === 0) {
         console.warn("[loadRoute] No items found for mock calculation.");
@@ -225,8 +242,5 @@ export const loadRoute = async (
     setRoute(orderedRoute);
     setRouteWarnings(warnings);
     setStatus("Indoor mock TSP route ready (Fallback).");
-    if (activePollCleanup) {
-        activePollCleanup();
-        activePollCleanup = null;
-    }
+    stopActivePoll();
 };
