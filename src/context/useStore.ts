@@ -171,7 +171,8 @@ export const useStore = create<AppState>()(
                 set({ isAutoCenterEnabled: value }),
             setIsMockGpsEnabled: (value) => set({ isMockGpsEnabled: value }),
             setIsAudioEnabled: (value) => set({ isAudioEnabled: value }),
-            setIsSimulationActive: (value) => set({ isSimulationActive: value }),
+            setIsSimulationActive: (value) =>
+                set({ isSimulationActive: value }),
             forceIndoorMode: () => {
                 set({
                     navigationMode: "indoor",
