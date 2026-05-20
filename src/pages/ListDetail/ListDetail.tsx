@@ -2217,8 +2217,8 @@ const ListDetail = ({
     const isReadOnly = authFailed;
     const wrapperClassName = isEmbedded
         ? "w-full flex flex-col h-full bg-surface/50"
-        : "flex justify-center items-start p-20px bg-bg";
-    const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`;
+        : "flex justify-center items-start min-h-svh bg-bg";
+    const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border h-full ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`;
 
     const handleInstantAdd = (suggestion: ProductSuggestion) => {
         const finalPrice =
@@ -2305,12 +2305,11 @@ const ListDetail = ({
                 ) : (
                     <>
                         <div
-                            className={`sticky top-0 z-30 flex flex-col gap-3 transition-all duration-200 ${
-                                isEmbedded ? "-mx-6 px-6" : ""
+                            className={`sticky top-0 z-30 flex flex-col gap-3 transition-all duration-200 bg-bg/95 backdrop-blur-md pb-4 pt-4 ${
+                                isEmbedded ? "-mx-6 px-6" : "-mx-4 px-4"
                             } ${
                                 isScrolled
-                                    ? "bg-bg/85 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] border-b border-border/50" +
-                                      scrolledPaddingClass
+                                    ? "shadow-[0_1px_3px_rgba(0,0,0,0.06)] border-b border-border/50"
                                     : ""
                             }`}
                         >
@@ -2436,14 +2435,14 @@ const ListDetail = ({
                             </div>
                         </div>
 
-                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-hidden flex-1">
+                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-visible flex-1">
                             {itemsLoading ? (
                                 <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
                                     <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
                                     <p>Loading...</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-border/50 h-full overflow-y-auto p-4 flex flex-col">
+                                <div className="divide-y divide-border/50 h-full p-4 flex flex-col" style={{ overflowAnchor: "auto" }}>
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}
