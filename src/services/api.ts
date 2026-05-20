@@ -47,8 +47,8 @@ api.interceptors.response.use(
 
         if (axios.isAxiosError(error) && error.response?.status === 401) {
             if (
-                typeof window !== "undefined" &&
-                !window.location.pathname.includes("/login")
+                globalThis.window !== undefined &&
+                !globalThis.window.location.pathname.includes("/login")
             ) {
                 // Afișăm în consolă FIX request-ul care declanșează nebunia
                 console.error(

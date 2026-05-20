@@ -26,6 +26,7 @@ import type { ProductSuggestion } from "../../services/api";
 import api, {
     aiMultimodalRequest,
     fetchProductSuggestions,
+    getApiBaseUrl,
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
@@ -188,17 +189,6 @@ const useListItems = (effectiveListId: string | undefined) => {
     const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
     /**
-     * Retrieves the base URL for API requests.
-     */
-    const getBaseUrl = useCallback(() => {
-        const base =
-            import.meta.env.VITE_API_URL ||
-            import.meta.env.VITE_API_BASE_URL ||
-            "http://localhost:8081";
-        return base === "/" ? "" : base;
-    }, []);
-
-    /**
      * Constructs the necessary headers for authentication and content type.
      */
     const getAuthHeaders = useCallback(
@@ -345,7 +335,7 @@ const useListItems = (effectiveListId: string | undefined) => {
         try {
             for (const item of feedback) {
                 const res = await fetch(
-                    `${getBaseUrl()}/api/lists/${effectiveListId}/items`,
+                    `${getApiBaseUrl()}/api/lists/${effectiveListId}/items`,
                     {
                         method: "POST",
                         headers: getAuthHeaders(true),
@@ -781,11 +771,14 @@ const useListItems = (effectiveListId: string | undefined) => {
 
         const timerId = setTimeout(async () => {
             try {
-                const res = await fetch(`${getBaseUrl()}/api/items/${itemId}`, {
-                    method: "DELETE",
-                    headers: getAuthHeaders(),
-                    credentials: "include",
-                });
+                const res = await fetch(
+                    `${getApiBaseUrl()}/api/items/${itemId}`,
+                    {
+                        method: "DELETE",
+                        headers: getAuthHeaders(),
+                        credentials: "include",
+                    },
+                );
 
                 if (!res.ok) {
                     if (res.status === 401) {
@@ -1597,7 +1590,7 @@ const ItemDetailsFields = ({
                         val === "" ||
                         (/^\d*(\.\d*)?$/.test(val) &&
                             val.length <= 10 &&
-                            (val === "" || Number(val) <= 999999999.99))
+                            Number(val) <= 999999999.99)
                     ) {
                         setPrice(val);
                     }
@@ -2155,6 +2148,26 @@ const ListDetail = ({
         setShowDetailsModal(true);
     };
 
+    const handleSubmitEdit = async (
+        trimmedName: string,
+        priceNum: number | undefined,
+    ) => {
+        if (!editingItemId) return;
+        const existingItem = items.find((i) => i.id === editingItemId);
+        const payload = {
+            name: trimmedName,
+            brand: detailBrand || null,
+            quantity: detailQuantity || "1",
+            price: priceNum ?? null,
+            category: detailCategory || null,
+            isChecked: existingItem?.checked ?? false,
+            isRecurrent: existingItem?.isRecurrent ?? false,
+            positionIndex: existingItem?.positionIndex ?? Date.now(),
+            timestamp: Date.now(),
+        };
+        await updateItem(editingItemId, payload);
+    };
+
     const handleDetailsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const trimmedName = detailName.trim();
@@ -2169,20 +2182,7 @@ const ListDetail = ({
 
         if (editingItemId) {
             try {
-                const existingItem = items.find((i) => i.id === editingItemId);
-                const payload = {
-                    name: trimmedName,
-                    brand: detailBrand || null,
-                    quantity: detailQuantity || "1",
-                    price: priceNum ?? null,
-                    category: detailCategory || null,
-                    isChecked: existingItem?.checked ?? false,
-                    isRecurrent: existingItem?.isRecurrent ?? false,
-                    positionIndex: existingItem?.positionIndex ?? Date.now(),
-                    timestamp: Date.now(),
-                };
-
-                await updateItem(editingItemId, payload);
+                await handleSubmitEdit(trimmedName, priceNum);
                 toast.success("Item updated successfully");
             } catch (err) {
                 console.error("Edit error:", err);

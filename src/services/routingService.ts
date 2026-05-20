@@ -39,8 +39,6 @@ export interface MacroRoutingResponse {
     driving: MacroEstimate | null;
 }
 
-const getBaseUrl = getApiBaseUrl;
-
 const authHeaders = (): HeadersInit => {
     const token = useStore.getState().token;
     return {
@@ -49,7 +47,7 @@ const authHeaders = (): HeadersInit => {
     };
 };
 
-const getRoutingUrl = (path = "") => `${getBaseUrl()}/api/routing${path}`;
+const getRoutingUrl = (path = "") => `${getApiBaseUrl()}/api/routing${path}`;
 
 /**
  * Validates that a routeId contains only safe characters.

@@ -88,9 +88,6 @@ const pickCurrentNormalList = (lists: ShoppingList[]) =>
                 new Date(left.updatedAt).getTime(),
         )[0] ?? null;
 
-/**
- * Constructs standard headers for API requests, including the Authorization Bearer token.
- */
 const authHeaders = (withContentType = false): HeadersInit => {
     const token = useStore.getState().token;
     return {
