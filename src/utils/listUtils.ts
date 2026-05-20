@@ -105,8 +105,7 @@ const toBaseUnit = ({ value, unit }: ParsedQuantity) => {
     }
 };
 
-const formatNumber = (value: number) =>
-    Number.isInteger(value) ? String(value) : String(value);
+const formatNumber = (value: number) => String(value);
 
 const formatMergedQuantity = (baseValue: number, family: string) => {
     if (family === "weight") {
