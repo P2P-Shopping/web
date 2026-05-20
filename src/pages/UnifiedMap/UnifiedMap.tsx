@@ -254,6 +254,8 @@ const mapApiStoreToRecommendation = async (
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
+import { getApiBaseUrl } from "../../services/api";
+
 const DefaultIcon = L.icon({
     iconUrl: icon,
     shadowUrl: iconShadow,
@@ -1196,10 +1198,12 @@ const UnifiedMap: React.FC = () => {
         const selectedList = lists.find((l) => l.id === idToFetch);
         if (!selectedList) return;
 
+        await fetchStoreRecommendations(selectedList);
+    };
+
+    const fetchStoreRecommendations = async (selectedList: ShoppingList) => {
         setIsFetchingStores(true);
         try {
-            // Use catalogId (product reference) instead of item.id for matching
-            // This allows matching across different shopping lists on the same product
             const itemIds =
                 selectedList.items
                     .map((item) => item.catalogId || item.id)
@@ -1210,12 +1214,7 @@ const UnifiedMap: React.FC = () => {
                 return;
             }
 
-            const apiBase =
-                import.meta.env.VITE_API_URL ||
-                import.meta.env.VITE_API_BASE_URL ||
-                "http://localhost:8081";
-            const baseUrl = apiBase === "/" ? "" : apiBase;
-
+            const baseUrl = getApiBaseUrl();
             const response = await fetch(
                 `${baseUrl}/api/routing/stores-match`,
                 {
@@ -1266,48 +1265,78 @@ const UnifiedMap: React.FC = () => {
         setTargetStoreId(store.id);
         setTargetStoreTransit(store.transit);
 
+        await fetchMacroRoute(store.id);
+
+        setNavigationMode("city");
+    };
+
+    const fetchMacroRoute = async (storeId: string) => {
         try {
-            const apiBase =
-                import.meta.env.VITE_API_URL ||
-                import.meta.env.VITE_API_BASE_URL ||
-                "http://localhost:8081";
-            const baseUrl = apiBase === "/" ? "" : apiBase;
+            const baseUrl = getApiBaseUrl();
             const params = new URLSearchParams({
                 userLat: String(userLocation.lat),
                 userLng: String(userLocation.lng),
-                storeId: store.id,
+                storeId,
             });
             const response = await fetch(
                 `${baseUrl}/api/routing/macro?${params}`,
             );
-            if (response.ok) {
-                const data = await response.json();
-                const polylineString = data[transportMode]?.polyline;
-
-                if (polylineString) {
-                    const decodedPath = polyline.decode(polylineString);
-                    useStore.getState().setMacroRouteGeometry(decodedPath);
-
-                    // NOU: Mutăm locația magazinului pe ultimul punct din traseul real
-                    if (decodedPath.length > 0) {
-                        const lastPoint = decodedPath[decodedPath.length - 1];
-                        setTargetStoreLocation({
-                            lat: lastPoint[0],
-                            lng: lastPoint[1],
-                        });
-                    }
-                } else {
-                    useStore.getState().setMacroRouteGeometry([]);
-                }
-            } else {
+            if (!response.ok) {
                 useStore.getState().setMacroRouteGeometry([]);
+                return;
+            }
+
+            const data = await response.json();
+            const polylineString = data[transportMode]?.polyline;
+
+            if (!polylineString) {
+                useStore.getState().setMacroRouteGeometry([]);
+                return;
+            }
+
+            const decodedPath = polyline.decode(polylineString);
+            useStore.getState().setMacroRouteGeometry(decodedPath);
+
+            if (decodedPath.length > 0) {
+                const lastPoint = decodedPath[decodedPath.length - 1];
+                setTargetStoreLocation({
+                    lat: lastPoint[0],
+                    lng: lastPoint[1],
+                });
             }
         } catch (err) {
             console.error("Failed to start route:", err);
             useStore.getState().setMacroRouteGeometry([]);
         }
+    };
 
-        setNavigationMode("city");
+    const handleEnterIndoorMode = async () => {
+        const activeList = lists.find((l) => l.id === selectedListId);
+        const currentItems =
+            activeList?.items.filter((item) => !item.checked) || [];
+
+        if (currentItems.length === 0) {
+            alert("Te rog selectează o listă care conține măcar un produs!");
+            return;
+        }
+
+        const loc = targetStoreLocation || DEMO_STORE_LOCATION;
+
+        setIsAutoCenterEnabled(true);
+        setTargetStoreLocation(loc);
+        setUserLocation(loc);
+        forceIndoorMode();
+
+        teleport(loc.lat, loc.lng);
+
+        setItems(activeList?.items || []);
+        await loadRoute(
+            currentItems.map((item) => item.id),
+            loc.lat,
+            loc.lng,
+            currentItems,
+            targetStoreId || undefined,
+        );
     };
 
     const handleRecenter = () => {
@@ -1664,43 +1693,7 @@ const UnifiedMap: React.FC = () => {
                         </button>
                         <button
                             type="button"
-                            onClick={async () => {
-                                const activeList = lists.find(
-                                    (l) => l.id === selectedListId,
-                                );
-                                const currentItems =
-                                    activeList?.items.filter(
-                                        (item) => !item.checked,
-                                    ) || [];
-
-                                if (currentItems.length === 0) {
-                                    alert(
-                                        "Te rog selectează o listă care conține măcar un produs!",
-                                    );
-                                    return;
-                                }
-
-                                const loc =
-                                    targetStoreLocation || DEMO_STORE_LOCATION;
-
-                                // Enable auto-center and enter indoor mode
-                                setIsAutoCenterEnabled(true);
-                                setTargetStoreLocation(loc);
-                                setUserLocation(loc);
-                                forceIndoorMode();
-
-                                // Teleport mock GPS into the store
-                                teleport(loc.lat, loc.lng);
-
-                                setItems(activeList?.items || []);
-                                await loadRoute(
-                                    currentItems.map((item) => item.id),
-                                    loc.lat,
-                                    loc.lng,
-                                    currentItems,
-                                    targetStoreId || undefined,
-                                );
-                            }}
+                            onClick={handleEnterIndoorMode}
                             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-xs font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >
                             <CheckCircle2 size={16} />

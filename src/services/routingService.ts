@@ -36,13 +36,9 @@ export interface MacroRoutingResponse {
     driving: MacroEstimate | null;
 }
 
-const getBaseUrl = () => {
-    const base =
-        import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
-    return base === "/" ? "" : base;
-};
+import { getApiBaseUrl } from "./api";
 
-const getRoutingUrl = (path = "") => `${getBaseUrl()}/api/routing${path}`;
+const getRoutingUrl = (path = "") => `${getApiBaseUrl()}/api/routing${path}`;
 
 /**
  * Validates that a routeId contains only safe characters.

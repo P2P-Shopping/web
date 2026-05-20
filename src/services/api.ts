@@ -1,7 +1,17 @@
 import axios from "axios";
 import { useStore } from "../context/useStore";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL;
+const DEFAULT_API_URL = "http://localhost:8081";
+
+export const getApiBaseUrl = () => {
+    const base =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        DEFAULT_API_URL;
+    return base === "/" ? "" : base;
+};
+
+const API_URL = getApiBaseUrl();
 
 const api = axios.create({
     baseURL: API_URL,
@@ -36,8 +46,8 @@ api.interceptors.response.use(
 
         if (axios.isAxiosError(error) && error.response?.status === 401) {
             if (
-                typeof window !== "undefined" &&
-                !window.location.pathname.includes("/login")
+                typeof globalThis.window !== "undefined" &&
+                !globalThis.window.location.pathname.includes("/login")
             ) {
                 // Afișăm în consolă FIX request-ul care declanșează nebunia
                 console.error(

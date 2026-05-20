@@ -13,6 +13,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import Modal from "../../components/Modal/Modal";
 import { useStore } from "../../context/useStore";
+import { getApiBaseUrl } from "../../services/api";
 import {
     startSimulation,
     stopSimulation,
@@ -84,6 +85,116 @@ const getRelativePixels = (
 
 const clamp = (value: number, min: number, max: number): number =>
     Math.min(Math.max(value, min), max);
+
+function getShelfPosition(
+    x: number,
+    y: number,
+    instruction: string,
+    shelfWidth: number,
+    shelfHeight: number,
+    zoom: number,
+): { shelfX: number; shelfY: number } {
+    if (instruction.includes("dreapta")) {
+        return { shelfX: x - 5 / zoom, shelfY: y - shelfHeight / 2 };
+    }
+    if (instruction.includes("stânga") || instruction.includes("stanga")) {
+        return {
+            shelfX: x - shelfWidth + 5 / zoom,
+            shelfY: y - shelfHeight / 2,
+        };
+    }
+    return { shelfX: x - shelfWidth / 2, shelfY: y - shelfHeight + 5 / zoom };
+}
+
+function drawShelves(
+    ctx: CanvasRenderingContext2D,
+    storeRoute: ReturnType<typeof useStore.getState>["route"],
+    anchor: Coordinate,
+    storePolygon: Coordinate[] | null,
+    zoom: number,
+) {
+    if (storeRoute.length === 0) return;
+
+    ctx.save();
+    if (storePolygon && storePolygon.length > 0) {
+        ctx.beginPath();
+        storePolygon.forEach((coord, idx) => {
+            const p = getRelativePixels(coord, anchor);
+            if (idx === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.closePath();
+        ctx.clip();
+    }
+
+    ctx.fillStyle = "#2D2D3A";
+    ctx.strokeStyle = "#4A4A5A";
+    ctx.lineWidth = 2 / zoom;
+
+    storeRoute.forEach((product) => {
+        const { x, y } = getRelativePixels(product, anchor);
+        const instruction = (product.audio_instruction || "").toLowerCase();
+        const shelfWidth = 40 / zoom;
+        const shelfHeight = 80 / zoom;
+        const shelfRadius = 4 / zoom;
+        const { shelfX, shelfY } = getShelfPosition(
+            x,
+            y,
+            instruction,
+            shelfWidth,
+            shelfHeight,
+            zoom,
+        );
+
+        ctx.beginPath();
+        ctx.roundRect(shelfX, shelfY, shelfWidth, shelfHeight, shelfRadius);
+        ctx.fill();
+        ctx.stroke();
+    });
+    ctx.restore();
+}
+
+function drawRouteArrows(
+    ctx: CanvasRenderingContext2D,
+    storeRoute: ReturnType<typeof useStore.getState>["route"],
+    userPos: Point,
+    anchor: Coordinate,
+    theme: ThemeColors,
+    timestamp: number,
+    zoom: number,
+) {
+    if (storeRoute.length === 0) return;
+
+    const pulseIntensity = Math.abs(Math.sin(timestamp / 500)) / 2 + 0.5;
+
+    ctx.beginPath();
+    ctx.strokeStyle = theme.route;
+    ctx.lineWidth = 4 / zoom;
+    ctx.globalAlpha = pulseIntensity;
+    ctx.setLineDash([10 / zoom, 10 / zoom]);
+    ctx.moveTo(userPos.x, userPos.y);
+
+    let lastP = userPos;
+    storeRoute.forEach((product) => {
+        const { x, y } = getRelativePixels(product, anchor);
+        ctx.lineTo(lastP.x, y);
+        ctx.lineTo(x, y);
+        lastP = { x, y };
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+
+    if (zoom > 1.2) {
+        ctx.fillStyle = theme.route;
+        storeRoute.forEach((product) => {
+            const { x, y } = getRelativePixels(product, anchor);
+            ctx.beginPath();
+            ctx.arc(x, y, 10 / zoom, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+}
 
 const getBounds = (points: Point[]): CameraBounds | null => {
     if (points.length === 0) return null;
@@ -203,11 +314,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         if (!targetStoreId) return;
         const fetchPolygon = async () => {
             try {
-                const apiBase =
-                    import.meta.env.VITE_API_URL ||
-                    import.meta.env.VITE_API_BASE_URL ||
-                    "http://localhost:8081";
-                const baseUrl = apiBase === "/" ? "" : apiBase;
+                const baseUrl = getApiBaseUrl();
                 const res = await fetch(
                     `${baseUrl}/api/routing/store/${targetStoreId}/polygon`,
                 );
@@ -401,111 +508,25 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                 }
 
                 // --- NOU: Desenează Rafturi Dinamice bazate pe produse ---
-                if (storeRoute.length > 0) {
-                    ctx.save();
-                    // Clip to store polygon if it exists
-                    if (storePolygon && storePolygon.length > 0) {
-                        ctx.beginPath();
-                        storePolygon.forEach((coord, idx) => {
-                            const p = getRelativePixels(coord, anchor);
-                            if (idx === 0) ctx.moveTo(p.x, p.y);
-                            else ctx.lineTo(p.x, p.y);
-                        });
-                        ctx.closePath();
-                        ctx.clip();
-                    }
-
-                    ctx.fillStyle = "#2D2D3A";
-                    ctx.strokeStyle = "#4A4A5A";
-                    ctx.lineWidth = 2 / camera.current.zoom;
-
-                    storeRoute.forEach((product) => {
-                        const { x, y } = getRelativePixels(product, anchor);
-                        const instruction = (
-                            product.audio_instruction || ""
-                        ).toLowerCase();
-
-                        const shelfWidth = 40 / camera.current.zoom;
-                        const shelfHeight = 80 / camera.current.zoom;
-                        const shelfRadius = 4 / camera.current.zoom;
-                        let shelfX = x;
-                        let shelfY = y;
-
-                        if (instruction.includes("dreapta")) {
-                            shelfX = x - 5 / camera.current.zoom;
-                            shelfY = y - shelfHeight / 2;
-                        } else if (
-                            instruction.includes("stânga") ||
-                            instruction.includes("stanga")
-                        ) {
-                            shelfX = x - shelfWidth + 5 / camera.current.zoom;
-                            shelfY = y - shelfHeight / 2;
-                        } else {
-                            // Default behind the product
-                            shelfX = x - shelfWidth / 2;
-                            shelfY = y - shelfHeight + 5 / camera.current.zoom;
-                        }
-
-                        ctx.beginPath();
-                        ctx.roundRect(
-                            shelfX,
-                            shelfY,
-                            shelfWidth,
-                            shelfHeight,
-                            shelfRadius,
-                        );
-                        ctx.fill();
-                        ctx.stroke();
-                    });
-                    ctx.restore();
-                }
+                drawShelves(
+                    ctx,
+                    storeRoute,
+                    anchor,
+                    storePolygon,
+                    camera.current.zoom,
+                );
                 // ---------------------------------------------------------------
 
                 // --- MODIFICARE: Logica de afisare Traseu cu Săgeți ---
-                if (storeRoute.length > 0) {
-                    const pulseIntensity =
-                        Math.abs(Math.sin(timestamp / 500)) / 2 + 0.5; // Pulsează între 0.5 și 1
-
-                    ctx.beginPath();
-                    ctx.strokeStyle = theme.route;
-                    ctx.lineWidth = 4 / camera.current.zoom;
-                    ctx.globalAlpha = pulseIntensity;
-                    ctx.setLineDash([
-                        10 / camera.current.zoom,
-                        10 / camera.current.zoom,
-                    ]);
-                    ctx.moveTo(userPos.x, userPos.y);
-
-                    // Desenăm linia (mai logică vizual - ortogonală pentru a sugera culoare)
-                    let lastP = userPos;
-                    storeRoute.forEach((product) => {
-                        const { x, y } = getRelativePixels(product, anchor);
-                        // Ne mutăm mai întâi pe axa Y (sau X), pentru a simula "culoare" de magazin
-                        ctx.lineTo(lastP.x, y);
-                        ctx.lineTo(x, y);
-                        lastP = { x, y };
-                    });
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                    ctx.globalAlpha = 1;
-
-                    // Adăugăm săgeți de direcție pe linia punctată (simplificat)
-                    if (camera.current.zoom > 1.2) {
-                        ctx.fillStyle = theme.route;
-                        storeRoute.forEach((product) => {
-                            const { x, y } = getRelativePixels(product, anchor);
-                            ctx.beginPath();
-                            ctx.arc(
-                                x,
-                                y,
-                                10 / camera.current.zoom,
-                                0,
-                                Math.PI * 2,
-                            );
-                            ctx.fill();
-                        });
-                    }
-                }
+                drawRouteArrows(
+                    ctx,
+                    storeRoute,
+                    userPos,
+                    anchor,
+                    theme,
+                    timestamp,
+                    camera.current.zoom,
+                );
 
                 // --- MODIFICARE: Logica de afisare Produse ---
                 storeRoute.forEach((product) => {
@@ -515,11 +536,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     ctx.beginPath();
                     ctx.arc(x, y, dotSize, 0, Math.PI * 2);
 
-                    type ProductWithConfidence = typeof product & {
-                        confidence_score?: number;
-                    };
-
-                    const confScore = (product as ProductWithConfidence)
+                    const confScore = (product as { confidence_score?: number })
                         .confidence_score;
 
                     if (confScore === 0.9595) {
