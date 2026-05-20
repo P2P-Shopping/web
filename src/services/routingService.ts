@@ -6,6 +6,7 @@ export interface BackendRoutePoint {
     lat: number;
     lng: number;
     audio_instruction?: string;
+    confidence_score?: number;
 }
 
 export interface CalculateRouteRequest {
@@ -124,7 +125,7 @@ export async function getMacroEstimates(
  */
 export function pollFullRoute(
     routeId: string,
-    onUpdate: (route: BackendRoutePoint[]) => void,
+    onUpdate: (route: BackendRoutePoint[], warnings?: string[]) => void,
     onError?: (error: Error) => void,
     intervalMs = 2000,
     maxAttempts = 30,
@@ -142,7 +143,7 @@ export function pollFullRoute(
         try {
             const data = await getFullRoute(routeId);
             if (data) {
-                onUpdate(data.route);
+                onUpdate(data.route, data.warnings);
             } else {
                 timerId = setTimeout(poll, intervalMs);
             }

@@ -74,8 +74,9 @@ export const loadRoute = async (
     fallbackItems: { id: string; name: string }[] = [],
     storeId?: string,
 ) => {
-    const { setRoute, setStatus } = useStore.getState();
+    const { setRoute, setStatus, setRouteWarnings } = useStore.getState();
     setStatus("Calculating route...");
+    setRouteWarnings([]); // Resetăm avertizările anterioare
 
     // Priority: Try to call the real SERVER API
     try {
@@ -95,7 +96,25 @@ export const loadRoute = async (
                 "[loadRoute] Successfully received route from server API",
             );
 
+            // Adăugăm warning-uri pentru produse cu scor de încredere mic (< 0.1)
+            const lowConfidenceWarnings = serverData.route
+                .filter(
+                    (p: any) =>
+                        p.confidence_score !== undefined &&
+                        p.confidence_score < 0.1,
+                )
+                .map(
+                    (p: any) =>
+                        `Produsul "${p.name}" are o precizie scăzută a locației.`,
+                );
+
+            const allWarnings = [
+                ...(serverData.warnings || []),
+                ...lowConfidenceWarnings,
+            ];
+
             setRoute(serverData.route);
+            setRouteWarnings(allWarnings);
             setStatus(
                 serverData.partial
                     ? "Partial route loaded. Optimizing..."
@@ -110,8 +129,21 @@ export const loadRoute = async (
             if (serverData.partial && serverData.routeId) {
                 activePollCleanup = pollFullRoute(
                     serverData.routeId,
-                    (fullRoute) => {
+                    (fullRoute, warnings) => {
                         setRoute(fullRoute);
+
+                        const lowConf = fullRoute
+                            .filter(
+                                (p: any) =>
+                                    p.confidence_score !== undefined &&
+                                    p.confidence_score < 0.1,
+                            )
+                            .map(
+                                (p: any) =>
+                                    `Produsul "${p.name}" are o precizie scăzută a locației.`,
+                            );
+
+                        setRouteWarnings([...(warnings || []), ...lowConf]);
                         setStatus("Optimized route loaded from server.");
                         activePollCleanup = null;
                     },
@@ -127,6 +159,15 @@ export const loadRoute = async (
             }
             return;
         }
+
+        // Dacă serverul nu a găsit rute dar a trimis warning-uri (ex: produse lipsă în catalog)
+        if ((serverData?.warnings?.length ?? 0) > 0) {
+            setRouteWarnings(serverData.warnings);
+            setRoute([]);
+            setStatus("Unele produse nu au fost găsite.");
+            return;
+        }
+
         console.warn("[loadRoute] Server returned empty route or non-success.");
     } catch (err) {
         console.error("[loadRoute] Server API call failed:", err);
@@ -135,6 +176,7 @@ export const loadRoute = async (
     // Fallback: Local mock logic
     console.debug("[loadRoute] Falling back to local mock TSP calculation...");
     const points: MockRouteSeed[] = [];
+    const warnings: string[] = [];
     const ids = productIds.length > 0 ? productIds : Object.keys(PALAS_ITEMS);
 
     for (const id of ids) {
@@ -149,6 +191,9 @@ export const loadRoute = async (
         } else {
             const fallbackItem = fallbackItems.find((entry) => entry.id === id);
             if (fallbackItem) {
+                warnings.push(
+                    `Nu s-a găsit produsul "${fallbackItem.name}" în magazin.`,
+                );
                 const index = points.length;
                 const ring = Math.floor(index / 6) + 1;
                 const angle = (index % 6) * (Math.PI / 3);
@@ -167,6 +212,7 @@ export const loadRoute = async (
     if (points.length === 0) {
         console.warn("[loadRoute] No items found for mock calculation.");
         setRoute([]);
+        setRouteWarnings(warnings);
         setStatus("No items to route.");
         return;
     }
@@ -177,6 +223,7 @@ export const loadRoute = async (
     });
 
     setRoute(orderedRoute);
+    setRouteWarnings(warnings);
     setStatus("Indoor mock TSP route ready (Fallback).");
     if (activePollCleanup) {
         activePollCleanup();

@@ -526,6 +526,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                         ctx.fillStyle = theme.product;
                     } else if (confScore !== undefined && confScore < 0.1) {
                         ctx.fillStyle = theme.productNotFound;
+                    } else {
+                        ctx.fillStyle = theme.product;
                     }
 
                     ctx.fill();
