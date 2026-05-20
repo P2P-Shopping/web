@@ -187,7 +187,8 @@ export const loadRoute = async (
     orderedRoute.forEach((point, index) => {
         // Injectăm frazele în ordine. Dacă avem mai multe puncte decât fraze, o repetăm pe ultima.
         (point as any).audio_instruction =
-            mockInstructions[index] || mockInstructions[mockInstructions.length - 1];
+            mockInstructions[index] ||
+            mockInstructions[mockInstructions.length - 1];
     });
     // ------------------------------------------
 
