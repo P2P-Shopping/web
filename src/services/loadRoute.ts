@@ -72,6 +72,7 @@ export const loadRoute = async (
     userLat: number,
     userLng: number,
     fallbackItems: { id: string; name: string }[] = [],
+    storeId?: string,
 ) => {
     const { setRoute, setStatus } = useStore.getState();
     setStatus("Calculating route...");
@@ -83,6 +84,7 @@ export const loadRoute = async (
             userLat,
             userLng,
             productIds,
+            storeId,
         });
 
         if (

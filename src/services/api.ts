@@ -12,7 +12,11 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
     const token = useStore.getState().token;
     if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        if (config.headers && typeof config.headers.set === "function") {
+            config.headers.set("Authorization", `Bearer ${token}`);
+        } else if (config.headers) {
+            (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
+        }
     }
     return config;
 });
@@ -22,7 +26,7 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (axios.isAxiosError(error) && error.response?.data) {
-            const data = error.response.data;
+            const data = error.response.data as Record<string, unknown>;
             const serverMessage = data.message || data.error || data.details;
             if (serverMessage && typeof serverMessage === "string") {
                 error.message = serverMessage;
@@ -30,8 +34,12 @@ api.interceptors.response.use(
         }
 
         if (axios.isAxiosError(error) && error.response?.status === 401) {
-            if (!globalThis.location.pathname.includes("/login")) {
-                useStore.getState().setAuth(null, null);
+            if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+                // Afișăm în consolă FIX request-ul care declanșează nebunia
+                console.error("⚠️ 401 Interceptat de la request-ul:", error.config?.url);
+                
+                // COMENTĂM ASTA TEMPORAR CA SĂ NU TE MAI DEA AFARĂ:
+                // useStore.getState().setAuth(null, null); 
             }
         }
         return Promise.reject(error);

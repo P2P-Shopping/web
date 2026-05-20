@@ -61,6 +61,7 @@ interface ApiStoreMatch {
     storeId: string;
     storeName: string;
     matchedItems: number;
+    matchPercentage?: number;
     distanceMeters: number;
     lat?: number;
     lng?: number;
@@ -211,15 +212,39 @@ const mapApiStoreToRecommendation = async (
         lng = DEMO_STORE_LOCATION.lng;
     }
 
+    // Calculate match percentage with proper validation
+    let stockMatchPercentage = 0;
+    if (
+        store.matchPercentage !== undefined &&
+        !Number.isNaN(store.matchPercentage)
+    ) {
+        // Use matchPercentage directly from API if available
+        stockMatchPercentage = Math.max(
+            0,
+            Math.min(100, Math.round(store.matchPercentage)),
+        );
+    } else if (
+        store.matchedItems !== undefined &&
+        !Number.isNaN(store.matchedItems)
+    ) {
+        // Fallback to calculating from matchedItems
+        stockMatchPercentage = Math.round(
+            (store.matchedItems / Math.max(itemCount, 1)) * 100,
+        );
+    }
+    // Ensure result is always a valid number between 0-100
+    stockMatchPercentage = Math.max(
+        0,
+        Math.min(100, stockMatchPercentage || 0),
+    );
+
     return {
         id: store.storeId,
         name: store.storeName,
         address: store.address || "Address unavailable",
         lat,
         lng,
-        stockMatchPercentage: Math.round(
-            (store.matchedItems / Math.max(itemCount, 1)) * 100,
-        ),
+        stockMatchPercentage,
         transit: realTransit,
     };
 };
@@ -962,6 +987,8 @@ const UnifiedMap: React.FC = () => {
     const setTargetStoreLocation = useStore(
         (state) => state.setTargetStoreLocation,
     );
+    const targetStoreId = useStore((state) => state.targetStoreId);
+    const setTargetStoreId = useStore((state) => state.setTargetStoreId);
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const setTargetStoreTransit = useStore(
         (state) => state.setTargetStoreTransit,
@@ -1062,13 +1089,16 @@ const UnifiedMap: React.FC = () => {
             currentUserLocation.lat,
             currentUserLocation.lng,
             activeIndoorItems.filter((item) => !item.checked),
+            targetStoreId || undefined,
         );
     }, [
         navigationMode,
         selectedListId,
+        remainingIndoorItemIds.length,
         activeIndoorItems,
-        remainingIndoorItemIds,
         setItems,
+        targetStoreId,
+        remainingIndoorItemIds,
     ]);
 
     useEffect(() => {
@@ -1125,6 +1155,7 @@ const UnifiedMap: React.FC = () => {
             userLocation.lat,
             userLocation.lng,
             activeIndoorItems.filter((item) => !item.checked),
+            targetStoreId || undefined,
         );
     }, [
         navigationMode,
@@ -1132,6 +1163,7 @@ const UnifiedMap: React.FC = () => {
         route,
         userLocation,
         activeIndoorItems,
+        targetStoreId,
     ]);
 
     // --- AUDIO NAVIGATION LOGIC ---
@@ -1155,7 +1187,12 @@ const UnifiedMap: React.FC = () => {
 
         setIsFetchingStores(true);
         try {
-            const itemIds = selectedList.items.map((item) => item.id) || [];
+            // Use catalogId (product reference) instead of item.id for matching
+            // This allows matching across different shopping lists on the same product
+            const itemIds =
+                selectedList.items
+                    .map((item) => item.catalogId || item.id)
+                    .filter((id) => id !== undefined && id !== null) || [];
             if (itemIds.length === 0) {
                 setRecommendedStores([]);
                 setIsShowingStores(true);
@@ -1215,6 +1252,7 @@ const UnifiedMap: React.FC = () => {
 
     const handleStartRoute = async (store: StoreRecommendation) => {
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
+        setTargetStoreId(store.id);
         setTargetStoreTransit(store.transit);
 
         try {
@@ -1637,6 +1675,7 @@ const UnifiedMap: React.FC = () => {
                                     loc.lat,
                                     loc.lng,
                                     currentItems,
+                                    targetStoreId || undefined,
                                 );
                             }}
                             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-xs font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"

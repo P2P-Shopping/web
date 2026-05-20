@@ -30,6 +30,7 @@ interface CameraState {
 
 interface ThemeColors {
     product: string;
+    productNotFound: string;
     user: string;
     route: string;
 }
@@ -57,6 +58,8 @@ const MAP_CONFIG = {
 
 const USER_GPS_DEFAULT = { lat: 47.151726, lng: 27.587914 };
 
+// Removed hardcoded store bounds and SVG.
+
 const getRelativePixels = (
     target: Coordinate,
     reference: Coordinate,
@@ -71,38 +74,6 @@ const getRelativePixels = (
         -(dLat * MAP_CONFIG.METERS_PER_DEGREE_LAT) *
         MAP_CONFIG.PIXELS_PER_METER;
     return { x, y };
-};
-
-const generateLocalProducts = (centerGps: Coordinate): RoutePoint[] => {
-    const latOffset = 0.00015;
-    const lngOffset = 0.00015;
-
-    return [
-        {
-            itemId: "1",
-            lat: centerGps.lat + latOffset,
-            lng: centerGps.lng + lngOffset,
-            name: "Milk",
-        },
-        {
-            itemId: "2",
-            lat: centerGps.lat - latOffset,
-            lng: centerGps.lng - lngOffset,
-            name: "Bread",
-        },
-        {
-            itemId: "3",
-            lat: centerGps.lat + latOffset * 1.5,
-            lng: centerGps.lng - lngOffset * 0.5,
-            name: "Apples",
-        },
-        {
-            itemId: "4",
-            lat: centerGps.lat - latOffset * 0.8,
-            lng: centerGps.lng + lngOffset * 1.2,
-            name: "Coffee",
-        },
-    ];
 };
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -147,13 +118,6 @@ const getCameraConstraints = (
     };
 };
 
-interface RoutePoint {
-    itemId: string;
-    name: string;
-    lat: number;
-    lng: number;
-}
-
 const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const [isDragging, setIsDragging] = useState(false);
     const [hasLocationLock, setHasLocationLock] = useState(false);
@@ -163,7 +127,6 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     const originGps = useRef<Coordinate | null>(null);
     const targetGps = useRef<Coordinate>({ lat: 0, lng: 0 });
     const currentRenderedGps = useRef<Coordinate>({ lat: 0, lng: 0 });
-    const routePoints = useRef<RoutePoint[]>([]);
     const isFirstLocationUpdate = useRef(true);
     const camera = useRef<CameraState>({ x: 0, y: 0, zoom: 1 });
     const userLocation = useStore((state) => state.userLocation);
@@ -174,6 +137,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         initialZoom: number;
         initialPinchWorld: Point | null;
     }>({ initialDist: 0, initialZoom: 1, initialPinchWorld: null });
+
+    // Removed static SVG background.
 
     const clampCameraPosition = (
         nextX: number,
@@ -199,8 +164,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         };
 
         const pointsToBound = [];
-        if (routePoints.current.length > 0) {
-            for (const p of routePoints.current) {
+        if (storeRoute.length > 0) {
+            for (const p of storeRoute) {
                 pointsToBound.push(getRelativePixels(p, anchor));
             }
         }
@@ -223,19 +188,113 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
     };
 
     const storeRoute = useStore((state) => state.route);
-    const navigationMode = useStore((state) => state.navigationMode);
+    const targetStoreId = useStore((state) => state.targetStoreId);
+
+    // --- NOU: Stare pentru Perimetrul Magazinului (GeoJSON Polygon) ---
+    const [storePolygon, setStorePolygon] = useState<Coordinate[] | null>(null);
+
+    useEffect(() => {
+        if (!targetStoreId) return;
+        const fetchPolygon = async () => {
+            try {
+                const apiBase =
+                    import.meta.env.VITE_API_URL ||
+                    import.meta.env.VITE_API_BASE_URL ||
+                    "http://localhost:8081";
+                const baseUrl = apiBase === "/" ? "" : apiBase;
+                const res = await fetch(
+                    `${baseUrl}/api/routing/store/${targetStoreId}/polygon`,
+                );
+                if (res.ok) {
+                    const geojsonStr = await res.text();
+                    const geojson = JSON.parse(geojsonStr);
+                    if (
+                        geojson.type === "Polygon" &&
+                        geojson.coordinates.length > 0
+                    ) {
+                        const coords = geojson.coordinates[0].map(
+                            (c: [number, number]) => ({
+                                lng: c[0],
+                                lat: c[1],
+                            }),
+                        );
+                        setStorePolygon(coords);
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not fetch store polygon", err);
+            }
+        };
+        fetchPolygon();
+    }, [targetStoreId]);
+
+    const centerOnPolygon = () => {
+        if (!storePolygon || storePolygon.length === 0 || !originGps.current)
+            return;
+        let sumLat = 0;
+        let sumLng = 0;
+        storePolygon.forEach((p) => {
+            sumLat += p.lat;
+            sumLng += p.lng;
+        });
+        const centerLat = sumLat / storePolygon.length;
+        const centerLng = sumLng / storePolygon.length;
+
+        const anchor = originGps.current;
+        const centerPixels = getRelativePixels(
+            { lat: centerLat, lng: centerLng },
+            anchor,
+        );
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        // Calculate bounds of polygon to determine zoom
+        let minX = Number.POSITIVE_INFINITY,
+            maxX = Number.NEGATIVE_INFINITY;
+        let minY = Number.POSITIVE_INFINITY,
+            maxY = Number.NEGATIVE_INFINITY;
+        storePolygon.forEach((coord) => {
+            const p = getRelativePixels(coord, anchor);
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+        });
+
+        const polyWidth = maxX - minX;
+        const polyHeight = maxY - minY;
+
+        let newZoom = camera.current.zoom;
+        if (polyWidth > 0 && polyHeight > 0) {
+            const zoomX = rect.width / (polyWidth * 1.2);
+            const zoomY = rect.height / (polyHeight * 1.2);
+            newZoom = clamp(
+                Math.min(zoomX, zoomY),
+                MAP_CONFIG.MIN_ZOOM,
+                MAP_CONFIG.MAX_ZOOM,
+            );
+        }
+
+        camera.current.zoom = newZoom;
+        clampCameraPosition(
+            -centerPixels.x * newZoom,
+            -centerPixels.y * newZoom,
+            newZoom,
+        );
+    };
+
+    // Recalculează bounds-urile magazinului
+    // biome-ignore lint/correctness/useExhaustiveDependencies: centerOnPolygon causes render loop
+    useEffect(() => {
+        if (storePolygon && storePolygon.length > 0 && hasLocationLock) {
+            centerOnPolygon();
+        }
+    }, [storePolygon, hasLocationLock]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
-
-        if (navigationMode === "indoor") {
-            routePoints.current = storeRoute.length > 0 ? storeRoute : [];
-        } else if (originGps.current) {
-            routePoints.current = generateLocalProducts(originGps.current);
-        }
-
         setIsRouting(false);
-    }, [hasLocationLock, navigationMode, storeRoute]);
+    }, [hasLocationLock]);
 
     useEffect(() => {
         if (!hasLocationLock) return;
@@ -248,7 +307,8 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         const theme: ThemeColors = {
             product:
                 rootStyles.getPropertyValue("--color-accent").trim() ||
-                "#FF3366",
+                "#e024c5", // Roz / Mov
+            productNotFound: "#555566", // GRI pentru 0% Confidence
             user:
                 rootStyles.getPropertyValue("--color-blue-neon").trim() ||
                 "#00D4FF",
@@ -317,37 +377,163 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
                     anchor,
                 );
 
-                if (routePoints.current.length > 0) {
+                // --- NOU: Desenează Perimetrul Magazinului ---
+                if (storePolygon && storePolygon.length > 0) {
+                    ctx.beginPath();
+                    storePolygon.forEach((coord, idx) => {
+                        const p = getRelativePixels(coord, anchor);
+                        if (idx === 0) ctx.moveTo(p.x, p.y);
+                        else ctx.lineTo(p.x, p.y);
+                    });
+                    ctx.closePath();
+                    // Umplem cu culoarea de suprafață a magazinului
+                    ctx.fillStyle = "#1e1e26";
+                    ctx.fill();
+                    ctx.lineWidth = 4 / camera.current.zoom;
+                    ctx.strokeStyle = "#3D3D4A";
+                    ctx.stroke();
+                }
+
+                // --- NOU: Desenează Rafturi Dinamice bazate pe produse ---
+                if (storeRoute.length > 0) {
+                    ctx.save();
+                    // Clip to store polygon if it exists
+                    if (storePolygon && storePolygon.length > 0) {
+                        ctx.beginPath();
+                        storePolygon.forEach((coord, idx) => {
+                            const p = getRelativePixels(coord, anchor);
+                            if (idx === 0) ctx.moveTo(p.x, p.y);
+                            else ctx.lineTo(p.x, p.y);
+                        });
+                        ctx.closePath();
+                        ctx.clip();
+                    }
+
+                    ctx.fillStyle = "#2D2D3A";
+                    ctx.strokeStyle = "#4A4A5A";
+                    ctx.lineWidth = 2 / camera.current.zoom;
+
+                    storeRoute.forEach((product) => {
+                        const { x, y } = getRelativePixels(product, anchor);
+                        const instruction = (
+                            product.audio_instruction || ""
+                        ).toLowerCase();
+
+                        const shelfWidth = 40 / camera.current.zoom;
+                        const shelfHeight = 80 / camera.current.zoom;
+                        const shelfRadius = 4 / camera.current.zoom;
+                        let shelfX = x;
+                        let shelfY = y;
+
+                        if (instruction.includes("dreapta")) {
+                            shelfX = x - 5 / camera.current.zoom;
+                            shelfY = y - shelfHeight / 2;
+                        } else if (
+                            instruction.includes("stânga") ||
+                            instruction.includes("stanga")
+                        ) {
+                            shelfX = x - shelfWidth + 5 / camera.current.zoom;
+                            shelfY = y - shelfHeight / 2;
+                        } else {
+                            // Default behind the product
+                            shelfX = x - shelfWidth / 2;
+                            shelfY = y - shelfHeight + 5 / camera.current.zoom;
+                        }
+
+                        ctx.beginPath();
+                        ctx.roundRect(
+                            shelfX,
+                            shelfY,
+                            shelfWidth,
+                            shelfHeight,
+                            shelfRadius,
+                        );
+                        ctx.fill();
+                        ctx.stroke();
+                    });
+                    ctx.restore();
+                }
+                // ---------------------------------------------------------------
+
+                // --- MODIFICARE: Logica de afisare Traseu cu Săgeți ---
+                if (storeRoute.length > 0) {
+                    const pulseIntensity =
+                        Math.abs(Math.sin(timestamp / 500)) / 2 + 0.5; // Pulsează între 0.5 și 1
+
                     ctx.beginPath();
                     ctx.strokeStyle = theme.route;
                     ctx.lineWidth = 4 / camera.current.zoom;
+                    ctx.globalAlpha = pulseIntensity;
                     ctx.setLineDash([
                         10 / camera.current.zoom,
                         10 / camera.current.zoom,
                     ]);
                     ctx.moveTo(userPos.x, userPos.y);
-                    routePoints.current.forEach((product) => {
+
+                    // Desenăm linia (mai logică vizual - ortogonală pentru a sugera culoare)
+                    let lastP = userPos;
+                    storeRoute.forEach((product) => {
                         const { x, y } = getRelativePixels(product, anchor);
+                        // Ne mutăm mai întâi pe axa Y (sau X), pentru a simula "culoare" de magazin
+                        ctx.lineTo(lastP.x, y);
                         ctx.lineTo(x, y);
+                        lastP = { x, y };
                     });
                     ctx.stroke();
                     ctx.setLineDash([]);
+                    ctx.globalAlpha = 1;
+
+                    // Adăugăm săgeți de direcție pe linia punctată (simplificat)
+                    if (camera.current.zoom > 1.2) {
+                        ctx.fillStyle = theme.route;
+                        storeRoute.forEach((product) => {
+                            const { x, y } = getRelativePixels(product, anchor);
+                            ctx.beginPath();
+                            ctx.arc(
+                                x,
+                                y,
+                                10 / camera.current.zoom,
+                                0,
+                                Math.PI * 2,
+                            );
+                            ctx.fill();
+                        });
+                    }
                 }
 
-                routePoints.current.forEach((product) => {
+                // --- MODIFICARE: Logica de afisare Produse ---
+                storeRoute.forEach((product) => {
                     const { x, y } = getRelativePixels(product, anchor);
+                    const dotSize = 7 / camera.current.zoom;
+
                     ctx.beginPath();
-                    ctx.arc(x, y, 8 / camera.current.zoom, 0, Math.PI * 2);
-                    ctx.fillStyle = theme.product;
+                    ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+
+                    type ProductWithConfidence = typeof product & {
+                        confidence_score?: number;
+                    };
+
+                    const confScore = (product as ProductWithConfidence)
+                        .confidence_score;
+
+                    if (confScore === 0.9595) {
+                        ctx.fillStyle = theme.product;
+                    } else if (confScore !== undefined && confScore < 0.1) {
+                        ctx.fillStyle = theme.productNotFound;
+                    }
+
                     ctx.fill();
 
-                    ctx.fillStyle = "white";
-                    ctx.font = `bold ${12 / camera.current.zoom}px Inter, sans-serif`;
-                    ctx.fillText(
-                        product.name,
-                        x + 12 / camera.current.zoom,
-                        y + 4 / camera.current.zoom,
-                    );
+                    // NOU: Afișăm textul doar la Zoom mai mare
+                    if (camera.current.zoom > 1.8) {
+                        ctx.fillStyle = "white";
+                        ctx.font = `bold ${10 / camera.current.zoom}px Inter, sans-serif`;
+                        ctx.fillText(
+                            product.name,
+                            x + dotSize + 4 / camera.current.zoom,
+                            y + dotSize / 2,
+                        );
+                    }
                 });
 
                 ctx.beginPath();
@@ -378,7 +564,7 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
         animationFrameId = requestAnimationFrame(renderLoop);
         return () => cancelAnimationFrame(animationFrameId);
-    }, [canvasRef, hasLocationLock]);
+    }, [canvasRef, hasLocationLock, storeRoute, storePolygon]);
 
     useEffect(() => {
         if (!("geolocation" in navigator)) {
@@ -601,7 +787,13 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
         gpsError,
         isRouting,
         currentGps: currentRenderedGps.current,
-        recenterCamera,
+        recenterCamera: () => {
+            if (storePolygon && storePolygon.length > 0) {
+                centerOnPolygon();
+            } else {
+                recenterCamera();
+            }
+        },
         zoomIn,
         zoomOut,
         exitIndoor: () => setNavigationMode("city"),
@@ -676,6 +868,14 @@ const StoreMap: React.FC<StoreMapProps> = ({
         exitIndoor,
     } = useMapEngine(canvasRef);
 
+    const routeWarnings = useStore((state) => state.routeWarnings);
+    const [dismissedWarnings, setDismissedWarnings] = useState<boolean>(false);
+
+    // Reset dismissed state when new warnings arrive
+    useEffect(() => {
+        if (routeWarnings.length > 0) setDismissedWarnings(false);
+    }, [routeWarnings]);
+
     if (!hasLocationLock) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4 bg-bg">
@@ -713,10 +913,36 @@ const StoreMap: React.FC<StoreMapProps> = ({
                         {gpsError}
                     </div>
                 )}
+
+                {routeWarnings.length > 0 && !dismissedWarnings && (
+                    <div
+                        role="alert"
+                        aria-live="polite"
+                        className="absolute bottom-4 left-4 right-4 z-20 px-4 py-3 bg-danger/90 text-white rounded-xl text-sm shadow-lg backdrop-blur-sm"
+                    >
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-col gap-1">
+                                {routeWarnings.map((warning) => (
+                                    <p key={warning} className="font-medium">
+                                        ⚠️ {warning}
+                                    </p>
+                                ))}
+                            </div>
+                            <button
+                                type="button"
+                                className="shrink-0 mt-0.5 text-white/70 hover:text-white transition-colors"
+                                onClick={() => setDismissedWarnings(true)}
+                                aria-label="Dismiss warnings"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Map Control Bar - Separated from map view */}
-            <div className="relative z-[3000] bg-surface/80 backdrop-blur-xl border-t border-border h-[84px] px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
+            <div className="relative z-3000 bg-surface/80 backdrop-blur-xl border-t border-border h-21 px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
                 <div className="flex items-center gap-4">
                     <button
                         type="button"

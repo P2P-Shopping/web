@@ -13,6 +13,7 @@ export interface Item {
     price?: number;
     storeName?: string;
     isRecurrent?: boolean;
+    catalogId?: string;
     // Claim fields
     claimedBy?: string;
     claimedAt?: number;

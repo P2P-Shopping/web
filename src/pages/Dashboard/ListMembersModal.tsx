@@ -1,5 +1,6 @@
 import { Crown, Mail, Shield, UserPlus, Users, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Modal } from "../../components";
 import { useListsStore } from "../../store/useListsStore";
 import type { CollaboratorInfo } from "../../types";
@@ -41,6 +42,7 @@ const ListMembersModal = ({
         try {
             const success = await shareList(listId, trimmedEmail);
             if (success) {
+                toast.success(`Invite sent to ${trimmedEmail}`);
                 setEmail("");
             } else {
                 setError(
