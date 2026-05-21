@@ -66,6 +66,23 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
             return email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
         };
 
+        const knownUnmaskedEmails = new Set<string>();
+        if (currentEmailClean) {
+            knownUnmaskedEmails.add(currentEmailClean);
+        }
+        for (const u of activeArray) {
+            const cleanActive = normalizeUsername(u);
+            if (cleanActive !== "anonymous") {
+                knownUnmaskedEmails.add(cleanActive);
+            }
+        }
+        for (const u of allUsers) {
+            const cleanU = normalizeUsername(u);
+            if (!cleanU.includes("***") && cleanU !== "anonymous") {
+                knownUnmaskedEmails.add(cleanU);
+            }
+        }
+
         const allPotentialUsers = [...allUsers, ...activeArray];
         const uniqueCleanUsernames = Array.from(
             new Set(
@@ -95,6 +112,18 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                                 ? currentEmailClean
                                 : matchClean;
                         }
+
+                        // Try matching from known unmasked emails
+                        let matchedUnmasked: string | undefined = undefined;
+                        for (const unmasked of knownUnmaskedEmails) {
+                            if (clean === maskEmail(unmasked)) {
+                                matchedUnmasked = unmasked;
+                                break;
+                            }
+                        }
+                        if (matchedUnmasked) {
+                            return matchedUnmasked;
+                        }
                     }
 
                     return clean;
@@ -119,6 +148,10 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                         );
                     }) ?? clean
                 );
+            }
+
+            if (knownUnmaskedEmails.has(clean)) {
+                return clean;
             }
 
             return (

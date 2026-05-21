@@ -3,6 +3,7 @@ import {
     Camera,
     CheckCircle2,
     ChevronDown,
+    Info,
     Plus,
     Settings,
     Users,
@@ -258,12 +259,14 @@ const useListItems = (effectiveListId: string | undefined) => {
                 if (
                     currentList.category ||
                     currentList.ownerEmail ||
-                    currentList.collaborators
+                    currentList.collaborators ||
+                    currentList.currentUserRole
                 ) {
                     useListsStore.getState().updateList(targetListId, {
                         category: currentList.category,
                         ownerEmail: currentList.ownerEmail,
                         collaborators: currentList.collaborators,
+                        currentUserRole: currentList.currentUserRole as any,
                     });
                 }
                 syncListItemsInStore(mappedItems, targetListId);
@@ -1065,6 +1068,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     };
 };
 
+const presenceRefCount: Record<string, number> = {};
+
 /**
  * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
  */
@@ -1100,19 +1105,25 @@ const useListPresence = (effectiveListId: string | undefined) => {
             user?.firstName?.trim() || user?.email?.split("@")[0] || undefined;
 
         console.debug("[ws] subscribing list presence", effectiveListId);
+
+        if (!presenceRefCount[effectiveListId]) {
+            presenceRefCount[effectiveListId] = 0;
+        }
+        presenceRefCount[effectiveListId]++;
+
         const presenceSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}/presence`,
             handlePresenceMessage,
         );
 
         const membersSubscription = stompClient.subscribe(
-            `/topic/lists/${effectiveListId}/members`,
+            `/topic/list/${effectiveListId}/members`,
             () => {
                 useListsStore.getState().fetchLists();
             },
         );
 
-        if (stompClient.connected) {
+        if (stompClient.connected && presenceRefCount[effectiveListId] === 1) {
             const joinEvent = {
                 eventType: "JOIN" as const,
                 username,
@@ -1129,7 +1140,10 @@ const useListPresence = (effectiveListId: string | undefined) => {
         }
 
         return () => {
-            if (stompClient.connected) {
+            presenceRefCount[effectiveListId]--;
+            const shouldCleanupPresence = presenceRefCount[effectiveListId] <= 0;
+
+            if (stompClient.connected && shouldCleanupPresence) {
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/presence`,
                     body: JSON.stringify({
@@ -1143,7 +1157,9 @@ const useListPresence = (effectiveListId: string | undefined) => {
             }
             presenceSubscription?.unsubscribe();
             membersSubscription?.unsubscribe();
-            clearPresence();
+            if (shouldCleanupPresence) {
+                clearPresence();
+            }
         };
     }, [
         effectiveListId,
@@ -1766,6 +1782,7 @@ const InlineAddForm = ({
     isReadOnly,
     isEmbedded,
     onAddFullItem,
+    isGuest,
 }: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
@@ -1775,6 +1792,7 @@ const InlineAddForm = ({
     isReadOnly: boolean;
     isEmbedded: boolean;
     onAddFullItem: (suggestion: ProductSuggestion) => void;
+    isGuest?: boolean;
 }) => {
     const [selectedSuggestion, setSelectedSuggestion] =
         useState<ProductSuggestion | null>(null);
@@ -1794,7 +1812,7 @@ const InlineAddForm = ({
         activeIndex,
         handleKeyDown,
         selectSuggestion,
-    } = useProductAutocomplete(newItemName, handleSelect, isReadOnly);
+    } = useProductAutocomplete(newItemName, handleSelect, isReadOnly || isGuest);
 
     const handleKeyDownWithOverride = (
         e: React.KeyboardEvent<HTMLInputElement>,
@@ -1820,6 +1838,8 @@ const InlineAddForm = ({
         setSelectedSuggestion(null);
     };
 
+    const isDisabled = isReadOnly || isGuest;
+
     return (
         <form
             onSubmit={handleFormSubmit}
@@ -1839,10 +1859,10 @@ const InlineAddForm = ({
                 }}
                 onBlur={() => setShowSuggestions(false)}
                 onKeyDown={handleKeyDownWithOverride}
-                placeholder={isReadOnly ? "List is read-only" : "Add item..."}
-                disabled={isReadOnly}
+                placeholder={isGuest ? "You are a guest (read-only)" : isReadOnly ? "List is read-only" : "Add item..."}
+                disabled={isDisabled}
                 autoComplete="off"
-                className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
+                className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isDisabled ? "cursor-not-allowed opacity-50" : ""}`}
             />
 
             <SuggestionsDropdown
@@ -1855,14 +1875,14 @@ const InlineAddForm = ({
             <button
                 type="button"
                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent border border-border transition-all shrink-0"
-                disabled={isReadOnly}
+                disabled={isDisabled}
                 onClick={() => onOpenDetails(selectedSuggestion)}
             >
                 <Settings size={18} />
             </button>
             <button
                 type="submit"
-                disabled={isReadOnly}
+                disabled={isDisabled}
                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 hover:opacity-90"
             >
                 <Plus size={18} strokeWidth={3} />
@@ -1879,7 +1899,7 @@ interface ListTitleProps {
     onKeyDown: (e: React.KeyboardEvent) => void;
     onClickEdit: () => void;
     activeListName: string;
-    currentUserRole?: "ADMIN" | "EDITOR";
+    currentUserRole?: "ADMIN" | "EDITOR" | "GUEST";
     isReadOnly: boolean;
 }
 
@@ -2014,13 +2034,52 @@ const ListDetail = ({
 
     const [sortMode, setSortMode] = useState<
         "alphabetical" | "chronological" | "custom"
-    >("chronological");
+    >(() => {
+        if (effectiveListId) {
+            const saved = localStorage.getItem(`sortMode_${effectiveListId}`);
+            if (
+                saved === "alphabetical" ||
+                saved === "chronological" ||
+                saved === "custom"
+            ) {
+                return saved;
+            }
+        }
+        return "chronological";
+    });
+
+    useEffect(() => {
+        if (effectiveListId && sortMode) {
+            localStorage.setItem(`sortMode_${effectiveListId}`, sortMode);
+        }
+    }, [sortMode, effectiveListId]);
+
+    useEffect(() => {
+        if (effectiveListId) {
+            const saved = localStorage.getItem(`sortMode_${effectiveListId}`);
+            if (
+                saved === "alphabetical" ||
+                saved === "chronological" ||
+                saved === "custom"
+            ) {
+                setSortMode(saved);
+            } else {
+                setSortMode("chronological");
+            }
+        }
+    }, [effectiveListId]);
+
+    const checkedCount = useMemo(
+        () => items.filter((item) => item.checked).length,
+        [items],
+    );
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
         () => lists.find((list) => list.id === effectiveListId) ?? null,
         [effectiveListId, lists],
     );
+    const isGuest = activeList?.currentUserRole === "GUEST";
     const normalLists = useMemo(
         () =>
             lists.filter(
@@ -2071,9 +2130,18 @@ const ListDetail = ({
         if (!current) return [];
 
         const users = new Set<string>();
+        const maskEmail = (email: string) => email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
+        const maskedOwner = current.ownerEmail ? maskEmail(current.ownerEmail).toLowerCase() : "";
+
         if (current.ownerEmail) users.add(current.ownerEmail);
         for (const c of current.collaborators || []) {
-            users.add(c.email);
+            if (c.email) {
+                const cleanEmail = c.email.toLowerCase();
+                if (cleanEmail === maskedOwner) {
+                    continue;
+                }
+                users.add(c.email);
+            }
         }
         return Array.from(users);
     }, [activeList]);
@@ -2251,7 +2319,7 @@ const ListDetail = ({
             onClickEdit={() => setIsEditingName(true)}
             activeListName={activeList?.name || ""}
             currentUserRole={activeList?.currentUserRole}
-            isReadOnly={isReadOnly}
+            isReadOnly={isReadOnly || isGuest}
         />
     );
 
@@ -2294,12 +2362,112 @@ const ListDetail = ({
                     </div>
                 )}
 
+                {isGuest && (
+                    <div className="bg-accent-subtle text-accent border border-accent-border/30 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300 mb-2">
+                        <Info size={20} className="shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold leading-none mb-1">Guest Mode</p>
+                            <p className="text-[13px] opacity-90 leading-tight">
+                                You have guest access to this list. You can only check or uncheck items.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {effectiveListId === "default" && isEmbedded ? (
                     <ListSelectionView
                         lists={lists}
                         isLoading={listsLoading}
                         onSelect={(listId) => navigate(`/nav/${listId}`)}
                     />
+                ) : isEmbedded ? (
+                    <div className="flex flex-col gap-4 h-full animate-in fade-in duration-300">
+                        {/* Elegant Header with Progress */}
+                        <div className="flex flex-col gap-2 p-1">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-lg font-black text-text-strong uppercase tracking-tight truncate">
+                                    {activeList?.name || "Shopping List"}
+                                </h2>
+                                <span className="text-xs font-bold text-text-muted bg-bg-muted px-2.5 py-1 rounded-full border border-border/30">
+                                    {checkedCount} / {items.length} done
+                                </span>
+                            </div>
+                            
+                            {/* Premium Progress Bar */}
+                            {items.length > 0 && (
+                                <div className="w-full h-1.5 bg-bg-muted rounded-full overflow-hidden border border-border/10">
+                                    <div 
+                                        className="h-full bg-accent transition-all duration-300 ease-out"
+                                        style={{ width: `${(checkedCount / items.length) * 100}%` }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* List Items Scroll Container */}
+                        <div className="bg-surface border border-border rounded-2xl shadow-sm overflow-y-auto flex-1 p-4">
+                            {itemsLoading ? (
+                                <div className="flex flex-col items-center justify-center gap-3 py-12 text-text-muted">
+                                    <div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" />
+                                    <p className="text-xs">Loading items...</p>
+                                </div>
+                            ) : items.length === 0 ? (
+                                <p className="text-center py-12 text-text-muted text-sm italic">
+                                    Your list is empty!
+                                </p>
+                            ) : (
+                                <ul className="flex flex-col gap-2 list-none p-0 m-0">
+                                    {items.map((item) => (
+                                        <li
+                                            key={item.id}
+                                            onClick={() => !isReadOnly && toggleItem(item.id)}
+                                            className={`flex items-center justify-between p-3.5 bg-bg-subtle border border-border/60 rounded-xl hover:border-accent hover:bg-accent-subtle/10 transition-all duration-200 cursor-pointer group ${
+                                                item.checked ? "opacity-60 bg-bg-muted/40 animate-in fade-in duration-200" : ""
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                                                {/* Modern Checkbox */}
+                                                <div
+                                                    className={`relative flex items-center justify-center w-5.5 h-5.5 rounded-md border-2 transition-all shrink-0 ${
+                                                        item.checked 
+                                                            ? "bg-success border-success text-white scale-100" 
+                                                            : "bg-surface border-border-strong group-hover:border-accent"
+                                                    }`}
+                                                >
+                                                    {item.checked && (
+                                                        <svg 
+                                                            className="w-3.5 h-3.5 stroke-[4] animate-in zoom-in-50 duration-200" 
+                                                            fill="none" 
+                                                            viewBox="0 0 24 24" 
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    )}
+                                                </div>
+
+                                                {/* Item Name */}
+                                                <span
+                                                    className={`text-sm font-semibold text-text-strong truncate ${
+                                                        item.checked ? "line-through opacity-50" : ""
+                                                    }`}
+                                                >
+                                                    {item.name}
+                                                </span>
+                                            </div>
+
+                                            {/* Item Quantity Pill */}
+                                            {item.quantity && (
+                                                <span className="text-[11px] font-black uppercase tracking-wider text-text-muted bg-bg-muted px-2.5 py-1 rounded-lg border border-border/30 shrink-0">
+                                                    {item.quantity}
+                                                </span>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
                 ) : (
                     <>
                         <div
@@ -2331,13 +2499,17 @@ const ListDetail = ({
                                                         activeList.currentUserRole ===
                                                         "ADMIN"
                                                             ? "bg-accent-subtle text-accent"
-                                                            : "bg-bg-muted text-text-muted border border-border"
+                                                            : activeList.currentUserRole === "GUEST"
+                                                                ? "bg-danger-subtle text-danger"
+                                                                : "bg-bg-muted text-text-muted border border-border"
                                                     }`}
                                                 >
                                                     {activeList.currentUserRole ===
                                                     "ADMIN"
                                                         ? "Admin"
-                                                        : "Editor"}
+                                                        : activeList.currentUserRole === "GUEST"
+                                                            ? "Guest"
+                                                            : "Editor"}
                                                 </span>
                                             )}
                                         </div>
@@ -2345,6 +2517,7 @@ const ListDetail = ({
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-2">
                                     {!isReadOnly &&
+                                        !isGuest &&
                                         !isTemplateList &&
                                         items.some((item) => item.checked) && (
                                             <button
@@ -2401,6 +2574,7 @@ const ListDetail = ({
                                 isReadOnly={isReadOnly}
                                 isEmbedded={isEmbedded}
                                 onAddFullItem={handleInstantAdd}
+                                isGuest={isGuest}
                             />
 
                             <div className="min-h-[16px] px-2 flex items-center justify-between mt-2 mb-1">
@@ -2447,12 +2621,12 @@ const ListDetail = ({
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}
-                                        onDelete={deleteItem}
-                                        onEdit={handleEditClick}
+                                        onDelete={isGuest ? undefined : deleteItem}
+                                        onEdit={isGuest ? undefined : handleEditClick}
                                         disabled={isReadOnly}
                                         checkable={!isTemplateList}
                                         sortMode={sortMode}
-                                        onReorder={reorderItem}
+                                        onReorder={isGuest ? undefined : reorderItem}
                                         onClaim={claimItem}
                                         onUnclaim={unclaimItem}
                                         currentUserEmail={user?.email}
@@ -2473,7 +2647,7 @@ const ListDetail = ({
                                                     {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            {!isTemplateList && (
+                                            {!isTemplateList && !isGuest && !isEmbedded && (
                                                 <button
                                                     type="button"
                                                     onClick={() =>
@@ -2493,7 +2667,7 @@ const ListDetail = ({
                 )}
             </div>
 
-            {!isReadOnly && (
+            {!isReadOnly && !isGuest && !isEmbedded && (
                 <button
                     type="button"
                     className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"

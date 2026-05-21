@@ -783,6 +783,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                 <div className="flex flex-col gap-3">
                     {visibleItems.map((item, index) => {
                         const isDisappearing = disappearingItemIds.has(item.id);
+                        const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
                         return (
                             <button
                                 key={item.id}
@@ -791,7 +792,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                                 className={`flex items-center gap-4 overflow-hidden rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-300 hover:border-accent hover:bg-accent-subtle/20 ${
                                     isDisappearing
                                         ? "max-h-0 translate-x-4 scale-95 p-0 opacity-0"
-                                        : "max-h-24 opacity-100"
+                                        : "max-h-32 opacity-100"
                                 }`}
                             >
                                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-black text-white">
@@ -800,10 +801,31 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm font-black text-text-strong">
                                         {item.name}
+                                        {item.quantity && (
+                                            <span className="ml-1 text-xs font-bold text-accent">
+                                                x{item.quantity}
+                                            </span>
+                                        )}
                                     </span>
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
-                                        Tap to check off
-                                    </span>
+                                    {item.brand || item.price != null ? (
+                                        <span className="flex items-center gap-1.5 text-[10px] text-text-muted mt-0.5">
+                                            {item.brand && (
+                                                <span className="px-1 py-0.5 bg-bg-muted rounded text-[9px] uppercase font-bold tracking-wider border border-border">
+                                                    {item.brand}
+                                                </span>
+                                            )}
+                                            {item.brand && item.price != null && <span>•</span>}
+                                            {item.price != null && (
+                                                <span className="font-bold text-accent">
+                                                    {formatPrice(item.price)}
+                                                </span>
+                                            )}
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                                            Tap to check off
+                                        </span>
+                                    )}
                                 </span>
                                 <CheckCircle2
                                     size={20}

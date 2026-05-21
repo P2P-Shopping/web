@@ -5,6 +5,7 @@ import type {
     CollaboratorInfo,
     Item,
     ListCategory,
+    ListRole,
     PendingInvitation,
     ShoppingList,
 } from "../types";
@@ -33,7 +34,7 @@ interface ApiShoppingList {
     ownerEmail?: string;
     userId?: string;
     collaborators?: CollaboratorInfo[];
-    currentUserRole?: "ADMIN" | "EDITOR";
+    currentUserRole?: ListRole;
     version?: number;
 }
 
@@ -70,7 +71,8 @@ interface ListsState {
     ) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
-    shareList: (listId: string, email: string) => Promise<boolean>;
+    shareList: (listId: string, email: string, role?: ListRole) => Promise<boolean>;
+    changeCollaboratorRole: (listId: string, userId: number, role: ListRole) => Promise<boolean>;
     removeCollaborator: (listId: string, userId: number) => Promise<boolean>;
     leaveList: (listId: string) => Promise<boolean>;
     openModal: () => void;
@@ -636,14 +638,14 @@ export const useListsStore = create<ListsState>((set, get) => ({
     /**
      * Shares a shopping list with another user by email.
      */
-    shareList: async (listId: string, email: string) => {
+    shareList: async (listId: string, email: string, role: ListRole = "EDITOR") => {
         try {
             const response = await fetch(
                 `${getApiBaseUrl()}/api/lists/${listId}/share`,
                 {
                     method: "POST",
                     headers: authHeaders(true),
-                    body: JSON.stringify({ email }),
+                    body: JSON.stringify({ email, role }),
                     credentials: "include",
                 },
             );
@@ -667,6 +669,64 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     error instanceof Error
                         ? error.message
                         : "Failed to share list",
+            });
+            return false;
+        }
+    },
+
+    changeCollaboratorRole: async (listId: string, userId: number, role: ListRole) => {
+        try {
+            const response = await fetch(
+                `${getApiBaseUrl()}/api/lists/${listId}/collaborators/${userId}/role`,
+                {
+                    method: "PATCH",
+                    headers: authHeaders(true),
+                    body: JSON.stringify({ role }),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                const errorData = (await response.json().catch(() => ({}))) as {
+                    message?: string;
+                };
+                throw new Error(
+                    errorData.message ||
+                        `Failed to change role (${response.status})`,
+                );
+            }
+
+            set((state) => {
+                const lists = state.lists.map((l) => {
+                    if (l.id === listId && l.collaborators) {
+                        const collaborators = l.collaborators.map((c) =>
+                            c.userId === userId ? { ...c, role } : c
+                        );
+                        return { ...l, collaborators };
+                    }
+                    return l;
+                });
+
+                let currentList = state.currentList;
+                if (currentList && currentList.id === listId && currentList.collaborators) {
+                    const collaborators = currentList.collaborators.map((c) =>
+                        c.userId === userId ? { ...c, role } : c
+                    );
+                    currentList = { ...currentList, collaborators };
+                }
+
+                return { lists, currentList };
+            });
+
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to change collaborator role",
             });
             return false;
         }
