@@ -2394,10 +2394,7 @@ const ListDetail = ({
                     <button
                         key={item.id}
                         type="button"
-                        onClick={() =>
-                            !isReadOnly &&
-                            toggleItem(item.id)
-                        }
+                        onClick={() => !isReadOnly && toggleItem(item.id)}
                         className={`flex items-center justify-between p-3.5 bg-bg-subtle border border-border/60 rounded-xl hover:border-accent hover:bg-accent-subtle/10 transition-all duration-200 cursor-pointer group w-full text-left ${
                             item.checked
                                 ? "opacity-60 bg-bg-muted/40 animate-in fade-in duration-200"
@@ -2420,9 +2417,7 @@ const ListDetail = ({
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
                                     >
-                                        <title>
-                                            Checked
-                                        </title>
+                                        <title>Checked</title>
                                         <path
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
@@ -2523,17 +2518,21 @@ const ListDetail = ({
                                 <div className="flex items-center gap-2">
                                     <PresenceBar
                                         variant="avatars"
-                                        allUsers={
-                                            activeCollaborationUsers
-                                        }
+                                        allUsers={activeCollaborationUsers}
                                     />
                                     {activeList?.currentUserRole && (
                                         <span
                                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                getRoleBadgeStyle(activeList.currentUserRole).className
+                                                getRoleBadgeStyle(
+                                                    activeList.currentUserRole,
+                                                ).className
                                             }`}
                                         >
-                                            {getRoleBadgeStyle(activeList.currentUserRole).label}
+                                            {
+                                                getRoleBadgeStyle(
+                                                    activeList.currentUserRole,
+                                                ).label
+                                            }
                                         </span>
                                     )}
                                 </div>
@@ -2576,13 +2575,9 @@ const ListDetail = ({
                                 <Users size={14} strokeWidth={2.5} />
                                 Members
                                 {activeList?.collaborators &&
-                                    activeList.collaborators.length >
-                                        0 && (
+                                    activeList.collaborators.length > 0 && (
                                         <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-accent/15 text-[10px] font-bold">
-                                            {
-                                                activeList.collaborators
-                                                    .length
-                                            }
+                                            {activeList.collaborators.length}
                                         </span>
                                     )}
                             </button>
@@ -2645,20 +2640,12 @@ const ListDetail = ({
                             <ShoppingListItems
                                 items={items}
                                 onCheck={toggleItem}
-                                onDelete={
-                                    isGuest ? undefined : deleteItem
-                                }
-                                onEdit={
-                                    isGuest
-                                        ? undefined
-                                        : handleEditClick
-                                }
+                                onDelete={isGuest ? undefined : deleteItem}
+                                onEdit={isGuest ? undefined : handleEditClick}
                                 disabled={isReadOnly}
                                 checkable={!isTemplateList}
                                 sortMode={sortMode}
-                                onReorder={
-                                    isGuest ? undefined : reorderItem
-                                }
+                                onReorder={isGuest ? undefined : reorderItem}
                                 onClaim={claimItem}
                                 onUnclaim={unclaimItem}
                                 currentUserEmail={user?.email}
@@ -2685,9 +2672,7 @@ const ListDetail = ({
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    setShowFinishModal(
-                                                        true,
-                                                    )
+                                                    setShowFinishModal(true)
                                                 }
                                                 className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
                                             >

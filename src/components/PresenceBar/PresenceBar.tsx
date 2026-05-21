@@ -44,7 +44,7 @@ interface UsernameResolutionContext {
 const findActiveUnmaskedMatch = (
     clean: string,
     activeArray: string[],
-    currentEmailClean: string | null
+    currentEmailClean: string | null,
 ): string | null => {
     for (const active of activeArray) {
         let activeClean = normalizeUsername(active);
@@ -60,7 +60,7 @@ const findActiveUnmaskedMatch = (
 
 const findKnownUnmaskedMatch = (
     clean: string,
-    knownUnmaskedEmails: Set<string>
+    knownUnmaskedEmails: Set<string>,
 ): string | null => {
     for (const unmasked of knownUnmaskedEmails) {
         if (clean === maskEmail(unmasked)) {
@@ -72,7 +72,7 @@ const findKnownUnmaskedMatch = (
 
 const resolveUniqueUsername = (
     u: string,
-    context: UsernameResolutionContext
+    context: UsernameResolutionContext,
 ): string => {
     const { currentEmailClean, activeArray, knownUnmaskedEmails } = context;
     let clean = normalizeUsername(u);
@@ -85,7 +85,11 @@ const resolveUniqueUsername = (
         return clean;
     }
 
-    const activeMatch = findActiveUnmaskedMatch(clean, activeArray, currentEmailClean);
+    const activeMatch = findActiveUnmaskedMatch(
+        clean,
+        activeArray,
+        currentEmailClean,
+    );
     if (activeMatch) {
         return activeMatch;
     }
@@ -109,7 +113,7 @@ interface BaseUserResolutionContext {
 const findActiveUserMatch = (
     clean: string,
     activeArray: string[],
-    currentEmailClean: string | null
+    currentEmailClean: string | null,
 ): string | null => {
     for (const u of activeArray) {
         const uClean = normalizeUsername(u);
@@ -125,7 +129,7 @@ const findActiveUserMatch = (
 
 const findAllUsersMatch = (
     clean: string,
-    allUsers: string[]
+    allUsers: string[],
 ): string | null => {
     for (const u of allUsers) {
         const uClean = normalizeUsername(u);
@@ -138,15 +142,23 @@ const findAllUsersMatch = (
 
 const resolveBaseUser = (
     clean: string,
-    context: BaseUserResolutionContext
+    context: BaseUserResolutionContext,
 ): string => {
-    const { activeUsernames, currentEmailClean, activeArray, knownUnmaskedEmails, allUsers } = context;
+    const {
+        activeUsernames,
+        currentEmailClean,
+        activeArray,
+        knownUnmaskedEmails,
+        allUsers,
+    } = context;
     const isActive =
         activeUsernames.has(clean) ||
         (clean === currentEmailClean && activeUsernames.has("anonymous"));
 
     if (isActive) {
-        return findActiveUserMatch(clean, activeArray, currentEmailClean) ?? clean;
+        return (
+            findActiveUserMatch(clean, activeArray, currentEmailClean) ?? clean
+        );
     }
 
     if (knownUnmaskedEmails.has(clean)) {
@@ -161,19 +173,17 @@ interface PresenceBarProps {
     allUsers?: string[];
 }
 
-const PresenceBar: React.FC<PresenceBarProps> = ({
-    variant = "avatars",
-    allUsers = [],
-}) => {
+const AvatarsPresenceBar: React.FC<{ allUsers: string[] }> = ({ allUsers }) => {
     const activeUsers = usePresenceStore((state) => state.activeUsers);
     const typingUsers = usePresenceStore((state) => state.typingUsers);
     const displayNames = usePresenceStore((state) => state.displayNames);
     const currentUserEmail = useStore((state) => state.user?.email ?? null);
 
     const activeArray = Array.from(activeUsers);
-    const typingArray = Object.keys(typingUsers);
     const activeUsernames = new Set(activeArray.map(normalizeUsername));
-    const typingUsernames = new Set(typingArray.map(normalizeUsername));
+    const typingUsernames = new Set(
+        Object.keys(typingUsers).map(normalizeUsername),
+    );
 
     const resolveDisplayName = (email: string): string => {
         const clean = normalizeUsername(email);
@@ -182,126 +192,147 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
         return toDisplayName(email);
     };
 
-    if (variant === "avatars") {
-        const currentEmailClean = currentUserEmail
-            ? normalizeUsername(currentUserEmail)
-            : null;
+    const currentEmailClean = currentUserEmail
+        ? normalizeUsername(currentUserEmail)
+        : null;
 
-        const knownUnmaskedEmails = new Set<string>();
-        if (currentEmailClean) {
-            knownUnmaskedEmails.add(currentEmailClean);
+    const knownUnmaskedEmails = new Set<string>();
+    if (currentEmailClean) {
+        knownUnmaskedEmails.add(currentEmailClean);
+    }
+    for (const u of activeArray) {
+        const cleanActive = normalizeUsername(u);
+        if (cleanActive !== "anonymous") {
+            knownUnmaskedEmails.add(cleanActive);
         }
-        for (const u of activeArray) {
-            const cleanActive = normalizeUsername(u);
-            if (cleanActive !== "anonymous") {
-                knownUnmaskedEmails.add(cleanActive);
-            }
+    }
+    for (const u of allUsers) {
+        const cleanU = normalizeUsername(u);
+        if (!cleanU.includes("***") && cleanU !== "anonymous") {
+            knownUnmaskedEmails.add(cleanU);
         }
-        for (const u of allUsers) {
-            const cleanU = normalizeUsername(u);
-            if (!cleanU.includes("***") && cleanU !== "anonymous") {
-                knownUnmaskedEmails.add(cleanU);
-            }
-        }
+    }
 
-        const allPotentialUsers = [...allUsers, ...activeArray];
-        const uniqueCleanUsernames = Array.from(
-            new Set(
-                allPotentialUsers.map((u) =>
-                    resolveUniqueUsername(u, {
-                        currentEmailClean,
-                        activeArray,
-                        knownUnmaskedEmails,
-                    })
-                )
+    const allPotentialUsers = [...allUsers, ...activeArray];
+    const uniqueCleanUsernames = Array.from(
+        new Set(
+            allPotentialUsers.map((u) =>
+                resolveUniqueUsername(u, {
+                    currentEmailClean,
+                    activeArray,
+                    knownUnmaskedEmails,
+                }),
             ),
-        );
+        ),
+    );
 
-        const baseUsers = uniqueCleanUsernames.map((clean) =>
-            resolveBaseUser(clean, {
-                activeUsernames,
-                currentEmailClean,
-                activeArray,
-                knownUnmaskedEmails,
-                allUsers,
-            })
-        );
+    const baseUsers = uniqueCleanUsernames.map((clean) =>
+        resolveBaseUser(clean, {
+            activeUsernames,
+            currentEmailClean,
+            activeArray,
+            knownUnmaskedEmails,
+            allUsers,
+        }),
+    );
 
-        if (baseUsers.length === 0) return null;
+    if (baseUsers.length === 0) return null;
 
-        return (
-            <div className="flex items-center gap-4 animate-in fade-in duration-300">
-                <div className="flex -space-x-3">
-                    {baseUsers.map((username) => {
-                        const cleanUsername = normalizeUsername(username);
-                        const isActive = activeUsernames.has(cleanUsername);
-                        const isTyping = typingUsernames.has(cleanUsername);
-                        const avatarClassName = getAvatarClassName(
-                            isActive,
-                            isTyping,
-                        );
-                        const displayName = resolveDisplayName(username);
-                        const avatarTitle = getAvatarTitle(
-                            displayName,
-                            isActive,
-                            isTyping,
-                        );
-                        return (
-                            <div key={username} className="relative group">
-                                <div
-                                    className={avatarClassName}
-                                    style={{
-                                        backgroundColor:
-                                            stringToColor(username),
-                                    }}
-                                    title={avatarTitle}
-                                >
-                                    {displayName.charAt(0).toUpperCase()}
-                                </div>
-                                {isTyping && (
-                                    <div className="absolute -bottom-1 -right-1 flex gap-0.5 px-1.5 py-1 bg-accent text-white rounded-full text-[8px] shadow-lg animate-bounce border border-surface">
-                                        <span className="w-1 h-1 bg-white rounded-full animate-pulse" />
-                                        <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.2s]" />
-                                        <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.4s]" />
-                                    </div>
-                                )}
+    return (
+        <div className="flex items-center gap-4 animate-in fade-in duration-300">
+            <div className="flex -space-x-3">
+                {baseUsers.map((username) => {
+                    const cleanUsername = normalizeUsername(username);
+                    const isActive = activeUsernames.has(cleanUsername);
+                    const isTyping = typingUsernames.has(cleanUsername);
+                    const avatarClassName = getAvatarClassName(
+                        isActive,
+                        isTyping,
+                    );
+                    const displayName = resolveDisplayName(username);
+                    const avatarTitle = getAvatarTitle(
+                        displayName,
+                        isActive,
+                        isTyping,
+                    );
+                    return (
+                        <div key={username} className="relative group">
+                            <div
+                                className={avatarClassName}
+                                style={{
+                                    backgroundColor: stringToColor(username),
+                                }}
+                                title={avatarTitle}
+                            >
+                                {displayName.charAt(0).toUpperCase()}
                             </div>
-                        );
-                    })}
-                </div>
-                <div className="w-px h-6 bg-border/60" aria-hidden="true" />
-                <div className="flex flex-col">
-                    <span className="text-xs font-black text-text-strong uppercase tracking-wider">
-                        {activeArray.length} Active
-                    </span>
-                    <span className="text-[9px] font-bold text-text-muted uppercase tracking-tight">
-                        {baseUsers.length} Total
-                    </span>
-                </div>
+                            {isTyping && (
+                                <div className="absolute -bottom-1 -right-1 flex gap-0.5 px-1.5 py-1 bg-accent text-white rounded-full text-[8px] shadow-lg animate-bounce border border-surface">
+                                    <span className="w-1 h-1 bg-white rounded-full animate-pulse" />
+                                    <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.2s]" />
+                                    <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.4s]" />
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
-        );
+            <div className="w-px h-6 bg-border/60" aria-hidden="true" />
+            <div className="flex flex-col">
+                <span className="text-xs font-black text-text-strong uppercase tracking-wider">
+                    {activeArray.length} Active
+                </span>
+                <span className="text-[9px] font-bold text-text-muted uppercase tracking-tight">
+                    {baseUsers.length} Total
+                </span>
+            </div>
+        </div>
+    );
+};
+
+const TypingPresenceBar: React.FC = () => {
+    const typingUsers = usePresenceStore((state) => state.typingUsers);
+    const displayNames = usePresenceStore((state) => state.displayNames);
+
+    const typingArray = Object.keys(typingUsers);
+    if (typingArray.length === 0) return null;
+
+    const resolveDisplayName = (email: string): string => {
+        const clean = normalizeUsername(email);
+        if (displayNames[clean]) return displayNames[clean];
+        if (displayNames[email]) return displayNames[email];
+        return toDisplayName(email);
+    };
+
+    return (
+        <div className="flex items-center gap-1.5 px-1 py-0.5 animate-in slide-in-from-bottom-1 fade-in duration-200 h-5">
+            <div className="flex gap-0.5 items-center" aria-hidden="true">
+                <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s]" />
+                <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.15s]" />
+                <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.3s]" />
+            </div>
+            <output
+                className="text-[12px] font-bold text-text-muted tracking-tight leading-none"
+                aria-live="polite"
+            >
+                {typingArray.length === 1
+                    ? `${resolveDisplayName(typingArray[0])} is typing...`
+                    : "Several people are typing..."}
+            </output>
+        </div>
+    );
+};
+
+const PresenceBar: React.FC<PresenceBarProps> = ({
+    variant = "avatars",
+    allUsers = [],
+}) => {
+    if (variant === "avatars") {
+        return <AvatarsPresenceBar allUsers={allUsers} />;
     }
 
     if (variant === "typing") {
-        if (typingArray.length === 0) return null;
-
-        return (
-            <div className="flex items-center gap-1.5 px-1 py-0.5 animate-in slide-in-from-bottom-1 fade-in duration-200 h-5">
-                <div className="flex gap-0.5 items-center" aria-hidden="true">
-                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s]" />
-                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.15s]" />
-                    <span className="w-1 h-1 bg-accent rounded-full animate-bounce [animation-duration:0.8s] [animation-delay:0.3s]" />
-                </div>
-                <output
-                    className="text-[12px] font-bold text-text-muted tracking-tight leading-none"
-                    aria-live="polite"
-                >
-                    {typingArray.length === 1
-                        ? `${resolveDisplayName(typingArray[0])} is typing...`
-                        : "Several people are typing..."}
-                </output>
-            </div>
-        );
+        return <TypingPresenceBar />;
     }
 
     return null;

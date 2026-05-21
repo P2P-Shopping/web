@@ -138,24 +138,26 @@ const normalizeItem = (item: ApiItem): Item => ({
 const updateCollaboratorsRole = (
     collaborators: CollaboratorInfo[],
     userId: number,
-    role: ListRole
+    role: ListRole,
 ): CollaboratorInfo[] => {
-    return collaborators.map((c) =>
-        c.userId === userId ? { ...c, role } : c
-    );
+    return collaborators.map((c) => (c.userId === userId ? { ...c, role } : c));
 };
 
 const updateListsWithNewRole = (
     lists: ShoppingList[],
     listId: string,
     userId: number,
-    role: ListRole
+    role: ListRole,
 ): ShoppingList[] => {
     return lists.map((l) => {
         if (l.id === listId && l.collaborators) {
             return {
                 ...l,
-                collaborators: updateCollaboratorsRole(l.collaborators, userId, role),
+                collaborators: updateCollaboratorsRole(
+                    l.collaborators,
+                    userId,
+                    role,
+                ),
             };
         }
         return l;
@@ -166,12 +168,16 @@ const updateCurrentListWithNewRole = (
     currentList: ShoppingList | null,
     listId: string,
     userId: number,
-    role: ListRole
+    role: ListRole,
 ): ShoppingList | null => {
-    if (currentList && currentList.id === listId && currentList.collaborators) {
+    if (currentList?.id === listId && currentList?.collaborators) {
         return {
             ...currentList,
-            collaborators: updateCollaboratorsRole(currentList.collaborators, userId, role),
+            collaborators: updateCollaboratorsRole(
+                currentList.collaborators,
+                userId,
+                role,
+            ),
         };
     }
     return currentList;
@@ -759,8 +765,18 @@ export const useListsStore = create<ListsState>((set, get) => ({
             }
 
             set((state) => ({
-                lists: updateListsWithNewRole(state.lists, listId, userId, role),
-                currentList: updateCurrentListWithNewRole(state.currentList, listId, userId, role),
+                lists: updateListsWithNewRole(
+                    state.lists,
+                    listId,
+                    userId,
+                    role,
+                ),
+                currentList: updateCurrentListWithNewRole(
+                    state.currentList,
+                    listId,
+                    userId,
+                    role,
+                ),
             }));
 
             return true;
