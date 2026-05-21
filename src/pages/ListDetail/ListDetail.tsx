@@ -31,7 +31,7 @@ import api, {
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import type { ListCategory } from "../../types";
+import type { ListCategory, ListRole } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 
 import ListMembersModal from "../Dashboard/ListMembersModal";
@@ -266,7 +266,8 @@ const useListItems = (effectiveListId: string | undefined) => {
                         category: currentList.category,
                         ownerEmail: currentList.ownerEmail,
                         collaborators: currentList.collaborators,
-                        currentUserRole: currentList.currentUserRole as any,
+                        currentUserRole:
+                            currentList.currentUserRole as ListRole,
                     });
                 }
                 syncListItemsInStore(mappedItems, targetListId);
@@ -1141,7 +1142,8 @@ const useListPresence = (effectiveListId: string | undefined) => {
 
         return () => {
             presenceRefCount[effectiveListId]--;
-            const shouldCleanupPresence = presenceRefCount[effectiveListId] <= 0;
+            const shouldCleanupPresence =
+                presenceRefCount[effectiveListId] <= 0;
 
             if (stompClient.connected && shouldCleanupPresence) {
                 stompClient.publish({
@@ -1812,7 +1814,11 @@ const InlineAddForm = ({
         activeIndex,
         handleKeyDown,
         selectSuggestion,
-    } = useProductAutocomplete(newItemName, handleSelect, isReadOnly || isGuest);
+    } = useProductAutocomplete(
+        newItemName,
+        handleSelect,
+        isReadOnly || isGuest,
+    );
 
     const handleKeyDownWithOverride = (
         e: React.KeyboardEvent<HTMLInputElement>,
@@ -1859,7 +1865,13 @@ const InlineAddForm = ({
                 }}
                 onBlur={() => setShowSuggestions(false)}
                 onKeyDown={handleKeyDownWithOverride}
-                placeholder={isGuest ? "You are a guest (read-only)" : isReadOnly ? "List is read-only" : "Add item..."}
+                placeholder={
+                    isGuest
+                        ? "You are a guest (read-only)"
+                        : isReadOnly
+                          ? "List is read-only"
+                          : "Add item..."
+                }
                 disabled={isDisabled}
                 autoComplete="off"
                 className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isDisabled ? "cursor-not-allowed opacity-50" : ""}`}
@@ -2130,8 +2142,11 @@ const ListDetail = ({
         if (!current) return [];
 
         const users = new Set<string>();
-        const maskEmail = (email: string) => email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
-        const maskedOwner = current.ownerEmail ? maskEmail(current.ownerEmail).toLowerCase() : "";
+        const maskEmail = (email: string) =>
+            email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
+        const maskedOwner = current.ownerEmail
+            ? maskEmail(current.ownerEmail).toLowerCase()
+            : "";
 
         if (current.ownerEmail) users.add(current.ownerEmail);
         for (const c of current.collaborators || []) {
@@ -2366,9 +2381,12 @@ const ListDetail = ({
                     <div className="bg-accent-subtle text-accent border border-accent-border/30 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300 mb-2">
                         <Info size={20} className="shrink-0" />
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold leading-none mb-1">Guest Mode</p>
+                            <p className="text-sm font-bold leading-none mb-1">
+                                Guest Mode
+                            </p>
                             <p className="text-[13px] opacity-90 leading-tight">
-                                You have guest access to this list. You can only check or uncheck items.
+                                You have guest access to this list. You can only
+                                check or uncheck items.
                             </p>
                         </div>
                     </div>
@@ -2392,13 +2410,15 @@ const ListDetail = ({
                                     {checkedCount} / {items.length} done
                                 </span>
                             </div>
-                            
+
                             {/* Premium Progress Bar */}
                             {items.length > 0 && (
                                 <div className="w-full h-1.5 bg-bg-muted rounded-full overflow-hidden border border-border/10">
-                                    <div 
+                                    <div
                                         className="h-full bg-accent transition-all duration-300 ease-out"
-                                        style={{ width: `${(checkedCount / items.length) * 100}%` }}
+                                        style={{
+                                            width: `${(checkedCount / items.length) * 100}%`,
+                                        }}
                                     />
                                 </div>
                             )}
@@ -2416,32 +2436,45 @@ const ListDetail = ({
                                     Your list is empty!
                                 </p>
                             ) : (
-                                <ul className="flex flex-col gap-2 list-none p-0 m-0">
+                                <div className="flex flex-col gap-2">
                                     {items.map((item) => (
-                                        <li
+                                        <button
                                             key={item.id}
-                                            onClick={() => !isReadOnly && toggleItem(item.id)}
-                                            className={`flex items-center justify-between p-3.5 bg-bg-subtle border border-border/60 rounded-xl hover:border-accent hover:bg-accent-subtle/10 transition-all duration-200 cursor-pointer group ${
-                                                item.checked ? "opacity-60 bg-bg-muted/40 animate-in fade-in duration-200" : ""
+                                            type="button"
+                                            onClick={() =>
+                                                !isReadOnly &&
+                                                toggleItem(item.id)
+                                            }
+                                            className={`flex items-center justify-between p-3.5 bg-bg-subtle border border-border/60 rounded-xl hover:border-accent hover:bg-accent-subtle/10 transition-all duration-200 cursor-pointer group w-full text-left ${
+                                                item.checked
+                                                    ? "opacity-60 bg-bg-muted/40 animate-in fade-in duration-200"
+                                                    : ""
                                             }`}
                                         >
                                             <div className="flex items-center gap-3.5 min-w-0 flex-1">
                                                 {/* Modern Checkbox */}
                                                 <div
                                                     className={`relative flex items-center justify-center w-5.5 h-5.5 rounded-md border-2 transition-all shrink-0 ${
-                                                        item.checked 
-                                                            ? "bg-success border-success text-white scale-100" 
+                                                        item.checked
+                                                            ? "bg-success border-success text-white scale-100"
                                                             : "bg-surface border-border-strong group-hover:border-accent"
                                                     }`}
                                                 >
                                                     {item.checked && (
-                                                        <svg 
-                                                            className="w-3.5 h-3.5 stroke-[4] animate-in zoom-in-50 duration-200" 
-                                                            fill="none" 
-                                                            viewBox="0 0 24 24" 
+                                                        <svg
+                                                            className="w-3.5 h-3.5 stroke-[4] animate-in zoom-in-50 duration-200"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
                                                             stroke="currentColor"
                                                         >
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                            <title>
+                                                                Checked
+                                                            </title>
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                d="M5 13l4 4L19 7"
+                                                            />
                                                         </svg>
                                                     )}
                                                 </div>
@@ -2449,7 +2482,9 @@ const ListDetail = ({
                                                 {/* Item Name */}
                                                 <span
                                                     className={`text-sm font-semibold text-text-strong truncate ${
-                                                        item.checked ? "line-through opacity-50" : ""
+                                                        item.checked
+                                                            ? "line-through opacity-50"
+                                                            : ""
                                                     }`}
                                                 >
                                                     {item.name}
@@ -2462,9 +2497,9 @@ const ListDetail = ({
                                                     {item.quantity}
                                                 </span>
                                             )}
-                                        </li>
+                                        </button>
                                     ))}
-                                </ul>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -2499,17 +2534,19 @@ const ListDetail = ({
                                                         activeList.currentUserRole ===
                                                         "ADMIN"
                                                             ? "bg-accent-subtle text-accent"
-                                                            : activeList.currentUserRole === "GUEST"
-                                                                ? "bg-danger-subtle text-danger"
-                                                                : "bg-bg-muted text-text-muted border border-border"
+                                                            : activeList.currentUserRole ===
+                                                                "GUEST"
+                                                              ? "bg-danger-subtle text-danger"
+                                                              : "bg-bg-muted text-text-muted border border-border"
                                                     }`}
                                                 >
                                                     {activeList.currentUserRole ===
                                                     "ADMIN"
                                                         ? "Admin"
-                                                        : activeList.currentUserRole === "GUEST"
-                                                            ? "Guest"
-                                                            : "Editor"}
+                                                        : activeList.currentUserRole ===
+                                                            "GUEST"
+                                                          ? "Guest"
+                                                          : "Editor"}
                                                 </span>
                                             )}
                                         </div>
@@ -2621,12 +2658,20 @@ const ListDetail = ({
                                     <ShoppingListItems
                                         items={items}
                                         onCheck={toggleItem}
-                                        onDelete={isGuest ? undefined : deleteItem}
-                                        onEdit={isGuest ? undefined : handleEditClick}
+                                        onDelete={
+                                            isGuest ? undefined : deleteItem
+                                        }
+                                        onEdit={
+                                            isGuest
+                                                ? undefined
+                                                : handleEditClick
+                                        }
                                         disabled={isReadOnly}
                                         checkable={!isTemplateList}
                                         sortMode={sortMode}
-                                        onReorder={isGuest ? undefined : reorderItem}
+                                        onReorder={
+                                            isGuest ? undefined : reorderItem
+                                        }
                                         onClaim={claimItem}
                                         onUnclaim={unclaimItem}
                                         currentUserEmail={user?.email}
@@ -2647,17 +2692,21 @@ const ListDetail = ({
                                                     {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            {!isTemplateList && !isGuest && !isEmbedded && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setShowFinishModal(true)
-                                                    }
-                                                    className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                                >
-                                                    Finish Shopping
-                                                </button>
-                                            )}
+                                            {!isTemplateList &&
+                                                !isGuest &&
+                                                !isEmbedded && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setShowFinishModal(
+                                                                true,
+                                                            )
+                                                        }
+                                                        className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                                    >
+                                                        Finish Shopping
+                                                    </button>
+                                                )}
                                         </div>
                                     )}
                                 </div>

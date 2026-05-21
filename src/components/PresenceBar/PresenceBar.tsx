@@ -114,7 +114,7 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
                         }
 
                         // Try matching from known unmasked emails
-                        let matchedUnmasked: string | undefined = undefined;
+                        let matchedUnmasked: string | undefined;
                         for (const unmasked of knownUnmaskedEmails) {
                             if (clean === maskEmail(unmasked)) {
                                 matchedUnmasked = unmasked;

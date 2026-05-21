@@ -783,7 +783,8 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                 <div className="flex flex-col gap-3">
                     {visibleItems.map((item, index) => {
                         const isDisappearing = disappearingItemIds.has(item.id);
-                        const formatPrice = (price: number) => `${price.toFixed(2)} RON`;
+                        const formatPrice = (price: number) =>
+                            `${price.toFixed(2)} RON`;
                         return (
                             <button
                                 key={item.id}
@@ -814,7 +815,10 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                                                     {item.brand}
                                                 </span>
                                             )}
-                                            {item.brand && item.price != null && <span>•</span>}
+                                            {item.brand &&
+                                                item.price != null && (
+                                                    <span>•</span>
+                                                )}
                                             {item.price != null && (
                                                 <span className="font-bold text-accent">
                                                     {formatPrice(item.price)}

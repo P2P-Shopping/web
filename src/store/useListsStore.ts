@@ -71,8 +71,16 @@ interface ListsState {
     ) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
-    shareList: (listId: string, email: string, role?: ListRole) => Promise<boolean>;
-    changeCollaboratorRole: (listId: string, userId: number, role: ListRole) => Promise<boolean>;
+    shareList: (
+        listId: string,
+        email: string,
+        role?: ListRole,
+    ) => Promise<boolean>;
+    changeCollaboratorRole: (
+        listId: string,
+        userId: number,
+        role: ListRole,
+    ) => Promise<boolean>;
     removeCollaborator: (listId: string, userId: number) => Promise<boolean>;
     leaveList: (listId: string) => Promise<boolean>;
     openModal: () => void;
@@ -638,7 +646,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
     /**
      * Shares a shopping list with another user by email.
      */
-    shareList: async (listId: string, email: string, role: ListRole = "EDITOR") => {
+    shareList: async (
+        listId: string,
+        email: string,
+        role: ListRole = "EDITOR",
+    ) => {
         try {
             const response = await fetch(
                 `${getApiBaseUrl()}/api/lists/${listId}/share`,
@@ -674,7 +686,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
         }
     },
 
-    changeCollaboratorRole: async (listId: string, userId: number, role: ListRole) => {
+    changeCollaboratorRole: async (
+        listId: string,
+        userId: number,
+        role: ListRole,
+    ) => {
         try {
             const response = await fetch(
                 `${getApiBaseUrl()}/api/lists/${listId}/collaborators/${userId}/role`,
@@ -702,7 +718,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 const lists = state.lists.map((l) => {
                     if (l.id === listId && l.collaborators) {
                         const collaborators = l.collaborators.map((c) =>
-                            c.userId === userId ? { ...c, role } : c
+                            c.userId === userId ? { ...c, role } : c,
                         );
                         return { ...l, collaborators };
                     }
@@ -710,9 +726,13 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 });
 
                 let currentList = state.currentList;
-                if (currentList && currentList.id === listId && currentList.collaborators) {
+                if (
+                    currentList &&
+                    currentList.id === listId &&
+                    currentList.collaborators
+                ) {
                     const collaborators = currentList.collaborators.map((c) =>
-                        c.userId === userId ? { ...c, role } : c
+                        c.userId === userId ? { ...c, role } : c,
                     );
                     currentList = { ...currentList, collaborators };
                 }
