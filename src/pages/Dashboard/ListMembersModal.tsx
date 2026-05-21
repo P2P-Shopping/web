@@ -15,6 +15,12 @@ interface ListMembersModalProps {
     onLeaveSuccess?: () => void;
 }
 
+const getRoleBadgeClass = (role: ListRole) => {
+    if (role === "ADMIN") return "bg-accent/10 text-accent";
+    if (role === "EDITOR") return "bg-primary/10 text-primary";
+    return "bg-text-muted/10 text-text-muted";
+};
+
 const ListMembersModal = ({
     listId,
     listName,
@@ -93,7 +99,8 @@ const ListMembersModal = ({
             toast.success(
                 `${collaborator.name || "Member"} removed successfully`,
             );
-        } catch (_err) {
+        } catch (err) {
+            console.error("Error removing member:", err);
             toast.error("Failed to remove member");
         } finally {
             setRemovingUserId(null);
@@ -104,10 +111,7 @@ const ListMembersModal = ({
         const targetCollaborator = collaborators.find(
             (c) => c.userId === userId,
         );
-        const isSelf =
-            targetCollaborator &&
-            currentUser &&
-            targetCollaborator.email === currentUser.email;
+        const isSelf = targetCollaborator?.email === currentUser?.email;
 
         if (isSelf && newRole !== "ADMIN") {
             if (otherAdmins.length <= 1) {
@@ -121,7 +125,8 @@ const ListMembersModal = ({
         try {
             await changeCollaboratorRole(listId, userId, newRole);
             toast.success("Role updated successfully");
-        } catch (_err) {
+        } catch (err) {
+            console.error("Error updating role:", err);
             toast.error("Failed to update role");
         }
     };
@@ -140,7 +145,7 @@ const ListMembersModal = ({
     };
 
     const renderCollaboratorRow = (collaborator: CollaboratorInfo) => {
-        const isSelf = currentUser && currentUser.email === collaborator.email;
+        const isSelf = currentUser?.email === collaborator.email;
         const canManage =
             isAdmin &&
             collaborator.userId !== ownerId &&
@@ -181,13 +186,9 @@ const ListMembersModal = ({
                         </select>
                     ) : (
                         <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                collaborator.role === "ADMIN"
-                                    ? "bg-accent/10 text-accent"
-                                    : collaborator.role === "EDITOR"
-                                      ? "bg-primary/10 text-primary"
-                                      : "bg-text-muted/10 text-text-muted"
-                            }`}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${getRoleBadgeClass(
+                                collaborator.role,
+                            )}`}
                         >
                             {collaborator.role}
                         </span>
@@ -314,8 +315,7 @@ const ListMembersModal = ({
                                 <div className="flex flex-col min-w-0 flex-1">
                                     <span className="text-sm font-semibold text-text-strong truncate">
                                         {owner.name || "Unknown"}{" "}
-                                        {currentUser &&
-                                            currentUser.email === owner.email &&
+                                        {currentUser?.email === owner.email &&
                                             "(You)"}
                                     </span>
                                     <span className="text-xs text-text-muted truncate">

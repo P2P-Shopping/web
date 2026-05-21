@@ -33,6 +33,7 @@ interface ApiShoppingList {
     ownerName?: string;
     ownerEmail?: string;
     userId?: string;
+    ownerId?: number;
     collaborators?: CollaboratorInfo[];
     currentUserRole?: ListRole;
     version?: number;
@@ -134,6 +135,48 @@ const normalizeItem = (item: ApiItem): Item => ({
     isRecurrent: item.isRecurrent,
 });
 
+const updateCollaboratorsRole = (
+    collaborators: CollaboratorInfo[],
+    userId: number,
+    role: ListRole
+): CollaboratorInfo[] => {
+    return collaborators.map((c) =>
+        c.userId === userId ? { ...c, role } : c
+    );
+};
+
+const updateListsWithNewRole = (
+    lists: ShoppingList[],
+    listId: string,
+    userId: number,
+    role: ListRole
+): ShoppingList[] => {
+    return lists.map((l) => {
+        if (l.id === listId && l.collaborators) {
+            return {
+                ...l,
+                collaborators: updateCollaboratorsRole(l.collaborators, userId, role),
+            };
+        }
+        return l;
+    });
+};
+
+const updateCurrentListWithNewRole = (
+    currentList: ShoppingList | null,
+    listId: string,
+    userId: number,
+    role: ListRole
+): ShoppingList | null => {
+    if (currentList && currentList.id === listId && currentList.collaborators) {
+        return {
+            ...currentList,
+            collaborators: updateCollaboratorsRole(currentList.collaborators, userId, role),
+        };
+    }
+    return currentList;
+};
+
 /**
  * Normalizes the raw list data from the API into the application's ShoppingList format.
  * @param list - The raw API shopping list data.
@@ -151,6 +194,7 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     ownerName: list.ownerName || "You",
     ownerEmail: list.ownerEmail,
     userId: list.userId,
+    ownerId: list.ownerId,
     collaborators: list.collaborators ?? [],
     currentUserRole: list.currentUserRole,
     items: (list.items ?? []).map(normalizeItem),
@@ -714,31 +758,10 @@ export const useListsStore = create<ListsState>((set, get) => ({
                 );
             }
 
-            set((state) => {
-                const lists = state.lists.map((l) => {
-                    if (l.id === listId && l.collaborators) {
-                        const collaborators = l.collaborators.map((c) =>
-                            c.userId === userId ? { ...c, role } : c,
-                        );
-                        return { ...l, collaborators };
-                    }
-                    return l;
-                });
-
-                let currentList = state.currentList;
-                if (
-                    currentList &&
-                    currentList.id === listId &&
-                    currentList.collaborators
-                ) {
-                    const collaborators = currentList.collaborators.map((c) =>
-                        c.userId === userId ? { ...c, role } : c,
-                    );
-                    currentList = { ...currentList, collaborators };
-                }
-
-                return { lists, currentList };
-            });
+            set((state) => ({
+                lists: updateListsWithNewRole(state.lists, listId, userId, role),
+                currentList: updateCurrentListWithNewRole(state.currentList, listId, userId, role),
+            }));
 
             return true;
         } catch (error) {

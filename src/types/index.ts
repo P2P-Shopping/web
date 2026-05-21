@@ -76,6 +76,7 @@ export interface ShoppingList {
     items: Item[];
     // User relation
     userId?: string;
+    ownerId?: number;
     ownerName?: string;
     ownerEmail?: string;
     collaborators?: CollaboratorInfo[];

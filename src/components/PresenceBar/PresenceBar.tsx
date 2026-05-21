@@ -31,6 +31,131 @@ const getAvatarClassName = (isActive: boolean, isTyping: boolean): string => {
     return `w-10 h-10 rounded-full border-2 border-surface flex items-center justify-center text-sm font-bold text-white shadow-md ring-1 ring-border/50 transition-all ${interactionClass} ${presenceClass}`;
 };
 
+const maskEmail = (email: string) => {
+    return email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
+};
+
+interface UsernameResolutionContext {
+    currentEmailClean: string | null;
+    activeArray: string[];
+    knownUnmaskedEmails: Set<string>;
+}
+
+const findActiveUnmaskedMatch = (
+    clean: string,
+    activeArray: string[],
+    currentEmailClean: string | null
+): string | null => {
+    for (const active of activeArray) {
+        let activeClean = normalizeUsername(active);
+        if (activeClean === "anonymous" && currentEmailClean) {
+            activeClean = currentEmailClean;
+        }
+        if (clean === maskEmail(activeClean)) {
+            return activeClean;
+        }
+    }
+    return null;
+};
+
+const findKnownUnmaskedMatch = (
+    clean: string,
+    knownUnmaskedEmails: Set<string>
+): string | null => {
+    for (const unmasked of knownUnmaskedEmails) {
+        if (clean === maskEmail(unmasked)) {
+            return unmasked;
+        }
+    }
+    return null;
+};
+
+const resolveUniqueUsername = (
+    u: string,
+    context: UsernameResolutionContext
+): string => {
+    const { currentEmailClean, activeArray, knownUnmaskedEmails } = context;
+    let clean = normalizeUsername(u);
+
+    if (clean === "anonymous" && currentEmailClean) {
+        clean = currentEmailClean;
+    }
+
+    if (!clean.includes("***")) {
+        return clean;
+    }
+
+    const activeMatch = findActiveUnmaskedMatch(clean, activeArray, currentEmailClean);
+    if (activeMatch) {
+        return activeMatch;
+    }
+
+    const knownMatch = findKnownUnmaskedMatch(clean, knownUnmaskedEmails);
+    if (knownMatch) {
+        return knownMatch;
+    }
+
+    return clean;
+};
+
+interface BaseUserResolutionContext {
+    activeUsernames: Set<string>;
+    currentEmailClean: string | null;
+    activeArray: string[];
+    knownUnmaskedEmails: Set<string>;
+    allUsers: string[];
+}
+
+const findActiveUserMatch = (
+    clean: string,
+    activeArray: string[],
+    currentEmailClean: string | null
+): string | null => {
+    for (const u of activeArray) {
+        const uClean = normalizeUsername(u);
+        if (uClean === clean) {
+            return u;
+        }
+        if (uClean === "anonymous" && clean === currentEmailClean) {
+            return u;
+        }
+    }
+    return null;
+};
+
+const findAllUsersMatch = (
+    clean: string,
+    allUsers: string[]
+): string | null => {
+    for (const u of allUsers) {
+        const uClean = normalizeUsername(u);
+        if (uClean === clean || uClean === maskEmail(clean)) {
+            return u;
+        }
+    }
+    return null;
+};
+
+const resolveBaseUser = (
+    clean: string,
+    context: BaseUserResolutionContext
+): string => {
+    const { activeUsernames, currentEmailClean, activeArray, knownUnmaskedEmails, allUsers } = context;
+    const isActive =
+        activeUsernames.has(clean) ||
+        (clean === currentEmailClean && activeUsernames.has("anonymous"));
+
+    if (isActive) {
+        return findActiveUserMatch(clean, activeArray, currentEmailClean) ?? clean;
+    }
+
+    if (knownUnmaskedEmails.has(clean)) {
+        return clean;
+    }
+
+    return findAllUsersMatch(clean, allUsers) ?? clean;
+};
+
 interface PresenceBarProps {
     variant?: "avatars" | "typing";
     allUsers?: string[];
@@ -62,10 +187,6 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
             ? normalizeUsername(currentUserEmail)
             : null;
 
-        const maskEmail = (email: string) => {
-            return email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
-        };
-
         const knownUnmaskedEmails = new Set<string>();
         if (currentEmailClean) {
             knownUnmaskedEmails.add(currentEmailClean);
@@ -86,81 +207,25 @@ const PresenceBar: React.FC<PresenceBarProps> = ({
         const allPotentialUsers = [...allUsers, ...activeArray];
         const uniqueCleanUsernames = Array.from(
             new Set(
-                allPotentialUsers.map((u) => {
-                    let clean = normalizeUsername(u);
-
-                    if (clean === "anonymous" && currentEmailClean) {
-                        clean = currentEmailClean;
-                    }
-
-                    if (clean.includes("***")) {
-                        const unmaskedMatch = activeArray.find((active) => {
-                            let activeClean = normalizeUsername(active);
-                            if (
-                                activeClean === "anonymous" &&
-                                currentEmailClean
-                            ) {
-                                activeClean = currentEmailClean;
-                            }
-                            return clean === maskEmail(activeClean);
-                        });
-
-                        if (unmaskedMatch) {
-                            const matchClean = normalizeUsername(unmaskedMatch);
-                            return matchClean === "anonymous" &&
-                                currentEmailClean
-                                ? currentEmailClean
-                                : matchClean;
-                        }
-
-                        // Try matching from known unmasked emails
-                        let matchedUnmasked: string | undefined;
-                        for (const unmasked of knownUnmaskedEmails) {
-                            if (clean === maskEmail(unmasked)) {
-                                matchedUnmasked = unmasked;
-                                break;
-                            }
-                        }
-                        if (matchedUnmasked) {
-                            return matchedUnmasked;
-                        }
-                    }
-
-                    return clean;
-                }),
+                allPotentialUsers.map((u) =>
+                    resolveUniqueUsername(u, {
+                        currentEmailClean,
+                        activeArray,
+                        knownUnmaskedEmails,
+                    })
+                )
             ),
         );
 
-        const baseUsers = uniqueCleanUsernames.map((clean) => {
-            const isActive =
-                activeUsernames.has(clean) ||
-                (clean === currentEmailClean &&
-                    activeUsernames.has("anonymous"));
-
-            if (isActive) {
-                return (
-                    activeArray.find((u) => {
-                        const uClean = normalizeUsername(u);
-                        return (
-                            uClean === clean ||
-                            (uClean === "anonymous" &&
-                                clean === currentEmailClean)
-                        );
-                    }) ?? clean
-                );
-            }
-
-            if (knownUnmaskedEmails.has(clean)) {
-                return clean;
-            }
-
-            return (
-                allUsers.find((u) => {
-                    const uClean = normalizeUsername(u);
-                    return uClean === clean || uClean === maskEmail(clean);
-                }) ?? clean
-            );
-        });
+        const baseUsers = uniqueCleanUsernames.map((clean) =>
+            resolveBaseUser(clean, {
+                activeUsernames,
+                currentEmailClean,
+                activeArray,
+                knownUnmaskedEmails,
+                allUsers,
+            })
+        );
 
         if (baseUsers.length === 0) return null;
 
