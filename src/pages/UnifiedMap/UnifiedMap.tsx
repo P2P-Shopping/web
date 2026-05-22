@@ -18,6 +18,7 @@ import {
 import "leaflet/dist/leaflet.css";
 import {
     ArrowLeft,
+    Camera,
     Car,
     CheckCircle2,
     ChevronRight,
@@ -33,7 +34,7 @@ import {
     Zap,
 } from "lucide-react";
 import { Modal } from "../../components";
-import type { AppState, Coordinate, RoutePoint } from "../../context/useStore";
+import type { Coordinate, RoutePoint } from "../../context/useStore";
 import { useStore } from "../../context/useStore";
 import {
     DEMO_STORE_LOCATION,
@@ -44,6 +45,7 @@ import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
+import { useFinishShopping } from "../ListDetail/useFinishShopping";
 import StoreMap from "../StoreMap/StoreMap";
 // --- Types & Constants ---
 export interface StoreRecommendation {
@@ -323,6 +325,9 @@ const getDistanceToRouteMeters = (
 };
 
 const normalizeLabel = (value: string) => value.trim().toLowerCase();
+
+const isNormalShoppingList = (list: ShoppingList) =>
+    (list.category ?? "NORMAL") === "NORMAL";
 
 const alignRouteToItems = (
     route: RoutePoint[],
@@ -705,8 +710,23 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
     const [disappearingItemIds, setDisappearingItemIds] = useState<Set<string>>(
         () => new Set(),
     );
+    const [finishError, setFinishError] = useState<string | null>(null);
     const updateItem = useListsStore((state) => state.updateItem);
     const setGlobalItems = useStore((state) => state.setItems);
+    const {
+        isFinishing,
+        showFinishModal,
+        setShowFinishModal,
+        receiptImage,
+        setReceiptImage,
+        isFinishDisabled,
+        handleFinishShopping,
+        activeShoppingSession,
+        syncActiveSession,
+    } = useFinishShopping({
+        effectiveListId: listId,
+        setError: setFinishError,
+    });
     const itemsById = new Map(items.map((item) => [item.id, item]));
     const itemsByName = new Map(
         items.map((item) => [normalizeLabel(item.name), item]),
@@ -735,6 +755,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
     const visibleItems = orderedItems.filter(
         (item) => !item.checked || disappearingItemIds.has(item.id),
     );
+    const canFinishShopping = activeShoppingSession?.listId === listId;
 
     const handleCheck = (item: Item) => {
         if (item.checked || disappearingItemIds.has(item.id)) return;
@@ -772,6 +793,10 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
             return next.size === prev.size ? prev : next;
         });
     }, [items]);
+
+    useEffect(() => {
+        void syncActiveSession();
+    }, [syncActiveSession]);
 
     return (
         <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -829,64 +854,94 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                     })}
                 </div>
             )}
+
+            {canFinishShopping && (
+                <div className="flex flex-col gap-3 border-t border-border pt-5">
+                    {finishError && (
+                        <div
+                            role="alert"
+                            className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-xs font-bold text-danger"
+                        >
+                            {finishError}
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setFinishError(null);
+                            setShowFinishModal(true);
+                        }}
+                        className="w-full rounded-2xl bg-accent py-3.5 text-sm font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        Finish Shopping
+                    </button>
+                </div>
+            )}
+
+            <Modal
+                isOpen={showFinishModal}
+                onClose={() => setShowFinishModal(false)}
+                title="Finish Shopping"
+                subtitle={
+                    activeShoppingSession?.storeName
+                        ? `Shopping at ${activeShoppingSession.storeName}. Add the receipt to complete the session.`
+                        : "Add the receipt to complete the shopping session."
+                }
+            >
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-2">
+                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                            Receipt Photo
+                        </span>
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                id="indoor-receipt-cam"
+                                className="hidden"
+                                onChange={(event) =>
+                                    setReceiptImage(
+                                        event.target.files?.[0] || null,
+                                    )
+                                }
+                            />
+                            <label
+                                htmlFor="indoor-receipt-cam"
+                                className={`flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-8 transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
+                            >
+                                <Camera size={28} />
+                                <span className="text-sm font-black">
+                                    {receiptImage
+                                        ? receiptImage.name
+                                        : "TAKE PHOTO"}
+                                </span>
+                                <span className="text-xs font-bold uppercase opacity-50">
+                                    Optional receipt
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowFinishModal(false)}
+                            className="rounded-lg bg-bg-muted py-3 font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={isFinishDisabled}
+                            onClick={handleFinishShopping}
+                            className="rounded-lg bg-text-strong py-3 font-bold text-bg transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {isFinishing ? "Processing..." : "Complete"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
-};
-
-const useIndoorCityTransition = (
-    navigationMode: "city" | "indoor",
-    route: RoutePoint[],
-    selectedListId: string | null,
-    lists: ShoppingList[],
-    setNavigationMode: (mode: "city" | "indoor") => void,
-    setTargetStoreLocation: (loc: Coordinate | null) => void,
-    setTargetStoreTransit: (transit: AppState["targetStoreTransit"]) => void,
-) => {
-    useEffect(() => {
-        if (navigationMode === "indoor" && selectedListId) {
-            const activeList = lists.find((l) => l.id === selectedListId);
-            if (!activeList) return;
-
-            if (
-                activeList.items.length > 0 &&
-                activeList.items.every((item) => item.checked)
-            ) {
-                const transitionTimer = setTimeout(() => {
-                    setNavigationMode("city");
-                    setTargetStoreLocation(null);
-                    setTargetStoreTransit(null);
-                    useStore.getState().setMacroRouteGeometry([]);
-                }, 1000);
-
-                return () => clearTimeout(transitionTimer);
-            }
-
-            const lastRoutePoint = route.at(-1);
-            if (!lastRoutePoint) return;
-            const lastItemState = activeList.items.find(
-                (item) => item.id === lastRoutePoint.itemId,
-            );
-
-            if (lastItemState?.checked) {
-                const transitionTimer = setTimeout(() => {
-                    setNavigationMode("city");
-                    setTargetStoreLocation(null);
-                    setTargetStoreTransit(null);
-                    useStore.getState().setMacroRouteGeometry([]);
-                }, 1000);
-
-                return () => clearTimeout(transitionTimer);
-            }
-        }
-    }, [
-        lists,
-        selectedListId,
-        route,
-        navigationMode,
-        setNavigationMode,
-        setTargetStoreLocation,
-        setTargetStoreTransit,
-    ]);
 };
 
 const useStoreFootprint = (activeTarget: { lat: number; lng: number }) => {
@@ -1028,6 +1083,7 @@ const UnifiedMap: React.FC = () => {
     );
     const navigationMode = useStore((state) => state.navigationMode);
     const setNavigationMode = useStore((state) => state.setNavigationMode);
+    const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
     const route = useStore((state) => state.route);
     const macroRouteGeometry = useStore((state) => state.macroRouteGeometry);
     const indoorItems = useStore((state) => state.items);
@@ -1072,8 +1128,12 @@ const UnifiedMap: React.FC = () => {
     const isMicroView = navigationMode === "indoor";
 
     const activeTarget = targetStoreLocation || DEMO_STORE_LOCATION;
+    const shoppableLists = useMemo(
+        () => lists.filter(isNormalShoppingList),
+        [lists],
+    );
     const selectedList = selectedListId
-        ? lists.find((list) => list.id === selectedListId)
+        ? shoppableLists.find((list) => list.id === selectedListId)
         : null;
     const activeIndoorItems =
         selectedList?.items && selectedList.items.length > 0
@@ -1095,15 +1155,14 @@ const UnifiedMap: React.FC = () => {
         // Automatic geofence transitions disabled per user request
     }, []);
 
-    useIndoorCityTransition(
-        navigationMode,
-        route,
-        selectedListId,
-        lists,
-        setNavigationMode,
-        setTargetStoreLocation,
-        setTargetStoreTransit,
-    );
+    useEffect(() => {
+        if (selectedListId && !selectedList) {
+            setSelectedListId(null);
+            setIsShowingStores(false);
+            setRecommendedStores([]);
+            setItems([]);
+        }
+    }, [selectedListId, selectedList, setItems]);
 
     useEffect(() => {
         if (navigationMode !== "indoor" || !selectedListId) {
@@ -1210,7 +1269,7 @@ const UnifiedMap: React.FC = () => {
     // --- AUDIO NAVIGATION LOGIC ---
     // Extracting audio logic to useAudioNavigation hook...
     const handleListSelect = (listId: string) => {
-        const selectedList = lists.find((l) => l.id === listId);
+        const selectedList = shoppableLists.find((l) => l.id === listId);
         if (!selectedList) return;
 
         setSelectedListId(listId);
@@ -1223,7 +1282,7 @@ const UnifiedMap: React.FC = () => {
         const idToFetch = listIdOverride ?? selectedListId;
         if (!idToFetch) return;
 
-        const selectedList = lists.find((l) => l.id === idToFetch);
+        const selectedList = shoppableLists.find((l) => l.id === idToFetch);
         if (!selectedList) return;
 
         await fetchStoreRecommendations(selectedList);
@@ -1310,7 +1369,7 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleStartRoute = async (store: StoreRecommendation) => {
-        if (!selectedListId) return;
+        if (!selectedListId || !selectedList) return;
         await startShoppingSession({
             listId: selectedListId,
             storeId: store.id,
@@ -1318,6 +1377,7 @@ const UnifiedMap: React.FC = () => {
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
         setTargetStoreId(store.id);
         setTargetStoreTransit(store.transit);
+        setHasEnteredStore(false);
 
         await fetchMacroRoute(store.id);
 
@@ -1326,7 +1386,7 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleStartCustomStore = async () => {
-        if (!selectedListId || !customStoreName.trim()) return;
+        if (!selectedListId || !selectedList || !customStoreName.trim()) return;
 
         try {
             await startShoppingSession({
@@ -1338,6 +1398,7 @@ const UnifiedMap: React.FC = () => {
             setTargetStoreId(null);
             setTargetStoreLocation(null);
             setTargetStoreTransit(null);
+            setHasEnteredStore(true);
             setNavigationMode("city");
             setIsShowingStores(false);
             setShowCustomStoreModal(false);
@@ -1397,7 +1458,7 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleEnterIndoorMode = async () => {
-        const activeList = lists.find((l) => l.id === selectedListId);
+        const activeList = shoppableLists.find((l) => l.id === selectedListId);
         const currentItems =
             activeList?.items.filter((item) => !item.checked) || [];
 
@@ -1436,7 +1497,7 @@ const UnifiedMap: React.FC = () => {
         if (!selectedListId) {
             return (
                 <ListSelectionView
-                    lists={lists}
+                    lists={shoppableLists}
                     isMicroView={isMicroView}
                     handleListSelect={handleListSelect}
                 />

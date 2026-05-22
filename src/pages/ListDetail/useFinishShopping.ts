@@ -22,6 +22,21 @@ export const useFinishShopping = ({
     const setActiveShoppingSession = useStore(
         (state) => state.setActiveShoppingSession,
     );
+    const setNavigationMode = useStore((state) => state.setNavigationMode);
+    const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
+    const setTargetStoreLocation = useStore(
+        (state) => state.setTargetStoreLocation,
+    );
+    const setTargetStoreId = useStore((state) => state.setTargetStoreId);
+    const setTargetStoreTransit = useStore(
+        (state) => state.setTargetStoreTransit,
+    );
+    const setRoute = useStore((state) => state.setRoute);
+    const setRouteWarnings = useStore((state) => state.setRouteWarnings);
+    const setMacroRouteGeometry = useStore(
+        (state) => state.setMacroRouteGeometry,
+    );
+    const setStatus = useStore((state) => state.setStatus);
     const [isFinishing, setIsFinishing] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
     const [receiptImage, setReceiptImage] = useState<File | null>(null);
@@ -58,6 +73,15 @@ export const useFinishShopping = ({
             setShowFinishModal(false);
             setReceiptImage(null);
             setActiveShoppingSession(null);
+            setNavigationMode("city");
+            setHasEnteredStore(true);
+            setTargetStoreLocation(null);
+            setTargetStoreId(null);
+            setTargetStoreTransit(null);
+            setRoute([]);
+            setRouteWarnings([]);
+            setMacroRouteGeometry([]);
+            setStatus("Shopping session finished.");
             navigate("/dashboard");
         } catch (_err) {
             const errorMessage =
