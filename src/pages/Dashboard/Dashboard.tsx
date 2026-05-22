@@ -889,9 +889,11 @@ const Dashboard = () => {
     }, [displayMode]);
 
     useEffect(() => {
-        fetchLists();
-        fetchPendingInvitations();
-    }, [fetchLists, fetchPendingInvitations]);
+        if (lists.length === 0) {
+            fetchLists();
+            fetchPendingInvitations();
+        }
+    }, [fetchLists, fetchPendingInvitations, lists.length]);
 
     const toggleSection = (section: string) => {
         setCollapsedSections((prev) => {
