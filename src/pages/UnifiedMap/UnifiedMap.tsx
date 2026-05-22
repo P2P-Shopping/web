@@ -102,6 +102,7 @@ const geocodeStore = async (
         const nomRes = await fetch(nomUrl, {
             headers: {
                 Accept: "application/json",
+                "User-Agent": "P2P-Shopping-Assistant/1.0",
             },
         });
         if (nomRes.ok) {
@@ -1389,25 +1390,52 @@ const UnifiedMap: React.FC = () => {
         if (!selectedListId || !selectedList || !customStoreName.trim()) return;
 
         try {
-            await startShoppingSession({
+            setIsStartingShopping(true);
+
+            // Attempt to geocode the custom store address
+            let coords = await geocodeStore(
+                customStoreName.trim(),
+                customStoreAddress.trim(),
+                userLocation,
+            );
+
+            // Fallback to user location if geocoding fails, so we at least create the store
+            if (!coords) {
+                console.warn(
+                    "Geocoding failed for custom store, using current user location as fallback.",
+                );
+                coords = userLocation;
+            }
+
+            const session = await startShoppingSession({
                 listId: selectedListId,
                 customStoreName: customStoreName.trim(),
                 customStoreAddress: customStoreAddress.trim() || undefined,
                 customStoreNotes: customStoreNotes.trim() || undefined,
+                latitude: coords.lat,
+                longitude: coords.lng,
             });
-            setTargetStoreId(null);
-            setTargetStoreLocation(null);
+
+            // Update local state to reflect the new session and enter indoor mode
+            setTargetStoreId(session.storeId ?? null);
+            setTargetStoreLocation({ lat: coords.lat, lng: coords.lng });
             setTargetStoreTransit(null);
             setHasEnteredStore(true);
-            setNavigationMode("city");
+            setNavigationMode("indoor"); // Enter in-store map immediately
             setIsShowingStores(false);
             setShowCustomStoreModal(false);
             setCustomStoreName("");
             setCustomStoreAddress("");
             setCustomStoreNotes("");
+
+            // Clear any existing route as this is a new custom store
+            setRoute([]);
+            setMacroRouteGeometry([]);
         } catch (error) {
             console.error("Failed to start custom shopping session", error);
             alert("Nu am putut porni sesiunea de cumpărături.");
+        } finally {
+            setIsStartingShopping(false);
         }
     };
 

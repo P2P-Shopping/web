@@ -99,6 +99,8 @@ export const startShoppingRequest = async (data: {
     customStoreName?: string;
     customStoreAddress?: string;
     customStoreNotes?: string;
+    latitude?: number;
+    longitude?: number;
 }) => {
     const response = await api.post<ShoppingSessionResponse>(
         "/api/shopping/start",
