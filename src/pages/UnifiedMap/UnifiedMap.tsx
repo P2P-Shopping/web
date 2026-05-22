@@ -32,6 +32,7 @@ import {
     X,
     Zap,
 } from "lucide-react";
+import { Modal } from "../../components";
 import type { AppState, Coordinate, RoutePoint } from "../../context/useStore";
 import { useStore } from "../../context/useStore";
 import {
@@ -259,7 +260,7 @@ const mapApiStoreToRecommendation = async (
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-import { getApiBaseUrl } from "../../services/api";
+import { getApiBaseUrl, startShoppingRequest } from "../../services/api";
 
 const DefaultIcon = L.icon({
     iconUrl: icon,
@@ -472,6 +473,7 @@ interface StoreRecommendationViewProps {
     setTransportMode: (mode: "driving" | "walking") => void;
     setSelectedListId: (id: string | null) => void;
     handleStartRoute: (store: StoreRecommendation) => void;
+    onPickOwnStore: () => void;
 }
 
 const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
@@ -480,6 +482,7 @@ const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
     setTransportMode,
     setSelectedListId,
     handleStartRoute,
+    onPickOwnStore,
 }) => (
     <div className="flex flex-col gap-6 animate-in slide-in-from-right-4">
         <header className="flex flex-col gap-4">
@@ -518,6 +521,18 @@ const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
             </div>
         </header>
         <div className="flex flex-col gap-4">
+            <button
+                type="button"
+                onClick={onPickOwnStore}
+                className="w-full rounded-[24px] border border-dashed border-border px-5 py-4 text-left bg-surface hover:border-accent hover:bg-accent-subtle/30 transition-all"
+            >
+                <span className="block text-xs font-black uppercase tracking-widest text-accent">
+                    Pick Your Own Store
+                </span>
+                <span className="mt-1 block text-sm text-text-muted">
+                    Choose another store and save it in the review queue.
+                </span>
+            </button>
             {recommendedStores.map((store, idx) => (
                 <div
                     key={store.id}
@@ -1004,6 +1019,9 @@ const UnifiedMap: React.FC = () => {
     );
     const targetStoreId = useStore((state) => state.targetStoreId);
     const setTargetStoreId = useStore((state) => state.setTargetStoreId);
+    const setActiveShoppingSession = useStore(
+        (state) => state.setActiveShoppingSession,
+    );
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const setTargetStoreTransit = useStore(
         (state) => state.setTargetStoreTransit,
@@ -1030,6 +1048,11 @@ const UnifiedMap: React.FC = () => {
     const [recommendedStores, setRecommendedStores] = useState<
         StoreRecommendation[]
     >([]);
+    const [showCustomStoreModal, setShowCustomStoreModal] = useState(false);
+    const [customStoreName, setCustomStoreName] = useState("");
+    const [customStoreAddress, setCustomStoreAddress] = useState("");
+    const [customStoreNotes, setCustomStoreNotes] = useState("");
+    const [isStartingShopping, setIsStartingShopping] = useState(false);
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
@@ -1269,7 +1292,29 @@ const UnifiedMap: React.FC = () => {
         }
     };
 
+    const startShoppingSession = async (payload: {
+        listId: string;
+        storeId?: string;
+        customStoreName?: string;
+        customStoreAddress?: string;
+        customStoreNotes?: string;
+    }) => {
+        setIsStartingShopping(true);
+        try {
+            const session = await startShoppingRequest(payload);
+            setActiveShoppingSession(session);
+            return session;
+        } finally {
+            setIsStartingShopping(false);
+        }
+    };
+
     const handleStartRoute = async (store: StoreRecommendation) => {
+        if (!selectedListId) return;
+        await startShoppingSession({
+            listId: selectedListId,
+            storeId: store.id,
+        });
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
         setTargetStoreId(store.id);
         setTargetStoreTransit(store.transit);
@@ -1277,6 +1322,32 @@ const UnifiedMap: React.FC = () => {
         await fetchMacroRoute(store.id);
 
         setNavigationMode("city");
+        setIsShowingStores(false);
+    };
+
+    const handleStartCustomStore = async () => {
+        if (!selectedListId || !customStoreName.trim()) return;
+
+        try {
+            await startShoppingSession({
+                listId: selectedListId,
+                customStoreName: customStoreName.trim(),
+                customStoreAddress: customStoreAddress.trim() || undefined,
+                customStoreNotes: customStoreNotes.trim() || undefined,
+            });
+            setTargetStoreId(null);
+            setTargetStoreLocation(null);
+            setTargetStoreTransit(null);
+            setNavigationMode("city");
+            setIsShowingStores(false);
+            setShowCustomStoreModal(false);
+            setCustomStoreName("");
+            setCustomStoreAddress("");
+            setCustomStoreNotes("");
+        } catch (error) {
+            console.error("Failed to start custom shopping session", error);
+            alert("Nu am putut porni sesiunea de cumpărături.");
+        }
     };
 
     const fetchMacroRoute = async (storeId: string) => {
@@ -1380,6 +1451,7 @@ const UnifiedMap: React.FC = () => {
                     setTransportMode={setTransportMode}
                     setSelectedListId={setSelectedListId}
                     handleStartRoute={handleStartRoute}
+                    onPickOwnStore={() => setShowCustomStoreModal(true)}
                 />
             );
         }
@@ -1757,6 +1829,62 @@ const UnifiedMap: React.FC = () => {
                     </button>
                 </div>
             )}
+            <Modal
+                isOpen={showCustomStoreModal}
+                onClose={() => setShowCustomStoreModal(false)}
+                title="Pick Your Own Store"
+                subtitle="Custom stores stay outside the official store data until they are reviewed."
+            >
+                <div className="flex flex-col gap-4">
+                    <input
+                        type="text"
+                        maxLength={80}
+                        value={customStoreName}
+                        onChange={(event) =>
+                            setCustomStoreName(event.target.value)
+                        }
+                        placeholder="Store name"
+                        className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
+                    />
+                    <input
+                        type="text"
+                        maxLength={120}
+                        value={customStoreAddress}
+                        onChange={(event) =>
+                            setCustomStoreAddress(event.target.value)
+                        }
+                        placeholder="Address or landmark"
+                        className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
+                    />
+                    <textarea
+                        value={customStoreNotes}
+                        onChange={(event) =>
+                            setCustomStoreNotes(event.target.value)
+                        }
+                        placeholder="Optional notes"
+                        className="min-h-24 p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent resize-none"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setShowCustomStoreModal(false)}
+                            className="py-3 bg-bg-muted rounded-lg font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={
+                                isStartingShopping || !customStoreName.trim()
+                            }
+                            onClick={handleStartCustomStore}
+                            className="py-3 bg-accent text-white rounded-lg font-bold disabled:opacity-50"
+                        >
+                            Start Shopping
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

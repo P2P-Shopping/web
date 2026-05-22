@@ -68,18 +68,54 @@ api.interceptors.response.use(
  * API Request for Finishing Shopping
  */
 export const finishShoppingRequest = async (data: {
-    storeName: string;
     receiptImage: File | null;
     listId: string;
 }) => {
     const formData = new FormData();
-    formData.append("storeName", data.storeName);
     formData.append("listId", data.listId);
     if (data.receiptImage) {
         formData.append("receipt", data.receiptImage);
     }
 
     return api.post("/api/shopping/finish", formData, { timeout: 60_000 });
+};
+
+export interface ShoppingSessionResponse {
+    sessionId: string;
+    listId: string;
+    status: "ACTIVE" | "FINISHED" | "CANCELLED";
+    storeId?: string | null;
+    storeCandidateSubmissionId?: string | null;
+    storeName?: string | null;
+    storeAddress?: string | null;
+    officialStore: boolean;
+    startedAt?: string | null;
+    finishedAt?: string | null;
+}
+
+export const startShoppingRequest = async (data: {
+    listId: string;
+    storeId?: string;
+    customStoreName?: string;
+    customStoreAddress?: string;
+    customStoreNotes?: string;
+}) => {
+    const response = await api.post<ShoppingSessionResponse>(
+        "/api/shopping/start",
+        data,
+    );
+    return response.data;
+};
+
+export const fetchActiveShoppingSessionRequest = async (listId: string) => {
+    const response = await api.get<ShoppingSessionResponse | null>(
+        `/api/shopping/session?listId=${encodeURIComponent(listId)}`,
+        {
+            validateStatus: (status) =>
+                (status >= 200 && status < 300) || status === 204,
+        },
+    );
+    return response.status === 204 ? null : response.data;
 };
 
 /**

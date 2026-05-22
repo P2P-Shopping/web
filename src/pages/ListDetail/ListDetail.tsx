@@ -2001,12 +2001,12 @@ const ListDetail = ({
         isFinishing,
         showFinishModal,
         setShowFinishModal,
-        finishStoreName,
-        setFinishStoreName,
         receiptImage,
         setReceiptImage,
         isFinishDisabled,
         handleFinishShopping,
+        activeShoppingSession,
+        syncActiveSession,
     } = useFinishShopping({ effectiveListId, setError });
 
     const { permissionStatus, showBanner, setShowBanner, isScrolled } =
@@ -2095,6 +2095,10 @@ const ListDetail = ({
             fetchLists();
         }
     }, [lists.length, fetchLists]);
+
+    useEffect(() => {
+        void syncActiveSession();
+    }, [syncActiveSession]);
 
     const resetDetailFields = useCallback((_targetListId?: string) => {
         setShowDetailsModal(false);
@@ -2473,17 +2477,21 @@ const ListDetail = ({
                                                     {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            {!isTemplateList && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setShowFinishModal(true)
-                                                    }
-                                                    className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                                >
-                                                    Finish Shopping
-                                                </button>
-                                            )}
+                                            {!isTemplateList &&
+                                                activeShoppingSession?.listId ===
+                                                    effectiveListId && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setShowFinishModal(
+                                                                true,
+                                                            )
+                                                        }
+                                                        className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                                    >
+                                                        Finish Shopping
+                                                    </button>
+                                                )}
                                         </div>
                                     )}
                                 </div>
@@ -2559,33 +2567,13 @@ const ListDetail = ({
                 isOpen={showFinishModal}
                 onClose={() => setShowFinishModal(false)}
                 title="Finish Shopping"
-                subtitle="Enter store and take a photo of your receipt."
+                subtitle={
+                    activeShoppingSession?.storeName
+                        ? `Shopping at ${activeShoppingSession.storeName}. Add the receipt to complete the session.`
+                        : "Add the receipt to complete the shopping session."
+                }
             >
                 <div className="flex flex-col gap-5">
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="store-name-input"
-                            className="text-[11px] font-black uppercase text-text-strong tracking-wider"
-                        >
-                            Store Name
-                        </label>
-                        <input
-                            id="store-name-input"
-                            type="text"
-                            maxLength={50}
-                            value={finishStoreName}
-                            onChange={(e) =>
-                                setFinishStoreName(
-                                    e.target.value.replace(
-                                        /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
-                                        "",
-                                    ),
-                                )
-                            }
-                            placeholder="e.g. Lidl"
-                            className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
-                        />
-                    </div>
                     <div className="flex flex-col gap-2">
                         <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
                             Receipt Photo
