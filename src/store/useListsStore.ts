@@ -5,6 +5,7 @@ import type {
     CollaboratorInfo,
     Item,
     ListCategory,
+    ListRole,
     PendingInvitation,
     ShoppingList,
 } from "../types";
@@ -25,15 +26,17 @@ interface ApiShoppingList {
     title: string;
     category?: ListCategory;
     subcategory?: string;
-    finalStore?: string;
+    finalStoreId?: string;
+    finalStoreName?: string;
     createdAt?: string;
     updatedAt?: string;
     items?: ApiItem[];
     ownerName?: string;
     ownerEmail?: string;
     userId?: string;
+    ownerId?: number;
     collaborators?: CollaboratorInfo[];
-    currentUserRole?: "ADMIN" | "EDITOR";
+    currentUserRole?: ListRole;
     version?: number;
 }
 
@@ -70,7 +73,16 @@ interface ListsState {
     ) => Promise<boolean>;
     toggleItem: (listId: string, itemId: string) => Promise<boolean>;
     deleteItem: (listId: string, itemId: string) => Promise<boolean>;
-    shareList: (listId: string, email: string) => Promise<boolean>;
+    shareList: (
+        listId: string,
+        email: string,
+        role?: ListRole,
+    ) => Promise<boolean>;
+    changeCollaboratorRole: (
+        listId: string,
+        userId: number,
+        role: ListRole,
+    ) => Promise<boolean>;
     removeCollaborator: (listId: string, userId: number) => Promise<boolean>;
     leaveList: (listId: string) => Promise<boolean>;
     openModal: () => void;
@@ -124,6 +136,54 @@ const normalizeItem = (item: ApiItem): Item => ({
     isRecurrent: item.isRecurrent,
 });
 
+const updateCollaboratorsRole = (
+    collaborators: CollaboratorInfo[],
+    userId: number,
+    role: ListRole,
+): CollaboratorInfo[] => {
+    return collaborators.map((c) => (c.userId === userId ? { ...c, role } : c));
+};
+
+const updateListsWithNewRole = (
+    lists: ShoppingList[],
+    listId: string,
+    userId: number,
+    role: ListRole,
+): ShoppingList[] => {
+    return lists.map((l) => {
+        if (l.id === listId && l.collaborators) {
+            return {
+                ...l,
+                collaborators: updateCollaboratorsRole(
+                    l.collaborators,
+                    userId,
+                    role,
+                ),
+            };
+        }
+        return l;
+    });
+};
+
+const updateCurrentListWithNewRole = (
+    currentList: ShoppingList | null,
+    listId: string,
+    userId: number,
+    role: ListRole,
+): ShoppingList | null => {
+    if (currentList?.id === listId && currentList?.collaborators) {
+        return {
+            ...currentList,
+            collaborators: updateCollaboratorsRole(
+                currentList.collaborators,
+                userId,
+                role,
+            ),
+        };
+    }
+    return currentList;
+};
+
 /**
  * Normalizes the raw list data from the API into the application's ShoppingList format.
  * @param list - The raw API shopping list data.
@@ -137,10 +197,12 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     status: "active",
     category: list.category ?? "NORMAL",
     subcategory: list.subcategory,
-    finalStore: list.finalStore,
+    finalStoreId: list.finalStoreId,
+    finalStoreName: list.finalStoreName,
     ownerName: list.ownerName || "You",
     ownerEmail: list.ownerEmail,
     userId: list.userId,
+    ownerId: list.ownerId,
     collaborators: list.collaborators ?? [],
     currentUserRole: list.currentUserRole,
     items: (list.items ?? []).map(normalizeItem),
@@ -636,14 +698,18 @@ export const useListsStore = create<ListsState>((set, get) => ({
     /**
      * Shares a shopping list with another user by email.
      */
-    shareList: async (listId: string, email: string) => {
+    shareList: async (
+        listId: string,
+        email: string,
+        role: ListRole = "EDITOR",
+    ) => {
         try {
             const response = await fetch(
                 `${getApiBaseUrl()}/api/lists/${listId}/share`,
                 {
                     method: "POST",
                     headers: authHeaders(true),
-                    body: JSON.stringify({ email }),
+                    body: JSON.stringify({ email, role }),
                     credentials: "include",
                 },
             );
@@ -667,6 +733,61 @@ export const useListsStore = create<ListsState>((set, get) => ({
                     error instanceof Error
                         ? error.message
                         : "Failed to share list",
+            });
+            return false;
+        }
+    },
+
+    changeCollaboratorRole: async (
+        listId: string,
+        userId: number,
+        role: ListRole,
+    ) => {
+        try {
+            const response = await fetch(
+                `${getApiBaseUrl()}/api/lists/${listId}/collaborators/${userId}/role`,
+                {
+                    method: "PATCH",
+                    headers: authHeaders(true),
+                    body: JSON.stringify({ role }),
+                    credentials: "include",
+                },
+            );
+
+            handleAuthResponse(response);
+
+            if (!response.ok) {
+                const errorData = (await response.json().catch(() => ({}))) as {
+                    message?: string;
+                };
+                throw new Error(
+                    errorData.message ||
+                        `Failed to change role (${response.status})`,
+                );
+            }
+
+            set((state) => ({
+                lists: updateListsWithNewRole(
+                    state.lists,
+                    listId,
+                    userId,
+                    role,
+                ),
+                currentList: updateCurrentListWithNewRole(
+                    state.currentList,
+                    listId,
+                    userId,
+                    role,
+                ),
+            }));
+
+            return true;
+        } catch (error) {
+            set({
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to change collaborator role",
             });
             return false;
         }

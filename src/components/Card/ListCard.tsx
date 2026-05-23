@@ -33,6 +33,8 @@ export default function ListCard({
         (item) => item.checked,
     ).length;
     const uncheckedItems = (list.items || []).filter((item) => !item.checked);
+    const checkedListItems = (list.items || []).filter((item) => item.checked);
+    const previewItems = [...uncheckedItems, ...checkedListItems];
 
     const progress =
         totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
@@ -158,7 +160,7 @@ export default function ListCard({
 
                             return (
                                 <>
-                                    {uncheckedItems
+                                    {previewItems
                                         .slice(0, PREVIEW_LIMIT)
                                         .map((item) => (
                                             <div
@@ -166,18 +168,24 @@ export default function ListCard({
                                                 className="flex items-center gap-2.5 p-[8px_12px] rounded-md bg-bg-subtle border border-border text-sm text-text transition-colors duration-200 ease-out"
                                             >
                                                 <span
-                                                    className="w-[16px] h-[16px] border-2 border-border-strong rounded-[4px] shrink-0 flex items-center justify-center transition-all bg-surface"
+                                                    className={`w-[16px] h-[16px] border-2 rounded-[4px] shrink-0 flex items-center justify-center transition-all ${item.checked ? "border-success bg-success text-white" : "border-border-strong bg-surface"}`}
                                                     aria-hidden="true"
-                                                />
-                                                <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                >
+                                                    {item.checked && (
+                                                        <Check size={10} />
+                                                    )}
+                                                </span>
+                                                <span
+                                                    className={`flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${item.checked ? "line-through opacity-70" : ""}`}
+                                                >
                                                     {item.name}
                                                 </span>
                                             </div>
                                         ))}
-                                    {uncheckedItems.length > PREVIEW_LIMIT && (
+                                    {previewItems.length > PREVIEW_LIMIT && (
                                         <div className="flex items-center justify-center p-[6px_12px] rounded-md bg-bg-muted border border-border text-xs font-bold text-text-muted">
                                             +
-                                            {uncheckedItems.length -
+                                            {previewItems.length -
                                                 PREVIEW_LIMIT}{" "}
                                             more
                                         </div>
