@@ -98,6 +98,8 @@ const RegistrationPage = () => {
                 type="button"
                 onClick={() => navigate("/")}
                 className="absolute top-6 left-6 md:top-10 md:left-10 p-2.5 text-text-muted hover:text-text-strong hover:bg-bg-subtle rounded-xl transition-all flex items-center gap-2 z-50"
+                aria-label="Go back to home"
+                title="Go back"
             >
                 <ArrowLeft size={24} />
             </button>

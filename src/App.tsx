@@ -428,9 +428,11 @@ function App() {
                     <Route
                         path="/"
                         element={
-                            <GuestRoute>
+                            isAuthenticated ? (
+                                <Navigate to="/dashboard" replace />
+                            ) : (
                                 <LandingPage />
-                            </GuestRoute>
+                            )
                         }
                     />
                     <Route path="*" element={<NotFound />} />
