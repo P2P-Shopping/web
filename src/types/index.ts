@@ -21,7 +21,7 @@ export interface Item {
 
 export type ListCategory = "NORMAL" | "RECIPE" | "FREQUENT";
 
-export type ListRole = "ADMIN" | "EDITOR";
+export type ListRole = "ADMIN" | "EDITOR" | "GUEST";
 
 export interface CollaboratorInfo {
     userId: number;
@@ -77,6 +77,7 @@ export interface ShoppingList {
     items: Item[];
     // User relation
     userId?: string;
+    ownerId?: number;
     ownerName?: string;
     ownerEmail?: string;
     collaborators?: CollaboratorInfo[];

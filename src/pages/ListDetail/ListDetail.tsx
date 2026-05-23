@@ -1,7 +1,9 @@
 import {
     AlertCircle,
+    Camera,
     CheckCircle2,
     ChevronDown,
+    Info,
     Plus,
     Settings,
     Users,
@@ -29,10 +31,11 @@ import api, {
 } from "../../services/api";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
-import type { ListCategory } from "../../types";
+import type { ListCategory, ListRole } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 
 import ListMembersModal from "../Dashboard/ListMembersModal";
+import { useFinishShopping } from "./useFinishShopping";
 import { useImportItems } from "./useImportItems";
 import { useListPageEffects } from "./useListPageEffects";
 
@@ -71,7 +74,9 @@ interface ApiShoppingList {
     category?: ListCategory;
     items?: ApiListItem[];
     ownerEmail?: string;
+    ownerId?: number;
     collaborators?: import("../../types").CollaboratorInfo[];
+    currentUserRole?: ListRole;
 }
 
 interface ListDetailProps {
@@ -257,12 +262,15 @@ const useListItems = (effectiveListId: string | undefined) => {
                 if (
                     currentList.category ||
                     currentList.ownerEmail ||
-                    currentList.collaborators
+                    currentList.collaborators ||
+                    currentList.currentUserRole
                 ) {
                     useListsStore.getState().updateList(targetListId, {
                         category: currentList.category,
                         ownerEmail: currentList.ownerEmail,
                         collaborators: currentList.collaborators,
+                        currentUserRole:
+                            currentList.currentUserRole as ListRole,
                     });
                 }
                 syncListItemsInStore(mappedItems, targetListId);
@@ -1064,6 +1072,8 @@ const useListItems = (effectiveListId: string | undefined) => {
     };
 };
 
+const presenceRefCount: Record<string, number> = {};
+
 /**
  * Custom hook to manage user presence (JOIN, LEAVE, TYPING) via WebSocket.
  */
@@ -1099,19 +1109,25 @@ const useListPresence = (effectiveListId: string | undefined) => {
             user?.firstName?.trim() || user?.email?.split("@")[0] || undefined;
 
         console.debug("[ws] subscribing list presence", effectiveListId);
+
+        if (!presenceRefCount[effectiveListId]) {
+            presenceRefCount[effectiveListId] = 0;
+        }
+        presenceRefCount[effectiveListId]++;
+
         const presenceSubscription = stompClient.subscribe(
             `/topic/list/${effectiveListId}/presence`,
             handlePresenceMessage,
         );
 
         const membersSubscription = stompClient.subscribe(
-            `/topic/lists/${effectiveListId}/members`,
+            `/topic/list/${effectiveListId}/members`,
             () => {
                 useListsStore.getState().fetchLists();
             },
         );
 
-        if (stompClient.connected) {
+        if (stompClient.connected && presenceRefCount[effectiveListId] === 1) {
             const joinEvent = {
                 eventType: "JOIN" as const,
                 username,
@@ -1128,7 +1144,11 @@ const useListPresence = (effectiveListId: string | undefined) => {
         }
 
         return () => {
-            if (stompClient.connected) {
+            presenceRefCount[effectiveListId]--;
+            const shouldCleanupPresence =
+                presenceRefCount[effectiveListId] <= 0;
+
+            if (stompClient.connected && shouldCleanupPresence) {
                 stompClient.publish({
                     destination: `/app/list/${effectiveListId}/presence`,
                     body: JSON.stringify({
@@ -1142,7 +1162,9 @@ const useListPresence = (effectiveListId: string | undefined) => {
             }
             presenceSubscription?.unsubscribe();
             membersSubscription?.unsubscribe();
-            clearPresence();
+            if (shouldCleanupPresence) {
+                clearPresence();
+            }
         };
     }, [
         effectiveListId,
@@ -1765,6 +1787,7 @@ const InlineAddForm = ({
     isReadOnly,
     isEmbedded,
     onAddFullItem,
+    isGuest,
 }: {
     addInputRef: React.RefObject<HTMLInputElement | null>;
     newItemName: string;
@@ -1774,6 +1797,7 @@ const InlineAddForm = ({
     isReadOnly: boolean;
     isEmbedded: boolean;
     onAddFullItem: (suggestion: ProductSuggestion) => void;
+    isGuest?: boolean;
 }) => {
     const [selectedSuggestion, setSelectedSuggestion] =
         useState<ProductSuggestion | null>(null);
@@ -1793,7 +1817,11 @@ const InlineAddForm = ({
         activeIndex,
         handleKeyDown,
         selectSuggestion,
-    } = useProductAutocomplete(newItemName, handleSelect, isReadOnly);
+    } = useProductAutocomplete(
+        newItemName,
+        handleSelect,
+        isReadOnly || isGuest,
+    );
 
     const handleKeyDownWithOverride = (
         e: React.KeyboardEvent<HTMLInputElement>,
@@ -1819,6 +1847,15 @@ const InlineAddForm = ({
         setSelectedSuggestion(null);
     };
 
+    const isDisabled = isReadOnly || isGuest;
+
+    let placeholderText = "Add item...";
+    if (isGuest) {
+        placeholderText = "You are a guest (read-only)";
+    } else if (isReadOnly) {
+        placeholderText = "List is read-only";
+    }
+
     return (
         <form
             onSubmit={handleFormSubmit}
@@ -1838,10 +1875,10 @@ const InlineAddForm = ({
                 }}
                 onBlur={() => setShowSuggestions(false)}
                 onKeyDown={handleKeyDownWithOverride}
-                placeholder={isReadOnly ? "List is read-only" : "Add item..."}
-                disabled={isReadOnly}
+                placeholder={placeholderText}
+                disabled={isDisabled}
                 autoComplete="off"
-                className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isReadOnly ? "cursor-not-allowed opacity-50" : ""}`}
+                className={`flex-1 min-w-0 border-none bg-transparent text-sm text-text-strong outline-none px-1 ${isDisabled ? "cursor-not-allowed opacity-50" : ""}`}
             />
 
             <SuggestionsDropdown
@@ -1854,14 +1891,14 @@ const InlineAddForm = ({
             <button
                 type="button"
                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-bg-muted text-text-muted hover:text-accent border border-border transition-all shrink-0"
-                disabled={isReadOnly}
+                disabled={isDisabled}
                 onClick={() => onOpenDetails(selectedSuggestion)}
             >
                 <Settings size={18} />
             </button>
             <button
                 type="submit"
-                disabled={isReadOnly}
+                disabled={isDisabled}
                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-text-strong text-bg transition-all shrink-0 hover:opacity-90"
             >
                 <Plus size={18} strokeWidth={3} />
@@ -1878,7 +1915,7 @@ interface ListTitleProps {
     onKeyDown: (e: React.KeyboardEvent) => void;
     onClickEdit: () => void;
     activeListName: string;
-    currentUserRole?: "ADMIN" | "EDITOR";
+    currentUserRole?: "ADMIN" | "EDITOR" | "GUEST";
     isReadOnly: boolean;
 }
 
@@ -1921,6 +1958,25 @@ const ListTitle = ({
             {activeListName || "Shopping List"}
         </h1>
     );
+};
+
+const getRoleBadgeStyle = (role: ListRole) => {
+    if (role === "ADMIN") {
+        return {
+            className: "bg-accent-subtle text-accent",
+            label: "Admin",
+        };
+    }
+    if (role === "GUEST") {
+        return {
+            className: "bg-danger-subtle text-danger",
+            label: "Guest",
+        };
+    }
+    return {
+        className: "bg-bg-muted text-text-muted border border-border",
+        label: "Editor",
+    };
 };
 
 const ListDetail = ({
@@ -1997,18 +2053,67 @@ const ListDetail = ({
     const [detailCategory, setDetailCategory] = useState("");
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
+    const {
+        isFinishing,
+        showFinishModal,
+        setShowFinishModal,
+        receiptImage,
+        setReceiptImage,
+        isFinishDisabled,
+        handleFinishShopping,
+    } = useFinishShopping({ effectiveListId, setError });
+
     const { permissionStatus, showBanner, setShowBanner, isScrolled } =
         useListPageEffects();
 
     const [sortMode, setSortMode] = useState<
         "alphabetical" | "chronological" | "custom"
-    >("chronological");
+    >(() => {
+        if (effectiveListId) {
+            const saved = localStorage.getItem(`sortMode_${effectiveListId}`);
+            if (
+                saved === "alphabetical" ||
+                saved === "chronological" ||
+                saved === "custom"
+            ) {
+                return saved;
+            }
+        }
+        return "chronological";
+    });
+
+    useEffect(() => {
+        if (effectiveListId && sortMode) {
+            localStorage.setItem(`sortMode_${effectiveListId}`, sortMode);
+        }
+    }, [sortMode, effectiveListId]);
+
+    useEffect(() => {
+        if (effectiveListId) {
+            const saved = localStorage.getItem(`sortMode_${effectiveListId}`);
+            if (
+                saved === "alphabetical" ||
+                saved === "chronological" ||
+                saved === "custom"
+            ) {
+                setSortMode(saved);
+            } else {
+                setSortMode("chronological");
+            }
+        }
+    }, [effectiveListId]);
+
+    const checkedCount = useMemo(
+        () => items.filter((item) => item.checked).length,
+        [items],
+    );
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
         () => lists.find((list) => list.id === effectiveListId) ?? null,
         [effectiveListId, lists],
     );
+    const isGuest = activeList?.currentUserRole === "GUEST";
     const normalLists = useMemo(
         () =>
             lists.filter(
@@ -2059,9 +2164,21 @@ const ListDetail = ({
         if (!current) return [];
 
         const users = new Set<string>();
+        const maskEmail = (email: string) =>
+            email.replace(/(^.)[^@]*(@.*$)/, "$1***$2");
+        const maskedOwner = current.ownerEmail
+            ? maskEmail(current.ownerEmail).toLowerCase()
+            : "";
+
         if (current.ownerEmail) users.add(current.ownerEmail);
         for (const c of current.collaborators || []) {
-            users.add(c.email);
+            if (c.email) {
+                const cleanEmail = c.email.toLowerCase();
+                if (cleanEmail === maskedOwner) {
+                    continue;
+                }
+                users.add(c.email);
+            }
         }
         return Array.from(users);
     }, [activeList]);
@@ -2239,7 +2356,7 @@ const ListDetail = ({
             onClickEdit={() => setIsEditingName(true)}
             activeListName={activeList?.name || ""}
             currentUserRole={activeList?.currentUserRole}
-            isReadOnly={isReadOnly}
+            isReadOnly={isReadOnly || isGuest}
         />
     );
 
@@ -2260,6 +2377,322 @@ const ListDetail = ({
         if (!currentItem) return;
         if (checkPolicy === "uncheck-only" && !currentItem.checked) return;
         await toggleItem(itemId);
+    };
+
+    const renderEmbeddedListItems = () => {
+        if (itemsLoading) {
+            return (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-text-muted">
+                    <div className="w-6 h-6 border-2 border-border border-t-accent rounded-full animate-spin" />
+                    <p className="text-xs">Loading items...</p>
+                </div>
+            );
+        }
+        if (items.length === 0) {
+            return (
+                <p className="text-center py-12 text-text-muted text-sm italic">
+                    Your list is empty!
+                </p>
+            );
+        }
+        return (
+            <div className="flex flex-col gap-2">
+                {items.map((item) => (
+                    <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => !isReadOnly && handleItemCheck(item.id)}
+                        className={`flex items-center justify-between p-3.5 bg-bg-subtle border border-border/60 rounded-xl hover:border-accent hover:bg-accent-subtle/10 transition-all duration-200 cursor-pointer group w-full text-left ${
+                            item.checked
+                                ? "opacity-60 bg-bg-muted/40 animate-in fade-in duration-200"
+                                : ""
+                        }`}
+                    >
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            {/* Modern Checkbox */}
+                            <div
+                                className={`relative flex items-center justify-center w-5.5 h-5.5 rounded-md border-2 transition-all shrink-0 ${
+                                    item.checked
+                                        ? "bg-success border-success text-white scale-100"
+                                        : "bg-surface border-border-strong group-hover:border-accent"
+                                }`}
+                            >
+                                {item.checked && (
+                                    <svg
+                                        className="w-3.5 h-3.5 stroke-[4] animate-in zoom-in-50 duration-200"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <title>Checked</title>
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M5 13l4 4L19 7"
+                                        />
+                                    </svg>
+                                )}
+                            </div>
+
+                            {/* Item Name */}
+                            <span
+                                className={`text-sm font-semibold text-text-strong truncate ${
+                                    item.checked
+                                        ? "line-through opacity-50"
+                                        : ""
+                                }`}
+                            >
+                                {item.name}
+                            </span>
+                        </div>
+
+                        {/* Item Quantity Pill */}
+                        {item.quantity && (
+                            <span className="text-[11px] font-black uppercase tracking-wider text-text-muted bg-bg-muted px-2.5 py-1 rounded-lg border border-border/30 shrink-0">
+                                {item.quantity}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+        );
+    };
+
+    const renderMainContent = () => {
+        if (effectiveListId === "default" && isEmbedded) {
+            return (
+                <ListSelectionView
+                    lists={lists}
+                    isLoading={listsLoading}
+                    onSelect={(listId) => navigate(`/nav/${listId}`)}
+                />
+            );
+        }
+
+        if (isEmbedded) {
+            return (
+                <div className="flex flex-col gap-4 h-full animate-in fade-in duration-300">
+                    {/* Elegant Header with Progress */}
+                    <div className="flex flex-col gap-2 p-1">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-lg font-black text-text-strong uppercase tracking-tight truncate">
+                                {activeList?.name || "Shopping List"}
+                            </h2>
+                            <span className="text-xs font-bold text-text-muted bg-bg-muted px-2.5 py-1 rounded-full border border-border/30">
+                                {checkedCount} / {items.length} done
+                            </span>
+                        </div>
+
+                        {/* Premium Progress Bar */}
+                        {items.length > 0 && (
+                            <div className="w-full h-1.5 bg-bg-muted rounded-full overflow-hidden border border-border/10">
+                                <div
+                                    className="h-full bg-accent transition-all duration-300 ease-out"
+                                    style={{
+                                        width: `${(checkedCount / items.length) * 100}%`,
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* List Items Scroll Container */}
+                    <div className="bg-surface border border-border rounded-2xl shadow-sm overflow-y-auto flex-1 p-4">
+                        {renderEmbeddedListItems()}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <>
+                <div
+                    className={`sticky top-0 z-30 flex flex-col gap-3 transition-all duration-200 bg-bg/95 backdrop-blur-md pb-4 pt-4 ${
+                        isEmbedded ? "-mx-6 px-6" : "-mx-4 px-4"
+                    } ${
+                        isScrolled
+                            ? "shadow-[0_1px_3px_rgba(0,0,0,0.06)] border-b border-border/50"
+                            : ""
+                    }`}
+                >
+                    <div className="flex justify-between items-end px-1">
+                        <div className="flex flex-col gap-1">
+                            {listNameDisplay}
+                            <div className="flex flex-col">
+                                <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
+                                    Collaboration
+                                </h2>
+                                <div className="flex items-center gap-2">
+                                    <PresenceBar
+                                        variant="avatars"
+                                        allUsers={activeCollaborationUsers}
+                                    />
+                                    {activeList?.currentUserRole && (
+                                        <span
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                getRoleBadgeStyle(
+                                                    activeList.currentUserRole,
+                                                ).className
+                                            }`}
+                                        >
+                                            {
+                                                getRoleBadgeStyle(
+                                                    activeList.currentUserRole,
+                                                ).label
+                                            }
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2">
+                            {!isReadOnly &&
+                                !isGuest &&
+                                !isTemplateList &&
+                                items.some((item) => item.checked) && (
+                                    <button
+                                        type="button"
+                                        onClick={clearCompletedItems}
+                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-danger hover:text-danger"
+                                    >
+                                        <CheckCircle2
+                                            size={14}
+                                            strokeWidth={2.5}
+                                        />
+                                        Clear Completed
+                                    </button>
+                                )}
+                            {canImportIntoNormalList && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        openImportModal();
+                                    }}
+                                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                                >
+                                    <Plus size={14} strokeWidth={2.5} />
+                                    Add to normal list
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setShowShareModal(true)}
+                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                            >
+                                <Users size={14} strokeWidth={2.5} />
+                                Members
+                                {activeList?.collaborators &&
+                                    activeList.collaborators.length > 0 && (
+                                        <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-accent/15 text-[10px] font-bold">
+                                            {activeList.collaborators.length}
+                                        </span>
+                                    )}
+                            </button>
+                        </div>
+                    </div>
+
+                    <InlineAddForm
+                        addInputRef={addInputRef}
+                        newItemName={newItemName}
+                        onNameChange={handleNewItemNameChange}
+                        onSubmit={handleInlineAdd}
+                        onOpenDetails={openDetailsModal}
+                        isReadOnly={isReadOnly}
+                        isEmbedded={isEmbedded}
+                        onAddFullItem={handleInstantAdd}
+                        isGuest={isGuest}
+                    />
+
+                    <div className="min-h-[16px] px-2 flex items-center justify-between mt-2 mb-1">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                                Sort:
+                            </span>
+                            <select
+                                value={sortMode}
+                                onChange={(e) =>
+                                    setSortMode(
+                                        e.target.value as
+                                            | "alphabetical"
+                                            | "chronological"
+                                            | "custom",
+                                    )
+                                }
+                                className="bg-surface border border-border rounded-md text-xs font-semibold px-2 py-1 text-text-strong outline-none focus:border-accent transition-colors"
+                            >
+                                <option value="chronological">
+                                    Chronological
+                                </option>
+                                <option value="alphabetical">
+                                    Alphabetical
+                                </option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <PresenceBar variant="typing" />
+                    </div>
+                </div>
+
+                <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-visible flex-1">
+                    {itemsLoading ? (
+                        <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
+                            <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
+                            <p>Loading...</p>
+                        </div>
+                    ) : (
+                        <div
+                            className="divide-y divide-border/50 h-full p-4 flex flex-col"
+                            style={{ overflowAnchor: "auto" }}
+                        >
+                            <ShoppingListItems
+                                items={items}
+                                onCheck={handleItemCheck}
+                                onDelete={isGuest ? undefined : deleteItem}
+                                onEdit={isGuest ? undefined : handleEditClick}
+                                disabled={isReadOnly}
+                                checkable={!isTemplateList}
+                                sortMode={sortMode}
+                                onReorder={isGuest ? undefined : reorderItem}
+                                onClaim={claimItem}
+                                onUnclaim={unclaimItem}
+                                currentUserEmail={user?.email}
+                                displayNames={displayNames}
+                            />
+                            {items.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
+                                                Estimated Total
+                                            </span>
+                                            <span className="text-xs text-text-muted opacity-70">
+                                                {items.length} items
+                                            </span>
+                                        </div>
+                                        <span className="text-xl font-black text-accent tracking-tight">
+                                            {estimatedTotal} lei
+                                        </span>
+                                    </div>
+                                    {!isTemplateList &&
+                                        !isGuest &&
+                                        !isEmbedded && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setShowFinishModal(true)
+                                                }
+                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
+                                            >
+                                                Finish Shopping
+                                            </button>
+                                        )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </>
+        );
     };
 
     return (
@@ -2289,195 +2722,25 @@ const ListDetail = ({
                     </div>
                 )}
 
-                {effectiveListId === "default" && isEmbedded ? (
-                    <ListSelectionView
-                        lists={lists}
-                        isLoading={listsLoading}
-                        onSelect={(listId) => navigate(`/nav/${listId}`)}
-                    />
-                ) : (
-                    <>
-                        <div
-                            className={`sticky top-0 z-30 flex flex-col gap-3 transition-all duration-200 bg-bg/95 backdrop-blur-md pb-4 pt-4 ${
-                                isEmbedded ? "-mx-6 px-6" : "-mx-4 px-4"
-                            } ${
-                                isScrolled
-                                    ? "shadow-[0_1px_3px_rgba(0,0,0,0.06)] border-b border-border/50"
-                                    : ""
-                            }`}
-                        >
-                            <div className="flex justify-between items-end px-1">
-                                <div className="flex flex-col gap-1">
-                                    {listNameDisplay}
-                                    <div className="flex flex-col">
-                                        <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                                            Collaboration
-                                        </h2>
-                                        <div className="flex items-center gap-2">
-                                            <PresenceBar
-                                                variant="avatars"
-                                                allUsers={
-                                                    activeCollaborationUsers
-                                                }
-                                            />
-                                            {activeList?.currentUserRole && (
-                                                <span
-                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                        activeList.currentUserRole ===
-                                                        "ADMIN"
-                                                            ? "bg-accent-subtle text-accent"
-                                                            : "bg-bg-muted text-text-muted border border-border"
-                                                    }`}
-                                                >
-                                                    {activeList.currentUserRole ===
-                                                    "ADMIN"
-                                                        ? "Admin"
-                                                        : "Editor"}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap justify-end gap-2">
-                                    {!isReadOnly &&
-                                        !isTemplateList &&
-                                        items.some((item) => item.checked) && (
-                                            <button
-                                                type="button"
-                                                onClick={clearCompletedItems}
-                                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-danger hover:text-danger"
-                                            >
-                                                <CheckCircle2
-                                                    size={14}
-                                                    strokeWidth={2.5}
-                                                />
-                                                Clear Completed
-                                            </button>
-                                        )}
-                                    {canImportIntoNormalList && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                openImportModal();
-                                            }}
-                                            className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
-                                        >
-                                            <Plus size={14} strokeWidth={2.5} />
-                                            Add to normal list
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowShareModal(true)}
-                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
-                                    >
-                                        <Users size={14} strokeWidth={2.5} />
-                                        Members
-                                        {activeList?.collaborators &&
-                                            activeList.collaborators.length >
-                                                0 && (
-                                                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-accent/15 text-[10px] font-bold">
-                                                    {
-                                                        activeList.collaborators
-                                                            .length
-                                                    }
-                                                </span>
-                                            )}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <InlineAddForm
-                                addInputRef={addInputRef}
-                                newItemName={newItemName}
-                                onNameChange={handleNewItemNameChange}
-                                onSubmit={handleInlineAdd}
-                                onOpenDetails={openDetailsModal}
-                                isReadOnly={isReadOnly}
-                                isEmbedded={isEmbedded}
-                                onAddFullItem={handleInstantAdd}
-                            />
-
-                            <div className="min-h-[16px] px-2 flex items-center justify-between mt-2 mb-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
-                                        Sort:
-                                    </span>
-                                    <select
-                                        value={sortMode}
-                                        onChange={(e) =>
-                                            setSortMode(
-                                                e.target.value as
-                                                    | "alphabetical"
-                                                    | "chronological"
-                                                    | "custom",
-                                            )
-                                        }
-                                        className="bg-surface border border-border rounded-md text-xs font-semibold px-2 py-1 text-text-strong outline-none focus:border-accent transition-colors"
-                                    >
-                                        <option value="chronological">
-                                            Chronological
-                                        </option>
-                                        <option value="alphabetical">
-                                            Alphabetical
-                                        </option>
-                                        <option value="custom">Custom</option>
-                                    </select>
-                                </div>
-                                <PresenceBar variant="typing" />
-                            </div>
+                {isGuest && (
+                    <div className="bg-accent-subtle text-accent border border-accent-border/30 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300 mb-2">
+                        <Info size={20} className="shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold leading-none mb-1">
+                                Guest Mode
+                            </p>
+                            <p className="text-[13px] opacity-90 leading-tight">
+                                You have guest access to this list. You can only
+                                check or uncheck items.
+                            </p>
                         </div>
-
-                        <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-visible flex-1">
-                            {itemsLoading ? (
-                                <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
-                                    <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
-                                    <p>Loading...</p>
-                                </div>
-                            ) : (
-                                <div
-                                    className="divide-y divide-border/50 h-full p-4 flex flex-col"
-                                    style={{ overflowAnchor: "auto" }}
-                                >
-                                    <ShoppingListItems
-                                        items={items}
-                                        onCheck={handleItemCheck}
-                                        onDelete={deleteItem}
-                                        onEdit={handleEditClick}
-                                        disabled={isReadOnly}
-                                        checkable={true}
-                                        sortMode={sortMode}
-                                        onReorder={reorderItem}
-                                        onClaim={claimItem}
-                                        onUnclaim={unclaimItem}
-                                        currentUserEmail={user?.email}
-                                        displayNames={displayNames}
-                                    />
-                                    {items.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
-                                            <div className="flex justify-between items-center">
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
-                                                        Estimated Total
-                                                    </span>
-                                                    <span className="text-xs text-text-muted opacity-70">
-                                                        {items.length} items
-                                                    </span>
-                                                </div>
-                                                <span className="text-xl font-black text-accent tracking-tight">
-                                                    {estimatedTotal} lei
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </>
+                    </div>
                 )}
+
+                {renderMainContent()}
             </div>
 
-            {!isReadOnly && (
+            {!isReadOnly && !isGuest && !isEmbedded && (
                 <button
                     type="button"
                     className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
@@ -2538,6 +2801,63 @@ const ListDetail = ({
                 onTyping={sendTypingEvent}
                 submitLabel={editingItemId ? "Save" : undefined}
             />
+
+            <Modal
+                isOpen={showFinishModal}
+                onClose={() => setShowFinishModal(false)}
+                title="Finish Shopping"
+                subtitle="Enter store and take a photo of your receipt."
+            >
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-2">
+                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                            Receipt Photo
+                        </span>
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                id="receipt-cam"
+                                className="hidden"
+                                onChange={(e) =>
+                                    setReceiptImage(e.target.files?.[0] || null)
+                                }
+                            />
+                            <label
+                                htmlFor="receipt-cam"
+                                className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
+                            >
+                                <Camera size={28} />
+                                <span className="text-sm font-black">
+                                    {receiptImage
+                                        ? receiptImage.name
+                                        : "TAKE PHOTO"}
+                                </span>
+                                <span className="text-xs uppercase font-bold opacity-50">
+                                    Click to open camera
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowFinishModal(false)}
+                            className="py-3 bg-bg-muted rounded-lg font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={isFinishDisabled}
+                            onClick={handleFinishShopping}
+                            className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
+                        >
+                            {isFinishing ? "Processing..." : "Complete"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <SmartReviewModal
                 isOpen={isReviewModalOpen}
