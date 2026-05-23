@@ -173,6 +173,8 @@ interface PresenceBarProps {
     allUsers?: string[];
 }
 
+const MAX_VISIBLE_AVATARS = 3;
+
 const AvatarsPresenceBar: React.FC<{ allUsers: string[] }> = ({ allUsers }) => {
     const activeUsers = usePresenceStore((state) => state.activeUsers);
     const typingUsers = usePresenceStore((state) => state.typingUsers);
@@ -238,54 +240,65 @@ const AvatarsPresenceBar: React.FC<{ allUsers: string[] }> = ({ allUsers }) => {
 
     if (baseUsers.length === 0) return null;
 
+    const isActiveUser = (username: string) => {
+        const clean = normalizeUsername(username);
+        return (
+            activeUsernames.has(clean) ||
+            (clean === currentEmailClean && activeUsernames.has("anonymous"))
+        );
+    };
+
+    const sortedUsers = [...baseUsers].sort((a, b) => {
+        const aActive = isActiveUser(a) ? 0 : 1;
+        const bActive = isActiveUser(b) ? 0 : 1;
+        return aActive - bActive;
+    });
+
+    const visibleUsers = sortedUsers.slice(0, MAX_VISIBLE_AVATARS);
+    const overflowCount = sortedUsers.length - visibleUsers.length;
+
     return (
-        <div className="flex items-center gap-4 animate-in fade-in duration-300">
-            <div className="flex -space-x-3">
-                {baseUsers.map((username) => {
-                    const cleanUsername = normalizeUsername(username);
-                    const isActive = activeUsernames.has(cleanUsername);
-                    const isTyping = typingUsernames.has(cleanUsername);
-                    const avatarClassName = getAvatarClassName(
-                        isActive,
-                        isTyping,
-                    );
-                    const displayName = resolveDisplayName(username);
-                    const avatarTitle = getAvatarTitle(
-                        displayName,
-                        isActive,
-                        isTyping,
-                    );
-                    return (
-                        <div key={username} className="relative group">
-                            <div
-                                className={avatarClassName}
-                                style={{
-                                    backgroundColor: stringToColor(username),
-                                }}
-                                title={avatarTitle}
-                            >
-                                {displayName.charAt(0).toUpperCase()}
-                            </div>
-                            {isTyping && (
-                                <div className="absolute -bottom-1 -right-1 flex gap-0.5 px-1.5 py-1 bg-accent text-white rounded-full text-[8px] shadow-lg animate-bounce border border-surface">
-                                    <span className="w-1 h-1 bg-white rounded-full animate-pulse" />
-                                    <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.2s]" />
-                                    <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.4s]" />
-                                </div>
-                            )}
+        <div className="flex -space-x-2.5">
+            {visibleUsers.map((username) => {
+                const cleanUsername = normalizeUsername(username);
+                const isActive = activeUsernames.has(cleanUsername);
+                const isTyping = typingUsernames.has(cleanUsername);
+                const avatarClassName = getAvatarClassName(isActive, isTyping);
+                const displayName = resolveDisplayName(username);
+                const avatarTitle = getAvatarTitle(
+                    displayName,
+                    isActive,
+                    isTyping,
+                );
+                return (
+                    <div key={username} className="relative group">
+                        <div
+                            className={avatarClassName}
+                            style={{
+                                backgroundColor: stringToColor(username),
+                            }}
+                            title={avatarTitle}
+                        >
+                            {displayName.charAt(0).toUpperCase()}
                         </div>
-                    );
-                })}
-            </div>
-            <div className="w-px h-6 bg-border/60" aria-hidden="true" />
-            <div className="flex flex-col">
-                <span className="text-xs font-black text-text-strong uppercase tracking-wider">
-                    {activeArray.length} Active
-                </span>
-                <span className="text-[9px] font-bold text-text-muted uppercase tracking-tight">
-                    {baseUsers.length} Total
-                </span>
-            </div>
+                        {isTyping && (
+                            <div className="absolute -bottom-1 -right-1 flex gap-0.5 px-1.5 py-1 bg-accent text-white rounded-full text-[8px] shadow-lg animate-bounce border border-surface">
+                                <span className="w-1 h-1 bg-white rounded-full animate-pulse" />
+                                <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.2s]" />
+                                <span className="w-1 h-1 bg-white rounded-full animate-pulse [animation-delay:0.4s]" />
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+            {overflowCount > 0 && (
+                <div
+                    className="w-10 h-10 rounded-full border-2 border-surface flex items-center justify-center text-xs font-bold text-white bg-bg-muted ring-1 ring-border/50"
+                    title={`${overflowCount} more`}
+                >
+                    +{overflowCount}
+                </div>
+            )}
         </div>
     );
 };

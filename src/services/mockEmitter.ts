@@ -1,15 +1,15 @@
 import { useStore } from "../context/useStore";
 
-let currentLat = 47.151726;
-let currentLng = 27.587914;
+let currentLat = 47.179899953185995;
+let currentLng = 27.568581517637444;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 export const startMockEmitter = () => {
     if (intervalId) return;
 
     const state = useStore.getState();
-    currentLat = state.userLocation?.lat ?? 47.151726;
-    currentLng = state.userLocation?.lng ?? 27.587914;
+    currentLat = state.userLocation?.lat ?? 47.179899953185995;
+    currentLng = state.userLocation?.lng ?? 27.568581517637444;
 
     intervalId = setInterval(() => {
         // Secure pseudo-random location mock update

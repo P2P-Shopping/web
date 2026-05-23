@@ -55,6 +55,9 @@ export interface AppState {
     activeShoppingSession: ActiveShoppingSession | null;
     setActiveShoppingSession: (session: ActiveShoppingSession | null) => void;
 
+    storeFootprint: Coordinate[] | null;
+    setStoreFootprint: (footprint: Coordinate[] | null) => void;
+
     navigationMode: "city" | "indoor";
     /** Whether the app already crossed the geofence into the store */
     hasEnteredStore: boolean;
@@ -64,6 +67,9 @@ export interface AppState {
     isAutoCenterEnabled: boolean;
     /** Whether to use mock GPS updates or real navigator.geolocation */
     isMockGpsEnabled: boolean;
+    /** Current GPS error message, if any */
+    gpsError: string | null;
+    setGpsError: (error: string | null) => void;
     /** Whether audio navigation is enabled */
     isAudioEnabled: boolean;
     /** Whether a user experience simulation is currently running */
@@ -142,7 +148,7 @@ export interface AppState {
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
-            userLocation: { lat: 47.155, lng: 27.585 },
+            userLocation: { lat: 47.179899953185995, lng: 27.568581517637444 },
             setUserLocation: (loc) => set({ userLocation: loc }),
 
             targetStoreLocation: null,
@@ -159,11 +165,16 @@ export const useStore = create<AppState>()(
             setActiveShoppingSession: (activeShoppingSession) =>
                 set({ activeShoppingSession }),
 
+            storeFootprint: null,
+            setStoreFootprint: (storeFootprint) => set({ storeFootprint }),
+
             navigationMode: "city",
             hasEnteredStore: false,
             isTransitioningToStore: false,
             isAutoCenterEnabled: true,
-            isMockGpsEnabled: true,
+            isMockGpsEnabled: false,
+            gpsError: null,
+            setGpsError: (error) => set({ gpsError: error }),
             isAudioEnabled: false,
             isSimulationActive: false,
             route: [],
@@ -285,6 +296,8 @@ export const useStore = create<AppState>()(
                 targetStoreLocation: state.targetStoreLocation,
                 targetStoreTransit: state.targetStoreTransit,
                 activeShoppingSession: state.activeShoppingSession,
+                navigationMode: state.navigationMode,
+                hasEnteredStore: state.hasEnteredStore,
             }),
         },
     ),

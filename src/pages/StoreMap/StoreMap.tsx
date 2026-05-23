@@ -923,6 +923,7 @@ const StoreMap: React.FC<StoreMapProps> = ({
     );
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const [dismissedWarnings, setDismissedWarnings] = useState<boolean>(false);
+    const [dismissedNewStore, setDismissedNewStore] = useState<boolean>(false);
     const isNewCustomStore =
         storeRoute.length === 0 &&
         (!!activeShoppingSession?.storeCandidateSubmissionId ||
@@ -962,9 +963,17 @@ const StoreMap: React.FC<StoreMapProps> = ({
                     {...handlers}
                 />
 
-                {isNewCustomStore && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center p-6 pointer-events-none">
-                        <div className="max-w-xl rounded-3xl border border-accent/30 bg-surface/95 p-6 shadow-2xl backdrop-blur-xl">
+                {isNewCustomStore && !dismissedNewStore && (
+                    <div className="absolute inset-0 z-20 flex items-end sm:items-center justify-center p-4 sm:p-6 pointer-events-none">
+                        <div className="relative max-w-xl rounded-2xl sm:rounded-3xl border border-accent/30 bg-surface/95 p-4 sm:p-6 shadow-2xl backdrop-blur-xl pointer-events-auto">
+                            <button
+                                type="button"
+                                onClick={() => setDismissedNewStore(true)}
+                                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-text-muted hover:text-text-strong hover:bg-bg-muted transition-colors"
+                                aria-label="Dismiss"
+                            >
+                                <X size={14} />
+                            </button>
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-accent">
                                 New Store Detected
                             </p>
@@ -1023,98 +1032,100 @@ const StoreMap: React.FC<StoreMapProps> = ({
             </div>
 
             {/* Map Control Bar - Separated from map view */}
-            <div className="relative z-3000 bg-surface/80 backdrop-blur-xl border-t border-border h-21 px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
-                <div className="flex items-center gap-4">
-                    <button
-                        type="button"
-                        className={`w-12 h-12 flex items-center justify-center rounded-full shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${isSimulationActive ? "bg-orange-500 text-white animate-pulse" : "bg-blue-500 text-white"}`}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (isSimulationActive) {
-                                stopSimulation();
-                            } else {
-                                startSimulation();
+            <div className="relative z-3000 bg-surface/80 backdrop-blur-xl border-t border-border h-16 sm:h-21 px-3 sm:px-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] shrink-0">
+                <div className="flex items-center gap-2 sm:gap-4">
+                    {import.meta.env.DEV && (
+                        <button
+                            type="button"
+                            className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${isSimulationActive ? "bg-orange-500 text-white animate-pulse" : "bg-blue-500 text-white"}`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isSimulationActive) {
+                                    stopSimulation();
+                                } else {
+                                    startSimulation();
+                                }
+                            }}
+                            title={
+                                isSimulationActive
+                                    ? "Stop Simulation"
+                                    : "Start Simulation"
                             }
-                        }}
-                        title={
-                            isSimulationActive
-                                ? "Stop Simulation"
-                                : "Start Simulation"
-                        }
-                    >
-                        {isSimulationActive ? (
-                            <Square size={20} />
-                        ) : (
-                            <Play size={20} className="ml-0.5" />
-                        )}
-                    </button>
+                        >
+                            {isSimulationActive ? (
+                                <Square size={18} />
+                            ) : (
+                                <Play size={18} className="ml-0.5" />
+                            )}
+                        </button>
+                    )}
 
                     <button
                         type="button"
-                        className="w-12 h-12 flex items-center justify-center bg-accent text-text-on-accent rounded-full shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-accent text-text-on-accent rounded-full shadow-[0_4px_12px_var(--color-accent-glow)] transition-all hover:bg-accent-hover hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
                         onClick={(e) => {
                             e.stopPropagation();
                             recenterCamera();
                         }}
                         title="Recenter Map"
                     >
-                        <LocateFixed size={20} />
+                        <LocateFixed size={18} />
                     </button>
 
                     <button
                         type="button"
-                        className="w-12 h-12 flex items-center justify-center bg-danger text-white rounded-full shadow-lg transition-all hover:bg-danger/80 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-danger text-white rounded-full shadow-lg transition-all hover:bg-danger/80 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
                         onClick={(e) => {
                             e.stopPropagation();
                             exitIndoor();
                         }}
                         title="Exit Indoor Mode"
                     >
-                        <ArrowLeft size={20} />
+                        <ArrowLeft size={18} />
                     </button>
 
                     <button
                         type="button"
-                        className="w-12 h-12 flex items-center justify-center bg-bg-muted text-text-strong border border-border rounded-full shadow-sm transition-all hover:bg-surface hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+                        className="hidden sm:flex w-10 h-10 sm:w-12 sm:h-12 items-center justify-center bg-bg-muted text-text-strong border border-border rounded-full shadow-sm transition-all hover:bg-surface hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
                         onClick={(e) => {
                             e.stopPropagation();
                             setIsCoordsModalOpen(true);
                         }}
                         title="Live Coordinates"
                     >
-                        <Navigation size={20} />
+                        <Navigation size={18} />
                     </button>
 
-                    <div className="flex items-center bg-bg-muted border border-border rounded-2xl p-1">
+                    <div className="hidden sm:flex items-center bg-bg-muted border border-border rounded-2xl p-1">
                         <button
                             type="button"
-                            className="w-10 h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 zoomIn();
                             }}
                             title="Zoom In"
                         >
-                            <ZoomIn size={18} />
+                            <ZoomIn size={16} />
                         </button>
-                        <div className="w-px h-6 bg-border mx-1" />
+                        <div className="w-px h-5 bg-border mx-1" />
                         <button
                             type="button"
-                            className="w-10 h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-text-strong hover:bg-surface rounded-xl transition-all active:scale-90"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 zoomOut();
                             }}
                             title="Zoom Out"
                         >
-                            <ZoomOut size={18} />
+                            <ZoomOut size={16} />
                         </button>
                     </div>
                 </div>
 
                 <button
                     type="button"
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 ${
+                    className={`flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-sm shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 ${
                         isSidebarExpanded
                             ? "bg-accent text-text-on-accent"
                             : "bg-text-strong text-bg"
@@ -1126,9 +1137,9 @@ const StoreMap: React.FC<StoreMapProps> = ({
                     aria-label={isSidebarExpanded ? "Close List" : "Show List"}
                 >
                     {isSidebarExpanded ? (
-                        <X size={20} className="rotate-90" />
+                        <X size={18} className="rotate-90" />
                     ) : (
-                        <List size={20} />
+                        <List size={18} />
                     )}
                     <span className="hidden sm:inline">
                         {isSidebarExpanded ? "Close List" : "View List"}

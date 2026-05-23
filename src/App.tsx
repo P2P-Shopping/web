@@ -20,7 +20,7 @@ import {
     UnifiedMap,
 } from "./pages";
 import { checkAuthRequest } from "./services/authService";
-import { DEMO_STORE_LOCATION, isWithinGeofence } from "./services/geofence";
+import { isWithinStoreGeofence } from "./services/geofence";
 import { loadRoute } from "./services/loadRoute";
 import { startMockEmitter, stopMockEmitter } from "./services/mockEmitter";
 import stompClient from "./services/socketService";
@@ -108,6 +108,8 @@ function App() {
         (state) => state.setIsTransitioningToStore,
     );
     const setStatus = useStore((state) => state.setStatus);
+    const storeFootprint = useStore((state) => state.storeFootprint);
+    const setStoreFootprint = useStore((state) => state.setStoreFootprint);
     const { theme } = useThemeStore();
 
     useEffect(() => {
@@ -157,6 +159,7 @@ function App() {
     const isMockGpsEnabled = useStore((state) => state.isMockGpsEnabled);
     const isSimulationActive = useStore((state) => state.isSimulationActive);
     const setUserLocation = useStore((state) => state.setUserLocation);
+    const setGpsError = useStore((state) => state.setGpsError);
 
     useEffect(() => {
         if (isSimulationActive) {
@@ -165,17 +168,19 @@ function App() {
         }
 
         if (isMockGpsEnabled) {
+            setGpsError(null);
             startMockEmitter();
             return () => stopMockEmitter();
         }
 
         if (!navigator.geolocation) {
-            console.error("Geolocation is not supported by this browser.");
+            setGpsError("Geolocation is not supported by this browser.");
             return;
         }
 
         const watchId = navigator.geolocation.watchPosition(
             (position) => {
+                setGpsError(null);
                 setUserLocation({
                     lat: position.coords.latitude,
                     lng: position.coords.longitude,
@@ -183,16 +188,39 @@ function App() {
             },
             (error) => {
                 console.error("Real GPS error:", error);
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        setGpsError(
+                            "Location access denied. Enable location permissions to use the map.",
+                        );
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        setGpsError(
+                            "Location unavailable. Check your device settings.",
+                        );
+                        break;
+                    case error.TIMEOUT:
+                        setGpsError("Location request timed out. Retrying...");
+                        break;
+                    default:
+                        setGpsError("Could not get your location.");
+                }
             },
             {
                 enableHighAccuracy: true,
                 maximumAge: 1000,
-                timeout: 5000,
+                timeout: 10000,
             },
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
-    }, [isMockGpsEnabled, setUserLocation, isSimulationActive]);
+    }, [isMockGpsEnabled, setUserLocation, isSimulationActive, setGpsError]);
+
+    useEffect(() => {
+        if (!targetStoreLocation) {
+            setStoreFootprint(null);
+        }
+    }, [targetStoreLocation, setStoreFootprint]);
 
     useEffect(() => {
         if (
@@ -203,8 +231,16 @@ function App() {
             return;
         }
 
-        const storeLocation = targetStoreLocation ?? DEMO_STORE_LOCATION;
-        if (!isWithinGeofence(userLocation, storeLocation)) return;
+        if (!targetStoreLocation) return;
+
+        if (
+            !isWithinStoreGeofence(
+                userLocation,
+                targetStoreLocation,
+                storeFootprint,
+            )
+        )
+            return;
 
         let cancelled = false;
 
@@ -213,8 +249,8 @@ function App() {
             setStatus("Geofence detected. Loading indoor canvas...");
             await loadRoute(
                 items.map((item) => item.id),
-                storeLocation.lat,
-                storeLocation.lng,
+                targetStoreLocation.lat,
+                targetStoreLocation.lng,
             );
 
             if (cancelled) return;
@@ -252,6 +288,7 @@ function App() {
         setIsTransitioningToStore,
         targetStoreLocation,
         userLocation,
+        storeFootprint,
         isTransitioningToStore,
     ]);
 
@@ -384,7 +421,7 @@ function App() {
                         path="/login"
                         element={
                             <GuestRoute>
-                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
+                                <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-bg min-h-svh">
                                     <LoginPage />
                                 </div>
                             </GuestRoute>
@@ -394,7 +431,7 @@ function App() {
                         path="/register"
                         element={
                             <GuestRoute>
-                                <div className="flex-1 flex items-center justify-center p-6 bg-bg min-h-svh">
+                                <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-bg min-h-svh">
                                     <RegistrationPage />
                                 </div>
                             </GuestRoute>
