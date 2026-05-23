@@ -257,9 +257,20 @@ function App() {
 
     const token = useStore((state) => state.token);
     const userEmail = useStore((state) => state.user?.email);
+    const fetchLists = useListsStore((state) => state.fetchLists);
+    const fetchPendingInvitations = useListsStore(
+        (state) => state.fetchPendingInvitations,
+    );
     const addPendingInvitation = useListsStore(
         (state) => state.addPendingInvitation,
     );
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchLists();
+            fetchPendingInvitations();
+        }
+    }, [isAuthenticated, fetchLists, fetchPendingInvitations]);
 
     useEffect(() => {
         let subscription: StompSubscription | null = null;

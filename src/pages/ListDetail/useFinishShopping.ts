@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { finishShoppingRequest } from "../../services/api";
+import { useStore } from "../../context/useStore";
+import {
+    fetchActiveShoppingSessionRequest,
+    finishShoppingRequest,
+} from "../../services/api";
 
 interface UseFinishShoppingParams {
     effectiveListId: string | undefined;
@@ -12,29 +16,72 @@ export const useFinishShopping = ({
     setError,
 }: UseFinishShoppingParams) => {
     const navigate = useNavigate();
+    const activeShoppingSession = useStore(
+        (state) => state.activeShoppingSession,
+    );
+    const setActiveShoppingSession = useStore(
+        (state) => state.setActiveShoppingSession,
+    );
+    const setNavigationMode = useStore((state) => state.setNavigationMode);
+    const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
+    const setTargetStoreLocation = useStore(
+        (state) => state.setTargetStoreLocation,
+    );
+    const setTargetStoreId = useStore((state) => state.setTargetStoreId);
+    const setTargetStoreTransit = useStore(
+        (state) => state.setTargetStoreTransit,
+    );
+    const setRoute = useStore((state) => state.setRoute);
+    const setRouteWarnings = useStore((state) => state.setRouteWarnings);
+    const setMacroRouteGeometry = useStore(
+        (state) => state.setMacroRouteGeometry,
+    );
+    const setStatus = useStore((state) => state.setStatus);
     const [isFinishing, setIsFinishing] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
-    const [finishStoreName, setFinishStoreName] = useState("");
     const [receiptImage, setReceiptImage] = useState<File | null>(null);
 
     const isFinishDisabled =
-        !finishStoreName.trim() ||
         isFinishing ||
         !effectiveListId ||
-        effectiveListId === "default";
+        effectiveListId === "default" ||
+        !activeShoppingSession ||
+        activeShoppingSession.listId !== effectiveListId;
+
+    const syncActiveSession = useCallback(async () => {
+        if (!effectiveListId || effectiveListId === "default") {
+            setActiveShoppingSession(null);
+            return;
+        }
+        try {
+            const session =
+                await fetchActiveShoppingSessionRequest(effectiveListId);
+            setActiveShoppingSession(session);
+        } catch {
+            setActiveShoppingSession(null);
+        }
+    }, [effectiveListId, setActiveShoppingSession]);
 
     const handleFinishShopping = async () => {
         if (!effectiveListId || effectiveListId === "default") return;
         setIsFinishing(true);
         try {
             await finishShoppingRequest({
-                storeName: finishStoreName.trim(),
                 receiptImage,
                 listId: effectiveListId,
             });
             setShowFinishModal(false);
-            setFinishStoreName("");
             setReceiptImage(null);
+            setActiveShoppingSession(null);
+            setNavigationMode("city");
+            setHasEnteredStore(true);
+            setTargetStoreLocation(null);
+            setTargetStoreId(null);
+            setTargetStoreTransit(null);
+            setRoute([]);
+            setRouteWarnings([]);
+            setMacroRouteGeometry([]);
+            setStatus("Shopping session finished.");
             navigate("/dashboard");
         } catch (_err) {
             const errorMessage =
@@ -52,11 +99,11 @@ export const useFinishShopping = ({
         isFinishing,
         showFinishModal,
         setShowFinishModal,
-        finishStoreName,
-        setFinishStoreName,
         receiptImage,
         setReceiptImage,
         isFinishDisabled,
         handleFinishShopping,
+        activeShoppingSession,
+        syncActiveSession,
     };
 };

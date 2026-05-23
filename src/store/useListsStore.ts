@@ -26,7 +26,8 @@ interface ApiShoppingList {
     title: string;
     category?: ListCategory;
     subcategory?: string;
-    finalStore?: string;
+    finalStoreId?: string;
+    finalStoreName?: string;
     createdAt?: string;
     updatedAt?: string;
     items?: ApiItem[];
@@ -196,7 +197,8 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
     status: "active",
     category: list.category ?? "NORMAL",
     subcategory: list.subcategory,
-    finalStore: list.finalStore,
+    finalStoreId: list.finalStoreId,
+    finalStoreName: list.finalStoreName,
     ownerName: list.ownerName || "You",
     ownerEmail: list.ownerEmail,
     userId: list.userId,

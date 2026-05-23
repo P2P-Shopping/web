@@ -18,6 +18,7 @@ import {
 import "leaflet/dist/leaflet.css";
 import {
     ArrowLeft,
+    Camera,
     Car,
     CheckCircle2,
     ChevronRight,
@@ -32,7 +33,8 @@ import {
     X,
     Zap,
 } from "lucide-react";
-import type { AppState, Coordinate, RoutePoint } from "../../context/useStore";
+import { Modal } from "../../components";
+import type { Coordinate, RoutePoint } from "../../context/useStore";
 import { useStore } from "../../context/useStore";
 import {
     DEMO_STORE_LOCATION,
@@ -43,6 +45,7 @@ import { teleport } from "../../services/mockEmitter";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
+import { useFinishShopping } from "../ListDetail/useFinishShopping";
 import StoreMap from "../StoreMap/StoreMap";
 // --- Types & Constants ---
 export interface StoreRecommendation {
@@ -88,28 +91,61 @@ const geocodeStore = async (
     address: string,
     userLocation: { lat: number; lng: number },
 ): Promise<{ lat: number; lng: number } | null> => {
-    try {
-        const query = encodeURIComponent(`${storeName} ${address || ""}`);
+    const parseFirstResult = (
+        data: unknown,
+    ): { lat: number; lng: number } | null => {
+        if (!Array.isArray(data) || data.length === 0) return null;
+        const first = data[0] as {
+            lat?: string | number;
+            lon?: string | number;
+        };
+        const lat = Number(first?.lat);
+        const lng = Number(first?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng };
+    };
+
+    const tryNominatim = async (query: string, bounded: boolean) => {
         const delta = 0.25;
         const left = userLocation.lng - delta;
         const right = userLocation.lng + delta;
         const top = userLocation.lat + delta;
         const bottom = userLocation.lat - delta;
-        const nomUrl = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&viewbox=${left},${top},${right},${bottom}&bounded=1`;
-        const nomRes = await fetch(nomUrl, {
+        const base = new URL("https://nominatim.openstreetmap.org/search");
+        base.searchParams.set("q", query);
+        base.searchParams.set("format", "json");
+        base.searchParams.set("limit", "1");
+        base.searchParams.set("countrycodes", "ro");
+        if (bounded) {
+            base.searchParams.set(
+                "viewbox",
+                `${left},${top},${right},${bottom}`,
+            );
+            base.searchParams.set("bounded", "1");
+        }
+
+        const response = await fetch(base.toString(), {
             headers: {
                 Accept: "application/json",
             },
         });
-        if (nomRes.ok) {
-            const nomData = await nomRes.json();
-            if (Array.isArray(nomData) && nomData.length > 0) {
-                return {
-                    lat: Number(nomData[0].lat),
-                    lng: Number(nomData[0].lon),
-                };
-            }
-        }
+        if (!response.ok) return null;
+        return parseFirstResult(await response.json());
+    };
+
+    try {
+        const fullQuery = `${storeName} ${address || ""}`.trim();
+        const addressOnlyQuery = address.trim();
+
+        return (
+            (fullQuery && (await tryNominatim(fullQuery, true))) ||
+            (addressOnlyQuery &&
+                (await tryNominatim(addressOnlyQuery, true))) ||
+            (fullQuery && (await tryNominatim(fullQuery, false))) ||
+            (addressOnlyQuery &&
+                (await tryNominatim(addressOnlyQuery, false))) ||
+            null
+        );
     } catch (err) {
         console.warn("Geocoding failed for store", storeName, err);
     }
@@ -259,7 +295,7 @@ const mapApiStoreToRecommendation = async (
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-import { getApiBaseUrl } from "../../services/api";
+import { getApiBaseUrl, startShoppingRequest } from "../../services/api";
 
 const DefaultIcon = L.icon({
     iconUrl: icon,
@@ -322,6 +358,9 @@ const getDistanceToRouteMeters = (
 };
 
 const normalizeLabel = (value: string) => value.trim().toLowerCase();
+
+const isNormalShoppingList = (list: ShoppingList) =>
+    (list.category ?? "NORMAL") === "NORMAL";
 
 const alignRouteToItems = (
     route: RoutePoint[],
@@ -472,6 +511,7 @@ interface StoreRecommendationViewProps {
     setTransportMode: (mode: "driving" | "walking") => void;
     setSelectedListId: (id: string | null) => void;
     handleStartRoute: (store: StoreRecommendation) => void;
+    onPickOwnStore: () => void;
 }
 
 const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
@@ -480,6 +520,7 @@ const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
     setTransportMode,
     setSelectedListId,
     handleStartRoute,
+    onPickOwnStore,
 }) => (
     <div className="flex flex-col gap-6 animate-in slide-in-from-right-4">
         <header className="flex flex-col gap-4">
@@ -518,6 +559,18 @@ const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
             </div>
         </header>
         <div className="flex flex-col gap-4">
+            <button
+                type="button"
+                onClick={onPickOwnStore}
+                className="w-full rounded-[24px] border border-dashed border-border px-5 py-4 text-left bg-surface hover:border-accent hover:bg-accent-subtle/30 transition-all"
+            >
+                <span className="block text-xs font-black uppercase tracking-widest text-accent">
+                    Pick Your Own Store
+                </span>
+                <span className="mt-1 block text-sm text-text-muted">
+                    Choose another store and save it in the review queue.
+                </span>
+            </button>
             {recommendedStores.map((store, idx) => (
                 <div
                     key={store.id}
@@ -690,13 +743,29 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
     const [disappearingItemIds, setDisappearingItemIds] = useState<Set<string>>(
         () => new Set(),
     );
+    const [finishError, setFinishError] = useState<string | null>(null);
     const updateItem = useListsStore((state) => state.updateItem);
     const setGlobalItems = useStore((state) => state.setItems);
+    const {
+        isFinishing,
+        showFinishModal,
+        setShowFinishModal,
+        receiptImage,
+        setReceiptImage,
+        isFinishDisabled,
+        handleFinishShopping,
+        activeShoppingSession,
+        syncActiveSession,
+    } = useFinishShopping({
+        effectiveListId: listId,
+        setError: setFinishError,
+    });
     const itemsById = new Map(items.map((item) => [item.id, item]));
     const itemsByName = new Map(
         items.map((item) => [normalizeLabel(item.name), item]),
     );
     const uncheckedItems = items.filter((item) => !item.checked);
+    const checkedItems = items.filter((item) => item.checked);
     const matchedRouteItems = route
         .map(
             (point) =>
@@ -720,6 +789,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
     const visibleItems = orderedItems.filter(
         (item) => !item.checked || disappearingItemIds.has(item.id),
     );
+    const canFinishShopping = activeShoppingSession?.listId === listId;
 
     const handleCheck = (item: Item) => {
         if (item.checked || disappearingItemIds.has(item.id)) return;
@@ -746,6 +816,21 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
         }, 220);
     };
 
+    const handleUncheck = async (item: Item) => {
+        if (!item.checked) return;
+        const updatedItems = items.map((entry) =>
+            entry.id === item.id ? { ...entry, checked: false } : entry,
+        );
+        setGlobalItems(updatedItems);
+        const didUpdate = await updateItem(listId, item.id, {
+            checked: false,
+        });
+
+        if (!didUpdate) {
+            setGlobalItems(items);
+        }
+    };
+
     useEffect(() => {
         setDisappearingItemIds((prev) => {
             const activeUncheckedIds = new Set(
@@ -757,6 +842,10 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
             return next.size === prev.size ? prev : next;
         });
     }, [items]);
+
+    useEffect(() => {
+        void syncActiveSession();
+    }, [syncActiveSession]);
 
     return (
         <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -790,7 +879,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                                 key={item.id}
                                 type="button"
                                 onClick={() => handleCheck(item)}
-                                className={`flex items-center gap-4 overflow-hidden rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-300 hover:border-accent hover:bg-accent-subtle/20 ${
+                                className={`flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-300 hover:border-accent hover:bg-accent-subtle/20 ${
                                     isDisappearing
                                         ? "max-h-0 translate-x-4 scale-95 p-0 opacity-0"
                                         : "max-h-32 opacity-100"
@@ -840,64 +929,122 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                     })}
                 </div>
             )}
+
+            {canFinishShopping && (
+                <div className="sticky bottom-0 z-10 -mx-6 mt-auto border-t border-border bg-surface/95 px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-md">
+                    {finishError && (
+                        <div
+                            role="alert"
+                            className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-xs font-bold text-danger"
+                        >
+                            {finishError}
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setFinishError(null);
+                            setShowFinishModal(true);
+                        }}
+                        className="w-full rounded-2xl bg-accent py-3.5 text-sm font-black text-white shadow-[0_4px_15px_var(--color-accent-glow)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                        Finish Shopping
+                    </button>
+                </div>
+            )}
+
+            {checkedItems.length > 0 && (
+                <div className="flex flex-col gap-3 border-t border-border pt-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                        Checked Items
+                    </p>
+                    {checkedItems.map((item) => (
+                        <button
+                            key={`checked-${item.id}`}
+                            type="button"
+                            onClick={() => void handleUncheck(item)}
+                            className="flex w-full items-center gap-4 rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-200 hover:border-accent"
+                        >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-black text-white">
+                                <CheckCircle2 size={16} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-black text-text-strong line-through opacity-80">
+                                    {item.name}
+                                </span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                                    Tap to uncheck
+                                </span>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            <Modal
+                isOpen={showFinishModal}
+                onClose={() => setShowFinishModal(false)}
+                title="Finish Shopping"
+                subtitle={
+                    activeShoppingSession?.storeName
+                        ? `Shopping at ${activeShoppingSession.storeName}. Add the receipt to complete the session.`
+                        : "Add the receipt to complete the shopping session."
+                }
+            >
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-2">
+                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
+                            Receipt Photo
+                        </span>
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                id="indoor-receipt-cam"
+                                className="hidden"
+                                onChange={(event) =>
+                                    setReceiptImage(
+                                        event.target.files?.[0] || null,
+                                    )
+                                }
+                            />
+                            <label
+                                htmlFor="indoor-receipt-cam"
+                                className={`flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-8 transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
+                            >
+                                <Camera size={28} />
+                                <span className="text-sm font-black">
+                                    {receiptImage
+                                        ? receiptImage.name
+                                        : "TAKE PHOTO"}
+                                </span>
+                                <span className="text-xs font-bold uppercase opacity-50">
+                                    Optional receipt
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowFinishModal(false)}
+                            className="rounded-lg bg-bg-muted py-3 font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={isFinishDisabled}
+                            onClick={handleFinishShopping}
+                            className="rounded-lg bg-text-strong py-3 font-bold text-bg transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {isFinishing ? "Processing..." : "Complete"}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
-};
-
-const useIndoorCityTransition = (
-    navigationMode: "city" | "indoor",
-    route: RoutePoint[],
-    selectedListId: string | null,
-    lists: ShoppingList[],
-    setNavigationMode: (mode: "city" | "indoor") => void,
-    setTargetStoreLocation: (loc: Coordinate | null) => void,
-    setTargetStoreTransit: (transit: AppState["targetStoreTransit"]) => void,
-) => {
-    useEffect(() => {
-        if (navigationMode === "indoor" && selectedListId) {
-            const activeList = lists.find((l) => l.id === selectedListId);
-            if (!activeList) return;
-
-            if (
-                activeList.items.length > 0 &&
-                activeList.items.every((item) => item.checked)
-            ) {
-                const transitionTimer = setTimeout(() => {
-                    setNavigationMode("city");
-                    setTargetStoreLocation(null);
-                    setTargetStoreTransit(null);
-                    useStore.getState().setMacroRouteGeometry([]);
-                }, 1000);
-
-                return () => clearTimeout(transitionTimer);
-            }
-
-            const lastRoutePoint = route.at(-1);
-            if (!lastRoutePoint) return;
-            const lastItemState = activeList.items.find(
-                (item) => item.id === lastRoutePoint.itemId,
-            );
-
-            if (lastItemState?.checked) {
-                const transitionTimer = setTimeout(() => {
-                    setNavigationMode("city");
-                    setTargetStoreLocation(null);
-                    setTargetStoreTransit(null);
-                    useStore.getState().setMacroRouteGeometry([]);
-                }, 1000);
-
-                return () => clearTimeout(transitionTimer);
-            }
-        }
-    }, [
-        lists,
-        selectedListId,
-        route,
-        navigationMode,
-        setNavigationMode,
-        setTargetStoreLocation,
-        setTargetStoreTransit,
-    ]);
 };
 
 const useStoreFootprint = (activeTarget: { lat: number; lng: number }) => {
@@ -1030,14 +1177,25 @@ const UnifiedMap: React.FC = () => {
     );
     const targetStoreId = useStore((state) => state.targetStoreId);
     const setTargetStoreId = useStore((state) => state.setTargetStoreId);
+    const setActiveShoppingSession = useStore(
+        (state) => state.setActiveShoppingSession,
+    );
+    const activeShoppingSession = useStore(
+        (state) => state.activeShoppingSession,
+    );
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const setTargetStoreTransit = useStore(
         (state) => state.setTargetStoreTransit,
     );
     const navigationMode = useStore((state) => state.navigationMode);
     const setNavigationMode = useStore((state) => state.setNavigationMode);
+    const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
     const route = useStore((state) => state.route);
+    const setRoute = useStore((state) => state.setRoute);
     const macroRouteGeometry = useStore((state) => state.macroRouteGeometry);
+    const setMacroRouteGeometry = useStore(
+        (state) => state.setMacroRouteGeometry,
+    );
     const indoorItems = useStore((state) => state.items);
     const setItems = useStore((state) => state.setItems);
     const isAutoCenterEnabled = useStore((state) => state.isAutoCenterEnabled);
@@ -1056,6 +1214,11 @@ const UnifiedMap: React.FC = () => {
     const [recommendedStores, setRecommendedStores] = useState<
         StoreRecommendation[]
     >([]);
+    const [showCustomStoreModal, setShowCustomStoreModal] = useState(false);
+    const [customStoreName, setCustomStoreName] = useState("");
+    const [customStoreAddress, setCustomStoreAddress] = useState("");
+    const [customStoreNotes, setCustomStoreNotes] = useState("");
+    const [isStartingShopping, setIsStartingShopping] = useState(false);
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
@@ -1075,8 +1238,12 @@ const UnifiedMap: React.FC = () => {
     const isMicroView = navigationMode === "indoor";
 
     const activeTarget = targetStoreLocation || DEMO_STORE_LOCATION;
+    const shoppableLists = useMemo(
+        () => lists.filter(isNormalShoppingList),
+        [lists],
+    );
     const selectedList = selectedListId
-        ? lists.find((list) => list.id === selectedListId)
+        ? shoppableLists.find((list) => list.id === selectedListId)
         : null;
     const activeIndoorItems =
         selectedList?.items && selectedList.items.length > 0
@@ -1093,20 +1260,23 @@ const UnifiedMap: React.FC = () => {
         driving: { timeMins: 0, distanceKm: "0.0" },
         walking: { timeMins: 0, distanceKm: "0.0" },
     };
+    const isNewCustomStore =
+        !!activeShoppingSession?.storeCandidateSubmissionId ||
+        activeShoppingSession?.officialStore === false ||
+        targetStoreTransit === null;
 
     useEffect(() => {
         // Automatic geofence transitions disabled per user request
     }, []);
 
-    useIndoorCityTransition(
-        navigationMode,
-        route,
-        selectedListId,
-        lists,
-        setNavigationMode,
-        setTargetStoreLocation,
-        setTargetStoreTransit,
-    );
+    useEffect(() => {
+        if (selectedListId && !selectedList) {
+            setSelectedListId(null);
+            setIsShowingStores(false);
+            setRecommendedStores([]);
+            setItems([]);
+        }
+    }, [selectedListId, selectedList, setItems]);
 
     useEffect(() => {
         if (navigationMode !== "indoor" || !selectedListId) {
@@ -1213,7 +1383,7 @@ const UnifiedMap: React.FC = () => {
     // --- AUDIO NAVIGATION LOGIC ---
     // Extracting audio logic to useAudioNavigation hook...
     const handleListSelect = (listId: string) => {
-        const selectedList = lists.find((l) => l.id === listId);
+        const selectedList = shoppableLists.find((l) => l.id === listId);
         if (!selectedList) return;
 
         setSelectedListId(listId);
@@ -1226,7 +1396,7 @@ const UnifiedMap: React.FC = () => {
         const idToFetch = listIdOverride ?? selectedListId;
         if (!idToFetch) return;
 
-        const selectedList = lists.find((l) => l.id === idToFetch);
+        const selectedList = shoppableLists.find((l) => l.id === idToFetch);
         if (!selectedList) return;
 
         await fetchStoreRecommendations(selectedList);
@@ -1295,14 +1465,102 @@ const UnifiedMap: React.FC = () => {
         }
     };
 
+    const startShoppingSession = async (payload: {
+        listId: string;
+        storeId?: string;
+        customStoreName?: string;
+        customStoreAddress?: string;
+        customStoreNotes?: string;
+        latitude?: number;
+        longitude?: number;
+    }) => {
+        setIsStartingShopping(true);
+        try {
+            const session = await startShoppingRequest(payload);
+            setActiveShoppingSession(session);
+            return session;
+        } finally {
+            setIsStartingShopping(false);
+        }
+    };
+
     const handleStartRoute = async (store: StoreRecommendation) => {
+        if (!selectedListId || !selectedList) return;
+        await startShoppingSession({
+            listId: selectedListId,
+            storeId: store.id,
+        });
         setTargetStoreLocation({ lat: store.lat, lng: store.lng });
         setTargetStoreId(store.id);
         setTargetStoreTransit(store.transit);
+        setHasEnteredStore(false);
 
         await fetchMacroRoute(store.id);
 
         setNavigationMode("city");
+        setIsShowingStores(false);
+    };
+
+    const handleStartCustomStore = async () => {
+        if (!selectedListId || !selectedList || !customStoreName.trim()) return;
+
+        try {
+            setIsStartingShopping(true);
+            const trimmedAddress = customStoreAddress.trim();
+
+            // Attempt to geocode the custom store address
+            let coords = await geocodeStore(
+                customStoreName.trim(),
+                trimmedAddress,
+                userLocation,
+            );
+
+            // For explicit addresses, avoid saving wrong fallback coordinates.
+            if (!coords && trimmedAddress.length > 0) {
+                alert(
+                    "Nu am putut localiza adresa introdusa. Verifica adresa sau foloseste un reper mai clar.",
+                );
+                return;
+            }
+
+            // If no address is provided, fallback to current location.
+            if (!coords) {
+                console.warn(
+                    "Geocoding failed for custom store, using current user location as fallback.",
+                );
+                coords = userLocation;
+            }
+
+            const session = await startShoppingSession({
+                listId: selectedListId,
+                customStoreName: customStoreName.trim(),
+                customStoreAddress: trimmedAddress || undefined,
+                customStoreNotes: customStoreNotes.trim() || undefined,
+                latitude: coords.lat,
+                longitude: coords.lng,
+            });
+
+            // Update local state to reflect the new session and enter indoor mode
+            setTargetStoreId(session.storeId ?? null);
+            setTargetStoreLocation({ lat: coords.lat, lng: coords.lng });
+            setTargetStoreTransit(null);
+            setHasEnteredStore(true);
+            setNavigationMode("indoor"); // Enter in-store map immediately
+            setIsShowingStores(false);
+            setShowCustomStoreModal(false);
+            setCustomStoreName("");
+            setCustomStoreAddress("");
+            setCustomStoreNotes("");
+
+            // Clear any existing route as this is a new custom store
+            setRoute([]);
+            setMacroRouteGeometry([]);
+        } catch (error) {
+            console.error("Failed to start custom shopping session", error);
+            alert("Nu am putut porni sesiunea de cumpărături.");
+        } finally {
+            setIsStartingShopping(false);
+        }
     };
 
     const fetchMacroRoute = async (storeId: string) => {
@@ -1352,7 +1610,7 @@ const UnifiedMap: React.FC = () => {
     };
 
     const handleEnterIndoorMode = async () => {
-        const activeList = lists.find((l) => l.id === selectedListId);
+        const activeList = shoppableLists.find((l) => l.id === selectedListId);
         const currentItems =
             activeList?.items.filter((item) => !item.checked) || [];
 
@@ -1391,7 +1649,7 @@ const UnifiedMap: React.FC = () => {
         if (!selectedListId) {
             return (
                 <ListSelectionView
-                    lists={lists}
+                    lists={shoppableLists}
                     isMicroView={isMicroView}
                     handleListSelect={handleListSelect}
                 />
@@ -1406,6 +1664,7 @@ const UnifiedMap: React.FC = () => {
                     setTransportMode={setTransportMode}
                     setSelectedListId={setSelectedListId}
                     handleStartRoute={handleStartRoute}
+                    onPickOwnStore={() => setShowCustomStoreModal(true)}
                 />
             );
         }
@@ -1484,7 +1743,7 @@ const UnifiedMap: React.FC = () => {
                                 </Marker>
                             ))}
 
-                        {targetStoreLocation && (
+                        {targetStoreLocation && !isNewCustomStore && (
                             <>
                                 <Circle
                                     center={[
@@ -1608,11 +1867,11 @@ const UnifiedMap: React.FC = () => {
                 )}
 
                 <div
-                    className={`absolute z-2500 transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-100 min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-4xl max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
+                    className={`absolute z-2500 transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-100 min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-4xl max-[1000px]:h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
                 >
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
-                    <div className="flex-1 overflow-y-auto p-6 pt-2">
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                         {renderSidebarContent()}
                     </div>
                 </div>
@@ -1783,6 +2042,62 @@ const UnifiedMap: React.FC = () => {
                     </button>
                 </div>
             )}
+            <Modal
+                isOpen={showCustomStoreModal}
+                onClose={() => setShowCustomStoreModal(false)}
+                title="Pick Your Own Store"
+                subtitle="Custom stores stay outside the official store data until they are reviewed."
+            >
+                <div className="flex flex-col gap-4">
+                    <input
+                        type="text"
+                        maxLength={80}
+                        value={customStoreName}
+                        onChange={(event) =>
+                            setCustomStoreName(event.target.value)
+                        }
+                        placeholder="Store name"
+                        className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
+                    />
+                    <input
+                        type="text"
+                        maxLength={120}
+                        value={customStoreAddress}
+                        onChange={(event) =>
+                            setCustomStoreAddress(event.target.value)
+                        }
+                        placeholder="Address or landmark"
+                        className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
+                    />
+                    <textarea
+                        value={customStoreNotes}
+                        onChange={(event) =>
+                            setCustomStoreNotes(event.target.value)
+                        }
+                        placeholder="Optional notes"
+                        className="min-h-24 p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent resize-none"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setShowCustomStoreModal(false)}
+                            className="py-3 bg-bg-muted rounded-lg font-bold"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={
+                                isStartingShopping || !customStoreName.trim()
+                            }
+                            onClick={handleStartCustomStore}
+                            className="py-3 bg-accent text-white rounded-lg font-bold disabled:opacity-50"
+                        >
+                            Start Shopping
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

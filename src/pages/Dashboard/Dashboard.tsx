@@ -889,9 +889,11 @@ const Dashboard = () => {
     }, [displayMode]);
 
     useEffect(() => {
-        fetchLists();
-        fetchPendingInvitations();
-    }, [fetchLists, fetchPendingInvitations]);
+        if (lists.length === 0) {
+            fetchLists();
+            fetchPendingInvitations();
+        }
+    }, [fetchLists, fetchPendingInvitations, lists.length]);
 
     const toggleSection = (section: string) => {
         setCollapsedSections((prev) => {
@@ -984,7 +986,10 @@ const Dashboard = () => {
         if (selectedList) {
             return (
                 <div className="max-w-[860px] mx-auto w-full">
-                    <ListDetail listIdOverride={selectedList.id} />
+                    <ListDetail
+                        listIdOverride={selectedList.id}
+                        checkPolicy="uncheck-only"
+                    />
                 </div>
             );
         }
