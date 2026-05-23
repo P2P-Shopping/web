@@ -16,6 +16,17 @@ export interface RoutePoint {
     audio_instruction?: string;
 }
 
+export interface ActiveShoppingSession {
+    sessionId: string;
+    listId: string;
+    status: "ACTIVE" | "FINISHED" | "CANCELLED";
+    storeId?: string | null;
+    storeCandidateSubmissionId?: string | null;
+    storeName?: string | null;
+    storeAddress?: string | null;
+    officialStore: boolean;
+}
+
 /**
  * Basic Item interface for Zustand
  */
@@ -40,6 +51,9 @@ export interface AppState {
         walking: { timeMins: number; distanceKm: string | number };
     } | null;
     setTargetStoreTransit: (transit: AppState["targetStoreTransit"]) => void;
+
+    activeShoppingSession: ActiveShoppingSession | null;
+    setActiveShoppingSession: (session: ActiveShoppingSession | null) => void;
 
     navigationMode: "city" | "indoor";
     /** Whether the app already crossed the geofence into the store */
@@ -140,6 +154,10 @@ export const useStore = create<AppState>()(
             targetStoreTransit: null,
             setTargetStoreTransit: (transit) =>
                 set({ targetStoreTransit: transit }),
+
+            activeShoppingSession: null,
+            setActiveShoppingSession: (activeShoppingSession) =>
+                set({ activeShoppingSession }),
 
             navigationMode: "city",
             hasEnteredStore: false,
@@ -266,6 +284,7 @@ export const useStore = create<AppState>()(
                 targetStoreId: state.targetStoreId,
                 targetStoreLocation: state.targetStoreLocation,
                 targetStoreTransit: state.targetStoreTransit,
+                activeShoppingSession: state.activeShoppingSession,
             }),
         },
     ),

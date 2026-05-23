@@ -917,7 +917,17 @@ const StoreMap: React.FC<StoreMapProps> = ({
     } = useMapEngine(canvasRef);
 
     const routeWarnings = useStore((state) => state.routeWarnings);
+    const storeRoute = useStore((state) => state.route);
+    const activeShoppingSession = useStore(
+        (state) => state.activeShoppingSession,
+    );
+    const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const [dismissedWarnings, setDismissedWarnings] = useState<boolean>(false);
+    const isNewCustomStore =
+        storeRoute.length === 0 &&
+        (!!activeShoppingSession?.storeCandidateSubmissionId ||
+            activeShoppingSession?.officialStore === false ||
+            targetStoreTransit === null);
 
     // Reset dismissed state when new warnings arrive
     useEffect(() => {
@@ -952,6 +962,24 @@ const StoreMap: React.FC<StoreMapProps> = ({
                     {...handlers}
                 />
 
+                {isNewCustomStore && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center p-6 pointer-events-none">
+                        <div className="max-w-xl rounded-3xl border border-accent/30 bg-surface/95 p-6 shadow-2xl backdrop-blur-xl">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-accent">
+                                New Store Detected
+                            </p>
+                            <h3 className="mt-2 text-base font-black text-text-strong">
+                                This is a new store.
+                            </h3>
+                            <p className="mt-1 text-sm leading-relaxed text-text-muted">
+                                Check items from your list while shopping so we
+                                can learn this layout and build better routes
+                                for your next visit.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {gpsError && (
                     <div
                         role="alert"
@@ -962,31 +990,36 @@ const StoreMap: React.FC<StoreMapProps> = ({
                     </div>
                 )}
 
-                {routeWarnings.length > 0 && !dismissedWarnings && (
-                    <div
-                        role="alert"
-                        aria-live="polite"
-                        className="absolute bottom-4 left-4 right-4 z-20 px-4 py-3 bg-danger/90 text-white rounded-xl text-sm shadow-lg backdrop-blur-sm"
-                    >
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="flex flex-col gap-1">
-                                {routeWarnings.map((warning) => (
-                                    <p key={warning} className="font-medium">
-                                        ⚠️ {warning}
-                                    </p>
-                                ))}
+                {routeWarnings.length > 0 &&
+                    !dismissedWarnings &&
+                    !isNewCustomStore && (
+                        <div
+                            role="alert"
+                            aria-live="polite"
+                            className="absolute bottom-4 left-4 right-4 z-20 px-4 py-3 bg-danger/90 text-white rounded-xl text-sm shadow-lg backdrop-blur-sm"
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex flex-col gap-1">
+                                    {routeWarnings.map((warning) => (
+                                        <p
+                                            key={warning}
+                                            className="font-medium"
+                                        >
+                                            ⚠️ {warning}
+                                        </p>
+                                    ))}
+                                </div>
+                                <button
+                                    type="button"
+                                    className="shrink-0 mt-0.5 text-white/70 hover:text-white transition-colors"
+                                    onClick={() => setDismissedWarnings(true)}
+                                    aria-label="Dismiss warnings"
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                className="shrink-0 mt-0.5 text-white/70 hover:text-white transition-colors"
-                                onClick={() => setDismissedWarnings(true)}
-                                aria-label="Dismiss warnings"
-                            >
-                                <X size={16} />
-                            </button>
                         </div>
-                    </div>
-                )}
+                    )}
             </div>
 
             {/* Map Control Bar - Separated from map view */}

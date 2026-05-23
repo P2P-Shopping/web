@@ -1,6 +1,5 @@
 import {
     AlertCircle,
-    Camera,
     CheckCircle2,
     ChevronDown,
     Plus,
@@ -34,7 +33,6 @@ import type { ListCategory } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 
 import ListMembersModal from "../Dashboard/ListMembersModal";
-import { useFinishShopping } from "./useFinishShopping";
 import { useImportItems } from "./useImportItems";
 import { useListPageEffects } from "./useListPageEffects";
 
@@ -79,6 +77,7 @@ interface ApiShoppingList {
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
+    checkPolicy?: "toggle" | "uncheck-only";
 }
 
 type SyncActionHandler = (prev: Item[], payload: SyncPayload) => Item[];
@@ -1927,6 +1926,7 @@ const ListTitle = ({
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
+    checkPolicy = "toggle",
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -1996,18 +1996,6 @@ const ListDetail = ({
     const [detailPrice, setDetailPrice] = useState("");
     const [detailCategory, setDetailCategory] = useState("");
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
-
-    const {
-        isFinishing,
-        showFinishModal,
-        setShowFinishModal,
-        finishStoreName,
-        setFinishStoreName,
-        receiptImage,
-        setReceiptImage,
-        isFinishDisabled,
-        handleFinishShopping,
-    } = useFinishShopping({ effectiveListId, setError });
 
     const { permissionStatus, showBanner, setShowBanner, isScrolled } =
         useListPageEffects();
@@ -2267,6 +2255,13 @@ const ListDetail = ({
         setShowDetailsModal(true);
     };
 
+    const handleItemCheck = async (itemId: string) => {
+        const currentItem = items.find((item) => item.id === itemId);
+        if (!currentItem) return;
+        if (checkPolicy === "uncheck-only" && !currentItem.checked) return;
+        await toggleItem(itemId);
+    };
+
     return (
         <div className={wrapperClassName}>
             <div className={contentClassName}>
@@ -2446,11 +2441,11 @@ const ListDetail = ({
                                 >
                                     <ShoppingListItems
                                         items={items}
-                                        onCheck={toggleItem}
+                                        onCheck={handleItemCheck}
                                         onDelete={deleteItem}
                                         onEdit={handleEditClick}
                                         disabled={isReadOnly}
-                                        checkable={!isTemplateList}
+                                        checkable={true}
                                         sortMode={sortMode}
                                         onReorder={reorderItem}
                                         onClaim={claimItem}
@@ -2473,17 +2468,6 @@ const ListDetail = ({
                                                     {estimatedTotal} lei
                                                 </span>
                                             </div>
-                                            {!isTemplateList && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setShowFinishModal(true)
-                                                    }
-                                                    className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                                >
-                                                    Finish Shopping
-                                                </button>
-                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -2554,87 +2538,6 @@ const ListDetail = ({
                 onTyping={sendTypingEvent}
                 submitLabel={editingItemId ? "Save" : undefined}
             />
-
-            <Modal
-                isOpen={showFinishModal}
-                onClose={() => setShowFinishModal(false)}
-                title="Finish Shopping"
-                subtitle="Enter store and take a photo of your receipt."
-            >
-                <div className="flex flex-col gap-5">
-                    <div className="flex flex-col gap-1.5">
-                        <label
-                            htmlFor="store-name-input"
-                            className="text-[11px] font-black uppercase text-text-strong tracking-wider"
-                        >
-                            Store Name
-                        </label>
-                        <input
-                            id="store-name-input"
-                            type="text"
-                            maxLength={50}
-                            value={finishStoreName}
-                            onChange={(e) =>
-                                setFinishStoreName(
-                                    e.target.value.replace(
-                                        /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
-                                        "",
-                                    ),
-                                )
-                            }
-                            placeholder="e.g. Lidl"
-                            className="p-3 bg-bg-muted border border-border rounded-xl outline-none focus:border-accent"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
-                            Receipt Photo
-                        </span>
-                        <div className="relative">
-                            <input
-                                type="file"
-                                accept="image/*"
-                                id="receipt-cam"
-                                className="hidden"
-                                onChange={(e) =>
-                                    setReceiptImage(e.target.files?.[0] || null)
-                                }
-                            />
-                            <label
-                                htmlFor="receipt-cam"
-                                className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
-                            >
-                                <Camera size={28} />
-                                <span className="text-sm font-black">
-                                    {receiptImage
-                                        ? receiptImage.name
-                                        : "TAKE PHOTO"}
-                                </span>
-                                <span className="text-xs uppercase font-bold opacity-50">
-                                    Click to open camera
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                        <button
-                            type="button"
-                            onClick={() => setShowFinishModal(false)}
-                            className="py-3 bg-bg-muted rounded-lg font-bold"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            disabled={isFinishDisabled}
-                            onClick={handleFinishShopping}
-                            className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
-                        >
-                            {isFinishing ? "Processing..." : "Complete"}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
 
             <SmartReviewModal
                 isOpen={isReviewModalOpen}
