@@ -35,8 +35,8 @@ import type { ListCategory, ListRole } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 
 import ListMembersModal from "../Dashboard/ListMembersModal";
-import { useImportItems } from "./useImportItems";
 import { useFinishShopping } from "./useFinishShopping";
+import { useImportItems } from "./useImportItems";
 import { useListPageEffects } from "./useListPageEffects";
 
 interface Item {
