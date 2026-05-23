@@ -91,29 +91,61 @@ const geocodeStore = async (
     address: string,
     userLocation: { lat: number; lng: number },
 ): Promise<{ lat: number; lng: number } | null> => {
-    try {
-        const query = encodeURIComponent(`${storeName} ${address || ""}`);
+    const parseFirstResult = (
+        data: unknown,
+    ): { lat: number; lng: number } | null => {
+        if (!Array.isArray(data) || data.length === 0) return null;
+        const first = data[0] as {
+            lat?: string | number;
+            lon?: string | number;
+        };
+        const lat = Number(first?.lat);
+        const lng = Number(first?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng };
+    };
+
+    const tryNominatim = async (query: string, bounded: boolean) => {
         const delta = 0.25;
         const left = userLocation.lng - delta;
         const right = userLocation.lng + delta;
         const top = userLocation.lat + delta;
         const bottom = userLocation.lat - delta;
-        const nomUrl = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&viewbox=${left},${top},${right},${bottom}&bounded=1`;
-        const nomRes = await fetch(nomUrl, {
+        const base = new URL("https://nominatim.openstreetmap.org/search");
+        base.searchParams.set("q", query);
+        base.searchParams.set("format", "json");
+        base.searchParams.set("limit", "1");
+        base.searchParams.set("countrycodes", "ro");
+        if (bounded) {
+            base.searchParams.set(
+                "viewbox",
+                `${left},${top},${right},${bottom}`,
+            );
+            base.searchParams.set("bounded", "1");
+        }
+
+        const response = await fetch(base.toString(), {
             headers: {
                 Accept: "application/json",
-                "User-Agent": "P2P-Shopping-Assistant/1.0",
             },
         });
-        if (nomRes.ok) {
-            const nomData = await nomRes.json();
-            if (Array.isArray(nomData) && nomData.length > 0) {
-                return {
-                    lat: Number(nomData[0].lat),
-                    lng: Number(nomData[0].lon),
-                };
-            }
-        }
+        if (!response.ok) return null;
+        return parseFirstResult(await response.json());
+    };
+
+    try {
+        const fullQuery = `${storeName} ${address || ""}`.trim();
+        const addressOnlyQuery = address.trim();
+
+        return (
+            (fullQuery && (await tryNominatim(fullQuery, true))) ||
+            (addressOnlyQuery &&
+                (await tryNominatim(addressOnlyQuery, true))) ||
+            (fullQuery && (await tryNominatim(fullQuery, false))) ||
+            (addressOnlyQuery &&
+                (await tryNominatim(addressOnlyQuery, false))) ||
+            null
+        );
     } catch (err) {
         console.warn("Geocoding failed for store", storeName, err);
     }
@@ -733,6 +765,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
         items.map((item) => [normalizeLabel(item.name), item]),
     );
     const uncheckedItems = items.filter((item) => !item.checked);
+    const checkedItems = items.filter((item) => item.checked);
     const matchedRouteItems = route
         .map(
             (point) =>
@@ -783,6 +816,21 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
         }, 220);
     };
 
+    const handleUncheck = async (item: Item) => {
+        if (!item.checked) return;
+        const updatedItems = items.map((entry) =>
+            entry.id === item.id ? { ...entry, checked: false } : entry,
+        );
+        setGlobalItems(updatedItems);
+        const didUpdate = await updateItem(listId, item.id, {
+            checked: false,
+        });
+
+        if (!didUpdate) {
+            setGlobalItems(items);
+        }
+    };
+
     useEffect(() => {
         setDisappearingItemIds((prev) => {
             const activeUncheckedIds = new Set(
@@ -829,7 +877,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                                 key={item.id}
                                 type="button"
                                 onClick={() => handleCheck(item)}
-                                className={`flex items-center gap-4 overflow-hidden rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-300 hover:border-accent hover:bg-accent-subtle/20 ${
+                                className={`flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-300 hover:border-accent hover:bg-accent-subtle/20 ${
                                     isDisappearing
                                         ? "max-h-0 translate-x-4 scale-95 p-0 opacity-0"
                                         : "max-h-24 opacity-100"
@@ -857,7 +905,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
             )}
 
             {canFinishShopping && (
-                <div className="flex flex-col gap-3 border-t border-border pt-5">
+                <div className="sticky bottom-0 z-10 -mx-6 mt-auto border-t border-border bg-surface/95 px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-md">
                     {finishError && (
                         <div
                             role="alert"
@@ -876,6 +924,34 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                     >
                         Finish Shopping
                     </button>
+                </div>
+            )}
+
+            {checkedItems.length > 0 && (
+                <div className="flex flex-col gap-3 border-t border-border pt-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                        Checked Items
+                    </p>
+                    {checkedItems.map((item) => (
+                        <button
+                            key={`checked-${item.id}`}
+                            type="button"
+                            onClick={() => void handleUncheck(item)}
+                            className="flex w-full items-center gap-4 rounded-2xl border border-border bg-bg-muted p-4 text-left transition-all duration-200 hover:border-accent"
+                        >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-black text-white">
+                                <CheckCircle2 size={16} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-black text-text-strong line-through opacity-80">
+                                    {item.name}
+                                </span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                                    Tap to uncheck
+                                </span>
+                            </span>
+                        </button>
+                    ))}
                 </div>
             )}
 
@@ -1078,6 +1154,9 @@ const UnifiedMap: React.FC = () => {
     const setActiveShoppingSession = useStore(
         (state) => state.setActiveShoppingSession,
     );
+    const activeShoppingSession = useStore(
+        (state) => state.activeShoppingSession,
+    );
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const setTargetStoreTransit = useStore(
         (state) => state.setTargetStoreTransit,
@@ -1086,7 +1165,11 @@ const UnifiedMap: React.FC = () => {
     const setNavigationMode = useStore((state) => state.setNavigationMode);
     const setHasEnteredStore = useStore((state) => state.setHasEnteredStore);
     const route = useStore((state) => state.route);
+    const setRoute = useStore((state) => state.setRoute);
     const macroRouteGeometry = useStore((state) => state.macroRouteGeometry);
+    const setMacroRouteGeometry = useStore(
+        (state) => state.setMacroRouteGeometry,
+    );
     const indoorItems = useStore((state) => state.items);
     const setItems = useStore((state) => state.setItems);
     const isAutoCenterEnabled = useStore((state) => state.isAutoCenterEnabled);
@@ -1151,6 +1234,10 @@ const UnifiedMap: React.FC = () => {
         driving: { timeMins: 0, distanceKm: "0.0" },
         walking: { timeMins: 0, distanceKm: "0.0" },
     };
+    const isNewCustomStore =
+        !!activeShoppingSession?.storeCandidateSubmissionId ||
+        activeShoppingSession?.officialStore === false ||
+        targetStoreTransit === null;
 
     useEffect(() => {
         // Automatic geofence transitions disabled per user request
@@ -1358,6 +1445,8 @@ const UnifiedMap: React.FC = () => {
         customStoreName?: string;
         customStoreAddress?: string;
         customStoreNotes?: string;
+        latitude?: number;
+        longitude?: number;
     }) => {
         setIsStartingShopping(true);
         try {
@@ -1391,15 +1480,24 @@ const UnifiedMap: React.FC = () => {
 
         try {
             setIsStartingShopping(true);
+            const trimmedAddress = customStoreAddress.trim();
 
             // Attempt to geocode the custom store address
             let coords = await geocodeStore(
                 customStoreName.trim(),
-                customStoreAddress.trim(),
+                trimmedAddress,
                 userLocation,
             );
 
-            // Fallback to user location if geocoding fails, so we at least create the store
+            // For explicit addresses, avoid saving wrong fallback coordinates.
+            if (!coords && trimmedAddress.length > 0) {
+                alert(
+                    "Nu am putut localiza adresa introdusa. Verifica adresa sau foloseste un reper mai clar.",
+                );
+                return;
+            }
+
+            // If no address is provided, fallback to current location.
             if (!coords) {
                 console.warn(
                     "Geocoding failed for custom store, using current user location as fallback.",
@@ -1410,7 +1508,7 @@ const UnifiedMap: React.FC = () => {
             const session = await startShoppingSession({
                 listId: selectedListId,
                 customStoreName: customStoreName.trim(),
-                customStoreAddress: customStoreAddress.trim() || undefined,
+                customStoreAddress: trimmedAddress || undefined,
                 customStoreNotes: customStoreNotes.trim() || undefined,
                 latitude: coords.lat,
                 longitude: coords.lng,
@@ -1619,7 +1717,7 @@ const UnifiedMap: React.FC = () => {
                                 </Marker>
                             ))}
 
-                        {targetStoreLocation && (
+                        {targetStoreLocation && !isNewCustomStore && (
                             <>
                                 <Circle
                                     center={[
@@ -1743,11 +1841,11 @@ const UnifiedMap: React.FC = () => {
                 )}
 
                 <div
-                    className={`absolute z-2500 transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-100 min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-4xl max-[1000px]:max-h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
+                    className={`absolute z-2500 transition-all duration-500 ease-in-out min-[1000px]:top-0 min-[1000px]:bottom-0 min-[1000px]:right-0 min-[1000px]:w-100 min-[1000px]:border-l min-[1000px]:border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[1000px]:left-0 max-[1000px]:right-0 max-[1000px]:bottom-0 max-[1000px]:rounded-t-4xl max-[1000px]:h-[85vh] bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden`}
                 >
                     <div className="min-[1000px]:hidden w-12 h-1.5 bg-border rounded-full mx-auto my-4 shrink-0" />
 
-                    <div className="flex-1 overflow-y-auto p-6 pt-2">
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                         {renderSidebarContent()}
                     </div>
                 </div>

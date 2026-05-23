@@ -77,6 +77,7 @@ interface ApiShoppingList {
 interface ListDetailProps {
     isEmbedded?: boolean;
     listIdOverride?: string;
+    checkPolicy?: "toggle" | "uncheck-only";
 }
 
 type SyncActionHandler = (prev: Item[], payload: SyncPayload) => Item[];
@@ -1925,6 +1926,7 @@ const ListTitle = ({
 const ListDetail = ({
     isEmbedded = false,
     listIdOverride,
+    checkPolicy = "toggle",
 }: ListDetailProps) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -2253,6 +2255,13 @@ const ListDetail = ({
         setShowDetailsModal(true);
     };
 
+    const handleItemCheck = async (itemId: string) => {
+        const currentItem = items.find((item) => item.id === itemId);
+        if (!currentItem) return;
+        if (checkPolicy === "uncheck-only" && !currentItem.checked) return;
+        await toggleItem(itemId);
+    };
+
     return (
         <div className={wrapperClassName}>
             <div className={contentClassName}>
@@ -2432,11 +2441,11 @@ const ListDetail = ({
                                 >
                                     <ShoppingListItems
                                         items={items}
-                                        onCheck={toggleItem}
+                                        onCheck={handleItemCheck}
                                         onDelete={deleteItem}
                                         onEdit={handleEditClick}
                                         disabled={isReadOnly}
-                                        checkable={false}
+                                        checkable={true}
                                         sortMode={sortMode}
                                         onReorder={reorderItem}
                                         onClaim={claimItem}

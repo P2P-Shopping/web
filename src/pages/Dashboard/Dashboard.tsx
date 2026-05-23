@@ -986,7 +986,10 @@ const Dashboard = () => {
         if (selectedList) {
             return (
                 <div className="max-w-[860px] mx-auto w-full">
-                    <ListDetail listIdOverride={selectedList.id} />
+                    <ListDetail
+                        listIdOverride={selectedList.id}
+                        checkPolicy="uncheck-only"
+                    />
                 </div>
             );
         }
