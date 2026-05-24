@@ -1,21 +1,12 @@
-import { ArrowLeft } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import ucartLogoLight from "../../assets/ucart-logo-text.svg";
-import ucartLogoDark from "../../assets/ucart-logo-text-dark.svg";
+import { AuthTabs, BackButton, Logo } from "../../components";
 import { useStore } from "../../context/useStore";
 import { loginRequest } from "../../services/authService";
-import { useThemeStore } from "../../store/useThemeStore";
 
 const LoginPage = () => {
-    const { theme } = useThemeStore();
-    const isDark =
-        theme === "dark" ||
-        (theme === "system" &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches);
-    const currentLogo = isDark ? ucartLogoDark : ucartLogoLight;
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -57,18 +48,9 @@ const LoginPage = () => {
 
     return (
         <div className="flex flex-col w-full max-w-[400px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
-            <button
-                type="button"
-                onClick={() => navigate("/")}
-                className="self-start -ml-1 mb-4 p-1.5 text-text-muted hover:text-text-strong hover:bg-bg-subtle rounded-lg transition-all flex items-center gap-1.5 text-sm font-medium"
-                aria-label="Go back to home"
-                title="Go back"
-            >
-                <ArrowLeft size={18} />
-                <span>Back</span>
-            </button>
+            <BackButton />
             <div className="flex justify-center mb-6">
-                <img src={currentLogo} alt="uCart" className="h-12 w-auto" />
+                <Logo className="h-12 w-auto" alt="uCart" />
             </div>
 
             <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
@@ -78,18 +60,7 @@ const LoginPage = () => {
                 Sign in to manage your shopping lists
             </p>
 
-            <div className="flex p-1 bg-bg-muted rounded-lg mb-8">
-                <div className="flex-1 py-2 text-sm font-bold bg-accent text-text-on-accent rounded-md shadow-md text-center">
-                    Login
-                </div>
-                <button
-                    type="button"
-                    className="flex-1 py-2 text-sm font-semibold text-text-muted hover:text-text-strong rounded-md transition-all"
-                    onClick={() => navigate("/register")}
-                >
-                    Register
-                </button>
-            </div>
+            <AuthTabs activeTab="login" />
 
             <form onSubmit={handleLogin} className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">

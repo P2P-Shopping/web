@@ -12,25 +12,9 @@ import {
 import type React from "react";
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import ucartIconLight from "../../assets/ucart-icon.svg";
-import ucartIconDark from "../../assets/ucart-icon-dark.svg";
-
-import ucartLogoLight from "../../assets/ucart-logo-text.svg";
-import ucartLogoDark from "../../assets/ucart-logo-text-dark.svg";
-import { ThemeSwitcher } from "../../components";
-import { useThemeStore } from "../../store/useThemeStore";
+import { Logo, ThemeSwitcher } from "../../components";
 
 const LandingPage: React.FC = () => {
-    const { theme } = useThemeStore();
-
-    const isDark =
-        theme === "dark" ||
-        (theme === "system" &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches);
-
-    const currentLogo = isDark ? ucartLogoDark : ucartLogoLight;
-    const currentIcon = isDark ? ucartIconDark : ucartIconLight;
-
     const navigate = useNavigate();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -134,11 +118,7 @@ const LandingPage: React.FC = () => {
             {/* Navbar */}
             <header className="w-full px-6 py-4 bg-bg border-b border-border flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2">
-                    <img
-                        src={currentLogo}
-                        alt="uCart Logo"
-                        className="h-8 w-auto"
-                    />
+                    <Logo className="h-8 w-auto" alt="uCart Logo" />
                 </div>
                 <div className="flex items-center gap-2 sm:gap-4">
                     <ThemeSwitcher />
@@ -281,10 +261,10 @@ const LandingPage: React.FC = () => {
             {/* Footer */}
             <footer className="w-full py-8 sm:py-10 flex flex-col items-center justify-center bg-bg border-t border-border shrink-0">
                 <div className="flex items-center gap-2 mb-4 opacity-50">
-                    <img
-                        src={currentIcon}
-                        alt="uCart Icon"
+                    <Logo
+                        variant="icon"
                         className="h-6 w-auto"
+                        alt="uCart Icon"
                     />
                     <span className="font-bold text-text-strong tracking-tight">
                         uCart
