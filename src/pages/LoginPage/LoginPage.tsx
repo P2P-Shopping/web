@@ -74,6 +74,7 @@ const LoginPage = () => {
                         className="h-12 w-auto"
                     />
                 </div>
+
                 <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
                     Welcome back
                 </h1>

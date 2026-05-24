@@ -177,6 +177,7 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
+        overflow-x: hidden;
     }
 
     body {
@@ -255,6 +256,7 @@
     min-height: 100svh;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
 }
 
 /* Keyframes */

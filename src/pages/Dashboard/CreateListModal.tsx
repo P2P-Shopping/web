@@ -73,10 +73,10 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
             initialFocusSelector="#list-name"
             maxWidth="760px"
             footer={
-                <div className="grid grid-cols-2 gap-3 w-full">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 w-full">
                     <button
                         type="button"
-                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border disabled:opacity-50"
+                        className="px-4 sm:px-6 py-2 sm:py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border disabled:opacity-50"
                         onClick={handleClose}
                         disabled={isSubmitting}
                     >
@@ -85,7 +85,7 @@ const CreateListModal = ({ onClose }: CreateListModalProps) => {
                     <button
                         type="submit"
                         form="create-list-form"
-                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={!listName.trim() || isSubmitting}
                         aria-busy={isSubmitting}
                         aria-label={

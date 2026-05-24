@@ -41,10 +41,10 @@ const DashboardEmptyState: React.FC<DashboardEmptyStateProps> = ({
         </p>
         <button
             type="button"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-accent text-text-on-accent rounded-md text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
+            className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-accent text-text-on-accent rounded-md text-sm sm:text-base font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3"
             onClick={openModal}
         >
-            <Plus size={20} />
+            <Plus size={18} />
             Create a List
         </button>
     </div>
@@ -509,8 +509,6 @@ const useDashboardImport = (
 interface DashboardHeaderProps {
     selectedList: ShoppingList | null;
     showAiImport: boolean;
-    listsCount: number;
-    currentListName?: string | null;
     displayMode: "split" | "tabs";
     setDisplayMode: (mode: "split" | "tabs") => void;
     onBack: () => void;
@@ -521,8 +519,6 @@ interface DashboardHeaderProps {
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     selectedList,
     showAiImport,
-    listsCount,
-    currentListName,
     displayMode,
     setDisplayMode,
     onBack,
@@ -533,39 +529,34 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     const detailTitle = showAiImport
         ? "AI Shopping Assistant"
         : selectedList?.name;
-    const listCountLabel = listsCount === 1 ? "list" : "lists";
-    const listSummary = currentListName
-        ? `${currentListName} • ${listsCount} total`
-        : `${listsCount} ${listCountLabel}`;
 
     return (
-        <header className="flex items-center justify-between gap-4 px-7 py-5 bg-bg/95 backdrop-blur-md border-b border-border sticky top-0 z-100 mt-2 max-[600px]:p-4 max-[600px]:flex-wrap">
+        <header
+            className={`flex items-center justify-between gap-3 px-4 sm:px-7 py-3 sm:py-5 bg-bg/95 backdrop-blur-md border-b border-border z-100 max-[600px]:p-3 max-[600px]:flex-wrap ${showDetailHeader ? "" : "sticky top-0"}`}
+        >
             {showDetailHeader ? (
                 <>
                     <button
                         type="button"
-                        className="inline-flex items-center justify-center w-[38px] h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                        className="inline-flex items-center justify-center w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] border border-border rounded-md bg-bg-muted text-text-strong transition-all duration-200 ease-out hover:bg-accent-subtle hover:border-accent-border hover:text-accent shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
                         onClick={onBack}
                         aria-label="Back"
                     >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={18} />
                     </button>
-                    <h1 className="flex-1 ml-3 text-[22px] font-extrabold text-text-strong tracking-tight">
+                    <h1 className="flex-1 ml-3 text-lg sm:text-[22px] font-extrabold text-text-strong tracking-tight">
                         {detailTitle}
                     </h1>
                 </>
             ) : (
                 <>
                     <div className="flex flex-col">
-                        <h1 className="text-[22px] font-extrabold text-text-strong tracking-tight">
+                        <h1 className="text-lg sm:text-[22px] font-extrabold text-text-strong tracking-tight">
                             My Lists
                         </h1>
-                        <p className="text-[13px] text-text-muted mt-0.5">
-                            {listSummary}
-                        </p>
                     </div>
-                    <div className="flex items-center gap-3 max-[600px]:w-full">
-                        <div className="flex items-center bg-bg-muted border border-border rounded-md p-1 mr-2">
+                    <div className="flex items-center gap-2 sm:gap-3 max-[600px]:w-full">
+                        <div className="hidden sm:flex items-center bg-bg-muted border border-border rounded-md p-1 mr-2">
                             <button
                                 type="button"
                                 onClick={() => setDisplayMode("split")}
@@ -585,18 +576,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                         </div>
                         <button
                             type="button"
-                            className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
+                            className="inline-flex items-center gap-1.5 sm:gap-[7px] px-3 py-1.5 sm:px-[18px] sm:py-[9px] bg-bg-muted text-text-strong border border-border rounded-md text-xs sm:text-sm font-bold transition-all duration-200 ease-out hover:bg-border hover:-translate-y-px active:translate-y-0 max-[600px]:flex-1 max-[600px]:justify-center"
                             onClick={onAiImport}
                         >
-                            <Sparkles size={18} className="text-accent" />
+                            <Sparkles size={16} className="text-accent" />
                             AI Import
                         </button>
                         <button
                             type="button"
-                            className="inline-flex items-center gap-[7px] px-[18px] py-[9px] bg-accent text-text-on-accent border-none rounded-md text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:flex-1 max-[600px]:justify-center"
+                            className="inline-flex items-center gap-1.5 sm:gap-[7px] px-3 py-1.5 sm:px-[18px] sm:py-[9px] bg-accent text-text-on-accent border-none rounded-md text-xs sm:text-sm font-bold transition-all duration-200 ease-out shadow-[0_2px_10px_var(--color-accent-glow)] shrink-0 hover:bg-accent-hover hover:-translate-y-px hover:shadow-[0_4px_18px_var(--color-accent-glow)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-3 max-[600px]:flex-1 max-[600px]:justify-center"
                             onClick={onNewList}
                         >
-                            <Plus size={20} />
+                            <Plus size={18} />
                             New List
                         </button>
                     </div>
@@ -826,7 +817,6 @@ const Dashboard = () => {
 
     const {
         lists,
-        currentList,
         isLoading,
         isModalOpen,
         deletingListId,
@@ -1080,8 +1070,6 @@ const Dashboard = () => {
             <DashboardHeader
                 selectedList={selectedList}
                 showAiImport={showAiImport}
-                listsCount={lists.length}
-                currentListName={currentList?.name}
                 displayMode={displayMode}
                 setDisplayMode={setDisplayMode}
                 onBack={showAiImport ? clearImport : () => setSearchParams({})}
@@ -1096,7 +1084,7 @@ const Dashboard = () => {
             />
 
             <main
-                className={`flex-1 p-7 max-w-[1200px] mx-auto w-full box-border max-[600px]:p-4 ${showAiImport ? "overflow-hidden flex flex-col h-[calc(100svh-80px)]" : "overflow-visible"}`}
+                className={`flex-1 p-4 sm:p-7 max-w-[1200px] mx-auto w-full box-border ${showAiImport ? "overflow-hidden flex flex-col h-[calc(100svh-80px)]" : "overflow-visible"}`}
             >
                 {renderDashboardContent()}
             </main>

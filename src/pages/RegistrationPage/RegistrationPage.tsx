@@ -39,7 +39,6 @@ const RegistrationPage = () => {
         setError("");
         if (isSubmitting) return;
 
-        // Frontend Validation
         if (formData.firstName.length < 2 || formData.firstName.length > 50) {
             setError("First name must be between 2 and 50 characters.");
             return;
@@ -84,9 +83,14 @@ const RegistrationPage = () => {
             await registerRequest(formData);
             toast.success("Account created successfully! Please log in.");
             navigate("/login");
-            // biome-ignore lint/suspicious/noExplicitAny: API error response format
-        } catch (err: any) {
-            setError(err.message || "Registration failed. Please try again.");
+        } catch (err: unknown) {
+            let message = "Registration failed. Please try again.";
+            if (err instanceof Error) {
+                message = err.message;
+            } else if (typeof err === "string" && err.trim().length > 0) {
+                message = err;
+            }
+            setError(message);
         } finally {
             setIsSubmitting(false);
         }

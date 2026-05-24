@@ -1,6 +1,6 @@
 import {
     AlertCircle,
-    Camera,
+    // Camera,
     CheckCircle2,
     ChevronDown,
     Info,
@@ -35,7 +35,6 @@ import type { ListCategory, ListRole } from "../../types";
 import { buildItemDuplicateKey, mergeQuantities } from "../../utils/listUtils";
 
 import ListMembersModal from "../Dashboard/ListMembersModal";
-import { useFinishShopping } from "./useFinishShopping";
 import { useImportItems } from "./useImportItems";
 import { useListPageEffects } from "./useListPageEffects";
 
@@ -1699,10 +1698,10 @@ const AddItemDetailsModal = ({
             subtitle={subtitle}
             initialFocusSelector={`#${idPrefix}-item-name`}
             footer={
-                <div className="grid grid-cols-2 gap-3 w-full">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 w-full">
                     <button
                         type="button"
-                        className="px-6 py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
+                        className="px-4 sm:px-6 py-2 sm:py-2.5 bg-bg-muted text-text-strong border border-border rounded-md text-sm font-semibold transition-all hover:bg-border"
                         onClick={onClose}
                     >
                         Cancel
@@ -1710,7 +1709,7 @@ const AddItemDetailsModal = ({
                     <button
                         type="submit"
                         form={`${idPrefix}-details-form`}
-                        className="inline-flex items-center justify-center px-6 py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
+                        className="inline-flex items-center justify-center px-4 sm:px-6 py-2 sm:py-2.5 bg-text-strong text-bg border-none rounded-md text-sm font-bold transition-all hover:opacity-90 active:scale-95"
                     >
                         {submitLabel ?? (isMobile ? "Add" : "Add Item")}
                     </button>
@@ -1933,7 +1932,7 @@ const ListTitle = ({
     if (isEditingName) {
         return (
             <input
-                className="text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
+                className="text-xl sm:text-2xl font-black text-text-strong bg-transparent border-b-2 border-accent outline-none w-full"
                 value={editedName}
                 onChange={(e) => setEditedName(e.target.value)}
                 onBlur={onBlur}
@@ -1947,14 +1946,14 @@ const ListTitle = ({
                 type="button"
                 onClick={onClickEdit}
                 disabled={isReadOnly}
-                className="text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
+                className="text-xl sm:text-2xl font-black text-text-strong tracking-tight hover:text-accent transition-colors cursor-pointer bg-transparent border-none p-0 text-left disabled:cursor-not-allowed disabled:hover:text-text-strong"
             >
                 {activeListName || "Shopping List"}
             </button>
         );
     }
     return (
-        <h1 className="text-2xl font-black text-text-strong tracking-tight">
+        <h1 className="text-xl sm:text-2xl font-black text-text-strong tracking-tight">
             {activeListName || "Shopping List"}
         </h1>
     );
@@ -2053,16 +2052,6 @@ const ListDetail = ({
     const [detailCategory, setDetailCategory] = useState("");
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
-    const {
-        isFinishing,
-        showFinishModal,
-        setShowFinishModal,
-        receiptImage,
-        setReceiptImage,
-        isFinishDisabled,
-        handleFinishShopping,
-    } = useFinishShopping({ effectiveListId, setError });
-
     const { permissionStatus, showBanner, setShowBanner, isScrolled } =
         useListPageEffects();
 
@@ -2102,11 +2091,6 @@ const ListDetail = ({
             }
         }
     }, [effectiveListId]);
-
-    const checkedCount = useMemo(
-        () => items.filter((item) => item.checked).length,
-        [items],
-    );
 
     const addInputRef = useRef<HTMLInputElement | null>(null);
     const activeList = useMemo(
@@ -2321,7 +2305,7 @@ const ListDetail = ({
     const wrapperClassName = isEmbedded
         ? "w-full flex flex-col h-full bg-surface/50"
         : "flex justify-center items-start min-h-svh bg-bg";
-    const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border h-full ${isEmbedded ? "p-6" : "max-[600px]:pb-[100px]"}`;
+    const contentClassName = `w-full ${isEmbedded ? "" : "max-w-[860px]"} mx-auto flex flex-col gap-4 box-border h-full ${isEmbedded ? "p-4 sm:p-6" : "max-[600px]:pb-[100px]"}`;
 
     const handleInstantAdd = (suggestion: ProductSuggestion) => {
         const finalPrice =
@@ -2398,61 +2382,33 @@ const ListDetail = ({
         return (
             <div className="flex flex-col gap-2">
                 {items.map((item) => (
-                    <button
+                    <div
                         key={item.id}
-                        type="button"
-                        onClick={() => !isReadOnly && handleItemCheck(item.id)}
-                        className={`flex items-center justify-between p-3.5 bg-bg-subtle border border-border/60 rounded-xl hover:border-accent hover:bg-accent-subtle/10 transition-all duration-200 cursor-pointer group w-full text-left ${
-                            item.checked
-                                ? "opacity-60 bg-bg-muted/40 animate-in fade-in duration-200"
-                                : ""
+                        className={`flex items-center gap-3.5 p-3.5 bg-bg-subtle border border-border/60 rounded-xl transition-all duration-200 group ${
+                            item.checked ? "opacity-50" : ""
                         }`}
                     >
-                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                            {/* Modern Checkbox */}
-                            <div
-                                className={`relative flex items-center justify-center w-5.5 h-5.5 rounded-md border-2 transition-all shrink-0 ${
-                                    item.checked
-                                        ? "bg-success border-success text-white scale-100"
-                                        : "bg-surface border-border-strong group-hover:border-accent"
-                                }`}
-                            >
-                                {item.checked && (
-                                    <svg
-                                        className="w-3.5 h-3.5 stroke-[4] animate-in zoom-in-50 duration-200"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <title>Checked</title>
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M5 13l4 4L19 7"
-                                        />
-                                    </svg>
-                                )}
-                            </div>
+                        <div className="relative flex items-center justify-center w-5.5 h-5.5 rounded-md bg-bg-muted border border-border shrink-0">
+                            <div className="w-2 h-2 rounded-full bg-text-muted" />
+                        </div>
 
-                            {/* Item Name */}
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                             <span
                                 className={`text-sm font-semibold text-text-strong truncate ${
                                     item.checked
-                                        ? "line-through opacity-50"
+                                        ? "line-through opacity-60"
                                         : ""
                                 }`}
                             >
                                 {item.name}
                             </span>
+                            {item.quantity && (
+                                <span className="text-[11px] font-black uppercase tracking-wider text-text-muted bg-bg-muted px-2 py-0.5 rounded-lg border border-border/30 shrink-0">
+                                    {item.quantity}
+                                </span>
+                            )}
                         </div>
-
-                        {/* Item Quantity Pill */}
-                        {item.quantity && (
-                            <span className="text-[11px] font-black uppercase tracking-wider text-text-muted bg-bg-muted px-2.5 py-1 rounded-lg border border-border/30 shrink-0">
-                                {item.quantity}
-                            </span>
-                        )}
-                    </button>
+                    </div>
                 ))}
             </div>
         );
@@ -2471,33 +2427,8 @@ const ListDetail = ({
 
         if (isEmbedded) {
             return (
-                <div className="flex flex-col gap-4 h-full animate-in fade-in duration-300">
-                    {/* Elegant Header with Progress */}
-                    <div className="flex flex-col gap-2 p-1">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-black text-text-strong uppercase tracking-tight truncate">
-                                {activeList?.name || "Shopping List"}
-                            </h2>
-                            <span className="text-xs font-bold text-text-muted bg-bg-muted px-2.5 py-1 rounded-full border border-border/30">
-                                {checkedCount} / {items.length} done
-                            </span>
-                        </div>
-
-                        {/* Premium Progress Bar */}
-                        {items.length > 0 && (
-                            <div className="w-full h-1.5 bg-bg-muted rounded-full overflow-hidden border border-border/10">
-                                <div
-                                    className="h-full bg-accent transition-all duration-300 ease-out"
-                                    style={{
-                                        width: `${(checkedCount / items.length) * 100}%`,
-                                    }}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* List Items Scroll Container */}
-                    <div className="bg-surface border border-border rounded-2xl shadow-sm overflow-y-auto flex-1 p-4">
+                <div className="animate-in fade-in duration-300">
+                    <div className="rounded-xl overflow-hidden">
                         {renderEmbeddedListItems()}
                     </div>
                 </div>
@@ -2507,7 +2438,7 @@ const ListDetail = ({
         return (
             <>
                 <div
-                    className={`sticky top-0 z-30 flex flex-col gap-3 transition-all duration-200 bg-bg/95 backdrop-blur-md pb-4 pt-4 ${
+                    className={`sticky top-0 z-30 flex flex-col gap-2 sm:gap-3 transition-all duration-200 bg-bg/95 backdrop-blur-md pb-2 pt-2 sm:pb-4 sm:pt-4 ${
                         isEmbedded ? "-mx-6 px-6" : "-mx-4 px-4"
                     } ${
                         isScrolled
@@ -2515,37 +2446,29 @@ const ListDetail = ({
                             : ""
                     }`}
                 >
-                    <div className="flex justify-between items-end px-1">
-                        <div className="flex flex-col gap-1">
-                            {listNameDisplay}
-                            <div className="flex flex-col">
-                                <h2 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-0.5">
-                                    Collaboration
-                                </h2>
-                                <div className="flex items-center gap-2">
-                                    <PresenceBar
-                                        variant="avatars"
-                                        allUsers={activeCollaborationUsers}
-                                    />
-                                    {activeList?.currentUserRole && (
-                                        <span
-                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                getRoleBadgeStyle(
-                                                    activeList.currentUserRole,
-                                                ).className
-                                            }`}
-                                        >
-                                            {
-                                                getRoleBadgeStyle(
-                                                    activeList.currentUserRole,
-                                                ).label
-                                            }
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-2">
+                    <div className="px-1">{listNameDisplay}</div>
+
+                    <div className="flex items-center justify-between px-1 gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <PresenceBar
+                                variant="avatars"
+                                allUsers={activeCollaborationUsers}
+                            />
+                            {activeList?.currentUserRole && (
+                                <span
+                                    className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        getRoleBadgeStyle(
+                                            activeList.currentUserRole,
+                                        ).className
+                                    }`}
+                                >
+                                    {
+                                        getRoleBadgeStyle(
+                                            activeList.currentUserRole,
+                                        ).label
+                                    }
+                                </span>
+                            )}
                             {!isReadOnly &&
                                 !isGuest &&
                                 !isTemplateList &&
@@ -2553,13 +2476,16 @@ const ListDetail = ({
                                     <button
                                         type="button"
                                         onClick={clearCompletedItems}
-                                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-danger hover:text-danger"
+                                        className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3.5 sm:py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-[11px] sm:text-xs font-bold transition-all hover:border-danger hover:text-danger"
                                     >
                                         <CheckCircle2
-                                            size={14}
+                                            size={12}
                                             strokeWidth={2.5}
                                         />
-                                        Clear Completed
+                                        <span className="hidden sm:inline">
+                                            Clear Completed
+                                        </span>
+                                        <span className="sm:hidden">Clear</span>
                                     </button>
                                 )}
                             {canImportIntoNormalList && (
@@ -2568,18 +2494,23 @@ const ListDetail = ({
                                     onClick={() => {
                                         openImportModal();
                                     }}
-                                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-xs font-bold transition-all hover:border-accent hover:text-accent"
+                                    className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3.5 sm:py-2 bg-bg-muted text-text-strong border border-border rounded-lg text-[11px] sm:text-xs font-bold transition-all hover:border-accent hover:text-accent"
                                 >
-                                    <Plus size={14} strokeWidth={2.5} />
-                                    Add to normal list
+                                    <Plus size={12} strokeWidth={2.5} />
+                                    <span className="hidden sm:inline">
+                                        Add to normal list
+                                    </span>
+                                    <span className="sm:hidden">Import</span>
                                 </button>
                             )}
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                             <button
                                 type="button"
                                 onClick={() => setShowShareModal(true)}
-                                className="inline-flex items-center gap-2 px-3.5 py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
+                                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3.5 sm:py-2 bg-accent-subtle text-accent border border-accent-border/30 rounded-lg text-[11px] sm:text-xs font-bold transition-all hover:bg-accent hover:text-white hover:-translate-y-px shadow-sm active:translate-y-0"
                             >
-                                <Users size={14} strokeWidth={2.5} />
+                                <Users size={12} strokeWidth={2.5} />
                                 Members
                                 {activeList?.collaborators &&
                                     activeList.collaborators.length > 0 && (
@@ -2603,7 +2534,7 @@ const ListDetail = ({
                         isGuest={isGuest}
                     />
 
-                    <div className="min-h-[16px] px-2 flex items-center justify-between mt-2 mb-1">
+                    <div className="min-h-[14px] px-2 flex items-center justify-between mt-1 mb-0.5 sm:mt-2 sm:mb-1">
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
                                 Sort:
@@ -2633,7 +2564,13 @@ const ListDetail = ({
                     </div>
                 </div>
 
-                <div className="bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-visible flex-1">
+                <div
+                    className={
+                        isEmbedded
+                            ? "min-h-[120px] overflow-visible flex-1"
+                            : "bg-surface border border-border rounded-xl shadow-sm min-h-[120px] overflow-visible flex-1"
+                    }
+                >
                     {itemsLoading ? (
                         <div className="flex flex-col items-center justify-center gap-4 p-[60px_20px] text-text-muted">
                             <div className="w-8 h-8 border-[3px] border-border border-t-accent rounded-full animate-spin" />
@@ -2641,7 +2578,7 @@ const ListDetail = ({
                         </div>
                     ) : (
                         <div
-                            className="divide-y divide-border/50 h-full p-4 flex flex-col"
+                            className="divide-y divide-border/50 h-full p-3 sm:p-4 flex flex-col"
                             style={{ overflowAnchor: "auto" }}
                         >
                             <ShoppingListItems
@@ -2659,7 +2596,7 @@ const ListDetail = ({
                                 displayNames={displayNames}
                             />
                             {items.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-4 -mb-4 px-6 py-4 gap-4">
+                                <div className="mt-3 pt-3 sm:mt-4 sm:pt-4 border-t border-border flex flex-col bg-bg-muted/30 -mx-3 -mb-3 px-4 py-3 sm:-mx-4 sm:-mb-4 sm:px-6 sm:py-4 gap-3 sm:gap-4">
                                     <div className="flex justify-between items-center">
                                         <div className="flex flex-col">
                                             <span className="text-xs font-bold text-text-muted uppercase tracking-widest">
@@ -2673,19 +2610,6 @@ const ListDetail = ({
                                             {estimatedTotal} lei
                                         </span>
                                     </div>
-                                    {!isTemplateList &&
-                                        !isGuest &&
-                                        !isEmbedded && (
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setShowFinishModal(true)
-                                                }
-                                                className="w-full py-3.5 bg-accent text-white rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all"
-                                            >
-                                                Finish Shopping
-                                            </button>
-                                        )}
                                 </div>
                             )}
                         </div>
@@ -2743,14 +2667,14 @@ const ListDetail = ({
             {!isReadOnly && !isGuest && !isEmbedded && (
                 <button
                     type="button"
-                    className="hidden max-[600px]:flex fixed bottom-24 right-6 w-[60px] h-[60px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
+                    className="hidden max-[600px]:flex fixed bottom-20 right-4 w-[52px] h-[52px] rounded-full bg-accent text-white border-none items-center justify-center shadow-[0_4px_12px_var(--color-accent-glow)] cursor-pointer transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_var(--color-accent-glow)] active:scale-95 z-100"
                     onClick={() => {
                         setDetailName(newItemName);
                         setShowMobileAddModal(true);
                     }}
                     aria-label="Add Item"
                 >
-                    <Plus size={28} strokeWidth={3} />
+                    <Plus size={24} strokeWidth={3} />
                 </button>
             )}
 
@@ -2801,63 +2725,6 @@ const ListDetail = ({
                 onTyping={sendTypingEvent}
                 submitLabel={editingItemId ? "Save" : undefined}
             />
-
-            <Modal
-                isOpen={showFinishModal}
-                onClose={() => setShowFinishModal(false)}
-                title="Finish Shopping"
-                subtitle="Enter store and take a photo of your receipt."
-            >
-                <div className="flex flex-col gap-5">
-                    <div className="flex flex-col gap-2">
-                        <span className="text-[11px] font-black uppercase text-text-strong tracking-wider">
-                            Receipt Photo
-                        </span>
-                        <div className="relative">
-                            <input
-                                type="file"
-                                accept="image/*"
-                                id="receipt-cam"
-                                className="hidden"
-                                onChange={(e) =>
-                                    setReceiptImage(e.target.files?.[0] || null)
-                                }
-                            />
-                            <label
-                                htmlFor="receipt-cam"
-                                className={`flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${receiptImage ? "border-accent bg-accent-subtle text-accent" : "border-border text-text-muted hover:border-accent"}`}
-                            >
-                                <Camera size={28} />
-                                <span className="text-sm font-black">
-                                    {receiptImage
-                                        ? receiptImage.name
-                                        : "TAKE PHOTO"}
-                                </span>
-                                <span className="text-xs uppercase font-bold opacity-50">
-                                    Click to open camera
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                        <button
-                            type="button"
-                            onClick={() => setShowFinishModal(false)}
-                            className="py-3 bg-bg-muted rounded-lg font-bold"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            disabled={isFinishDisabled}
-                            onClick={handleFinishShopping}
-                            className="bg-text-strong text-bg py-3 rounded-lg font-bold disabled:opacity-50 transition-all active:scale-95"
-                        >
-                            {isFinishing ? "Processing..." : "Complete"}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
 
             <SmartReviewModal
                 isOpen={isReviewModalOpen}
