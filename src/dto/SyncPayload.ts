@@ -43,6 +43,15 @@ export interface SyncPayload {
 
     /** The email of the user who claimed the item (used for CLAIM_ITEM/UNCLAIM_ITEM). */
     claimedBy?: string;
+
+    /** User's current latitude for telemetry recording. */
+    lat?: number;
+
+    /** User's current longitude for telemetry recording. */
+    lng?: number;
+
+    /** GPS accuracy in meters for telemetry recording. */
+    accuracyMeters?: number;
 }
 
 /**

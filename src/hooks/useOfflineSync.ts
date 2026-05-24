@@ -44,16 +44,22 @@ export const useOfflineSync = () => {
 
             case "TOGGLE_ITEM":
                 if (!payload.itemId) break;
-                await api.put(`/api/items/${payload.itemId}`, {
-                    name: payload.name,
-                    isChecked: payload.checked,
-                    brand: payload.brand ?? null,
-                    quantity: payload.quantity ?? null,
-                    price: payload.price ?? null,
-                    category: payload.category ?? null,
-                    isRecurrent: payload.isRecurrent ?? false,
-                    timestamp: action.timestamp,
-                });
+                {
+                    const { userLocation } = useStore.getState();
+                    await api.put(`/api/items/${payload.itemId}`, {
+                        name: payload.name,
+                        isChecked: payload.checked,
+                        brand: payload.brand ?? null,
+                        quantity: payload.quantity ?? null,
+                        price: payload.price ?? null,
+                        category: payload.category ?? null,
+                        isRecurrent: payload.isRecurrent ?? false,
+                        timestamp: action.timestamp,
+                        lat: userLocation?.lat ?? null,
+                        lng: userLocation?.lng ?? null,
+                        accuracyMeters: 10.0,
+                    });
+                }
                 break;
 
             case "DELETE_ITEM":

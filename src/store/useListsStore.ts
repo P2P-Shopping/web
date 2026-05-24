@@ -211,19 +211,27 @@ const normalizeListFromApi = (list: ApiShoppingList): ShoppingList => ({
 
 /**
  * Formats a partial item object into the payload expected by the API.
+ * Includes GPS coordinates from the global store when available so that
+ * the backend can record telemetry with location data.
  * @param item - Partial item data to be formatted.
  * @returns The API-ready request payload.
  */
-const buildItemRequest = (item: Partial<Item>) => ({
-    name: item.name ?? "",
-    isChecked: Boolean(item.checked),
-    brand: item.brand ?? null,
-    quantity: item.quantity ?? null,
-    price: item.price ?? null,
-    category: item.category ?? null,
-    isRecurrent: Boolean(item.isRecurrent),
-    timestamp: Date.now(),
-});
+const buildItemRequest = (item: Partial<Item>) => {
+    const { userLocation } = useStore.getState();
+    return {
+        name: item.name ?? "",
+        isChecked: Boolean(item.checked),
+        brand: item.brand ?? null,
+        quantity: item.quantity ?? null,
+        price: item.price ?? null,
+        category: item.category ?? null,
+        isRecurrent: Boolean(item.isRecurrent),
+        timestamp: Date.now(),
+        lat: userLocation?.lat ?? null,
+        lng: userLocation?.lng ?? null,
+        accuracyMeters: 10.0,
+    };
+};
 
 const updateItemInList = (
     lists: ShoppingList[],

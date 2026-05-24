@@ -42,6 +42,20 @@ export const useNetworkState = (): void => {
             }
 
             try {
+                const { userLocation, activeShoppingSession, targetStoreId } =
+                    useStore.getState();
+
+                const storeId =
+                    activeShoppingSession?.storeId || targetStoreId;
+                const items = useStore.getState().items;
+                const firstItem = items?.find((i) => !i.checked);
+
+                if (!storeId || !firstItem) {
+                    // No store or item context available — skip telemetry but keep the heartbeat going
+                    schedulePing(BASE_DELAY);
+                    return;
+                }
+
                 const res = await fetch("/api/v1/telemetry/ping", {
                     method: "POST",
                     headers: {
@@ -49,7 +63,15 @@ export const useNetworkState = (): void => {
                         "X-API-Key": TELEMETRY_API_KEY,
                         "X-Device-Id": deviceId,
                     },
-                    body: JSON.stringify({ ts: Date.now() }),
+                    body: JSON.stringify({
+                        deviceId,
+                        storeId,
+                        itemId: firstItem.id,
+                        lat: userLocation.lat,
+                        lng: userLocation.lng,
+                        accuracyMeters: 10.0,
+                        timestamp: Date.now(),
+                    }),
                     signal: AbortSignal.timeout(5000),
                 });
 
