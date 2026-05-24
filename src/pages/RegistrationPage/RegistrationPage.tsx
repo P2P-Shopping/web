@@ -2,10 +2,12 @@ import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { AuthTabs, BackButton, Logo } from "../../components";
 import { registerRequest } from "../../services/authService";
 
 const RegistrationPage = () => {
     const navigate = useNavigate();
+
     const [formData, setFormData] = useState({
         firstName: "",
         lastName: "",
@@ -26,7 +28,6 @@ const RegistrationPage = () => {
         setError("");
         if (isSubmitting) return;
 
-        // Frontend Validation
         if (formData.firstName.length < 2 || formData.firstName.length > 50) {
             setError("First name must be between 2 and 50 characters.");
             return;
@@ -71,20 +72,24 @@ const RegistrationPage = () => {
             await registerRequest(formData);
             toast.success("Account created successfully! Please log in.");
             navigate("/login");
-            // biome-ignore lint/suspicious/noExplicitAny: API error response format
-        } catch (err: any) {
-            setError(err.message || "Registration failed. Please try again.");
+        } catch (err: unknown) {
+            let message = "Registration failed. Please try again.";
+            if (err instanceof Error) {
+                message = err.message;
+            } else if (typeof err === "string" && err.trim().length > 0) {
+                message = err;
+            }
+            setError(message);
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="flex flex-col w-full max-w-[440px] bg-surface border border-border rounded-2xl p-5 sm:p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="flex flex-col w-full max-w-[440px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
+            <BackButton />
             <div className="flex items-center justify-center gap-3 mb-8">
-                <span className="text-2xl font-black text-text-strong tracking-tighter">
-                    P2P Shopping
-                </span>
+                <Logo className="h-12 w-auto" alt="uCart" />
             </div>
 
             <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
@@ -94,21 +99,7 @@ const RegistrationPage = () => {
                 Join to start managing your shopping lists
             </p>
 
-            <div className="flex p-1 bg-bg-muted rounded-lg mb-8">
-                <button
-                    type="button"
-                    className="flex-1 py-2 text-sm font-semibold text-text-muted hover:text-text-strong rounded-md transition-all"
-                    onClick={() => navigate("/login")}
-                >
-                    Login
-                </button>
-                <button
-                    type="button"
-                    className="flex-1 py-2 text-sm font-bold bg-accent text-text-on-accent rounded-md shadow-md transition-all"
-                >
-                    Register
-                </button>
-            </div>
+            <AuthTabs activeTab="register" />
 
             <form onSubmit={handleRegister} className="flex flex-col gap-4">
                 <div className="flex gap-4">

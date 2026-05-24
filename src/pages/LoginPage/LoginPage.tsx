@@ -2,6 +2,7 @@ import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { AuthTabs, BackButton, Logo } from "../../components";
 import { useStore } from "../../context/useStore";
 import { loginRequest } from "../../services/authService";
 
@@ -46,11 +47,10 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="flex flex-col w-full max-w-[400px] bg-surface border border-border rounded-2xl p-5 sm:p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
-            <div className="flex items-center justify-center gap-3 mb-8">
-                <span className="text-2xl font-black text-text-strong tracking-tighter">
-                    P2P Shopping
-                </span>
+        <div className="flex flex-col w-full max-w-[400px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
+            <BackButton />
+            <div className="flex justify-center mb-6">
+                <Logo className="h-12 w-auto" alt="uCart" />
             </div>
 
             <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
@@ -60,18 +60,7 @@ const LoginPage = () => {
                 Sign in to manage your shopping lists
             </p>
 
-            <div className="flex p-1 bg-bg-muted rounded-lg mb-8">
-                <div className="flex-1 py-2 text-sm font-bold bg-accent text-text-on-accent rounded-md shadow-md text-center">
-                    Login
-                </div>
-                <button
-                    type="button"
-                    className="flex-1 py-2 text-sm font-semibold text-text-muted hover:text-text-strong rounded-md transition-all"
-                    onClick={() => navigate("/register")}
-                >
-                    Register
-                </button>
-            </div>
+            <AuthTabs activeTab="login" />
 
             <form onSubmit={handleLogin} className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
