@@ -86,7 +86,7 @@ const RegistrationPage = () => {
     };
 
     return (
-        <div className="flex flex-col w-full max-w-[440px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="my-auto flex flex-col w-full max-w-[440px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
             <BackButton />
             <div className="flex items-center justify-center gap-3 mb-8">
                 <Logo className="h-12 w-auto" alt="uCart" />

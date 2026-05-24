@@ -422,7 +422,7 @@ function App() {
                         path="/login"
                         element={
                             <GuestRoute>
-                                <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-bg min-h-svh">
+                                <div className="flex-1 flex flex-col items-center overflow-y-auto p-4 sm:p-6 bg-bg">
                                     <LoginPage />
                                 </div>
                             </GuestRoute>
@@ -432,7 +432,7 @@ function App() {
                         path="/register"
                         element={
                             <GuestRoute>
-                                <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-bg min-h-svh">
+                                <div className="flex-1 flex flex-col items-center overflow-y-auto p-4 sm:p-6 bg-bg">
                                     <RegistrationPage />
                                 </div>
                             </GuestRoute>

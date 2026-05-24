@@ -47,7 +47,7 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="flex flex-col w-full max-w-[400px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="my-auto flex flex-col w-full max-w-[400px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
             <BackButton />
             <div className="flex justify-center mb-6">
                 <Logo className="h-12 w-auto" alt="uCart" />
