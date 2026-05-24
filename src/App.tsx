@@ -14,6 +14,7 @@ import { useNetworkState } from "./hooks/useNetworkState";
 import { useOfflineSync } from "./hooks/useOfflineSync";
 import {
     Dashboard,
+    LandingPage,
     ListDetail,
     LoginPage,
     RegistrationPage,
@@ -41,7 +42,7 @@ function ProtectedRoute({ children }: Readonly<{ children: React.ReactNode }>) {
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to="/" replace />;
     }
     return children;
 }
@@ -76,7 +77,7 @@ function NotFound() {
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to="/" replace />;
     }
 
     return (
@@ -467,7 +468,7 @@ function App() {
                             isAuthenticated ? (
                                 <Navigate to="/dashboard" replace />
                             ) : (
-                                <Navigate to="/login" replace />
+                                <LandingPage />
                             )
                         }
                     />
