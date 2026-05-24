@@ -52,6 +52,8 @@ export interface StoreRecommendation {
     lat: number;
     lng: number;
     stockMatchPercentage: number;
+    totalEstimatedPrice: number | null;
+    priceCoveragePercentage: number;
     transit: {
         driving: { timeMins: number; distanceKm: string | number };
         walking: { timeMins: number; distanceKm: string | number };
@@ -64,6 +66,9 @@ interface ApiStoreMatch {
     matchedItems: number;
     matchPercentage?: number;
     distanceMeters: number;
+    totalEstimatedPrice?: number | null;
+    pricedItems?: number;
+    priceCoveragePercentage?: number;
     lat?: number;
     lng?: number;
     latitude?: number;
@@ -284,8 +289,36 @@ const mapApiStoreToRecommendation = async (
         lat,
         lng,
         stockMatchPercentage,
+        totalEstimatedPrice:
+            store.totalEstimatedPrice !== undefined &&
+            store.totalEstimatedPrice !== null &&
+            Number.isFinite(Number(store.totalEstimatedPrice))
+                ? Number(store.totalEstimatedPrice)
+                : null,
+        priceCoveragePercentage:
+            store.priceCoveragePercentage !== undefined &&
+            Number.isFinite(Number(store.priceCoveragePercentage))
+                ? Math.max(
+                      0,
+                      Math.min(
+                          100,
+                          Math.round(Number(store.priceCoveragePercentage)),
+                      ),
+                  )
+                : 0,
         transit: realTransit,
     };
+};
+
+const formatEstimatedPrice = (price: number | null): string => {
+    if (price === null || !Number.isFinite(price)) {
+        return "N/A";
+    }
+    return new Intl.NumberFormat("ro-RO", {
+        style: "currency",
+        currency: "RON",
+        maximumFractionDigits: 2,
+    }).format(price);
 };
 
 // Fix Leaflet marker icons
@@ -595,6 +628,14 @@ const StoreRecommendationView: React.FC<StoreRecommendationViewProps> = ({
                             </span>
                             <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-text-muted">
                                 Stock
+                            </span>
+                            <span className="mt-1 text-[9px] sm:text-[10px] font-bold text-text-strong">
+                                {formatEstimatedPrice(
+                                    store.totalEstimatedPrice,
+                                )}
+                            </span>
+                            <span className="text-[8px] sm:text-[9px] uppercase tracking-widest text-text-muted">
+                                Price ({store.priceCoveragePercentage}% priced)
                             </span>
                         </div>
                     </div>
