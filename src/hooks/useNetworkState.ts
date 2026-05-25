@@ -45,8 +45,7 @@ export const useNetworkState = (): void => {
                 const { userLocation, activeShoppingSession, targetStoreId } =
                     useStore.getState();
 
-                const storeId =
-                    activeShoppingSession?.storeId || targetStoreId;
+                const storeId = activeShoppingSession?.storeId || targetStoreId;
                 const items = useStore.getState().items;
                 const firstItem = items?.find((i) => !i.checked);
 

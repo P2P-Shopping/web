@@ -90,7 +90,13 @@ export interface AppState {
     /** Tracks whether the application is connected to the backend server */
     isServerConnected: boolean;
     /** Current authenticated user info */
-    user: { email: string; firstName?: string; userId?: string } | null;
+    user: {
+        email: string;
+        firstName?: string;
+        lastName?: string;
+        userId?: string;
+        hasProfilePicture?: boolean;
+    } | null;
     /** Whether the user is authenticated */
     isAuthenticated: boolean;
     /** Whether the initial auth check has been completed */

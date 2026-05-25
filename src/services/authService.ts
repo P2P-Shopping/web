@@ -71,3 +71,30 @@ export const logoutRequest = async () => {
         throw error;
     }
 };
+
+export const updateProfileRequest = async (data: {
+    firstName?: string;
+    lastName?: string;
+}) => {
+    const response = await api.put("/api/auth/profile", data);
+    return response.data;
+};
+
+export const uploadProfilePictureRequest = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post("/api/auth/profile-picture", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+};
+
+export const getProfilePictureUrl = () => {
+    const base =
+        import.meta.env.VITE_API_URL ||
+        import.meta.env.VITE_API_BASE_URL ||
+        "http://localhost:8081";
+    const normalizedBase =
+        base === "/" ? "" : base.endsWith("/") ? base.slice(0, -1) : base;
+    return `${normalizedBase}/api/auth/profile-picture`;
+};

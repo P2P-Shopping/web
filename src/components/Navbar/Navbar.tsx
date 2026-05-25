@@ -2,6 +2,7 @@ import {
     LayoutDashboard,
     Map as MapIcon,
     MoreHorizontal,
+    User,
     X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -173,6 +174,17 @@ export default function Navbar() {
                                     </span>
                                 </div>
                             )}
+                            <Link
+                                to="/profile"
+                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                                    pathname.startsWith("/profile")
+                                        ? "text-accent bg-accent-subtle font-bold"
+                                        : "text-text-muted hover:text-text-strong hover:bg-bg-muted"
+                                }`}
+                            >
+                                <User size={20} />
+                                <span className="text-sm">Edit Profile</span>
+                            </Link>
                             <button
                                 type="button"
                                 onClick={handleLogout}

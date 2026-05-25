@@ -17,6 +17,7 @@ import {
     LandingPage,
     ListDetail,
     LoginPage,
+    ProfilePage,
     RegistrationPage,
     UnifiedMap,
 } from "./pages";
@@ -451,6 +452,14 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <Dashboard />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/profile"
+                        element={
+                            <ProtectedRoute>
+                                <ProfilePage />
                             </ProtectedRoute>
                         }
                     />
