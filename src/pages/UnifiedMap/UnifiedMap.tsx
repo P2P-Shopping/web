@@ -1268,6 +1268,7 @@ const UnifiedMap: React.FC = () => {
     const isSimulationActive = useStore((state) => state.isSimulationActive);
     const routeOriginRef = useRef<Coordinate | null>(null);
     const lastDeviationRecalcRef = useRef<Coordinate | null>(null);
+    const lastMacroRecalcRef = useRef<Coordinate | null>(null);
 
     const { resetSpokenNodes } = useAudioNavigation(
         userLocation,
@@ -1341,6 +1342,38 @@ const UnifiedMap: React.FC = () => {
                 const decodedPath = polyline.decode(polylineString);
                 useStore.getState().setMacroRouteGeometry(decodedPath);
 
+                const setTargetStoreTransit =
+                    useStore.getState().setTargetStoreTransit;
+                const currentTransit = useStore.getState()
+                    .targetStoreTransit || {
+                    walking: { timeMins: 0, distanceKm: "0.0" },
+                    driving: { timeMins: 0, distanceKm: "0.0" },
+                };
+
+                setTargetStoreTransit({
+                    ...currentTransit,
+                    walking: data.walking
+                        ? {
+                              timeMins: Math.ceil(
+                                  data.walking.durationSeconds / 60,
+                              ),
+                              distanceKm: (
+                                  data.walking.distanceM / 1000
+                              ).toFixed(1),
+                          }
+                        : currentTransit.walking,
+                    driving: data.driving
+                        ? {
+                              timeMins: Math.ceil(
+                                  data.driving.durationSeconds / 60,
+                              ),
+                              distanceKm: (
+                                  data.driving.distanceM / 1000
+                              ).toFixed(1),
+                          }
+                        : currentTransit.driving,
+                });
+
                 if (decodedPath.length > 0) {
                     const lastPoint = decodedPath[decodedPath.length - 1];
                     setTargetStoreLocation({
@@ -1359,6 +1392,19 @@ const UnifiedMap: React.FC = () => {
     useEffect(() => {
         // Automatic geofence transitions disabled per user request
     }, []);
+
+    useEffect(() => {
+        if (navigationMode !== "city" || !targetStoreId) return;
+
+        const distance = lastMacroRecalcRef.current
+            ? getDistanceMeters(userLocation, lastMacroRecalcRef.current)
+            : Number.POSITIVE_INFINITY;
+
+        if (distance > 20) {
+            lastMacroRecalcRef.current = { ...userLocation };
+            void fetchMacroRoute(targetStoreId);
+        }
+    }, [userLocation, navigationMode, targetStoreId, fetchMacroRoute]);
 
     // Restore shopping session after page refresh
     const restoredRef = useRef(false);
