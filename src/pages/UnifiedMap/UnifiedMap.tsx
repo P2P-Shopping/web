@@ -1086,7 +1086,7 @@ const useStoreFootprint = (
             try {
                 const query = `[out:json];way(around:150, ${activeTarget.lat}, ${activeTarget.lng})[building];out geom;`;
                 const response = await fetch(
-                    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+                    `https://overpass.private.coffee/api/interpreter?data=${encodeURIComponent(query)}`,
                 );
                 const data = await response.json();
                 if (data.elements && data.elements.length > 0) {
@@ -1315,6 +1315,7 @@ const UnifiedMap: React.FC = () => {
                             Authorization: `Bearer ${useStore.getState().token}`,
                         },
                         credentials: "include",
+                        signal: AbortSignal.timeout(30000),
                     },
                 );
                 if (!response.ok) {
@@ -1394,6 +1395,7 @@ const UnifiedMap: React.FC = () => {
         // Automatic geofence transitions disabled per user request
     }, []);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally fire only on target/mode change, not every GPS tick
     useEffect(() => {
         if (navigationMode !== "city" || !targetStoreId) {
             lastMacroRecalcRef.current = null;
@@ -1401,7 +1403,7 @@ const UnifiedMap: React.FC = () => {
         }
         lastMacroRecalcRef.current = { ...userLocation };
         void fetchMacroRoute(targetStoreId);
-    }, [targetStoreId, navigationMode, fetchMacroRoute, userLocation]);
+    }, [targetStoreId, navigationMode]);
 
     // Swap the displayed polyline when the user toggles driving/walking
     useEffect(() => {
@@ -2311,7 +2313,9 @@ const UnifiedMap: React.FC = () => {
                             onClick={handleStartCustomStore}
                             className="py-2.5 bg-accent text-white rounded-lg font-bold text-sm disabled:opacity-50"
                         >
-                            Start Shopping
+                            {isStartingShopping
+                                ? "Locating store..."
+                                : "Start Shopping"}
                         </button>
                     </div>
                 </div>
