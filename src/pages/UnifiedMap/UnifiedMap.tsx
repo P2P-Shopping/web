@@ -1397,7 +1397,7 @@ const UnifiedMap: React.FC = () => {
             return;
         }
         lastMacroRecalcRef.current = { ...userLocation };
-    }, [targetStoreId, navigationMode]);
+    }, [targetStoreId, navigationMode, userLocation]);
 
     useEffect(() => {
         if (navigationMode !== "city" || !targetStoreId) return;
@@ -1419,7 +1419,7 @@ const UnifiedMap: React.FC = () => {
 
         lastMacroRecalcRef.current = { ...userLocation };
         void fetchMacroRoute(targetStoreId);
-    }, [transportMode]);
+    }, [navigationMode, targetStoreId, userLocation, fetchMacroRoute]);
 
     // Restore shopping session after page refresh
     const restoredRef = useRef(false);
