@@ -1086,7 +1086,7 @@ const useStoreFootprint = (
             try {
                 const query = `[out:json];way(around:150, ${activeTarget.lat}, ${activeTarget.lng})[building];out geom;`;
                 const response = await fetch(
-                    `https://overpass.private.coffee/api/interpreter?data=${encodeURIComponent(query)}`,
+                    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
                 );
                 const data = await response.json();
                 if (data.elements && data.elements.length > 0) {
