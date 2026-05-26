@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:\\\\Users\\\\Edd1e\\\\Documents\\\\GitHub\\\\web\" diff --name-only)",
+      "Bash(git -C \"c:\\\\Users\\\\Edd1e\\\\Documents\\\\GitHub\\\\server\" diff --name-only)"
+    ]
+  }
+}
