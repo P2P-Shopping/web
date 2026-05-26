@@ -39,6 +39,7 @@ import { useStore } from "../../context/useStore";
 import { GEOFENCE_RADIUS_METERS } from "../../services/geofence";
 import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
+import { getMacroEstimates } from "../../services/routingService";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
@@ -157,7 +158,6 @@ const geocodeStore = async (
 const fetchMacroTransit = async (
     storeId: string,
     userLocation: { lat: number; lng: number },
-    baseUrl: string,
 ) => {
     const transit = {
         driving: { timeMins: 10, distanceKm: "2.0" },
@@ -165,20 +165,11 @@ const fetchMacroTransit = async (
     };
 
     try {
-        const params = new URLSearchParams({
-            userLat: String(userLocation.lat),
-            userLng: String(userLocation.lng),
+        const data = await getMacroEstimates(
+            userLocation.lat,
+            userLocation.lng,
             storeId,
-        });
-        const res = await fetch(`${baseUrl}/api/routing/macro?${params}`, {
-            headers: {
-                Authorization: `Bearer ${useStore.getState().token}`,
-            },
-            credentials: "include",
-        });
-        if (!res.ok) return transit;
-
-        const data = await res.json();
+        );
         if (data.driving) {
             transit.driving = {
                 timeMins: Math.round(data.driving.durationSeconds / 60),
@@ -228,14 +219,9 @@ const extractCoordsFromStore = (store: ApiStoreMatch) => {
 const mapApiStoreToRecommendation = async (
     store: ApiStoreMatch,
     userLocation: { lat: number; lng: number },
-    baseUrl: string,
     itemCount: number,
 ): Promise<StoreRecommendation> => {
-    const realTransit = await fetchMacroTransit(
-        store.storeId,
-        userLocation,
-        baseUrl,
-    );
+    const realTransit = await fetchMacroTransit(store.storeId, userLocation);
 
     let { lat, lng } = extractCoordsFromStore(store);
 
@@ -1263,11 +1249,17 @@ const UnifiedMap: React.FC = () => {
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
+    const [bothMacroGeometries, setBothMacroGeometries] = useState<{
+        driving: [number, number][];
+        walking: [number, number][];
+    }>({ driving: [], walking: [] });
     const isAudioEnabled = useStore((state) => state.isAudioEnabled);
     const setIsAudioEnabled = useStore((state) => state.setIsAudioEnabled);
     const isSimulationActive = useStore((state) => state.isSimulationActive);
     const routeOriginRef = useRef<Coordinate | null>(null);
     const lastDeviationRecalcRef = useRef<Coordinate | null>(null);
+    const macroProgressRef = useRef(0);
+    const lastMacroRecalcRef = useRef<Coordinate | null>(null);
 
     const { resetSpokenNodes } = useAudioNavigation(
         userLocation,
@@ -1323,6 +1315,7 @@ const UnifiedMap: React.FC = () => {
                             Authorization: `Bearer ${useStore.getState().token}`,
                         },
                         credentials: "include",
+                        signal: AbortSignal.timeout(30000),
                     },
                 );
                 if (!response.ok) {
@@ -1331,18 +1324,60 @@ const UnifiedMap: React.FC = () => {
                 }
 
                 const data = await response.json();
-                const polylineString = data[transportMode]?.polyline;
+                const decodeMode = (
+                    m: {
+                        polyline?: string;
+                        geometry?: [number, number][];
+                    } | null,
+                ): [number, number][] => {
+                    if (!m) return [];
+                    if (m.polyline) return polyline.decode(m.polyline);
+                    if (m.geometry) return m.geometry;
+                    return [];
+                };
+                const drivingPath = decodeMode(data.driving);
+                const walkingPath = decodeMode(data.walking);
 
-                if (!polylineString) {
-                    useStore.getState().setMacroRouteGeometry([]);
-                    return;
-                }
+                setBothMacroGeometries({
+                    driving: drivingPath,
+                    walking: walkingPath,
+                });
+                const activePath =
+                    transportMode === "driving" ? drivingPath : walkingPath;
+                useStore.getState().setMacroRouteGeometry(activePath);
 
-                const decodedPath = polyline.decode(polylineString);
-                useStore.getState().setMacroRouteGeometry(decodedPath);
+                const currentTransit = useStore.getState()
+                    .targetStoreTransit || {
+                    walking: { timeMins: 0, distanceKm: "0.0" },
+                    driving: { timeMins: 0, distanceKm: "0.0" },
+                };
 
-                if (decodedPath.length > 0) {
-                    const lastPoint = decodedPath[decodedPath.length - 1];
+                useStore.getState().setTargetStoreTransit({
+                    ...currentTransit,
+                    walking: data.walking
+                        ? {
+                              timeMins: Math.ceil(
+                                  data.walking.durationSeconds / 60,
+                              ),
+                              distanceKm: (
+                                  data.walking.distanceM / 1000
+                              ).toFixed(1),
+                          }
+                        : currentTransit.walking,
+                    driving: data.driving
+                        ? {
+                              timeMins: Math.ceil(
+                                  data.driving.durationSeconds / 60,
+                              ),
+                              distanceKm: (
+                                  data.driving.distanceM / 1000
+                              ).toFixed(1),
+                          }
+                        : currentTransit.driving,
+                });
+
+                if (activePath.length > 0) {
+                    const lastPoint = activePath[activePath.length - 1];
                     setTargetStoreLocation({
                         lat: lastPoint[0],
                         lng: lastPoint[1],
@@ -1359,6 +1394,24 @@ const UnifiedMap: React.FC = () => {
     useEffect(() => {
         // Automatic geofence transitions disabled per user request
     }, []);
+
+    // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally fire only on target/mode change, not every GPS tick
+    useEffect(() => {
+        if (navigationMode !== "city" || !targetStoreId) {
+            lastMacroRecalcRef.current = null;
+            return;
+        }
+        lastMacroRecalcRef.current = { ...userLocation };
+        void fetchMacroRoute(targetStoreId);
+    }, [targetStoreId, navigationMode]);
+
+    // Swap the displayed polyline when the user toggles driving/walking
+    useEffect(() => {
+        const geo = bothMacroGeometries[transportMode];
+        if (geo.length > 0) {
+            useStore.getState().setMacroRouteGeometry(geo);
+        }
+    }, [transportMode, bothMacroGeometries]);
 
     // Restore shopping session after page refresh
     const restoredRef = useRef(false);
@@ -1518,6 +1571,65 @@ const UnifiedMap: React.FC = () => {
         targetStoreId,
     ]);
 
+    // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset ref on mode change
+    useEffect(() => {
+        macroProgressRef.current = 0;
+    }, [transportMode]);
+
+    // Trim the displayed macro route as the user progresses; recalculate if off-route
+    useEffect(() => {
+        if (navigationMode !== "city" || !targetStoreId) return;
+
+        const fullGeometry = bothMacroGeometries[transportMode];
+        if (fullGeometry.length < 2) return;
+
+        // Guard against stale progress index after a mode switch or recalc
+        if (macroProgressRef.current >= fullGeometry.length) {
+            macroProgressRef.current = 0;
+        }
+
+        // Search forward with a small lookback to handle GPS jitter
+        const searchFrom = Math.max(0, macroProgressRef.current - 3);
+        let closestIdx = macroProgressRef.current;
+        let minDist = Infinity;
+        for (let i = searchFrom; i < fullGeometry.length; i++) {
+            const d = getDistanceMeters(userLocation, {
+                lat: fullGeometry[i][0],
+                lng: fullGeometry[i][1],
+            });
+            if (d < minDist) {
+                minDist = d;
+                closestIdx = i;
+            }
+        }
+
+        if (minDist > 150) {
+            // Off-route: debounce so we don't spam API calls while the user is stationary off-route
+            const distFromLastRecalc = lastMacroRecalcRef.current
+                ? getDistanceMeters(userLocation, lastMacroRecalcRef.current)
+                : Infinity;
+            if (distFromLastRecalc < 50) return;
+            lastMacroRecalcRef.current = { ...userLocation };
+            macroProgressRef.current = 0;
+            setBothMacroGeometries({ driving: [], walking: [] });
+            useStore.getState().setMacroRouteGeometry([]);
+            void fetchMacroRoute(targetStoreId);
+        } else if (closestIdx > macroProgressRef.current) {
+            // Progressed forward along the route: trim the displayed polyline
+            macroProgressRef.current = closestIdx;
+            useStore
+                .getState()
+                .setMacroRouteGeometry(fullGeometry.slice(closestIdx));
+        }
+    }, [
+        userLocation,
+        navigationMode,
+        transportMode,
+        targetStoreId,
+        bothMacroGeometries,
+        fetchMacroRoute,
+    ]);
+
     // --- AUDIO NAVIGATION LOGIC ---
     // Extracting audio logic to useAudioNavigation hook...
     const handleListSelect = (listId: string) => {
@@ -1586,7 +1698,6 @@ const UnifiedMap: React.FC = () => {
                     mapApiStoreToRecommendation(
                         store,
                         userLocation,
-                        baseUrl,
                         itemIds.length,
                     ),
                 ),
@@ -1677,11 +1788,16 @@ const UnifiedMap: React.FC = () => {
 
             setTargetStoreId(session.storeId ?? null);
             setTargetStoreLocation({ lat: coords.lat, lng: coords.lng });
-            setTargetStoreTransit(null);
             setHasEnteredStore(false);
 
             if (session.storeId) {
-                await fetchMacroRoute(session.storeId);
+                const [transit] = await Promise.all([
+                    fetchMacroTransit(session.storeId, userLocation),
+                    fetchMacroRoute(session.storeId),
+                ]);
+                setTargetStoreTransit(transit);
+            } else {
+                setTargetStoreTransit(null);
             }
 
             setNavigationMode("city");
@@ -2197,7 +2313,9 @@ const UnifiedMap: React.FC = () => {
                             onClick={handleStartCustomStore}
                             className="py-2.5 bg-accent text-white rounded-lg font-bold text-sm disabled:opacity-50"
                         >
-                            Start Shopping
+                            {isStartingShopping
+                                ? "Locating store..."
+                                : "Start Shopping"}
                         </button>
                     </div>
                 </div>

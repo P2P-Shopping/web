@@ -105,6 +105,7 @@ export const startShoppingRequest = async (data: {
     const response = await api.post<ShoppingSessionResponse>(
         "/api/shopping/start",
         data,
+        { timeout: 60_000 },
     );
     return response.data;
 };

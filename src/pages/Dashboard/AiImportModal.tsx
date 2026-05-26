@@ -3,6 +3,7 @@ import {
     Image as ImageIcon,
     Loader2,
     MapPin,
+    Plus,
     RotateCcw,
     Send,
     Sparkles,
@@ -77,6 +78,8 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     } | null>(null);
     const [isLocating, setIsLocating] = useState(false);
 
+    const [showAttachMenu, setShowAttachMenu] = useState(false);
+    const attachMenuRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { addList, addItem } = useListsStore();
@@ -90,6 +93,22 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             scrollToBottom();
         }
     }, [messages.length, isProcessing, scrollToBottom]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (
+                attachMenuRef.current &&
+                !attachMenuRef.current.contains(e.target as Node)
+            ) {
+                setShowAttachMenu(false);
+            }
+        };
+        if (showAttachMenu) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
+    }, [showAttachMenu]);
 
     useEffect(() => {
         // biome-ignore lint/suspicious/noExplicitAny: custom bridge callback
@@ -348,27 +367,27 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
     return (
         <div className="flex flex-col h-full overflow-hidden">
             {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
                 {messages.map((message, idx) => (
                     <div
                         key={message.id}
-                        className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+                        className={`flex gap-2 sm:gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
                     >
                         <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                            className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 ${
                                 message.role === "user"
                                     ? "bg-accent text-white"
                                     : "bg-bg-muted text-text-strong border border-border"
                             }`}
                         >
                             {message.role === "user" ? (
-                                <User size={16} />
+                                <User size={14} />
                             ) : (
-                                <Sparkles size={16} className="text-accent" />
+                                <Sparkles size={14} className="text-accent" />
                             )}
                         </div>
                         <div
-                            className={`flex flex-col gap-2 max-w-[80%] ${message.role === "user" ? "items-end" : "items-start"}`}
+                            className={`flex flex-col gap-1 sm:gap-2 max-w-[80%] ${message.role === "user" ? "items-end" : "items-start"}`}
                         >
                             {message.image && (
                                 <div className="rounded-2xl overflow-hidden border border-border shadow-sm max-w-sm">
@@ -381,7 +400,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                             )}
                             {message.content && (
                                 <div
-                                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                                    className={`px-3 py-2 sm:px-4 sm:py-3 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                                         message.role === "user"
                                             ? "bg-accent text-white rounded-tr-none"
                                             : "bg-bg-muted text-text-strong border border-border rounded-tl-none"
@@ -391,7 +410,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                                 </div>
                             )}
                             <div className="flex items-center gap-2 px-1 group">
-                                <span className="text-xs text-text-muted uppercase font-bold tracking-tight opacity-70">
+                                <span className="text-[10px] sm:text-xs text-text-muted uppercase font-bold tracking-tight opacity-70">
                                     {new Date(
                                         message.timestamp,
                                     ).toLocaleTimeString([], {
@@ -432,19 +451,19 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                     </div>
                 ))}
                 {isProcessing && (
-                    <div className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-bg-muted border border-border flex items-center justify-center shrink-0">
+                    <div className="flex gap-2 sm:gap-3">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-bg-muted border border-border flex items-center justify-center shrink-0">
                             <Sparkles
-                                size={16}
+                                size={14}
                                 className="text-accent animate-pulse"
                             />
                         </div>
-                        <div className="bg-bg-muted text-text-strong border border-border px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
+                        <div className="bg-bg-muted text-text-strong border border-border px-3 py-2 sm:px-4 sm:py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
                             <Loader2
                                 size={14}
                                 className="animate-spin text-accent"
                             />
-                            <span className="text-sm font-medium italic opacity-70">
+                            <span className="text-xs sm:text-sm font-medium italic opacity-70">
                                 Analyzing your data...
                             </span>
                         </div>
@@ -454,17 +473,17 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
             </div>
 
             {/* Input Area */}
-            <div className="p-4">
+            <div className="p-2 sm:p-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <form
                     onSubmit={handleSend}
-                    className="flex flex-col gap-3 max-w-3xl mx-auto"
+                    className="flex flex-col gap-2 sm:gap-3 max-w-3xl mx-auto"
                 >
                     {imagePreview && (
                         <div className="relative inline-block self-start">
                             <img
                                 src={imagePreview}
                                 alt="Preview"
-                                className="w-20 h-20 object-cover rounded-xl border-2 border-accent"
+                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border-2 border-accent"
                             />
                             <button
                                 type="button"
@@ -476,53 +495,82 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                         </div>
                     )}
 
-                    <div className="flex items-end gap-2 bg-bg-muted border border-border rounded-2xl p-2 focus-within:border-accent transition-all shadow-sm">
-                        <input
-                            type="file"
-                            accept="image/*"
-                            ref={fileInputRef}
-                            className="hidden"
-                            onChange={handleImageChange}
-                        />
-                        <button
-                            type="button"
-                            onClick={handleLocationClick}
-                            className={`p-2.5 rounded-xl transition-all ${
-                                location
-                                    ? "text-accent bg-accent-subtle shadow-inner"
-                                    : "text-text-muted hover:text-accent hover:bg-surface"
-                            }`}
-                            disabled={isLocating}
-                            title={
-                                location ? "Location shared" : "Share location"
-                            }
-                        >
-                            {isLocating ? (
-                                <Loader2 size={20} className="animate-spin" />
-                            ) : (
-                                <MapPin size={20} />
+                    <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        className="hidden"
+                        onChange={handleImageChange}
+                    />
+
+                    <div className="flex items-end gap-1.5 sm:gap-2 bg-bg-muted border border-border rounded-2xl p-1.5 sm:p-2 focus-within:border-accent transition-all shadow-sm">
+                        {/* Attach Menu (Plus button) */}
+                        <div className="relative" ref={attachMenuRef}>
+                            <button
+                                type="button"
+                                onClick={() => setShowAttachMenu((v) => !v)}
+                                className={`p-2 sm:p-2.5 rounded-xl transition-all ${
+                                    showAttachMenu || image || location
+                                        ? "text-accent bg-accent-subtle"
+                                        : "text-text-muted hover:text-accent hover:bg-surface"
+                                }`}
+                                title="Attach"
+                            >
+                                <Plus
+                                    size={20}
+                                    className={`transition-transform ${showAttachMenu ? "rotate-45" : ""}`}
+                                />
+                            </button>
+
+                            {showAttachMenu && (
+                                <div className="absolute bottom-full left-0 mb-2 bg-surface border border-border rounded-xl shadow-lg p-1.5 min-w-[140px] z-50">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const bridge = (
+                                                globalThis as unknown as Window
+                                            ).P2PBridge;
+                                            if (bridge) {
+                                                bridge.openNativeCamera?.(
+                                                    "dashboard_upload_v1",
+                                                );
+                                            } else {
+                                                fileInputRef.current?.click();
+                                            }
+                                            setShowAttachMenu(false);
+                                        }}
+                                        className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-text-strong hover:bg-bg-muted rounded-lg transition-colors"
+                                    >
+                                        <ImageIcon size={16} />
+                                        Image
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            handleLocationClick();
+                                            setShowAttachMenu(false);
+                                        }}
+                                        className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-lg transition-colors ${
+                                            location
+                                                ? "text-accent bg-accent-subtle"
+                                                : "text-text-strong hover:bg-bg-muted"
+                                        }`}
+                                    >
+                                        {isLocating ? (
+                                            <Loader2
+                                                size={16}
+                                                className="animate-spin"
+                                            />
+                                        ) : (
+                                            <MapPin size={16} />
+                                        )}
+                                        {location
+                                            ? "Location shared"
+                                            : "Location"}
+                                    </button>
+                                </div>
                             )}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const bridge = (globalThis as unknown as Window)
-                                    .P2PBridge;
-
-                                if (bridge) {
-                                    bridge.openNativeCamera?.(
-                                        "dashboard_upload_v1",
-                                    );
-                                } else {
-                                    fileInputRef.current?.click();
-                                }
-                            }}
-                            className="p-2.5 text-text-muted hover:text-accent hover:bg-surface rounded-xl transition-all"
-                            title="Attach image"
-                        >
-                            <ImageIcon size={20} />
-                        </button>
+                        </div>
 
                         <textarea
                             value={prompt}
@@ -534,7 +582,7 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                                 }
                             }}
                             placeholder="Type your request here..."
-                            className="flex-1 bg-transparent border-none outline-none text-sm py-2 px-1 resize-none max-h-32 min-h-[40px] text-text-strong"
+                            className="flex-1 bg-transparent border-none outline-none text-xs sm:text-sm py-1.5 sm:py-2 px-1 resize-none max-h-32 min-h-[36px] text-text-strong"
                             rows={1}
                         />
 
@@ -544,12 +592,15 @@ const AiImportModal = ({ onClose }: AiImportModalProps) => {
                                 isProcessing || (!prompt.trim() && !image)
                             }
                             onClick={() => void handleSend()}
-                            className="p-2.5 bg-accent text-white rounded-xl shadow-md hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            className="p-2 sm:p-2.5 bg-accent text-white rounded-xl shadow-md hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
-                            <Send size={18} />
+                            <Send
+                                size={16}
+                                className="sm:w-[18px] sm:h-[18px]"
+                            />
                         </button>
                     </div>
-                    <p className="text-xs text-text-muted text-center font-bold tracking-widest opacity-60">
+                    <p className="text-[11px] sm:text-xs text-text-muted text-center opacity-60 whitespace-nowrap overflow-hidden text-ellipsis">
                         AI may provide inaccurate product matches. Always
                         verify.
                     </p>

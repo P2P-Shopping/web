@@ -61,6 +61,7 @@ const validateRouteId = (routeId: string): string => {
     return routeId;
 };
 const TIMEOUT_MS = 10000;
+const MACRO_TIMEOUT_MS = 30000;
 
 /**
  * POST /api/routing/calculate
@@ -122,7 +123,7 @@ export async function getMacroEstimates(
     const res = await fetch(getRoutingUrl(`/macro?${params}`), {
         headers: { Authorization: `Bearer ${useStore.getState().token}` },
         credentials: "include",
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(MACRO_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`Macro routing failed: ${res.status}`);
     return res.json();
