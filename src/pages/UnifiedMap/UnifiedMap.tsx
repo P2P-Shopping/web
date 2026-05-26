@@ -1342,15 +1342,13 @@ const UnifiedMap: React.FC = () => {
                 const decodedPath = polyline.decode(polylineString);
                 useStore.getState().setMacroRouteGeometry(decodedPath);
 
-                const setTargetStoreTransit =
-                    useStore.getState().setTargetStoreTransit;
                 const currentTransit = useStore.getState()
                     .targetStoreTransit || {
                     walking: { timeMins: 0, distanceKm: "0.0" },
                     driving: { timeMins: 0, distanceKm: "0.0" },
                 };
 
-                setTargetStoreTransit({
+                useStore.getState().setTargetStoreTransit({
                     ...currentTransit,
                     walking: data.walking
                         ? {
@@ -1394,17 +1392,34 @@ const UnifiedMap: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (navigationMode !== "city" || !targetStoreId) return;
+        if (navigationMode !== "city" || !targetStoreId) {
+            lastMacroRecalcRef.current = null;
+            return;
+        }
+        lastMacroRecalcRef.current = { ...userLocation };
+    }, [targetStoreId, navigationMode]);
 
-        const distance = lastMacroRecalcRef.current
-            ? getDistanceMeters(userLocation, lastMacroRecalcRef.current)
-            : Number.POSITIVE_INFINITY;
+    useEffect(() => {
+        if (navigationMode !== "city" || !targetStoreId) return;
+        if (!lastMacroRecalcRef.current) return;
+
+        const distance = getDistanceMeters(
+            userLocation,
+            lastMacroRecalcRef.current,
+        );
 
         if (distance > 20) {
             lastMacroRecalcRef.current = { ...userLocation };
             void fetchMacroRoute(targetStoreId);
         }
     }, [userLocation, navigationMode, targetStoreId, fetchMacroRoute]);
+
+    useEffect(() => {
+        if (navigationMode !== "city" || !targetStoreId) return;
+
+        lastMacroRecalcRef.current = { ...userLocation };
+        void fetchMacroRoute(targetStoreId);
+    }, [transportMode]);
 
     // Restore shopping session after page refresh
     const restoredRef = useRef(false);
