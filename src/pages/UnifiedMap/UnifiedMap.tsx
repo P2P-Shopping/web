@@ -1396,6 +1396,17 @@ const UnifiedMap: React.FC = () => {
         // Automatic geofence transitions disabled per user request
     }, []);
 
+    // Reset GPS error dismissal when the error message changes, and auto-hide after a delay
+    useEffect(() => {
+        if (gpsError) {
+            setDismissedGpsError(false);
+            const timer = setTimeout(() => {
+                setDismissedGpsError(true);
+            }, 8000); // Auto-hide after 8 seconds
+            return () => clearTimeout(timer);
+        }
+    }, [gpsError]);
+
     // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally fire only on target/mode change, not every GPS tick
     useEffect(() => {
         if (navigationMode !== "city" || !targetStoreId) {
@@ -2127,7 +2138,7 @@ const UnifiedMap: React.FC = () => {
 
                 {/* GPS Error Banner */}
                 {gpsError && !isMicroView && !dismissedGpsError && (
-                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-3000 max-w-[90vw] sm:max-w-md">
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-3000 max-w-[90vw] sm:max-w-md animate-in fade-in slide-in-from-top-4 duration-300">
                         <div className="flex items-center gap-2 px-3 py-2 bg-warning/90 text-white rounded-full text-xs font-bold shadow-lg backdrop-blur-md">
                             <span className="shrink-0">⚠</span>
                             <span className="truncate">{gpsError}</span>
