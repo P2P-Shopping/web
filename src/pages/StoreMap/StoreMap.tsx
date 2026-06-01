@@ -942,6 +942,8 @@ const StoreMap: React.FC<StoreMapProps> = ({
     const targetStoreTransit = useStore((state) => state.targetStoreTransit);
     const [dismissedWarnings, setDismissedWarnings] = useState<boolean>(false);
     const [dismissedNewStore, setDismissedNewStore] = useState<boolean>(false);
+    const [dismissedGpsError, setDismissedGpsError] = useState<boolean>(false);
+
     const isNewCustomStore =
         storeRoute.length === 0 &&
         (!!activeShoppingSession?.storeCandidateSubmissionId ||
@@ -950,8 +952,34 @@ const StoreMap: React.FC<StoreMapProps> = ({
 
     // Reset dismissed state when new warnings arrive
     useEffect(() => {
-        if (routeWarnings.length > 0) setDismissedWarnings(false);
+        if (routeWarnings.length > 0) {
+            setDismissedWarnings(false);
+            const timer = setTimeout(() => {
+                setDismissedWarnings(true);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
     }, [routeWarnings]);
+
+    useEffect(() => {
+        if (isNewCustomStore) {
+            setDismissedNewStore(false);
+            const timer = setTimeout(() => {
+                setDismissedNewStore(true);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [isNewCustomStore]);
+
+    useEffect(() => {
+        if (gpsError) {
+            setDismissedGpsError(false);
+            const timer = setTimeout(() => {
+                setDismissedGpsError(true);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [gpsError]);
 
     if (!hasLocationLock) {
         return (
@@ -1007,13 +1035,22 @@ const StoreMap: React.FC<StoreMapProps> = ({
                     </div>
                 )}
 
-                {gpsError && (
+                {gpsError && !dismissedGpsError && (
                     <div
                         role="alert"
                         aria-live="assertive"
                         className="absolute top-4 left-4 right-4 z-20 px-4 py-3 bg-danger text-white rounded-xl text-sm font-bold shadow-lg"
                     >
-                        {gpsError}
+                        <div className="flex items-center justify-between gap-2">
+                            <span>{gpsError}</span>
+                            <button
+                                type="button"
+                                onClick={() => setDismissedGpsError(true)}
+                                className="shrink-0 text-white/70 hover:text-white"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
                     </div>
                 )}
 

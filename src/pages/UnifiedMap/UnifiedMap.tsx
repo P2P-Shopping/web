@@ -1241,6 +1241,7 @@ const UnifiedMap: React.FC = () => {
     const [recommendedStores, setRecommendedStores] = useState<
         StoreRecommendation[]
     >([]);
+    const [dismissedGpsError, setDismissedGpsError] = useState<boolean>(false);
     const [showCustomStoreModal, setShowCustomStoreModal] = useState(false);
     const [customStoreName, setCustomStoreName] = useState("");
     const [customStoreAddress, setCustomStoreAddress] = useState("");
@@ -2125,11 +2126,18 @@ const UnifiedMap: React.FC = () => {
                 </div>
 
                 {/* GPS Error Banner */}
-                {gpsError && !isMicroView && (
+                {gpsError && !isMicroView && !dismissedGpsError && (
                     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-3000 max-w-[90vw] sm:max-w-md">
                         <div className="flex items-center gap-2 px-3 py-2 bg-warning/90 text-white rounded-full text-xs font-bold shadow-lg backdrop-blur-md">
                             <span className="shrink-0">⚠</span>
                             <span className="truncate">{gpsError}</span>
+                            <button
+                                type="button"
+                                onClick={() => setDismissedGpsError(true)}
+                                className="ml-1 shrink-0 text-white/70 hover:text-white"
+                            >
+                                <X size={14} />
+                            </button>
                         </div>
                     </div>
                 )}
