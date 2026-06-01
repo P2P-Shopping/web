@@ -132,6 +132,12 @@ function drawShelves(
     ctx.lineWidth = 2 / zoom;
 
     storeRoute.forEach((product) => {
+        if (
+            product.type === "USER" ||
+            product.itemId === "user_loc" ||
+            product.name === "Tu"
+        )
+            return;
         const { x, y } = getRelativePixels(product, anchor);
         const instruction = (product.audio_instruction || "").toLowerCase();
         const shelfWidth = 40 / zoom;
@@ -188,6 +194,12 @@ function drawRouteArrows(
     if (zoom > 1.2) {
         ctx.fillStyle = theme.route;
         storeRoute.forEach((product) => {
+            if (
+                product.type === "USER" ||
+                product.itemId === "user_loc" ||
+                product.name === "Tu"
+            )
+                return;
             const { x, y } = getRelativePixels(product, anchor);
             ctx.beginPath();
             ctx.arc(x, y, 10 / zoom, 0, Math.PI * 2);
@@ -536,6 +548,12 @@ const useMapEngine = (canvasRef: React.RefObject<HTMLCanvasElement | null>) => {
 
                 // --- MODIFICARE: Logica de afisare Produse ---
                 storeRoute.forEach((product) => {
+                    if (
+                        product.type === "USER" ||
+                        product.itemId === "user_loc" ||
+                        product.name === "Tu"
+                    )
+                        return;
                     const { x, y } = getRelativePixels(product, anchor);
                     const dotSize = 7 / camera.current.zoom;
 

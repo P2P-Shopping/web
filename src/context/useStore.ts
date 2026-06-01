@@ -11,6 +11,7 @@ export interface Coordinate {
 export interface RoutePoint {
     itemId: string;
     name: string;
+    type?: string;
     lat: number;
     lng: number;
     audio_instruction?: string;
