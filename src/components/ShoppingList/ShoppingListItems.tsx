@@ -323,6 +323,8 @@ const ShoppingListItems: React.FC<Props> = ({
     currentUserEmail,
     displayNames,
 }) => {
+    const [activeId, setActiveId] = React.useState<string | null>(null);
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -441,8 +443,6 @@ const ShoppingListItems: React.FC<Props> = ({
         onReorder(reordered, movedItem);
     };
 
-    const [activeId, setActiveId] = React.useState<string | null>(null);
-
     if (sortMode === "custom") {
         return (
             <div className="flex flex-col gap-2.5">
@@ -480,23 +480,28 @@ const ShoppingListItems: React.FC<Props> = ({
                         </ul>
                     </SortableContext>
                     <DragOverlay>
-                        {activeId ? (
-                            <ul className="flex flex-col list-none p-0 m-0">
-                                <SortableItemRow
-                                    item={sortedItems.find(i => i.id === activeId)!}
-                                    checkable={checkable}
-                                    disabled={disabled}
-                                    onCheck={onCheck}
-                                    onDelete={onDelete}
-                                    onEdit={onEdit}
-                                    isDraggable={true}
-                                    onClaim={onClaim}
-                                    onUnclaim={onUnclaim}
-                                    currentUserEmail={currentUserEmail}
-                                    displayNames={displayNames}
-                                />
-                            </ul>
-                        ) : null}
+                        {(() => {
+                            if (!activeId) return null;
+                            const activeItem = sortedItems.find((i) => i.id === activeId);
+                            if (!activeItem) return null;
+                            return (
+                                <ul className="flex flex-col list-none p-0 m-0">
+                                    <SortableItemRow
+                                        item={activeItem}
+                                        checkable={checkable}
+                                        disabled={disabled}
+                                        onCheck={onCheck}
+                                        onDelete={onDelete}
+                                        onEdit={onEdit}
+                                        isDraggable={true}
+                                        onClaim={onClaim}
+                                        onUnclaim={onUnclaim}
+                                        currentUserEmail={currentUserEmail}
+                                        displayNames={displayNames}
+                                    />
+                                </ul>
+                            );
+                        })()}
                     </DragOverlay>
                 </DndContext>
             </div>
