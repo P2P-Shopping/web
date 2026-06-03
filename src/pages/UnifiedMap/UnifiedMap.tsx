@@ -40,6 +40,7 @@ import { GEOFENCE_RADIUS_METERS } from "../../services/geofence";
 import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { getMacroEstimates } from "../../services/routingService";
+import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
@@ -832,7 +833,19 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
                 checked: true,
             });
 
-            if (!didUpdate) {
+            if (didUpdate) {
+                if (stompClient.active) {
+                    stompClient.publish({
+                        destination: `/app/list/${listId}/update`,
+                        body: JSON.stringify({
+                            action: "CHECK_OFF",
+                            itemId: item.id,
+                            checked: true,
+                            timestamp: Date.now(),
+                        }),
+                    });
+                }
+            } else {
                 setDisappearingItemIds((prev) => {
                     const next = new Set(prev);
                     next.delete(item.id);
@@ -853,10 +866,39 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
             checked: false,
         });
 
-        if (!didUpdate) {
+        if (didUpdate) {
+            if (stompClient.active) {
+                stompClient.publish({
+                    destination: `/app/list/${listId}/update`,
+                    body: JSON.stringify({
+                        action: "CHECK_OFF",
+                        itemId: item.id,
+                        checked: false,
+                        timestamp: Date.now(),
+                    }),
+                });
+            }
+        } else {
             setGlobalItems(items);
         }
     };
+
+    const applyIndoorSyncAction = useCallback(
+        (payload: { action: string; itemId?: string; checked?: boolean }) => {
+            if (payload.action !== "CHECK_OFF" || !payload.itemId) {
+                return;
+            }
+            const nextItems = useStore
+                .getState()
+                .items.map((item) =>
+                    item.id === payload.itemId
+                        ? { ...item, checked: Boolean(payload.checked) }
+                        : item,
+                );
+            setGlobalItems(nextItems);
+        },
+        [setGlobalItems],
+    );
 
     useEffect(() => {
         setDisappearingItemIds((prev) => {
@@ -873,6 +915,28 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
     useEffect(() => {
         void syncActiveSession();
     }, [syncActiveSession]);
+
+    useEffect(() => {
+        if (!listId || listId === "default" || !stompClient.active) {
+            return;
+        }
+
+        const subscription = stompClient.subscribe(
+            `/topic/list/${listId}`,
+            (message) => {
+                try {
+                    const payload = JSON.parse(message.body);
+                    applyIndoorSyncAction(payload);
+                } catch (err) {
+                    console.error("Failed to parse indoor sync message:", err);
+                }
+            },
+        );
+
+        return () => {
+            subscription?.unsubscribe();
+        };
+    }, [listId, applyIndoorSyncAction]);
 
     return (
         <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -2092,7 +2156,7 @@ const UnifiedMap: React.FC = () => {
                 )}
 
                 <div
-                    className={`absolute z-2500 transition-all duration-500 ease-in-out top-0 bottom-0 right-0 bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden border-l border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[640px]:w-[85vw] sm:max-[1000px]:w-80 min-[1000px]:w-100`}
+                    className={`absolute z-[3100] transition-all duration-500 ease-in-out top-0 bottom-0 right-0 bg-surface/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden border-l border-border ${isSidebarExpanded ? "translate-x-0" : "translate-x-full"} max-[640px]:w-[85vw] sm:max-[1000px]:w-80 min-[1000px]:w-100`}
                 >
                     <div className="hidden max-[640px]:flex justify-center px-4 pt-3 pb-1 shrink-0">
                         <div className="w-10 h-1 bg-border rounded-full" />
