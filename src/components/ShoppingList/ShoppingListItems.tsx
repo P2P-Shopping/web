@@ -2,11 +2,11 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import {
     closestCenter,
     DndContext,
+    DragOverlay,
     KeyboardSensor,
     PointerSensor,
     useSensor,
     useSensors,
-    DragOverlay,
 } from "@dnd-kit/core";
 import {
     arrayMove,
@@ -449,7 +449,9 @@ const ShoppingListItems: React.FC<Props> = ({
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
-                    onDragStart={(event) => setActiveId(event.active.id as string)}
+                    onDragStart={(event) =>
+                        setActiveId(event.active.id as string)
+                    }
                     onDragCancel={() => setActiveId(null)}
                     onDragEnd={(event) => {
                         setActiveId(null);
@@ -482,7 +484,9 @@ const ShoppingListItems: React.FC<Props> = ({
                     <DragOverlay>
                         {(() => {
                             if (!activeId) return null;
-                            const activeItem = sortedItems.find((i) => i.id === activeId);
+                            const activeItem = sortedItems.find(
+                                (i) => i.id === activeId,
+                            );
                             if (!activeItem) return null;
                             return (
                                 <ul className="flex flex-col list-none p-0 m-0">

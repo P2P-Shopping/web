@@ -811,11 +811,13 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
     const handleCheck = (item: Item) => {
         if (item.checked || disappearingItemIds.has(item.id)) return;
 
+        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
         if ((globalThis as any).AndroidInterface) {
+            // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
             (globalThis as any).AndroidInterface.postTelemetry(
                 useStore.getState().targetStoreId || "Lidl_Vite_Physical",
                 item.id,
-                "WEB_UI_CHECKOFF"
+                "WEB_UI_CHECKOFF",
             );
         }
 
