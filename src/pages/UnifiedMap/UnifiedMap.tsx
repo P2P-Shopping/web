@@ -811,6 +811,14 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
     const handleCheck = (item: Item) => {
         if (item.checked || disappearingItemIds.has(item.id)) return;
 
+        if ((globalThis as any).AndroidInterface) {
+            (globalThis as any).AndroidInterface.postTelemetry(
+                targetStoreId || "Lidl_Vite_Physical",
+                item.id,
+                "WEB_UI_CHECKOFF"
+            );
+        }
+
         setDisappearingItemIds((prev) => new Set(prev).add(item.id));
 
         globalThis.setTimeout(async () => {

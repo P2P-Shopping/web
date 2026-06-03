@@ -6,6 +6,7 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
+    DragOverlay,
 } from "@dnd-kit/core";
 import {
     arrayMove,
@@ -440,13 +441,20 @@ const ShoppingListItems: React.FC<Props> = ({
         onReorder(reordered, movedItem);
     };
 
+    const [activeId, setActiveId] = React.useState<string | null>(null);
+
     if (sortMode === "custom") {
         return (
             <div className="flex flex-col gap-2.5">
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
+                    onDragStart={(event) => setActiveId(event.active.id as string)}
+                    onDragCancel={() => setActiveId(null)}
+                    onDragEnd={(event) => {
+                        setActiveId(null);
+                        handleDragEnd(event);
+                    }}
                 >
                     <SortableContext
                         items={sortedItems.map((i) => i.id)}
@@ -471,6 +479,25 @@ const ShoppingListItems: React.FC<Props> = ({
                             ))}
                         </ul>
                     </SortableContext>
+                    <DragOverlay>
+                        {activeId ? (
+                            <ul className="flex flex-col list-none p-0 m-0">
+                                <SortableItemRow
+                                    item={sortedItems.find(i => i.id === activeId)!}
+                                    checkable={checkable}
+                                    disabled={disabled}
+                                    onCheck={onCheck}
+                                    onDelete={onDelete}
+                                    onEdit={onEdit}
+                                    isDraggable={true}
+                                    onClaim={onClaim}
+                                    onUnclaim={onUnclaim}
+                                    currentUserEmail={currentUserEmail}
+                                    displayNames={displayNames}
+                                />
+                            </ul>
+                        ) : null}
+                    </DragOverlay>
                 </DndContext>
             </div>
         );
