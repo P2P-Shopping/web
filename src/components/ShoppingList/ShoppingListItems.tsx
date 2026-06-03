@@ -2,6 +2,7 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import {
     closestCenter,
     DndContext,
+    DragOverlay,
     KeyboardSensor,
     PointerSensor,
     useSensor,
@@ -322,6 +323,8 @@ const ShoppingListItems: React.FC<Props> = ({
     currentUserEmail,
     displayNames,
 }) => {
+    const [activeId, setActiveId] = React.useState<string | null>(null);
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -446,7 +449,14 @@ const ShoppingListItems: React.FC<Props> = ({
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
+                    onDragStart={(event) =>
+                        setActiveId(event.active.id as string)
+                    }
+                    onDragCancel={() => setActiveId(null)}
+                    onDragEnd={(event) => {
+                        setActiveId(null);
+                        handleDragEnd(event);
+                    }}
                 >
                     <SortableContext
                         items={sortedItems.map((i) => i.id)}
@@ -471,6 +481,32 @@ const ShoppingListItems: React.FC<Props> = ({
                             ))}
                         </ul>
                     </SortableContext>
+                    <DragOverlay>
+                        {(() => {
+                            if (!activeId) return null;
+                            const activeItem = sortedItems.find(
+                                (i) => i.id === activeId,
+                            );
+                            if (!activeItem) return null;
+                            return (
+                                <ul className="flex flex-col list-none p-0 m-0">
+                                    <SortableItemRow
+                                        item={activeItem}
+                                        checkable={checkable}
+                                        disabled={disabled}
+                                        onCheck={onCheck}
+                                        onDelete={onDelete}
+                                        onEdit={onEdit}
+                                        isDraggable={true}
+                                        onClaim={onClaim}
+                                        onUnclaim={onUnclaim}
+                                        currentUserEmail={currentUserEmail}
+                                        displayNames={displayNames}
+                                    />
+                                </ul>
+                            );
+                        })()}
+                    </DragOverlay>
                 </DndContext>
             </div>
         );
