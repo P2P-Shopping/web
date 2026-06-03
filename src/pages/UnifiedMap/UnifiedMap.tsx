@@ -813,7 +813,7 @@ const IndoorRouteList: React.FC<IndoorRouteListProps> = ({
 
         if ((globalThis as any).AndroidInterface) {
             (globalThis as any).AndroidInterface.postTelemetry(
-                targetStoreId || "Lidl_Vite_Physical",
+                useStore.getState().targetStoreId || "Lidl_Vite_Physical",
                 item.id,
                 "WEB_UI_CHECKOFF"
             );
