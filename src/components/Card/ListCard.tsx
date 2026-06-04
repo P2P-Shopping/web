@@ -1,4 +1,11 @@
-import { CalendarDays, Check, ListPlus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import {
+    CalendarDays,
+    Check,
+    ListPlus,
+    Plus,
+    ShoppingCart,
+    Trash2,
+} from "lucide-react";
 import type React from "react";
 import { useStore } from "../../context/useStore";
 import type { ShoppingList } from "../../types";
@@ -238,7 +245,9 @@ export default function ListCard({
                         <button
                             type="button"
                             className={`flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 ${
-                                isDeleting ? "opacity-50 cursor-not-allowed" : ""
+                                isDeleting
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
                             }`}
                             onClick={onDelete}
                             disabled={isDeleting}

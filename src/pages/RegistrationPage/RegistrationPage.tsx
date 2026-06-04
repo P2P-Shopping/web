@@ -40,7 +40,9 @@ const RegistrationPage = () => {
 
         const nameRegex = /^[a-zA-Z\s-]+$/;
         if (!nameRegex.test(formData.firstName)) {
-            setError("First name can only contain letters, spaces, or hyphens.");
+            setError(
+                "First name can only contain letters, spaces, or hyphens.",
+            );
             return;
         }
         if (!nameRegex.test(formData.lastName)) {
@@ -60,7 +62,9 @@ const RegistrationPage = () => {
         }
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
         if (!passwordRegex.test(formData.password)) {
-            setError("Password must be 8+ chars with uppercase, lowercase, and a number.");
+            setError(
+                "Password must be 8+ chars with uppercase, lowercase, and a number.",
+            );
             return;
         }
 
@@ -92,7 +96,10 @@ const RegistrationPage = () => {
             <form onSubmit={handleRegister} className="flex flex-col gap-4">
                 <div className="flex gap-4">
                     <div className="flex flex-col gap-1.5 flex-1">
-                        <label htmlFor="firstName" className="text-[12px] font-bold text-text-strong uppercase tracking-wider">
+                        <label
+                            htmlFor="firstName"
+                            className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                        >
                             First Name
                         </label>
                         <input
@@ -106,7 +113,10 @@ const RegistrationPage = () => {
                         />
                     </div>
                     <div className="flex flex-col gap-1.5 flex-1">
-                        <label htmlFor="lastName" className="text-[12px] font-bold text-text-strong uppercase tracking-wider">
+                        <label
+                            htmlFor="lastName"
+                            className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                        >
                             Last Name
                         </label>
                         <input
@@ -122,7 +132,10 @@ const RegistrationPage = () => {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <label htmlFor="email" className="text-[12px] font-bold text-text-strong uppercase tracking-wider">
+                    <label
+                        htmlFor="email"
+                        className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                    >
                         Email
                     </label>
                     <input
@@ -137,7 +150,10 @@ const RegistrationPage = () => {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <label htmlFor="password" className="text-[12px] font-bold text-text-strong uppercase tracking-wider">
+                    <label
+                        htmlFor="password"
+                        className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                    >
                         Password
                     </label>
                     <input
@@ -152,7 +168,10 @@ const RegistrationPage = () => {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <label htmlFor="confirmPassword" className="text-[12px] font-bold text-text-strong uppercase tracking-wider">
+                    <label
+                        htmlFor="confirmPassword"
+                        className="text-[12px] font-bold text-text-strong uppercase tracking-wider"
+                    >
                         Confirm Password
                     </label>
                     <input
@@ -167,7 +186,10 @@ const RegistrationPage = () => {
                 </div>
 
                 {error && (
-                    <p role="alert" className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium">
+                    <p
+                        role="alert"
+                        className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium"
+                    >
                         {error}
                     </p>
                 )}

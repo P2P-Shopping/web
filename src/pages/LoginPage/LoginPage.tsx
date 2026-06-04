@@ -27,7 +27,9 @@ const LoginPage = () => {
                 typeof result.token !== "string" ||
                 result.token.trim().length === 0
             ) {
-                throw new Error("Invalid response from server. No token received.");
+                throw new Error(
+                    "Invalid response from server. No token received.",
+                );
             }
             setAuth(result, result.token);
             toast.success("Welcome back!");
@@ -54,7 +56,10 @@ const LoginPage = () => {
         >
             <form onSubmit={handleLogin} className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
-                    <label htmlFor="email" className="text-[13px] font-bold text-text-strong uppercase tracking-wider">
+                    <label
+                        htmlFor="email"
+                        className="text-[13px] font-bold text-text-strong uppercase tracking-wider"
+                    >
                         Email
                     </label>
                     <input
@@ -69,7 +74,10 @@ const LoginPage = () => {
                     />
                 </div>
                 <div className="flex flex-col gap-2">
-                    <label htmlFor="password" className="text-[13px] font-bold text-text-strong uppercase tracking-wider">
+                    <label
+                        htmlFor="password"
+                        className="text-[13px] font-bold text-text-strong uppercase tracking-wider"
+                    >
                         Password
                     </label>
                     <input
@@ -85,7 +93,10 @@ const LoginPage = () => {
                 </div>
 
                 {error && (
-                    <p role="alert" className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium animate-in shake-in duration-300">
+                    <p
+                        role="alert"
+                        className="bg-danger-subtle text-danger border border-danger-border p-3 rounded-lg text-sm font-medium animate-in shake-in duration-300"
+                    >
                         {error}
                     </p>
                 )}

@@ -1405,7 +1405,11 @@ const UnifiedMap: React.FC = () => {
         targetStoreTransit === null;
 
     const fetchMacroRoute = useCallback(
-        async (storeId: string | null, storeLat?: number, storeLng?: number) => {
+        async (
+            storeId: string | null,
+            storeLat?: number,
+            storeLng?: number,
+        ) => {
             try {
                 const baseUrl = getApiBaseUrl();
                 const loc = useStore.getState().userLocation;
@@ -1912,7 +1916,11 @@ const UnifiedMap: React.FC = () => {
             setTargetStoreLocation({ lat: coords.lat, lng: coords.lng });
             setHasEnteredStore(false);
 
-            await fetchMacroRoute(session.storeId ?? null, coords.lat, coords.lng);
+            await fetchMacroRoute(
+                session.storeId ?? null,
+                coords.lat,
+                coords.lng,
+            );
 
             setNavigationMode("city");
             setIsShowingStores(false);
@@ -2191,9 +2199,10 @@ const UnifiedMap: React.FC = () => {
                             position={[userLocation.lat, userLocation.lng]}
                             icon={L.divIcon({
                                 className: "user-location-marker",
-                                html: transportMode === "walking"
-                                    ? `<div style="width:38px;height:38px;background:white;border-radius:50%;border:3px solid var(--color-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.25);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><line x1="12" y1="6" x2="12" y2="14"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="12" y1="14" x2="9" y2="20"/><line x1="12" y1="14" x2="15" y2="20"/></svg></div>`
-                                    : `<div style="width:38px;height:38px;background:white;border-radius:50%;border:3px solid var(--color-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.25);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="11" width="20" height="7" rx="2"/><path d="M6 11 8 7h8l2 4"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></svg></div>`,
+                                html:
+                                    transportMode === "walking"
+                                        ? `<div style="width:38px;height:38px;background:white;border-radius:50%;border:3px solid var(--color-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.25);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><line x1="12" y1="6" x2="12" y2="14"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="12" y1="14" x2="9" y2="20"/><line x1="12" y1="14" x2="15" y2="20"/></svg></div>`
+                                        : `<div style="width:38px;height:38px;background:white;border-radius:50%;border:3px solid var(--color-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.25);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="11" width="20" height="7" rx="2"/><path d="M6 11 8 7h8l2 4"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></svg></div>`,
                                 iconSize: [38, 38],
                                 iconAnchor: [19, 19],
                             })}

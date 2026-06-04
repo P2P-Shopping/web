@@ -5,7 +5,8 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import App from "./App.tsx";
 
-const GOOGLE_CLIENT_ID = "1011433342347-l9445a7d8f14e06rcog3npas9uvsos96.apps.googleusercontent.com"
+const GOOGLE_CLIENT_ID =
+    "1011433342347-l9445a7d8f14e06rcog3npas9uvsos96.apps.googleusercontent.com";
 
 let rootElement = document.getElementById("root");
 if (!rootElement) {
