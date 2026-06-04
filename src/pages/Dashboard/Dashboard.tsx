@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ImportItemsModal, ListCard } from "../../components";
+import { ImportItemsModal, ListCard, Modal } from "../../components";
 import { useStore } from "../../context/useStore";
 import { useListsStore } from "../../store/useListsStore";
 import type { Item, ListCategory, ShoppingList } from "../../types";
@@ -101,6 +101,7 @@ interface ListCategorySectionProps {
         id: string,
         name: string,
     ) => void;
+    onImportList: (e: React.MouseEvent<HTMLButtonElement>, id: string) => void;
     deletingListId: string | null;
     userEmail?: string;
 }
@@ -118,6 +119,7 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
     dragOverListId,
     onCardClick,
     onDeleteList,
+    onImportList,
     deletingListId,
     userEmail,
 }) => (
@@ -177,6 +179,7 @@ const ListCategorySection: React.FC<ListCategorySectionProps> = ({
                                     ? (e) => onDeleteList(e, list.id, list.name)
                                     : undefined
                             }
+                            onImport={(e) => onImportList(e, list.id)}
                             isDeleting={deletingListId === list.id}
                         />
                     </li>
@@ -609,6 +612,7 @@ interface DashboardTabsViewProps {
         id: string,
         name: string,
     ) => void;
+    onImportList: (e: React.MouseEvent<HTMLButtonElement>, id: string) => void;
     deletingListId: string | null;
     handleDragStart: (e: React.DragEvent, id: string) => void;
     resetDragState: () => void;
@@ -634,6 +638,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
     sectionLabels,
     onCardClick,
     onDeleteList,
+    onImportList,
     deletingListId,
     handleDragStart,
     resetDragState,
@@ -715,6 +720,7 @@ const DashboardTabsView: React.FC<DashboardTabsViewProps> = ({
                                     ? (e) => onDeleteList(e, list.id, list.name)
                                     : undefined
                             }
+                            onImport={(e) => onImportList(e, list.id)}
                             isDeleting={deletingListId === list.id}
                         />
                     </li>
@@ -751,6 +757,7 @@ interface DashboardSplitViewProps {
         id: string,
         name: string,
     ) => void;
+    onImportList: (e: React.MouseEvent<HTMLButtonElement>, id: string) => void;
     deletingListId: string | null;
     userEmail?: string;
 }
@@ -769,6 +776,7 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
     handleDropOnNormalList,
     onCardClick,
     onDeleteList,
+    onImportList,
     deletingListId,
     userEmail,
 }) => (
@@ -801,6 +809,7 @@ const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                 dragOverListId={dragOverListId}
                 onCardClick={onCardClick}
                 onDeleteList={onDeleteList}
+                onImportList={onImportList}
                 deletingListId={deletingListId}
                 userEmail={userEmail}
             />
@@ -873,6 +882,26 @@ const Dashboard = () => {
         confirmImportSelection,
         handleDropOnNormalList,
     } = useDashboardImport(lists, addItem, updateItem, resetDragState);
+
+    const [importPickerSourceId, setImportPickerSourceId] = useState<
+        string | null
+    >(null);
+
+    const handleImportClick = (
+        e: React.MouseEvent<HTMLButtonElement>,
+        listId: string,
+    ) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setImportPickerSourceId(listId);
+    };
+
+    const handlePickImportTarget = (targetId: string) => {
+        if (importPickerSourceId) {
+            handleDropOnNormalList(targetId, importPickerSourceId);
+        }
+        setImportPickerSourceId(null);
+    };
 
     useEffect(() => {
         localStorage.setItem("dashboard_display_mode", displayMode);
@@ -997,6 +1026,7 @@ const Dashboard = () => {
                             sectionLabels={sectionLabels}
                             onCardClick={handleCardClick}
                             onDeleteList={handleDeleteList}
+                            onImportList={handleImportClick}
                             deletingListId={deletingListId}
                             handleDragStart={handleDragStart}
                             resetDragState={resetDragState}
@@ -1026,6 +1056,7 @@ const Dashboard = () => {
                             handleDropOnNormalList={handleDropOnNormalList}
                             onCardClick={handleCardClick}
                             onDeleteList={handleDeleteList}
+                            onImportList={handleImportClick}
                             deletingListId={deletingListId}
                             userEmail={user?.email}
                         />
@@ -1053,6 +1084,7 @@ const Dashboard = () => {
                                               )
                                         : undefined
                                 }
+                                onImport={(e) => handleImportClick(e, list.id)}
                                 isDeleting={deletingListId === list.id}
                             />
                         </li>
@@ -1111,6 +1143,45 @@ const Dashboard = () => {
                 onConfirm={confirmImportSelection}
                 isSubmitting={isImportingItems}
             />
+            {importPickerSourceId && (
+                <Modal
+                    isOpen={true}
+                    onClose={() => setImportPickerSourceId(null)}
+                    title="Import items into:"
+                    maxWidth="400px"
+                >
+                    <div className="flex flex-col gap-2">
+                        {lists
+                            .filter((l) => l.id !== importPickerSourceId)
+                            .map((l) => (
+                                <button
+                                    key={l.id}
+                                    type="button"
+                                    onClick={() => handlePickImportTarget(l.id)}
+                                    className="flex items-start gap-3 p-3 rounded-xl border border-border hover:bg-bg-muted hover:border-accent-border transition-all text-left"
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-text-strong truncate">
+                                            {l.name}
+                                        </div>
+                                        <div className="text-xs text-text-muted mt-0.5">
+                                            {l.items.length}{" "}
+                                            {l.items.length === 1
+                                                ? "item"
+                                                : "items"}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        {lists.filter((l) => l.id !== importPickerSourceId)
+                            .length === 0 && (
+                            <p className="text-sm text-text-muted text-center py-4">
+                                No other lists available.
+                            </p>
+                        )}
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 };

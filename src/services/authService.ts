@@ -61,6 +61,19 @@ export const checkAuthRequest = async () => {
     }
 };
 
+export const googleLoginRequest = async (credential: string) => {
+    const response = await api.post<AuthResponse>(
+        "/api/auth/google",
+        { credential },
+        { headers: { "X-Return-Token": "true" } },
+    );
+    const { token, ...userData } = response.data;
+    if (token) {
+        useStore.getState().setAuth(userData, token);
+    }
+    return response.data;
+};
+
 export const logoutRequest = async () => {
     try {
         await api.post("/api/auth/logout", {});

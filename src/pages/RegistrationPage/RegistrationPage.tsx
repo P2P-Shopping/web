@@ -2,7 +2,8 @@ import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { AuthTabs, BackButton, Logo } from "../../components";
+import { AuthLayout } from "../../components/AuthLayout";
+import { GoogleLoginButton } from "../../components/GoogleLoginButton";
 import { registerRequest } from "../../services/authService";
 
 const RegistrationPage = () => {
@@ -86,21 +87,12 @@ const RegistrationPage = () => {
     };
 
     return (
-        <div className="my-auto flex flex-col w-full max-w-[440px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
-            <BackButton />
-            <div className="flex items-center justify-center gap-3 mb-8">
-                <Logo className="h-12 w-auto" alt="uCart" />
-            </div>
-
-            <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
-                Create account
-            </h1>
-            <p className="text-[15px] text-text-muted mb-8">
-                Join to start managing your shopping lists
-            </p>
-
-            <AuthTabs activeTab="register" />
-
+        <AuthLayout
+            title="Create account"
+            subtitle="Join to start managing your shopping lists"
+            activeTab="register"
+            maxWidthClass="max-w-[440px]"
+        >
             <form onSubmit={handleRegister} className="flex flex-col gap-4">
                 <div className="flex gap-4">
                     <div className="flex flex-col gap-1.5 flex-1">
@@ -210,7 +202,9 @@ const RegistrationPage = () => {
                     {isSubmitting ? "Creating account…" : "Create Account"}
                 </button>
             </form>
-        </div>
+
+            <GoogleLoginButton setError={setError} />
+        </AuthLayout>
     );
 };
 

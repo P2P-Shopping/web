@@ -16,6 +16,7 @@
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
         "@mapbox/polyline": "^1.2.1",
+        "@react-oauth/google": "^0.13.5",
         "@stomp/stompjs": "^7.3.0",
         "@tailwindcss/vite": "^4.2.4",
         "@types/leaflet": "^1.9.21",

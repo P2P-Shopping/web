@@ -2,7 +2,8 @@ import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { AuthTabs, BackButton, Logo } from "../../components";
+import { AuthLayout } from "../../components/AuthLayout";
+import { GoogleLoginButton } from "../../components/GoogleLoginButton";
 import { useStore } from "../../context/useStore";
 import { loginRequest } from "../../services/authService";
 
@@ -47,21 +48,12 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="my-auto flex flex-col w-full max-w-[400px] bg-surface border border-border rounded-2xl p-8 shadow-xl animate-in fade-in zoom-in-95 duration-500">
-            <BackButton />
-            <div className="flex justify-center mb-6">
-                <Logo className="h-12 w-auto" alt="uCart" />
-            </div>
-
-            <h1 className="text-2xl font-bold text-text-strong tracking-tight mb-1">
-                Welcome back
-            </h1>
-            <p className="text-[15px] text-text-muted mb-8">
-                Sign in to manage your shopping lists
-            </p>
-
-            <AuthTabs activeTab="login" />
-
+        <AuthLayout
+            title="Welcome back"
+            subtitle="Sign in to manage your shopping lists"
+            activeTab="login"
+            maxWidthClass="max-w-[400px]"
+        >
             <form onSubmit={handleLogin} className="flex flex-col gap-5">
                 <div className="flex flex-col gap-2">
                     <label
@@ -117,7 +109,9 @@ const LoginPage = () => {
                     {isSubmitting ? "Signing In..." : "Sign In"}
                 </button>
             </form>
-        </div>
+
+            <GoogleLoginButton setError={setError} />
+        </AuthLayout>
     );
 };
 

@@ -113,12 +113,18 @@ export async function getMacroEstimates(
     userLat: number,
     userLng: number,
     storeId: string,
+    storeLat?: number,
+    storeLng?: number,
 ): Promise<MacroRoutingResponse> {
     const params = new URLSearchParams({
         userLat: String(userLat),
         userLng: String(userLng),
         storeId,
     });
+    if (storeLat !== undefined && storeLng !== undefined) {
+        params.set("storeLat", String(storeLat));
+        params.set("storeLng", String(storeLng));
+    }
 
     const res = await fetch(getRoutingUrl(`/macro?${params}`), {
         headers: { Authorization: `Bearer ${useStore.getState().token}` },

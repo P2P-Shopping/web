@@ -1,4 +1,11 @@
-import { CalendarDays, Check, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import {
+    CalendarDays,
+    Check,
+    ListPlus,
+    Plus,
+    ShoppingCart,
+    Trash2,
+} from "lucide-react";
 import type React from "react";
 import { useStore } from "../../context/useStore";
 import type { ShoppingList } from "../../types";
@@ -10,6 +17,7 @@ interface ListCardProps {
     list: ShoppingList;
     onClick?: () => void;
     onDelete?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+    onImport?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     isDeleting?: boolean;
     canDelete?: boolean;
 }
@@ -24,6 +32,7 @@ export default function ListCard({
     list,
     onClick,
     onDelete,
+    onImport,
     isDeleting,
     canDelete = true,
 }: Readonly<ListCardProps>) {
@@ -219,19 +228,36 @@ export default function ListCard({
                 </div>
             </button>
 
-            {onDelete && canDelete && (
-                <button
-                    type="button"
-                    className={`absolute top-5 right-5 flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 z-10 ${
-                        isDeleting ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                    onClick={onDelete}
-                    disabled={isDeleting}
-                    title="Delete list"
-                    aria-label="Delete list"
-                >
-                    <Trash2 size={16} />
-                </button>
+            {(onImport || (onDelete && canDelete)) && (
+                <div className="absolute top-5 right-5 flex items-center gap-1.5 z-10">
+                    {onImport && (
+                        <button
+                            type="button"
+                            className="flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-accent-subtle hover:text-accent hover:border-accent-border shrink-0 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                            onClick={onImport}
+                            title="Import items from this list"
+                            aria-label="Import items from this list"
+                        >
+                            <ListPlus size={16} />
+                        </button>
+                    )}
+                    {onDelete && canDelete && (
+                        <button
+                            type="button"
+                            className={`flex items-center justify-center w-8.5 h-8.5 border border-border rounded-md bg-bg-muted text-text-muted transition-all duration-200 ease-out hover:bg-danger-subtle hover:text-danger hover:border-danger-border shrink-0 focus-visible:outline-2 focus-visible:outline-danger focus-visible:outline-offset-2 ${
+                                isDeleting
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
+                            }`}
+                            onClick={onDelete}
+                            disabled={isDeleting}
+                            title="Delete list"
+                            aria-label="Delete list"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
+                </div>
             )}
         </div>
     );

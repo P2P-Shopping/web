@@ -27,7 +27,9 @@ import {
     List as ListIcon,
     LocateFixed,
     MapPin,
+    Moon,
     Satellite,
+    Sun,
     Volume2,
     VolumeX,
     X,
@@ -42,6 +44,7 @@ import { teleport } from "../../services/mockEmitter";
 import { getMacroEstimates } from "../../services/routingService";
 import stompClient from "../../services/socketService";
 import { useListsStore } from "../../store/useListsStore";
+import { useThemeStore } from "../../store/useThemeStore";
 import type { Item, ShoppingList } from "../../types";
 import ListDetail from "../ListDetail/ListDetail";
 import { useFinishShopping } from "../ListDetail/useFinishShopping";
@@ -1324,6 +1327,34 @@ const UnifiedMap: React.FC = () => {
     const [transportMode, setTransportMode] = useState<"driving" | "walking">(
         "driving",
     );
+    const { theme: uiTheme } = useThemeStore();
+    const effectiveUiTheme = useMemo((): "light" | "dark" => {
+        if (uiTheme === "system") {
+            return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+        }
+        return uiTheme as "light" | "dark";
+    }, [uiTheme]);
+    const [mapTheme, setMapTheme] = useState<"light" | "dark">(() => {
+        const saved = localStorage.getItem("ucart-map-theme");
+        if (saved === "light" || saved === "dark") return saved;
+        if (uiTheme === "system") {
+            return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+        }
+        return uiTheme === "dark" ? "dark" : "light";
+    });
+    useEffect(() => {
+        if (!localStorage.getItem("ucart-map-theme")) {
+            setMapTheme(effectiveUiTheme);
+        }
+    }, [effectiveUiTheme]);
+    const handleSetMapTheme = (newTheme: "light" | "dark") => {
+        setMapTheme(newTheme);
+        localStorage.setItem("ucart-map-theme", newTheme);
+    };
     const [bothMacroGeometries, setBothMacroGeometries] = useState<{
         driving: [number, number][];
         walking: [number, number][];
@@ -1374,15 +1405,23 @@ const UnifiedMap: React.FC = () => {
         targetStoreTransit === null;
 
     const fetchMacroRoute = useCallback(
-        async (storeId: string) => {
+        async (
+            storeId: string | null,
+            storeLat?: number,
+            storeLng?: number,
+        ) => {
             try {
                 const baseUrl = getApiBaseUrl();
                 const loc = useStore.getState().userLocation;
                 const params = new URLSearchParams({
                     userLat: String(loc.lat),
                     userLng: String(loc.lng),
-                    storeId,
                 });
+                if (storeId) params.set("storeId", storeId);
+                if (storeLat !== undefined && storeLng !== undefined) {
+                    params.set("storeLat", String(storeLat));
+                    params.set("storeLng", String(storeLng));
+                }
                 const response = await fetch(
                     `${baseUrl}/api/routing/macro?${params}`,
                     {
@@ -1394,7 +1433,6 @@ const UnifiedMap: React.FC = () => {
                     },
                 );
                 if (!response.ok) {
-                    useStore.getState().setMacroRouteGeometry([]);
                     return;
                 }
 
@@ -1483,12 +1521,13 @@ const UnifiedMap: React.FC = () => {
 
     // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally fire only on target/mode change, not every GPS tick
     useEffect(() => {
-        if (navigationMode !== "city" || !targetStoreId) {
+        if (navigationMode !== "city" || !targetStoreLocation) {
             lastMacroRecalcRef.current = null;
             return;
         }
         lastMacroRecalcRef.current = { ...userLocation };
-        void fetchMacroRoute(targetStoreId);
+        const loc = useStore.getState().targetStoreLocation;
+        void fetchMacroRoute(targetStoreId, loc?.lat, loc?.lng);
     }, [targetStoreId, navigationMode]);
 
     // Swap the displayed polyline when the user toggles driving/walking
@@ -1664,17 +1703,15 @@ const UnifiedMap: React.FC = () => {
 
     // Trim the displayed macro route as the user progresses; recalculate if off-route
     useEffect(() => {
-        if (navigationMode !== "city" || !targetStoreId) return;
+        if (navigationMode !== "city" || !targetStoreLocation) return;
 
         const fullGeometry = bothMacroGeometries[transportMode];
         if (fullGeometry.length < 2) return;
 
-        // Guard against stale progress index after a mode switch or recalc
         if (macroProgressRef.current >= fullGeometry.length) {
             macroProgressRef.current = 0;
         }
 
-        // Search forward with a small lookback to handle GPS jitter
         const searchFrom = Math.max(0, macroProgressRef.current - 3);
         let closestIdx = macroProgressRef.current;
         let minDist = Infinity;
@@ -1690,7 +1727,6 @@ const UnifiedMap: React.FC = () => {
         }
 
         if (minDist > 150) {
-            // Off-route: debounce so we don't spam API calls while the user is stationary off-route
             const distFromLastRecalc = lastMacroRecalcRef.current
                 ? getDistanceMeters(userLocation, lastMacroRecalcRef.current)
                 : Infinity;
@@ -1699,9 +1735,12 @@ const UnifiedMap: React.FC = () => {
             macroProgressRef.current = 0;
             setBothMacroGeometries({ driving: [], walking: [] });
             useStore.getState().setMacroRouteGeometry([]);
-            void fetchMacroRoute(targetStoreId);
+            void fetchMacroRoute(
+                targetStoreId,
+                targetStoreLocation.lat,
+                targetStoreLocation.lng,
+            );
         } else if (closestIdx > macroProgressRef.current) {
-            // Progressed forward along the route: trim the displayed polyline
             macroProgressRef.current = closestIdx;
             useStore
                 .getState()
@@ -1712,6 +1751,7 @@ const UnifiedMap: React.FC = () => {
         navigationMode,
         transportMode,
         targetStoreId,
+        targetStoreLocation,
         bothMacroGeometries,
         fetchMacroRoute,
     ]);
@@ -1876,15 +1916,11 @@ const UnifiedMap: React.FC = () => {
             setTargetStoreLocation({ lat: coords.lat, lng: coords.lng });
             setHasEnteredStore(false);
 
-            if (session.storeId) {
-                const [transit] = await Promise.all([
-                    fetchMacroTransit(session.storeId, userLocation),
-                    fetchMacroRoute(session.storeId),
-                ]);
-                setTargetStoreTransit(transit);
-            } else {
-                setTargetStoreTransit(null);
-            }
+            await fetchMacroRoute(
+                session.storeId ?? null,
+                coords.lat,
+                coords.lng,
+            );
 
             setNavigationMode("city");
             setIsShowingStores(false);
@@ -2018,8 +2054,13 @@ const UnifiedMap: React.FC = () => {
                         <ZoomControl position="topleft" />
 
                         <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            key={mapTheme}
+                            attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+                            url={
+                                mapTheme === "dark"
+                                    ? "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
+                                    : "https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png"
+                            }
                         />
                         <MapEvents />
                         <MapController
@@ -2034,9 +2075,9 @@ const UnifiedMap: React.FC = () => {
                                     position={[store.lat, store.lng]}
                                     icon={L.divIcon({
                                         className: "store-marker",
-                                        html: `<div style="color: var(--color-accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
-                                        iconSize: [24, 24],
-                                        iconAnchor: [12, 24],
+                                        html: `<div style="width:34px;height:34px;background:var(--color-accent);border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid white;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>`,
+                                        iconSize: [34, 34],
+                                        iconAnchor: [17, 34],
                                     })}
                                 >
                                     <Popup>{store.name}</Popup>
@@ -2075,9 +2116,9 @@ const UnifiedMap: React.FC = () => {
                                     ]}
                                     icon={L.divIcon({
                                         className: "target-store-icon",
-                                        html: `<div style="color: var(--color-accent);"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>`,
-                                        iconSize: [32, 32],
-                                        iconAnchor: [16, 32],
+                                        html: `<div style="width:40px;height:40px;background:var(--color-accent);border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,0.35);border:3px solid white;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>`,
+                                        iconSize: [40, 40],
+                                        iconAnchor: [20, 40],
                                     })}
                                 />
                             </>
@@ -2086,14 +2127,28 @@ const UnifiedMap: React.FC = () => {
                         {targetStoreLocation &&
                             !isMicroView &&
                             macroRouteGeometry.length > 0 && (
-                                <Polyline
-                                    positions={macroRouteGeometry}
-                                    pathOptions={{
-                                        color: "var(--color-blue-neon)",
-                                        weight: 4,
-                                        dashArray: "10, 10",
-                                    }}
-                                />
+                                <>
+                                    <Polyline
+                                        positions={macroRouteGeometry}
+                                        pathOptions={{
+                                            color: "#1d4ed8",
+                                            weight: 8,
+                                            lineCap: "round",
+                                            lineJoin: "round",
+                                            opacity: 1,
+                                        }}
+                                    />
+                                    <Polyline
+                                        positions={macroRouteGeometry}
+                                        pathOptions={{
+                                            color: "#60a5fa",
+                                            weight: 5,
+                                            lineCap: "round",
+                                            lineJoin: "round",
+                                            opacity: 1,
+                                        }}
+                                    />
+                                </>
                             )}
 
                         {isMicroView && route.length > 0 && (
@@ -2142,6 +2197,15 @@ const UnifiedMap: React.FC = () => {
                         )}
                         <Marker
                             position={[userLocation.lat, userLocation.lng]}
+                            icon={L.divIcon({
+                                className: "user-location-marker",
+                                html:
+                                    transportMode === "walking"
+                                        ? `<div style="width:38px;height:38px;background:white;border-radius:50%;border:3px solid var(--color-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.25);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><line x1="12" y1="6" x2="12" y2="14"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="12" y1="14" x2="9" y2="20"/><line x1="12" y1="14" x2="15" y2="20"/></svg></div>`
+                                        : `<div style="width:38px;height:38px;background:white;border-radius:50%;border:3px solid var(--color-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.25);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="11" width="20" height="7" rx="2"/><path d="M6 11 8 7h8l2 4"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/></svg></div>`,
+                                iconSize: [38, 38],
+                                iconAnchor: [19, 19],
+                            })}
                         />
                     </MapContainer>
                 )}
@@ -2227,9 +2291,31 @@ const UnifiedMap: React.FC = () => {
                     </div>
                 )}
 
-                {/* BUTOANELE MOCK / REAL GPS - RIGHT SIDE CORNER (dev only) */}
-                {import.meta.env.DEV && (
-                    <div className="absolute top-4 right-4 z-3000">
+                {/* TOP-RIGHT CONTROLS: map theme toggle + dev GPS */}
+                <div className="absolute top-4 right-4 z-3000 flex flex-col gap-2 items-end">
+                    {!isMicroView && (
+                        <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
+                            <button
+                                type="button"
+                                onClick={() => handleSetMapTheme("light")}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${mapTheme === "light" ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
+                                title="Light Map"
+                            >
+                                <Sun size={12} />
+                                Light
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSetMapTheme("dark")}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all ${mapTheme === "dark" ? "bg-accent text-white" : "text-text-muted hover:text-text-strong"}`}
+                                title="Dark Map"
+                            >
+                                <Moon size={12} />
+                                Dark
+                            </button>
+                        </div>
+                    )}
+                    {import.meta.env.DEV && (
                         <div className="flex bg-surface/90 backdrop-blur-md border border-border rounded-xl p-1 shadow-lg">
                             <button
                                 type="button"
@@ -2250,8 +2336,8 @@ const UnifiedMap: React.FC = () => {
                                 Real
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {!isMicroView && targetStoreLocation && (
