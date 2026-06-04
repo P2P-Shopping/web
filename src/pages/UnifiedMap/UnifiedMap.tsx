@@ -37,6 +37,9 @@ import { Modal } from "../../components";
 import type { Coordinate, RoutePoint } from "../../context/useStore";
 import { useStore } from "../../context/useStore";
 import { GEOFENCE_RADIUS_METERS } from "../../services/geofence";
+import { StoreMapLegend } from "../../components/Map/StoreMapLegend";
+import { speakInstruction } from "../../services/ttsService";
+import type { TelemetryData } from "../../types/telemetry";
 import { loadRoute } from "../../services/loadRoute";
 import { teleport } from "../../services/mockEmitter";
 import { getMacroEstimates } from "../../services/routingService";
@@ -1252,14 +1255,8 @@ const useAudioNavigation = (
                     console.warn("Audio beep failed", e);
                 }
 
-                const utterance = new SpeechSynthesisUtterance(
-                    point.audio_instruction,
-                );
-                utterance.lang = "ro-RO";
-                utterance.rate = 1;
-
                 setTimeout(() => {
-                    globalThis.speechSynthesis.speak(utterance);
+                    speakInstruction(point.audio_instruction || "");
                 }, 150);
             }
         });
