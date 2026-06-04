@@ -1193,7 +1193,12 @@ const useAudioNavigation = (
                 utterance.rate = 1;
 
                 setTimeout(() => {
-                    globalThis.speechSynthesis.speak(utterance);
+                    const win = globalThis as any;
+                    if (win.AndroidInterface && win.AndroidInterface.speak) {
+                        win.AndroidInterface.speak(point.audio_instruction);
+                    } else if (globalThis.speechSynthesis) {
+                        globalThis.speechSynthesis.speak(utterance);
+                    }
                 }, 150);
             }
         });

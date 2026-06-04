@@ -55,7 +55,7 @@ export const useNetworkState = (): void => {
                     return;
                 }
 
-                const res = await fetch("/api/v1/telemetry/ping", {
+                const res = await fetch(`${getApiBaseUrl()}/api/v1/telemetry/ping`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -66,10 +66,12 @@ export const useNetworkState = (): void => {
                         deviceId,
                         storeId,
                         itemId: firstItem.id,
+                        triggerType: "BACKGROUND",
                         lat: userLocation.lat,
                         lng: userLocation.lng,
                         accuracyMeters: 10.0,
                         timestamp: Date.now(),
+                        pingId: crypto.randomUUID(),
                     }),
                     signal: AbortSignal.timeout(5000),
                 });

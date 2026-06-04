@@ -955,6 +955,12 @@ const StoreMap: React.FC<StoreMapProps> = ({
         if (routeWarnings.length > 0) {
             setDismissedWarnings(false);
             const timer = setTimeout(() => {
+                const win = globalThis as any;
+                if (win.AndroidInterface && win.AndroidInterface.speak) {
+                    win.AndroidInterface.speak(routeWarnings.join(", "));
+                } else if (globalThis.speechSynthesis) {
+                    globalThis.speechSynthesis.speak(new SpeechSynthesisUtterance(routeWarnings.join(", ")));
+                }
                 setDismissedWarnings(true);
             }, 5000);
             return () => clearTimeout(timer);
