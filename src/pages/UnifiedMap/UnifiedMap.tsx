@@ -2055,12 +2055,17 @@ const UnifiedMap: React.FC = () => {
 
                         <TileLayer
                             key={mapTheme}
-                            attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+                            attribution={
+                                mapTheme === "dark"
+                                    ? "Esri, TomTom, Garmin, GeoTechnologies, Inc | METI/NASA | USGS"
+                                    : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
+                            }
                             url={
                                 mapTheme === "dark"
-                                    ? "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
-                                    : "https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png"
+                                    ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                                    : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                             }
+                            maxNativeZoom={mapTheme === "dark" ? 16 : 19}
                         />
                         <MapEvents />
                         <MapController
