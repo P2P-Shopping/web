@@ -2,59 +2,92 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { speakInstruction } from "./ttsService";
 
 describe("ttsService", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-    let originalAndroidInterface: any;
-    // biome-ignore lint/suspicious/noExplicitAny
-    let originalSpeechSynthesis: any;
-    // biome-ignore lint/suspicious/noExplicitAny
-    let originalSpeechSynthesisUtterance: any;
+    let originalAndroidInterface: Window["AndroidInterface"];
+    let originalSpeechSynthesis: SpeechSynthesis | undefined;
+    let originalSpeechSynthesisUtterance: typeof SpeechSynthesisUtterance;
 
     beforeEach(() => {
-        // Save original globals
-        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-        originalAndroidInterface = (globalThis as any).AndroidInterface;
+        originalAndroidInterface = (
+            globalThis as unknown as {
+                AndroidInterface?: Window["AndroidInterface"];
+            }
+        ).AndroidInterface;
         originalSpeechSynthesis = globalThis.speechSynthesis;
-        // biome-ignore lint/suspicious/noExplicitAny
-        originalSpeechSynthesisUtterance = (globalThis as any)
-            .SpeechSynthesisUtterance;
+        originalSpeechSynthesisUtterance = (
+            globalThis as unknown as {
+                SpeechSynthesisUtterance: typeof SpeechSynthesisUtterance;
+            }
+        ).SpeechSynthesisUtterance;
 
-        // Mock SpeechSynthesisUtterance
-        // biome-ignore lint/suspicious/noExplicitAny
-        (globalThis as any).SpeechSynthesisUtterance = class {
+        (
+            globalThis as unknown as Record<string, unknown>
+        ).SpeechSynthesisUtterance = class MockUtterance
+            implements SpeechSynthesisUtterance
+        {
             text: string;
             lang: string = "";
             rate: number = 1;
+            pitch: number = 1;
+            volume: number = 1;
+            voice: SpeechSynthesisVoice | null = null;
             constructor(text: string) {
                 this.text = text;
+            }
+            onstart: ((event: SpeechSynthesisEvent) => void) | null = null;
+            onend: ((event: SpeechSynthesisEvent) => void) | null = null;
+            onerror: ((event: SpeechSynthesisErrorEvent) => void) | null = null;
+            onpause: ((event: SpeechSynthesisEvent) => void) | null = null;
+            onresume: ((event: SpeechSynthesisEvent) => void) | null = null;
+            onmark: ((event: SpeechSynthesisEvent) => void) | null = null;
+            onboundary: ((event: SpeechSynthesisEvent) => void) | null = null;
+            addEventListener<K extends keyof SpeechSynthesisUtteranceEventMap>(
+                _type: K,
+                _listener: (
+                    this: SpeechSynthesisUtterance,
+                    ev: SpeechSynthesisUtteranceEventMap[K],
+                ) => void,
+            ): void {}
+            removeEventListener<
+                K extends keyof SpeechSynthesisUtteranceEventMap,
+            >(
+                _type: K,
+                _listener: (
+                    this: SpeechSynthesisUtterance,
+                    ev: SpeechSynthesisUtteranceEventMap[K],
+                ) => void,
+            ): void {}
+            dispatchEvent(): boolean {
+                return true;
             }
         };
     });
 
     afterEach(() => {
-        // Restore globals
-        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-        (globalThis as any).AndroidInterface = originalAndroidInterface;
+        (globalThis as unknown as Record<string, unknown>).AndroidInterface =
+            originalAndroidInterface;
         globalThis.speechSynthesis = originalSpeechSynthesis;
-        // biome-ignore lint/suspicious/noExplicitAny
-        (globalThis as any).SpeechSynthesisUtterance =
-            originalSpeechSynthesisUtterance;
+        (
+            globalThis as unknown as Record<string, unknown>
+        ).SpeechSynthesisUtterance = originalSpeechSynthesisUtterance;
         vi.restoreAllMocks();
     });
 
     it("should not do anything if instruction is empty", () => {
-        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-        (globalThis as any).AndroidInterface = { speak: vi.fn() };
+        (globalThis as unknown as Record<string, unknown>).AndroidInterface = {
+            speak: vi.fn(),
+        };
         speakInstruction("");
         expect(
-            // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-            (globalThis as any).AndroidInterface.speak,
+            (globalThis as unknown as Record<string, { speak?: unknown }>)
+                .AndroidInterface.speak,
         ).not.toHaveBeenCalled();
     });
 
     it("should use AndroidInterface if available", () => {
         const mockSpeak = vi.fn();
-        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-        (globalThis as any).AndroidInterface = { speak: mockSpeak };
+        (globalThis as unknown as Record<string, unknown>).AndroidInterface = {
+            speak: mockSpeak,
+        };
 
         speakInstruction("Salutare");
 
@@ -63,12 +96,13 @@ describe("ttsService", () => {
     });
 
     it("should fallback to speechSynthesis if AndroidInterface is not available", () => {
-        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-        (globalThis as any).AndroidInterface = undefined;
+        (globalThis as unknown as Record<string, unknown>).AndroidInterface =
+            undefined;
 
         const mockSpeak = vi.fn();
-        // biome-ignore lint/suspicious/noExplicitAny
-        globalThis.speechSynthesis = { speak: mockSpeak } as any;
+        globalThis.speechSynthesis = {
+            speak: mockSpeak,
+        } as unknown as SpeechSynthesis;
 
         speakInstruction("Merge fallback");
 
@@ -80,10 +114,10 @@ describe("ttsService", () => {
     });
 
     it("should not throw if no TTS is available", () => {
-        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-        (globalThis as any).AndroidInterface = undefined;
-        // biome-ignore lint/suspicious/noExplicitAny: Android interface is injected at runtime
-        (globalThis as any).speechSynthesis = undefined;
+        (globalThis as unknown as Record<string, unknown>).AndroidInterface =
+            undefined;
+        (globalThis as unknown as Record<string, unknown>).speechSynthesis =
+            undefined;
 
         expect(() => speakInstruction("Nimic")).not.toThrow();
     });
